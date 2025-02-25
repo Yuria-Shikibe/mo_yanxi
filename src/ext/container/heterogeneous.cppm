@@ -5,7 +5,7 @@ module;
 export module ext.heterogeneous;
 
 import std;
-import ext.meta_programming;
+import mo_yanxi.meta_programming;
 
 export namespace mo_yanxi::transparent{
 	template <typename T, typename Proj, typename Comp = std::less<std::invoke_result_t<Proj, const T&>>>

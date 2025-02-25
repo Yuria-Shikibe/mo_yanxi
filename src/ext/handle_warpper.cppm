@@ -1,4 +1,4 @@
-export module ext.handle_wrapper;
+export module mo_yanxi.handle_wrapper;
 import std;
 
 export namespace mo_yanxi{
@@ -101,6 +101,7 @@ export namespace mo_yanxi{
 		}
 
 		[[nodiscard]] constexpr const T* as_data() const noexcept{ return &handle; }
+		[[nodiscard]] constexpr T* as_data() noexcept{ return &handle; }
 
 		constexpr dependency(const dependency& other) = delete;
 
@@ -118,11 +119,6 @@ export namespace mo_yanxi{
 			return *this;
 		}
 
-		constexpr dependency& operator=(const T& other) noexcept{
-			if(this->handle == other) return *this;
-			return this->operator=(dependency{other});
-		}
-
 		constexpr friend bool operator==(const dependency& lhs, const dependency& rhs) noexcept requires (std::equality_comparable<T>) = default;
 		constexpr friend bool operator==(const dependency& lhs, const T& rhs) noexcept requires (std::equality_comparable<T>){
 			return lhs.handle == rhs;
@@ -130,4 +126,10 @@ export namespace mo_yanxi{
 			return rhs.handle == lhs;
 		}
 	};
+
+	template <typename T>
+	using exclusive_handle_member = dependency<T>;
+
+	template <typename T>
+	using exclusive_handle = wrapper<T>;
 }

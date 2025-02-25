@@ -1,16 +1,17 @@
 add_rules("mode.debug", "mode.release")
 
-set_toolchains("msvc")
-set_plat("msvc")
+-- set_toolchains("msvc", {
+--      vs_toolset = "v143"
+--  })
+
+set_arch("x64")
 set_policy("build.ccache", true)
+set_runtimes("MD")
 
 if is_mode("debug") then
-    set_symbols("debug")   -- 生成调试符号
-    set_optimize("none")   -- 禁用优化
---     set_policy("build.sanitizer.address")    -- AddressSanitizer（内存错误）
---     set_policy("build.sanitizer.leak")    -- AddressSanitizer（内存错误）
---     set_policy("build.sanitizer.thread")    -- AddressSanitizer（内存错误）
---     set_policy("build.sanitizer.undefined")    -- AddressSanitizer（内存错误）
+    add_defines("DEBUG_CHECK=1")
+else
+    add_defines("DEBUG_CHECK=0")
 end
 
 set_warnings("all")
@@ -36,14 +37,17 @@ target("mo_yanxi")
     add_cxflags("/EHsc")
     add_cxflags("/diagnostics:column")
     add_cxflags("/arch:AVX2")
+
     add_files("src/**.cpp")
     add_files("src/**.cppm")
     add_files("src/**.ixx")
 
-
     add_packages("glfw")
+    add_packages("lunasvg")
 
+    add_includedirs("VulkanMemoryAllocator/include")
     add_includedirs("includes")
+
 
     -- Windows 平台特定配置
     if is_plat("windows") then

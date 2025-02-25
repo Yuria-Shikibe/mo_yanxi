@@ -2,7 +2,7 @@
 // Created by Matrix on 2024/9/9.
 //
 
-export module ext.algo.string_parse;
+export module mo_yanxi.algo.string_parse;
 
 import std;
 

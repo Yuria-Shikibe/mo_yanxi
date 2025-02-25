@@ -6,7 +6,7 @@ export module ext.json;
 
 import std;
 import ext.heterogeneous.open_addr_hash;
-import ext.meta_programming;
+import mo_yanxi.meta_programming;
 
 namespace mo_yanxi::json{
 	export struct parse_string_t{};

@@ -1,7 +1,7 @@
 export module ext.type_map;
 
 import std;
-import ext.meta_programming;
+import mo_yanxi.meta_programming;
 
 export namespace mo_yanxi{
 	template <typename T, typename... Ts>

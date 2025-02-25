@@ -2,7 +2,7 @@ export module mo_yanxi.concepts;
 
 import std;
 
-export import ext.meta_programming;
+export import mo_yanxi.meta_programming;
 
 namespace mo_yanxi {
 	export

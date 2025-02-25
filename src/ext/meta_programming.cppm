@@ -1,4 +1,4 @@
-export module ext.meta_programming;
+export module mo_yanxi.meta_programming;
 
 import std;
 

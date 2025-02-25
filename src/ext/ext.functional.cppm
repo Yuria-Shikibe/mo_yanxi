@@ -5,7 +5,7 @@
 export module ext.func_initialzer;
 
 import std;
-export import ext.meta_programming;
+export import mo_yanxi.meta_programming;
 
 namespace mo_yanxi{
 	export

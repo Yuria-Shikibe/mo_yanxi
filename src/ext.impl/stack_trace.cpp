@@ -1,10 +1,9 @@
-module ext.stack_trace;
+module mo_yanxi.stack_trace;
 
-import ext.algo.string_parse;
-import ext.meta_programming;
+import mo_yanxi.algo.string_parse;
+import mo_yanxi.meta_programming;
 
-void mo_yanxi::print_stack_trace(std::ostream& ss, unsigned skip){
-	const auto currentStacktrace = std::stacktrace::current();
+void mo_yanxi::print_stack_trace(std::ostream& ss, unsigned skip, const std::stacktrace& currentStacktrace){
 	std::println(ss, "Stack Trace: ");
 
 	for (const auto & [i, stacktrace] : currentStacktrace
