@@ -1,24 +1,28 @@
 add_rules("mode.debug", "mode.release")
 
--- set_toolchains("msvc", {
---      vs_toolset = "v143"
---  })
-
 set_arch("x64")
+set_policy("build.c++.modules", true)
 set_policy("build.ccache", true)
-set_runtimes("MD")
 
 if is_mode("debug") then
+    set_runtimes("MDd")
     add_defines("DEBUG_CHECK=1")
 else
+    set_runtimes("MD")
     add_defines("DEBUG_CHECK=0")
 end
 
 set_warnings("all")
-set_encodings("utf-8")  -- 确保路径无乱码
-
+set_encodings("utf-8")
 
 add_requires("glfw")
+add_requires("freetype")
+
+local msvc_path = "D:/lib/msvc/VC/Tools/MSVC/14.44.34823"
+set_toolchains("msvc")
+set_toolset("cc", path.join(msvc_path, "/bin/Hostx64/x64/cl.exe"))
+set_toolset("cxx", path.join(msvc_path, "/bin/Hostx64/x64/cl.exe"))
+add_includedirs(path.join(msvc_path, "/include"))
 
 
 target("mo_yanxi")
@@ -26,24 +30,29 @@ target("mo_yanxi")
     set_extension(".exe")
     set_languages("c++23")
 
-    set_policy("build.c++.modules", true)
 
     if is_plat("windows") then
         add_links("kernel32", "user32")  -- Windows API库
         add_syslinks("advapi32", "shell32")
     end
 
+    if is_mode("debug") then
+        add_defines("_DEBUG")
+        add_cxflags("/RTCsu", { force = true })
+    end
+
     add_cxflags("/FC", { force = true })
-    add_cxflags("/EHsc")
     add_cxflags("/diagnostics:column")
     add_cxflags("/arch:AVX2")
 
-    add_files("src/**.cpp")
     add_files("src/**.cppm")
     add_files("src/**.ixx")
+    add_files("src/**.cpp")
 
     add_packages("glfw")
-    add_packages("lunasvg")
+    add_packages("freetype")
+--     add_packages("lunasvg")
+--     add_packages("volk")
 
     add_includedirs("VulkanMemoryAllocator/include")
     add_includedirs("includes")
@@ -72,7 +81,7 @@ target("mo_yanxi")
         add_links("vulkan-1")
 
         -- 如果需要 shaderc 等额外库，可以添加：
-        add_links("shaderc_combined")
+        add_links("shaderc_shared")
     end
 
 --

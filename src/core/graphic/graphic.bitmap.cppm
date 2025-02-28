@@ -1,12 +1,11 @@
 module;
 
-#include <cassert>
-
 export module mo_yanxi.graphic.bitmap;
 
 export import mo_yanxi.math.vector2;
-import mo_yanxi.concepts;
+
 import std;
+import mo_yanxi.concepts;
 import mo_yanxi.dim2.tile;
 
 namespace mo_yanxi::graphic{
@@ -88,9 +87,11 @@ namespace mo_yanxi::graphic{
         [[nodiscard]] explicit bitmap(const std::string& path) : bitmap{std::string_view{path}}{}
         [[nodiscard]] explicit bitmap(const std::filesystem::path& path) : bitmap(path.string()) {}
 
-        [[nodiscard]] constexpr extent_type size2D() const noexcept{
-            return tile::size2D<extent_type>();
+        [[nodiscard]] constexpr extent_type extent() const noexcept{
+            return tile::extent<extent_type>();
         }
+
+        using tile::extent;
 
         void write(std::string_view path, bool autoCreateFile = false) const;
 

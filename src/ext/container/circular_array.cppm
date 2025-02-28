@@ -1,4 +1,4 @@
-export module ext.circular_array;
+export module mo_yanxi.circular_array;
 
 import std;
 

@@ -1,3 +1,7 @@
+module;
+
+#include <cassert>
+
 export module mo_yanxi.handle_wrapper;
 import std;
 
@@ -42,6 +46,12 @@ export namespace mo_yanxi{
 		}
 
 	public:
+		template <typename Ty>
+		[[nodiscard]] constexpr decltype(auto) operator*(this Ty&& self) noexcept(
+			requires(T t){ requires noexcept(*std::forward_like<Ty>(t)); }){
+			assert(static_cast<bool>(self));
+			return *std::forward_like<Ty>(self.handle);
+		}
 
 		[[nodiscard]] constexpr explicit(false) operator T() const noexcept{ return handle; }
 
@@ -98,6 +108,13 @@ export namespace mo_yanxi{
 			}else{
 				return std::addressof(handle);
 			}
+		}
+
+		template <typename Ty>
+		[[nodiscard]] constexpr decltype(auto) operator*(this Ty&& self) noexcept(
+			requires(T t){ requires noexcept( *std::forward_like<Ty>(t)); }){
+			assert(static_cast<bool>(self));
+			return *std::forward_like<Ty>(self.handle);
 		}
 
 		[[nodiscard]] constexpr const T* as_data() const noexcept{ return &handle; }

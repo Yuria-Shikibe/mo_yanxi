@@ -863,6 +863,10 @@ export namespace mo_yanxi::math{
 				return vector2<TN>{static_cast<TN>(x), static_cast<TN>(y)};
 			}
 		}
+		template <spec_of<vector2> TN>
+		[[nodiscard]] FORCE_INLINE constexpr auto as() const noexcept{
+			return as<typename TN::value_type>();
+		}
 
 		template <mo_yanxi::number TN>
 		[[nodiscard]] FORCE_INLINE constexpr explicit operator vector2<TN>() const noexcept{
@@ -959,6 +963,8 @@ export namespace mo_yanxi::math{
 	using nor_vec2 = vector2<float>;
 
 	using point2 = vector2<int>;
+	using iszie2 = vector2<int>;
+	using uszie2 = vector2<unsigned int>;
 	using upoint2 = vector2<unsigned int>;
 	using short_point2 = vector2<short>;
 	using ushort_point2 = vector2<unsigned short>;

@@ -1,7 +1,7 @@
 module;
 
 #include <vulkan/vulkan.h>
-#include "../src/core/vulkan/util/vk_loader.hpp"
+#include "../core/vulkan/vk_loader.hpp"
 
 module mo_yanxi.vk.validation;
 
@@ -21,7 +21,7 @@ VkBool32 mo_yanxi::vk::validationCallback(
 	std::println(std::cerr, "[Vulkan] ID:{} | {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName);
 
 	std::println(std::cerr, "{}", str);
-	print_stack_trace(std::cerr, 2);
+	print_stack_trace(std::cerr, 1);
 
 	return false;
 }

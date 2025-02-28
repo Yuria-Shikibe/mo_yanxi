@@ -44,51 +44,8 @@ namespace mo_yanxi::vk{
 	}
 
 	export
-	template <typename T>
-		requires requires(T& t){
-			t.srcAccessMask;
-			t.dstAccessMask;
-			t.srcStageMask;
-			t.dstStageMask;
-
-			std::swap(t.srcAccessMask, t.dstAccessMask);
-			std::swap(t.srcStageMask, t.dstStageMask);
-		}
-	void swapStage(T& t){
-		std::swap(t.srcAccessMask, t.dstAccessMask);
-		std::swap(t.srcStageMask, t.dstStageMask);
-	}
-
-	export
-	template <>
-	void swapStage(VkImageMemoryBarrier2& t){
-		std::swap(t.srcAccessMask, t.dstAccessMask);
-		std::swap(t.srcStageMask, t.dstStageMask);
-		std::swap(t.srcQueueFamilyIndex, t.dstQueueFamilyIndex);
-		std::swap(t.oldLayout, t.newLayout);
-	}
-
-	export
-	template <std::ranges::range Rng>
-		requires (std::same_as<std::ranges::range_reference_t<Rng>, VkImageMemoryBarrier2&>)
-	void swapStage(Rng&& arr){
-		for (VkImageMemoryBarrier2& t : arr){
-			swapStage(t);
-		}
-	}
-
-	export
-	template <std::ranges::range Rng>
-		requires (std::same_as<std::ranges::range_reference_t<Rng>, VkBufferMemoryBarrier2&>)
-	void swapStage(Rng&& arr){
-		for (VkBufferMemoryBarrier2& t : arr){
-			swapStage<VkBufferMemoryBarrier2>(t);
-		}
-	}
-
-	export
 	template <std::size_t size>
-	void submitCommand(VkQueue queue, const std::array<VkCommandBuffer, size>& commandBuffer, VkFence fence = nullptr,
+	void submit_command(VkQueue queue, const std::array<VkCommandBuffer, size>& commandBuffer, VkFence fence = nullptr,
 			VkSemaphore toWait = nullptr, VkPipelineStageFlags2 waitStage = VK_PIPELINE_STAGE_2_NONE,
 			VkSemaphore toSignal = nullptr, VkPipelineStageFlags2 signalStage = VK_PIPELINE_STAGE_2_NONE
 			){
@@ -135,20 +92,23 @@ namespace mo_yanxi::vk{
 			submitInfo.pSignalSemaphoreInfos = &semaphoreSubmitInfo_Signal;
 		}
 
-		vkQueueSubmit2(queue, 1, &submitInfo, fence);
+		if(const auto rst = vkQueueSubmit2(queue, 1, &submitInfo, fence)){
+			// std::println(std::cerr, "[Vulkan] [{}] Failed to submit the command buffer!", static_cast<int>(rst));
+			throw vk_error{rst, "Failed To Submit Command"};
+		}
 	}
 
 	export
-	void submitCommand(VkQueue queue, const std::span<VkCommandBuffer> commandBuffer, VkFence fence = nullptr,
-	                   VkSemaphore toWait = nullptr, VkPipelineStageFlags2 waitStage = VK_PIPELINE_STAGE_2_NONE,
-	                   VkSemaphore toSignal = nullptr, VkPipelineStageFlags2 signalStage = VK_PIPELINE_STAGE_2_NONE
+	void submit_command(VkQueue queue, const std::span<VkCommandBuffer> commandBuffer, VkFence fence = nullptr,
+	                   VkSemaphore toWait = nullptr, const VkPipelineStageFlags2 wait_before = VK_PIPELINE_STAGE_2_NONE,
+	                   VkSemaphore toSignal = nullptr, const VkPipelineStageFlags2 signal_after = VK_PIPELINE_STAGE_2_NONE
 	){
 		if(commandBuffer.size() == 0)return;
 		VkSemaphoreSubmitInfo semaphoreSubmitInfo_Wait{
 				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
 				.semaphore = toWait,
 				.value = 0,
-				.stageMask = waitStage,
+				.stageMask = wait_before,
 				.deviceIndex = 0
 			};
 
@@ -156,7 +116,7 @@ namespace mo_yanxi::vk{
 				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
 				.semaphore = toSignal,
 				.value = 0,
-				.stageMask = signalStage,
+				.stageMask = signal_after,
 				.deviceIndex = 0
 			};
 
@@ -190,17 +150,17 @@ namespace mo_yanxi::vk{
 	}
 
 	export
-	void submitCommand(VkQueue queue, VkCommandBuffer commandBuffer, VkFence fence = nullptr,
-		VkSemaphore toWait = nullptr, VkPipelineStageFlags2 waitStage = VK_PIPELINE_STAGE_2_NONE,
-		VkSemaphore toSignal = nullptr, VkPipelineStageFlags2 signalStage = VK_PIPELINE_STAGE_2_NONE
+	void submit_command(VkQueue queue, VkCommandBuffer commandBuffer, VkFence fence = nullptr,
+		VkSemaphore toWait = nullptr, const VkPipelineStageFlags2 wait_before = VK_PIPELINE_STAGE_2_NONE,
+		VkSemaphore toSignal = nullptr, const VkPipelineStageFlags2 signal_after = VK_PIPELINE_STAGE_2_NONE
 		){
 
-		submitCommand(queue, std::array{commandBuffer}, fence, toWait, waitStage, toSignal, signalStage);
+		submit_command(queue, std::array{commandBuffer}, fence, toWait, wait_before, toSignal, signal_after);
 	}
 
 	export
 	template <std::size_t W, std::size_t S>
-	void submitCommand(VkQueue queue, VkCommandBuffer commandBuffer, VkFence fence = nullptr,
+	void submit_command(VkQueue queue, VkCommandBuffer commandBuffer, VkFence fence = nullptr,
 		const std::array<VkSemaphore, W> toWait = {}, const std::array<VkPipelineStageFlags2, W> waitStage = {},
 		const std::array<VkSemaphore, S> toSignal = {}, const std::array<VkPipelineStageFlags2, S> signalStage = {}
 		){

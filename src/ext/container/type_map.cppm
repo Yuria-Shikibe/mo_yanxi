@@ -1,4 +1,4 @@
-export module ext.type_map;
+export module mo_yanxi.type_map;
 
 import std;
 import mo_yanxi.meta_programming;

@@ -10,7 +10,7 @@ import mo_yanxi.math;
 import mo_yanxi.math.vector4;
 import mo_yanxi.math.vector4;
 
-namespace mo_yanxi{
+namespace mo_yanxi::graphic{
 	/**
 	 * \brief  32Bits for 4 u byte[0, 255]
 	 * \code
@@ -54,15 +54,6 @@ namespace mo_yanxi{
 		}
 
 	private:
-		FORCE_INLINE constexpr color& clamp() noexcept{
-			r = math::clamp(r);
-			g = math::clamp(g);
-			b = math::clamp(b);
-			a = math::clamp(a);
-
-			return *this;
-		}
-
 		template <bool doClamp>
 		FORCE_INLINE constexpr color& clampCond() noexcept{
 			if constexpr(doClamp){
@@ -351,14 +342,16 @@ namespace mo_yanxi{
 			return clampCond<doClamp>();
 		}
 
-		template <bool doClamp = true>
-		FORCE_INLINE constexpr color& lerp(const color& target, const float t) noexcept{
-			math::lerp_inplace(r, target.r, t);
-			math::lerp_inplace(g, target.g, t);
-			math::lerp_inplace(b, target.b, t);
-			math::lerp_inplace(a, target.a, t);
-			return clampCond<doClamp>();
-		}
+		using vector4::lerp;
+
+		// template <bool doClamp = true>
+		// FORCE_INLINE constexpr color& lerp(const color& target, const float t) noexcept{
+		// 	math::lerp_inplace(r, target.r, t);
+		// 	math::lerp_inplace(g, target.g, t);
+		// 	math::lerp_inplace(b, target.b, t);
+		// 	math::lerp_inplace(a, target.a, t);
+		// 	return clampCond<doClamp>();
+		// }
 
 		template <bool doClamp = true>
 		FORCE_INLINE constexpr color& lerpRGB(const color& target, const float t) noexcept{
@@ -706,15 +699,15 @@ namespace mo_yanxi{
 
 export
 template <>
-struct ::std::hash<mo_yanxi::color>{
-	size_t operator()(const mo_yanxi::color& obj) const noexcept{
+struct ::std::hash<mo_yanxi::graphic::color>{
+	size_t operator()(const mo_yanxi::graphic::color& obj) const noexcept{
 		return obj.hash_value();
 	}
 };
 
 export
 template <>
-struct ::std::formatter<mo_yanxi::color>{
+struct ::std::formatter<mo_yanxi::graphic::color>{
 	bool haveAlpha{false};
 	bool haveWrapper{false};
 
@@ -736,8 +729,8 @@ struct ::std::formatter<mo_yanxi::color>{
 		return it;
 	}
 
-	auto format(const mo_yanxi::color& c, auto& context) const{
-		using mo_yanxi::color;
+	auto format(const mo_yanxi::graphic::color& c, auto& context) const{
+		using mo_yanxi::graphic::color;
 		using ColorBits = color::rgba8_bits;
 		if(haveAlpha){
 			if(haveWrapper){

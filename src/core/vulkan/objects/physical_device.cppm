@@ -2,7 +2,7 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.object.physical_device;
+export module mo_yanxi.vk.physical_device;
 
 import std;
 
@@ -14,10 +14,11 @@ import mo_yanxi.meta_programming;
 
 
 namespace mo_yanxi::vk{
-	constexpr std::array device_extensions{
+	export constexpr std::array device_extensions{
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-		VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
+		// VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
 		VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+		VK_EXT_MESH_SHADER_EXTENSION_NAME,
 		// VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
 	};
 
@@ -32,8 +33,8 @@ namespace mo_yanxi::vk{
 			void create_queues(VkDevice device, std::vector<VkQueue>& queues) const{
 				queues.resize(count);
 
-				for (auto && [i, vkQueue] : queues | std::views::enumerate){
-					vkGetDeviceQueue(device, index, i, queues.data() + i);
+				for (auto && [i, _] : queues | std::views::enumerate){
+					vkGetDeviceQueue(device, index, static_cast<std::uint32_t>(i), queues.data() + i);
 				}
 			}
 
@@ -76,7 +77,7 @@ namespace mo_yanxi::vk{
 
 				//Obtain present queue
 				VkBool32 presentSupport = false;
-				vkGetPhysicalDeviceSurfaceSupportKHR(device, index, surface, &presentSupport);
+				vkGetPhysicalDeviceSurfaceSupportKHR(device, static_cast<std::uint32_t>(index), surface, &presentSupport);
 				if(presentSupport){
 					present = {static_cast<std::uint32_t>(index), 1};
 				}
@@ -93,6 +94,7 @@ namespace mo_yanxi::vk{
 		}
 	};
 
+	export
 	struct physical_device{
 		VkPhysicalDevice device{};
 
@@ -141,7 +143,7 @@ namespace mo_yanxi::vk{
 
 		[[nodiscard]] bool check_extension_support(const auto& requiredExtensions) const{
 			if(auto [availableExtensions, rst] = enumerate(vkEnumerateDeviceExtensionProperties, device, nullptr); rst){
-				throw exception{rst, "Failed to get device extensions"};
+				throw vk_error{rst, "Failed to get device extensions"};
 			}else{
 				return vk::check_support(requiredExtensions, availableExtensions, &VkExtensionProperties::extensionName);
 			}

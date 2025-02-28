@@ -510,6 +510,8 @@ export namespace mo_yanxi::math{
 		FORCE_INLINE constexpr explicit operator Ty() const noexcept{
 			return Ty{x, y};
 		}
+
+		constexpr friend bool operator==(const vector3& lhs, const vector3& rhs) noexcept = default;
 	};
 
 	using Vec3 = vector3<float>;

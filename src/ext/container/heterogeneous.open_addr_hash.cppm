@@ -4,7 +4,7 @@ module;
 
 export module ext.heterogeneous.open_addr_hash;
 
-export import ext.heterogeneous;
+export import mo_yanxi.heterogeneous;
 export import ext.open_addr_hash_map;
 
 import std;

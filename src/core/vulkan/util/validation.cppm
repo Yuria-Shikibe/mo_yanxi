@@ -72,7 +72,7 @@ namespace mo_yanxi::vk{
 				};
 
 				if(auto rst = CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, callback.as_data())){
-					throw exception(rst, "Failed to set up debug callback!");
+					throw vk_error(rst, "Failed to set up debug callback!");
 				}
 
 				std::println("[Vulkan] Validation Callback Setup Succeed: {:#X}", std::bit_cast<std::uintptr_t>(callbackFuncPtr));

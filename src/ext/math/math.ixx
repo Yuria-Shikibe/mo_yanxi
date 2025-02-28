@@ -522,6 +522,7 @@ namespace mo_yanxi::math {
 
 	export
 	template <typename T, typename Prog>
+		requires (!small_object<T>)
 	MATH_ATTR constexpr T lerp(const T& fromValue, const T& toValue, const Prog progress) noexcept {
 		return fromValue + (toValue - fromValue) * progress;
 	}

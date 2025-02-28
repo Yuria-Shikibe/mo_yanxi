@@ -46,29 +46,29 @@ namespace mo_yanxi::math{
 			}
 
 			template <std::derived_from<vector4> D>
-			[[nodiscard]] FORCE_INLINE friend constexpr vector4 operator%(const D& lhs, const D& rhs) noexcept{
+			[[nodiscard]] FORCE_INLINE friend constexpr D operator%(const D& lhs, const D& rhs) noexcept{
 				return {math::mod(lhs.r, rhs.r), math::mod(lhs.g, rhs.g), math::mod(lhs.b, rhs.b), math::mod(lhs.a, rhs.a)};
 			}
 
 			template <std::derived_from<vector4> D>
-			[[nodiscard]] FORCE_INLINE friend constexpr vector4 operator*(const D& lhs, const T val) noexcept{
+			[[nodiscard]] FORCE_INLINE friend constexpr D operator*(const D& lhs, const T val) noexcept{
 				return {lhs.r * val, lhs.g * val, lhs.b * val, lhs.a * val};
 			}
 
 
 			template <std::derived_from<vector4> D>
-			[[nodiscard]] FORCE_INLINE friend constexpr vector4 operator/(const D& lhs, const T val) noexcept{
+			[[nodiscard]] FORCE_INLINE friend constexpr D operator/(const D& lhs, const T val) noexcept{
 				return {lhs.r / val, lhs.g / val, lhs.b / val, lhs.a / val};
 			}
 
 			template <std::derived_from<vector4> D>
-			[[nodiscard]] FORCE_INLINE friend constexpr vector4 operator%(const D& lhs, const T val) noexcept{
+			[[nodiscard]] FORCE_INLINE friend constexpr D operator%(const D& lhs, const T val) noexcept{
 				return {math::mod(lhs.r, val), math::mod(lhs.g, val), math::mod(lhs.b, val), math::mod(lhs.a, val)};
 			}
 
 
 			template <std::derived_from<vector4> D>
-			FORCE_INLINE friend constexpr vector4& operator+=(const D& lhs, const D& rhs) noexcept{
+			FORCE_INLINE friend constexpr D& operator+=(const D& lhs, const D& rhs) noexcept{
 				lhs.r += rhs.r;
 				lhs.g += rhs.g;
 				lhs.b += rhs.b;
@@ -77,7 +77,7 @@ namespace mo_yanxi::math{
 			}
 
 			template <std::derived_from<vector4> D>
-			FORCE_INLINE friend constexpr vector4& operator-=(const D& lhs, const D& rhs) noexcept{
+			FORCE_INLINE friend constexpr D& operator-=(const D& lhs, const D& rhs) noexcept{
 				lhs.r -= rhs.r;
 				lhs.g -= rhs.g;
 				lhs.b -= rhs.b;
@@ -86,7 +86,7 @@ namespace mo_yanxi::math{
 			}
 
 			template <std::derived_from<vector4> D>
-			FORCE_INLINE friend constexpr vector4& operator*=(const D& lhs, const D& rhs) noexcept{
+			FORCE_INLINE friend constexpr D& operator*=(const D& lhs, const D& rhs) noexcept{
 				lhs.r *= rhs.r;
 				lhs.g *= rhs.g;
 				lhs.b *= rhs.b;
@@ -95,7 +95,7 @@ namespace mo_yanxi::math{
 			}
 
 			template <std::derived_from<vector4> D>
-			FORCE_INLINE friend constexpr vector4& operator/=(const D& lhs, const D& rhs) noexcept{
+			FORCE_INLINE friend constexpr D& operator/=(const D& lhs, const D& rhs) noexcept{
 				lhs.r /= rhs.r;
 				lhs.g /= rhs.g;
 				lhs.b /= rhs.b;
@@ -104,7 +104,7 @@ namespace mo_yanxi::math{
 			}
 
 			template <std::derived_from<vector4> D>
-			FORCE_INLINE friend constexpr vector4& operator%=(const D& lhs, const D& rhs) noexcept{
+			FORCE_INLINE friend constexpr D& operator%=(const D& lhs, const D& rhs) noexcept{
 				lhs.r = math::mod(lhs.r, rhs.r);
 				lhs.g = math::mod(lhs.g, rhs.g);
 				lhs.b = math::mod(lhs.b, rhs.b);
@@ -113,7 +113,7 @@ namespace mo_yanxi::math{
 			}
 
 			template <std::derived_from<vector4> D>
-			FORCE_INLINE friend constexpr vector4& operator*=(const D& lhs, const T v) noexcept{
+			FORCE_INLINE friend constexpr D& operator*=(const D& lhs, const T v) noexcept{
 				lhs.r *= v;
 				lhs.g *= v;
 				lhs.b *= v;
@@ -122,7 +122,7 @@ namespace mo_yanxi::math{
 			}
 
 			template <std::derived_from<vector4> D>
-			FORCE_INLINE friend constexpr vector4& operator/=(const D& lhs, const T v) noexcept{
+			FORCE_INLINE friend constexpr D& operator/=(const D& lhs, const T v) noexcept{
 				lhs.r /= v;
 				lhs.g /= v;
 				lhs.b /= v;
@@ -131,7 +131,7 @@ namespace mo_yanxi::math{
 			}
 
 			template <std::derived_from<vector4> D>
-			FORCE_INLINE friend constexpr vector4& operator%=(const D& lhs, const T v) noexcept{
+			FORCE_INLINE friend constexpr D& operator%=(const D& lhs, const T v) noexcept{
 				lhs.r = math::mod(r, v);
 				lhs.g = math::mod(g, v);
 				lhs.b = math::mod(b, v);
@@ -148,28 +148,34 @@ namespace mo_yanxi::math{
 				return *this;
 			}
 
-			FORCE_INLINE constexpr vector4& set(const T val) noexcept{
-				return this->set(val, val, val, val);
+			template <std::derived_from<vector4> S>
+			FORCE_INLINE constexpr S& set(this S& self, const T val) noexcept{
+				return self.set(val, val, val, val);
 			}
 
-			FORCE_INLINE constexpr vector4& set(const_pass_t tgt) noexcept{
-				return this->operator=(tgt);
+			template <std::derived_from<vector4> S>
+			FORCE_INLINE constexpr S& set(this S& self, const_pass_t tgt) noexcept{
+				return (self = tgt);
 			}
 
-			FORCE_INLINE constexpr vector4& lerp(const_pass_t tgt, const floating_point_t alpha) noexcept{
-				return *this = math::lerp(*this, tgt, alpha);
+			template <std::derived_from<vector4> S>
+			FORCE_INLINE constexpr S& lerp(this S& self, const S& tgt, const floating_point_t alpha) noexcept{
+				return self = math::lerp(self, tgt, alpha);
 			}
 
-			constexpr vector4& clamp() noexcept{
-				r = math::clamp(r);
-				g = math::clamp(g);
-				b = math::clamp(b);
-				a = math::clamp(a);
+			template <std::derived_from<vector4> S>
+			FORCE_INLINE constexpr S& clamp(this S& self) noexcept{
+				self.r = math::clamp(self.r);
+				self.g = math::clamp(self.g);
+				self.b = math::clamp(self.b);
+				self.a = math::clamp(self.a);
 
-				return *this;
+				return self;
 			}
 
 			constexpr friend bool operator==(const vector4& lhs, const vector4& rhs) noexcept = default;
 		};
+
+		export using vec4 = vector4<float>;
 	}
 

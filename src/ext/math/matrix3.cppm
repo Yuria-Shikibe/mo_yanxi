@@ -90,7 +90,7 @@ namespace mo_yanxi::math{
 			return inv();
 		}
 
-		FORCE_INLINE constexpr float operator*() const noexcept {
+		FORCE_INLINE constexpr floating_point_t operator*() const noexcept {
 			return det();
 		}
 
@@ -108,7 +108,7 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr trans2_t to_transform() const noexcept{
+		[[nodiscard]] FORCE_INLINE trans2_t to_transform() const noexcept{
 			return trans2_t{get_translation(), get_rotation()};
 		}
 
@@ -278,7 +278,7 @@ namespace mo_yanxi::math{
 			return std::move(ss).str();
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr auto det() const noexcept {
+		[[nodiscard]] FORCE_INLINE constexpr vec3_t::value_type det() const noexcept {
 			return c1.x * c2.y * c3.z + c1.y * c2.z * c3.x + c1.z * c2.x * c3.y - c1.x * c3.y * c2.z - c1.y * c3.z * c2.x - c1.z * c3.x * c2.y;
 		}
 

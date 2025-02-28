@@ -3,17 +3,17 @@ module;
 #include <cassert>
 #include "adapted_attributes.hpp"
 
-export module ext.event;
+export module mo_yanxi.event;
 
 import std;
 import mo_yanxi.concepts;
-import ext.type_map;
-import ext.heterogeneous;
+import mo_yanxi.type_map;
+import mo_yanxi.heterogeneous;
 
 
 //TODO delayed event submitter
-namespace mo_yanxi{
-	export struct event_type{};
+namespace mo_yanxi::events{
+	export struct event_type_tag{};
 
 	export
 	template <typename T>
@@ -73,7 +73,7 @@ namespace mo_yanxi{
 	public:
 		using event_registry::event_registry;
 
-		template <std::derived_from<event_type> T>
+		template <std::derived_from<event_type_tag> T>
 			requires (std::is_final_v<T>)
 		void fire(const T& event) const{
 			checkRegister<T>();
@@ -85,7 +85,7 @@ namespace mo_yanxi{
 			}
 		}
 
-		template <std::derived_from<event_type> T, typename... Args>
+		template <std::derived_from<event_type_tag> T, typename... Args>
 			requires requires(Args&&... args){
 				requires std::is_final_v<T>;
 				T{std::forward<Args>(args)...};
@@ -98,7 +98,7 @@ namespace mo_yanxi{
 	export
 	struct legacy_event_manager : BasicEventManager<std::vector>{
 		// using BasicEventManager<std::vector>::BasicEventManager;
-		template <std::derived_from<event_type> T, std::invocable<const T&> Func>
+		template <std::derived_from<event_type_tag> T, std::invocable<const T&> Func>
 			requires std::is_final_v<T>
 		void on(Func&& func){
 			checkRegister<T>();
@@ -110,10 +110,10 @@ namespace mo_yanxi{
 	};
 
 	export
-	struct LegacyNamedEventManager : BasicEventManager<string_hash_map, LegacyNamedEventManager>{
+	struct legacy_named_event_manager : BasicEventManager<string_hash_map, legacy_named_event_manager>{
 		// using BasicEventManager<StringHashMap, NamedEventManager>::BasicEventManager;
 
-		template <std::derived_from<event_type> T, std::invocable<const T&> Func>
+		template <std::derived_from<event_type_tag> T, std::invocable<const T&> Func>
 			requires std::is_final_v<T>
 		void on(const std::string_view name, Func&& func){
 			checkRegister<T>();
@@ -123,7 +123,7 @@ namespace mo_yanxi{
 			});
 		}
 
-		template <std::derived_from<event_type> T>
+		template <std::derived_from<event_type_tag> T>
 			requires std::is_final_v<T>
 		std::optional<FuncType> erase(const std::string_view name){
 			checkRegister<T>();
@@ -294,11 +294,11 @@ namespace mo_yanxi{
 }
 
 
-namespace mo_yanxi{
+namespace mo_yanxi::events{
 	// using event_erased_func_type = void(const void*);
 	// using T = std::add_const_t<event_erased_func_type>;
 
-	export
+
 	template <template<typename > typename T>
 	using wrapped_func =
 	T<std::conditional_t<
@@ -309,7 +309,7 @@ namespace mo_yanxi{
 	template <
 		template<typename > typename FuncWrapperTy = std::function,
 		template <typename, typename...> typename Container = std::vector,
-		std::indirectly_regular_unary_invocable<std::ranges::iterator_t<Container<wrapped_func<FuncWrapperTy>>>> Proj = std::identity,
+		typename ContainerProj = std::identity,
 		typename... EventTs>
 	struct event_manager_base{
 
@@ -318,13 +318,13 @@ namespace mo_yanxi{
 		}, "invalid function wrapper template type");
 
 		using value_type = wrapped_func<FuncWrapperTy>;
-		using container_type = std::vector<value_type>;
+		using container_type = Container<value_type>;
 		using mapping_type = type_map<container_type, EventTs...>;
 
 	protected:
 		mapping_type events{};
 
-		ADAPTED_NO_UNIQUE_ADDRESS Proj proj{};
+		ADAPTED_NO_UNIQUE_ADDRESS ContainerProj proj{};
 
 	public:
 		template <event_argument T>
@@ -370,7 +370,7 @@ namespace mo_yanxi{
 
 	export
 	template<template<typename > typename FuncWrapperTy = std::function, typename... EventTs>
-	struct named_event_manager : event_manager_base<FuncWrapperTy, string_hash_map, decltype(std::views::values), EventTs...>{
+	struct named_event_manager : event_manager_base<FuncWrapperTy, string_hash_map, std::decay_t<decltype(std::views::values)>, EventTs...>{
 		template <event_argument T, std::invocable<const T&> Func>
 		void on(const std::string_view name, Func&& func){
 			string_hash_map<wrapped_func<FuncWrapperTy>>& tgt = this->template group_at<T>();

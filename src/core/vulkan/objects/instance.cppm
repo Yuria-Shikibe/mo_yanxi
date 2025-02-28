@@ -3,7 +3,7 @@ module;
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-export module mo_yanxi.vk.object.instance;
+export module mo_yanxi.vk.instance;
 
 import mo_yanxi.vk.exception;
 import mo_yanxi.vk.util;
@@ -53,7 +53,7 @@ namespace mo_yanxi::vk{
 	}
 
 	export
-	class instance : public exclusive_handle<VkInstance>{
+	struct instance : exclusive_handle<VkInstance>{
 	public:
 		[[nodiscard]] constexpr instance() = default;
 
@@ -92,7 +92,7 @@ namespace mo_yanxi::vk{
 			createInfo.ppEnabledExtensionNames = extensions.data();
 
 			if(const auto rst = vkCreateInstance(&createInfo, nullptr, &handle)){
-				throw exception(rst, "failed to create vulkan instance!");
+				throw vk_error(rst, "failed to create vulkan instance!");
 			}
 
 			std::println("[Vulkan] Instance Create Succeed: {:#X}", std::bit_cast<std::uintptr_t>(handle));

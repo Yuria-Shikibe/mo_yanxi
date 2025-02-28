@@ -2,7 +2,7 @@ module;
 
 #include "../adapted_attributes.hpp"
 
-export module ext.heterogeneous;
+export module mo_yanxi.heterogeneous;
 
 import std;
 import mo_yanxi.meta_programming;

@@ -331,7 +331,7 @@ export namespace mo_yanxi::dim2{
 		}
 
 		template <position_constructable<size_type> Rst = std::pair<size_type, size_type>>
-		[[nodiscard]] constexpr Rst size2D() const noexcept{
+		[[nodiscard]] constexpr Rst extent() const noexcept{
 			return Rst{width(), height()};
 		}
 

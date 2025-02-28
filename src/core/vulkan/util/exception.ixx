@@ -7,8 +7,8 @@ export module mo_yanxi.vk.exception;
 import std;
 
 namespace mo_yanxi::vk{
-	export struct exception final : std::exception{
-		[[nodiscard]] exception(const VkResult result, const std::string_view msg)
+	export struct vk_error final : std::exception{
+		[[nodiscard]] vk_error(const VkResult result, const std::string_view msg)
 			: std::exception(msg.data(), result), result{result}{
 		}
 
@@ -25,6 +25,20 @@ namespace mo_yanxi::vk{
 		}
 
 		[[nodiscard]] unqualified_error(const std::string_view msg)
+			: std::exception(msg.data()){
+		}
+
+		[[nodiscard]] const char* what() const override{
+			return std::exception::what();
+		}
+	};
+
+	struct ambiguous_error final : std::exception{
+		[[nodiscard]] ambiguous_error() : std::exception("Ambiguous Setting"){
+
+		}
+
+		[[nodiscard]] ambiguous_error(const std::string_view msg)
 			: std::exception(msg.data()){
 		}
 
