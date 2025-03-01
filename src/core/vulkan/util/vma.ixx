@@ -271,7 +271,7 @@ namespace mo_yanxi::vk{
 			vmaUnmapMemory(*allocator, allocation);
 		}
 
-		[[nodiscard]] VkMemoryPropertyFlags get_allocation_prop() const noexcept{
+		[[nodiscard]] VkMemoryPropertyFlags get_allocation_prop_flags() const noexcept{
 			assert(allocator);
 			VkMemoryPropertyFlags flags{};
 			if(allocation)vmaGetAllocationMemoryProperties(*allocator, allocation, &flags);

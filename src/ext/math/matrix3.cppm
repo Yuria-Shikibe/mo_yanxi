@@ -133,18 +133,16 @@ namespace mo_yanxi::math{
 		}
 
 		constexpr matrix3& set_orthogonal(const vec2_t bot_lft, const vec2_t size) noexcept{
-			const float right = bot_lft.x + size.x, top = bot_lft.y + size.y;
+			const auto top_rit = bot_lft + size;
 
-			const float x_orth = 2.0f / size.x;
-			const float y_orth = 2.0f / size.y;
+			const auto orth = ~size * static_cast<vec2_t::floating_point_t>(2.);
 
-			const float tx = -(right + bot_lft.x) / size.x;
-			const float ty = -(top + bot_lft.y) / size.y;
-			return from_scaling(x_orth, y_orth).set_translation(tx, ty);
+			return from_scaling(orth).set_translation(-(top_rit + bot_lft) / size);
 		}
 
 		constexpr matrix3& set_orthogonal_flip_y(vec2_t bot_lft, vec2_t size) noexcept{
-			return set_orthogonal(bot_lft.add_y(size.y), size.flip_y());
+			bot_lft.add_y(size.y);
+			return set_orthogonal(bot_lft, size.flip_y());
 		}
 
 		constexpr matrix3& set_orthogonal(const vec2_t size) noexcept{

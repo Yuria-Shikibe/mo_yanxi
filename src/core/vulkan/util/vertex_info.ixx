@@ -19,19 +19,33 @@ namespace mo_yanxi::vk{
 
 		export
 		struct vertex_bind_info{
+		private:
 			std::array<vertex_attribute, 16> attributes{};
+			std::array<VkVertexInputAttributeDescription, 16> builtin_attr_desc{};
+			std::array<VkVertexInputBindingDescription, 1> builtin_bind_desc{};
+
 			std::uint32_t count{};
 			std::uint32_t stride{};
 
+		public:
 			[[nodiscard]] constexpr vertex_bind_info(
 				const std::uint32_t size, const std::initializer_list<vertex_attribute> attribs) : stride(size){
 				for (const auto & attrib : attribs){
-					attributes[count++] = attrib;
+					attributes[count] = attrib;
+					builtin_attr_desc[count] = {
+						.location = count,
+						.binding = 0,
+						.format = attrib.format,
+						.offset = attrib.offset,
+					};
+					count++;
 				}
+
+				builtin_bind_desc[0] = get_bind_desc();
 			}
 
 		public:
-			[[nodiscard]] VkVertexInputBindingDescription get_bind_desc(
+			[[nodiscard]] constexpr VkVertexInputBindingDescription get_bind_desc(
 				const std::uint32_t binding = 0,
 				const VkVertexInputRate inputRate = VK_VERTEX_INPUT_RATE_VERTEX
 			) const noexcept{
@@ -59,6 +73,14 @@ namespace mo_yanxi::vk{
 							};
 					})
 				| std::ranges::to<std::vector>();
+			}
+
+			[[nodiscard]] std::span<const VkVertexInputAttributeDescription> get_default_attr_desc() const noexcept{
+				return {builtin_attr_desc.data(), count};
+			}
+
+			[[nodiscard]] std::span<const VkVertexInputBindingDescription> get_default_bind_desc() const noexcept{
+				return {builtin_bind_desc.data(), 1};
 			}
 		};
 

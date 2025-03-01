@@ -1,12 +1,74 @@
 module;
 
 #include <cassert>
-// #include <type_traits>
 
-export module ext.algo;
+export module mo_yanxi.algo;
 import mo_yanxi.concepts;
 import std;
 
+
+namespace mo_yanxi::algo{
+	//heap search, fast, but not the best fit
+	export
+	template <
+		std::random_access_iterator It,
+		typename Pred = std::less<>,
+		std::indirectly_unary_invocable<It> Proj = std::identity,
+		typename ValTy>
+		requires requires{
+		requires std::predicate<Pred, std::indirect_result_t<Proj, It>, const ValTy&>;
+		}
+	It unstable_search_heap_upper_bound(It begin, const It end, const ValTy& val, const Pred pred = {}, const Proj proj = {}) noexcept {
+		const auto stride = std::distance(begin, end);
+
+		if(!stride)return end; //empty range
+
+		auto current = begin;
+		if(std::invoke(pred, std::invoke(proj, *current), val)){
+			// val > proj(*current)
+			return end;
+		}
+
+		while(true){
+			const auto dst = std::distance(begin, current);
+
+			if(const auto lchild_idx = dst * 2 + 1; lchild_idx < stride){
+				const auto lchild = begin + lchild_idx;
+				if(!std::invoke(pred, std::invoke(proj, *lchild), val)){
+					//val <= *lchild -> !(val > *lchild)
+					current = lchild;
+					continue;
+				}
+			}
+
+			if(const auto rchild_idx = dst * 2 + 2; rchild_idx < stride){
+				const auto rchild = begin + rchild_idx;
+				if(!std::invoke(pred, std::invoke(proj, *rchild), val)){
+					current = rchild;
+					continue;
+				}
+			}
+
+			//val > both two elements and <= current, then current is the upper bound
+			return current;
+		}
+
+		std::unreachable();
+	}
+
+	export
+	template <
+		std::ranges::random_access_range Rng,
+		typename Pred = std::less<>,
+		std::indirectly_unary_invocable<std::ranges::iterator_t<Rng>> Proj = std::identity,
+		typename ValTy>
+		requires requires{
+		requires std::predicate<Pred, std::indirect_result_t<Proj, std::ranges::iterator_t<Rng>>, const ValTy&>;
+		}
+	auto unstable_search_heap_upper_bound(Rng&& rng, const ValTy& val, const Pred pred = {}, const Proj proj = {}) noexcept {
+		return algo::unstable_search_heap_upper_bound(std::ranges::begin(std::forward<Rng>(rng)), std::ranges::end(std::forward<Rng>(rng)), val, std::move(pred), std::move(proj));
+	}
+}
 
 namespace mo_yanxi::algo{
 	export

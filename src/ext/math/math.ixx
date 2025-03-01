@@ -343,10 +343,10 @@ namespace mo_yanxi::math {
 		}else if constexpr (Exponent == 1) {
 			return val;
 		}else if constexpr (Exponent % 2 == 0) {
-			const float v = math::pow_integral<Exponent / 2, T>(val);
+			const T v = math::pow_integral<Exponent / 2, T>(val);
 			return v * v;
 		}else {
-			const float v = math::pow_integral<(Exponent - 1) / 2, T>(val);
+			const T v = math::pow_integral<(Exponent - 1) / 2, T>(val);
 			return val * v * v;
 		}
 	}
@@ -359,10 +359,10 @@ namespace mo_yanxi::math {
 		}else if (Exponent == 1) {
 			return val;
 		}else if (Exponent % 2 == 0) {
-			const float v = math::pow_integral<T>(val, Exponent / 2);
+			const T v = math::pow_integral<T>(val, Exponent / 2);
 			return v * v;
 		}else {
-			const float v = math::pow_integral<T>(val, (Exponent - 1) / 2);
+			const T v = math::pow_integral<T>(val, (Exponent - 1) / 2);
 			return val * v * v;
 		}
 	}

@@ -9,6 +9,9 @@ import ext.dim2.plane_concept;
 import std;
 
 export namespace mo_yanxi::dim2{
+	// template <typename Derived, typename Base>
+	// concept remove_cvref_derived_from = std::derived_from<std::remove_cvref_t<Derived>, Base>;
+
 	template <typename Impl, typename T, std::unsigned_integral SizeType = unsigned>
 	struct tile_adaptor{
 		using value_type = T;
@@ -269,27 +272,31 @@ export namespace mo_yanxi::dim2{
 			return static_cast<Fp>(width()) / static_cast<Fp>(height());
 		}
 
-		/**
-		 * @brief Slice by row
-		 */
+
+		[[nodiscard]] constexpr auto to_byte_mdspan_row_major() noexcept{
+			return std::mdspan{reinterpret_cast<std::byte*>(data()), height() * sizeof(T), width() * sizeof(T)};
+		}
+
+		[[nodiscard]] constexpr auto to_byte_mdspan_row_major() const noexcept{
+			return std::mdspan{reinterpret_cast<const std::byte*>(data()), height() * sizeof(T), width() * sizeof(T)};
+		}
+
+		[[nodiscard]] constexpr auto to_mdspan_row_major() noexcept{
+			return std::mdspan{data(), height(), width()};
+		}
+
 		[[nodiscard]] constexpr auto to_mdspan_row_major() const noexcept{
 			return std::mdspan{data(), height(), width()};
 		}
 
-		/**
-		 * @brief Slice by row
-		 */
-		[[nodiscard]] constexpr auto to_mdspan_row_major() noexcept{
-			return std::mdspan{data(), height(), width()};
+		[[nodiscard]] constexpr auto to_mdspan() noexcept{
+			return to_mdspan_row_major();
 		}
 
 		[[nodiscard]] constexpr auto to_mdspan() const noexcept{
 			return to_mdspan_row_major();
 		}
 
-		[[nodiscard]] constexpr auto to_mdspan() noexcept{
-			return to_mdspan_row_major();
-		}
 
 		[[nodiscard]] constexpr std::span<value_type> to_span() noexcept{
 			return std::span<value_type>{data(), size()};
@@ -477,7 +484,7 @@ export namespace mo_yanxi::dim2{
 	// 	size_type width_{};
 	// 	size_type height_{};
 	};
-	
+
 	template <typename T, std::unsigned_integral SizeType = unsigned, std::size_t MinAlign = 4>
 	struct tile : public tile_adaptor<tile<T, SizeType, MinAlign>, T, SizeType>{
 	private:

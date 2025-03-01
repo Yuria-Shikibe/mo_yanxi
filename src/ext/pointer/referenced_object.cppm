@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 #include "../adapted_attributes.hpp"
-export module ext.referenced_ptr;
+export module mo_yanxi.referenced_ptr;
 
 import ext.cond_atomic;
 import std;
@@ -115,7 +115,8 @@ namespace mo_yanxi{
 		[[nodiscard]] constexpr referenced_object() = default;
 
 		//TODO delete these?
-		constexpr referenced_object(const referenced_object& other) noexcept requires (!isAtomic) {}
+		constexpr referenced_object(const referenced_object& other) noexcept requires (!isAtomic){
+		}
 
 		constexpr referenced_object& operator=(const referenced_object& other) requires (!isAtomic){
 			return *this;

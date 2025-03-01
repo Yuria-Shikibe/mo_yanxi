@@ -26,6 +26,7 @@ import mo_yanxi.core.window;
 import mo_yanxi.meta_programming;
 import mo_yanxi.stack_trace;
 import mo_yanxi.circular_array;
+import mo_yanxi.event;
 import std;
 
 
@@ -86,6 +87,8 @@ namespace mo_yanxi::vk{
 		circular_array<InFlightData, 2> sync_arr{};
 		swap_chain_staging_image_data final_staging_image{};
 
+		events::named_event_manager<std::move_only_function, window_instance::resize_event> eventManager{};
+
 	public:
 
 		[[nodiscard]] context() = default;
@@ -94,9 +97,9 @@ namespace mo_yanxi::vk{
 			init(app_info);
 		}
 
-		void set_staging_image(const swap_chain_staging_image_data& image_data){
+		void set_staging_image(const swap_chain_staging_image_data& image_data, bool instantly_create_command = true){
 			this->final_staging_image = image_data;
-			record_post_command();
+			if(instantly_create_command)record_post_command();
 		}
 
 		void flush(){
@@ -256,8 +259,8 @@ namespace mo_yanxi::vk{
 			return window_;
 		}
 
-		void register_on_resize(const std::string_view name, std::move_only_function<void(const window_instance::resize_event&) const>&& callback) {
-			window_.on_resize(name, std::move(callback));
+		void register_post_resize(const std::string_view name, std::move_only_function<void(const window_instance::resize_event&) const>&& callback) {
+			eventManager.on<window_instance::resize_event>(name, std::move(callback));
 		}
 
 	private:
@@ -573,6 +576,9 @@ namespace mo_yanxi::vk{
 			last_swap_chain = swap_chain;
 
 			createSwapChain();
+
+			eventManager.fire(window_instance::resize_event(get_extent()));
+
 			record_post_command();
 
 			// recreateCallback(*this);

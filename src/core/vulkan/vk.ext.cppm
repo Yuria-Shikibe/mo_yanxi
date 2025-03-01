@@ -45,7 +45,7 @@ namespace mo_yanxi::vk::ext{
 		const VkCommandBuffer commandBuffer,
 		const VkPipelineBindPoint pipelineBindPoint,
 		const VkPipelineLayout layout,
-		const uint32_t firstSet,
+		const std::uint32_t firstSet,
 		const VkDescriptorBufferBindingInfoEXT* pBindingInfos,
 		std::uint32_t bufferCount
 	){
@@ -68,6 +68,16 @@ namespace mo_yanxi::vk::ext{
 		const std::span<const VkDescriptorBufferBindingInfoEXT> infos
 	){
 		cmdBindThenSetDescriptorBuffers(commandBuffer, pipelineBindPoint, layout, firstSet, infos.data(), infos.size());
+	}
+
+	export void cmdBindThenSetDescriptorBuffers(
+		const VkCommandBuffer commandBuffer,
+		const VkPipelineBindPoint pipelineBindPoint,
+		const VkPipelineLayout layout,
+		const uint32_t firstSet,
+		const std::initializer_list<const VkDescriptorBufferBindingInfoEXT> infos
+	){
+		cmdBindThenSetDescriptorBuffers(commandBuffer, pipelineBindPoint, layout, firstSet, infos.begin(), infos.size());
 	}
 
 	export void load(VkInstance instance){

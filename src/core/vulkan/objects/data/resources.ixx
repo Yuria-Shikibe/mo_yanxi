@@ -3,6 +3,7 @@ module;
 #include <cassert>
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
+#include "../src/ext/adapted_attributes.hpp"
 
 export module mo_yanxi.vk.resources;
 
@@ -11,8 +12,45 @@ export import mo_yanxi.vk.util.cmd.resources;
 import mo_yanxi.vk.vma;
 import mo_yanxi.vk.concepts;
 import mo_yanxi.handle_wrapper;
+import mo_yanxi.math;
 
 namespace mo_yanxi::vk{
+	export
+	std::size_t get_format_size(VkFormat format) {
+		switch (format) {
+			// 8-bit formats
+		case VK_FORMAT_R8_UNORM:
+		case VK_FORMAT_R8_SNORM:
+			return 1;
+
+			// 16-bit formats
+		case VK_FORMAT_R8G8_UNORM:
+		case VK_FORMAT_R16_UNORM:
+			return 2;
+
+			// 32-bit formats
+		case VK_FORMAT_R8G8B8A8_UNORM:
+		case VK_FORMAT_B8G8R8A8_UNORM:
+		case VK_FORMAT_R32_SFLOAT:
+			return 4;
+
+			// 64-bit formats
+		case VK_FORMAT_R16G16B16A16_SFLOAT:
+		case VK_FORMAT_R32G32_SFLOAT:
+			return 8;
+
+			// 128-bit formats
+		case VK_FORMAT_R32G32B32A32_SFLOAT:
+			return 16;
+
+		case VK_FORMAT_BC1_RGB_UNORM_BLOCK:
+		case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:
+			return 8; //
+
+		default:
+			return 0;
+		}
+	}
 
 	export struct buffer : resource_base<VkBuffer>{
 	protected:
@@ -79,6 +117,10 @@ namespace mo_yanxi::vk{
 		~buffer_mapper(){
 			if(mapped){
 				buffer_obj->unmap();
+				auto flags = buffer_obj->get_allocation_prop_flags();
+				if(!(flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)){
+					buffer_obj->flush();
+				}
 			}
 		}
 
@@ -204,7 +246,7 @@ namespace mo_yanxi::vk{
 			return VK_IMAGE_TYPE_3D;
 		}
 
-		void layout_on_init(
+		void init_layout_write(
 			VkCommandBuffer command_buffer,
 			VkImageLayout layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			const VkImageSubresourceRange& range = default_image_subrange,
@@ -221,6 +263,28 @@ namespace mo_yanxi::vk{
 				range,
 				srcQueueFamilyIndex,
 				dstQueueFamilyIndex);
+		}
+
+		void init_layout_shader(
+			VkCommandBuffer command_buffer,
+			VkImageLayout dstLayout,
+			std::uint32_t mipLevels = 1, std::uint32_t arrayLayers = 1
+			) const noexcept{
+			cmd::memory_barrier(
+				command_buffer, handle,
+				VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+				VK_ACCESS_2_NONE,
+				VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+				VK_ACCESS_2_SHADER_READ_BIT,
+				VK_IMAGE_LAYOUT_UNDEFINED,
+				dstLayout,
+				{
+					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+					.baseMipLevel = 0,
+					.levelCount = mipLevels,
+					.baseArrayLayer = 0,
+					.layerCount = arrayLayers
+				});
 		}
 	};
 
@@ -260,7 +324,7 @@ namespace mo_yanxi::vk::templates{
 			{
 				.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 				.size = size,
-				.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+				.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
 			}, {
 				.usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
 			}
@@ -325,5 +389,176 @@ namespace mo_yanxi::vk::templates{
 			}
 		};
 	}
+}
 
+namespace mo_yanxi::vk{
+	template <typename T>
+	struct void_or{
+		T value;
+
+		template <typename Sty>
+		constexpr explicit(false) operator decltype(std::forward_like<Sty>(std::declval<T&>())) (this Sty&& self) noexcept{
+			return std::forward_like<Sty>(self.value);
+		}
+	};
+
+	template <>
+	struct void_or<void>{
+
+	};
+
+	export
+	struct temp_resource_reserver{
+		struct promise_type;
+		using handle = std::coroutine_handle<promise_type>;
+		using value_type = VkCommandBuffer;
+
+		[[nodiscard]] temp_resource_reserver() = default;
+
+		[[nodiscard]] explicit temp_resource_reserver(handle&& hdl)
+			: hdl{std::move(hdl)}{}
+
+		struct promise_type{
+			[[nodiscard]] promise_type() = default;
+
+			temp_resource_reserver get_return_object(){
+				return temp_resource_reserver{handle::from_promise(*this)};
+			}
+
+			[[nodiscard]] static auto initial_suspend() noexcept{ return std::suspend_never{}; }
+
+			[[nodiscard]] static auto final_suspend() noexcept{ return std::suspend_always{}; }
+
+			static void return_void() noexcept{
+
+			}
+
+			auto yield_value(value_type val) noexcept{
+				toSubmit = val;
+				return std::suspend_always{};
+			}
+
+			[[noreturn]] static void unhandled_exception() noexcept{
+				std::terminate();
+			}
+
+		private:
+			friend temp_resource_reserver;
+
+			value_type toSubmit;
+		};
+
+		void resume() const{
+			hdl->resume();
+		}
+
+		[[nodiscard]] bool done() const noexcept{
+			return hdl->done();
+		}
+
+		[[nodiscard]] value_type current() const noexcept{
+			return hdl->promise().toSubmit;
+		}
+
+		~temp_resource_reserver(){
+			if(hdl){
+				assert(done());
+				hdl->destroy();
+			}
+		}
+
+		temp_resource_reserver(const temp_resource_reserver& other) = delete;
+		temp_resource_reserver(temp_resource_reserver&& other) noexcept = default;
+		temp_resource_reserver& operator=(const temp_resource_reserver& other) = delete;
+		temp_resource_reserver& operator=(temp_resource_reserver&& other) noexcept = default;
+
+	private:
+		exclusive_handle_member<handle> hdl{};
+	};
+
+	export
+	template <typename T, typename ExtentTy>
+		requires (std::is_trivially_copyable_v<T>)
+	[[nodiscard]] temp_resource_reserver dump_image(
+		allocator& alloc,
+		VkCommandBuffer command_buffer,
+		VkImage image,
+		VkFormat image_format,
+		VkRect2D region,
+
+		std::mdspan<T, ExtentTy> target_row_major,
+
+		VkPipelineStageFlags2 currentStage,
+		VkAccessFlags2 currentAccess,
+		VkImageLayout currentLayout,
+		std::uint32_t mipmapLevel = 0,
+		VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+		std::uint32_t layer = 0){
+
+		const auto div = math::pow_integral(2u, mipmapLevel);
+		const VkRect2D scaled{
+			static_cast<std::int32_t>(region.offset.x / div), static_cast<std::int32_t>(region.offset.y / div), region.extent.width / div, region.extent.height / div
+		};
+
+		const std::size_t formatSize{get_format_size(image_format)};
+		const auto staging_buffer = templates::create_staging_buffer(alloc, formatSize * target_row_major.size());
+
+		cmd::memory_barrier(command_buffer, image,
+			currentStage,
+			currentAccess,
+			VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+			VK_ACCESS_2_TRANSFER_READ_BIT,
+			currentLayout,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			{
+				.aspectMask = aspectFlags,
+				.baseMipLevel = mipmapLevel,
+				.levelCount = 1,
+				.baseArrayLayer = layer,
+				.layerCount = 1
+			}
+		);
+
+
+		cmd::copy_image_to_buffer(
+			command_buffer, image, staging_buffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, {
+				VkBufferImageCopy{
+					.bufferOffset = 0,
+					.bufferRowLength = static_cast<std::uint32_t>(target_row_major.extent(0)),
+					.bufferImageHeight = static_cast<std::uint32_t>(target_row_major.extent(1)),
+					.imageSubresource = {
+						.aspectMask = aspectFlags,
+						.mipLevel = mipmapLevel,
+						.baseArrayLayer = layer,
+						.layerCount = 1
+					},
+					.imageOffset = {scaled.offset.x, scaled.offset.y, 0},
+					.imageExtent = {scaled.extent.width, scaled.extent.height, 1},
+				}
+			});
+
+		cmd::memory_barrier(command_buffer, image,
+			VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+			VK_ACCESS_2_TRANSFER_READ_BIT,
+			currentStage,
+			currentAccess,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			currentLayout,
+			{
+				.aspectMask = aspectFlags,
+				.baseMipLevel = mipmapLevel,
+				.levelCount = 1,
+				.baseArrayLayer = layer,
+				.layerCount = 1
+			}
+		);
+
+		co_yield command_buffer;
+
+		auto mapped = staging_buffer.map();
+
+		std::memcpy(target_row_major.data_handle(), mapped, staging_buffer.get_size());
+
+		staging_buffer.unmap();
+	}
 }

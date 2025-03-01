@@ -50,7 +50,7 @@ namespace mo_yanxi::vk{
 			VkCommandPool commandPool,
 			const VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY
 		) : device{device}, pool{commandPool}{
-			VkCommandBufferAllocateInfo allocInfo{
+			const VkCommandBufferAllocateInfo allocInfo{
 					.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 					.pNext = nullptr,
 					.commandPool = commandPool,
@@ -58,7 +58,7 @@ namespace mo_yanxi::vk{
 					.commandBufferCount = 1
 				};
 
-			if(auto rst = vkAllocateCommandBuffers(device, &allocInfo, &handle)){
+			if(const auto rst = vkAllocateCommandBuffers(device, &allocInfo, &handle)){
 				throw vk_error(rst, "Failed to allocate command buffers!");
 			}
 		}
@@ -167,33 +167,40 @@ namespace mo_yanxi::vk{
 		scoped_recorder& operator=(scoped_recorder&& other) noexcept = delete;
 	};
 
-	struct [[jetbrains::guard]] transient_command : command_buffer{
+	export
+	struct transient_command : command_buffer{
 		static constexpr VkCommandBufferBeginInfo BeginInfo{
 				VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 				nullptr,
 				VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 			};
 
+	private:
 		VkQueue targetQueue{};
+		VkFence fence{};
 
-		std::vector<VkSemaphore> toWait{};
-		std::vector<VkSemaphore> toSignal{};
-
+	public:
 		[[nodiscard]] transient_command() = default;
 
-		[[nodiscard]] transient_command(command_buffer&& commandBuffer, VkQueue targetQueue) :
+		[[nodiscard]] transient_command(command_buffer&& commandBuffer, VkQueue targetQueue, VkFence fence = nullptr) :
 			command_buffer{
 				std::move(commandBuffer)
-			}, targetQueue{targetQueue}{
+			}, targetQueue{targetQueue}, fence(fence){
 			vkBeginCommandBuffer(handle, &BeginInfo);
 		}
 
-		[[nodiscard]] transient_command(VkDevice device, VkCommandPool commandPool,
-		                                VkQueue targetQueue)
+		[[nodiscard]] transient_command(
+			VkDevice device,
+			VkCommandPool commandPool,
+			VkQueue targetQueue, VkFence fence = nullptr)
 			: command_buffer{device, commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY},
-			  targetQueue{targetQueue}{
+			  targetQueue{targetQueue}, fence(fence){
 			vkBeginCommandBuffer(handle, &BeginInfo);
 		}
+
+		[[nodiscard]] transient_command(
+			const command_pool& command_pool,
+			VkQueue targetQueue, VkFence fence = nullptr);
 
 		~transient_command() noexcept(false){
 			submit();
@@ -207,11 +214,9 @@ namespace mo_yanxi::vk{
 
 		transient_command& operator=(transient_command&& other) noexcept{
 			if(this == &other) return *this;
-			submit();
-			command_buffer::operator =(std::move(other));
-			targetQueue = other.targetQueue;
-			toWait = std::move(other.toWait);
-			toSignal = std::move(other.toSignal);
+			std::swap(static_cast<command_buffer&>(*this), static_cast<command_buffer&>(other));
+			std::swap(fence, other.fence);
+			std::swap(targetQueue, other.targetQueue);
 			return *this;
 		}
 
@@ -224,8 +229,8 @@ namespace mo_yanxi::vk{
 			const VkSubmitInfo submitInfo{
 					.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 					.pNext = nullptr,
-					.waitSemaphoreCount = static_cast<std::uint32_t>(toWait.size()),
-					.pWaitSemaphores = toWait.data(),
+					.waitSemaphoreCount = 0,
+					.pWaitSemaphores = nullptr,
 					.pWaitDstStageMask = nullptr,
 					.commandBufferCount = 1,
 					.pCommandBuffers = &handle,
@@ -233,8 +238,17 @@ namespace mo_yanxi::vk{
 					.pSignalSemaphores = nullptr
 				};
 
-			vkQueueSubmit(targetQueue, 1, &submitInfo, nullptr);
-			vkQueueWaitIdle(targetQueue);
+			vkQueueSubmit(targetQueue, 1, &submitInfo, fence);
+			if(fence){
+				if(const auto rst = vkWaitForFences(device, 1, &fence, true, std::numeric_limits<uint64_t>::max())){
+					throw vk_error{rst, "Failed To Wait Fence On Transient Command"};
+				}
+				if(const auto rst = vkResetFences(device, 1, &fence)){
+					throw vk_error{rst, "Failed To Reset Fence On Transient Command"};
+				}
+			}else{
+				vkQueueWaitIdle(targetQueue);
+			}
 		}
 	};
 }

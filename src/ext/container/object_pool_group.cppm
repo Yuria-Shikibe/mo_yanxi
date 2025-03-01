@@ -5,7 +5,7 @@ module;
 export module ext.object_pool_group;
 
 export import ext.object_pool;
-export import ext.open_addr_hash_map;
+export import mo_yanxi.open_addr_hash_map;
 import std;
 
 namespace mo_yanxi{

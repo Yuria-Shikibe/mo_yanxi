@@ -74,6 +74,7 @@ namespace mo_yanxi::graphic{
 
     };
 
+
     export
     struct bitmap : dim2::tile<color_bits>{
         static constexpr size_type channels = 4;
@@ -112,6 +113,18 @@ namespace mo_yanxi::graphic{
             }else{
                 std::memcpy(dst, src_data, size_bytes());
             }
+        }
+    };
+
+
+    export
+    struct bitmap_view{
+        std::mdspan<const color_bits, std::dextents<std::size_t, 2>> data{};
+
+        [[nodiscard]] bitmap_view() = default;
+
+        [[nodiscard]] explicit bitmap_view(const bitmap& data)
+            : data(data.to_mdspan_row_major()){
         }
     };
     //TODO PixmapView

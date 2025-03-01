@@ -27,7 +27,7 @@ module;
 #include <cassert>
 #include "../adapted_attributes.hpp"
 
-export module ext.open_addr_hash_map;
+export module mo_yanxi.open_addr_hash_map;
 
 import std;
 

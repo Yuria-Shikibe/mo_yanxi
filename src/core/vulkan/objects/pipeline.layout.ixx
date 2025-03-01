@@ -146,6 +146,10 @@ namespace mo_yanxi::vk{
 		void create(VkDescriptorSetLayoutCreateFlags flag, const descriptor_layout_builder& builder){
 			const auto builder_rst = builder.export_bindings();
 
+			if(!builder_rst.bindings.empty()){
+				bindings = builder_rst.bindings.back().binding + 1;
+			}
+
 			VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
 				VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO
 			};

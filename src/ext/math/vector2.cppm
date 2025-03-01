@@ -84,9 +84,9 @@ export namespace mo_yanxi::math{
 				return {static_cast<T>(1) / x, static_cast<T>(1) / y};
 			}else if constexpr (std::unsigned_integral<T>){
 				return {~x, ~y};
+			}else{
+				static_assert(false, "unsupported");
 			}
-
-			static_assert(false, "unsupported");
 		}
 
 		FORCE_INLINE constexpr vector2& inverse() noexcept{
@@ -915,6 +915,8 @@ export namespace mo_yanxi::math{
 			return x / y;
 		}
 
+		constexpr auto operator<=>(const vector2&) const noexcept requires (std::integral<T>) = default;
+
 		template <typename Ty>
 			requires std::constructible_from<Ty, T, T>
 		FORCE_INLINE explicit constexpr operator Ty() const noexcept{
@@ -983,7 +985,7 @@ export namespace mo_yanxi::math{
 		}
 
 		template <typename T>
-		struct constant{
+		struct constant2{
 			static constexpr vector2<T> base_vec2{1, 1};
 			static constexpr vector2<T> zero_vec2{0, 0};
 			static constexpr vector2<T> x_vec2{1, 0};

@@ -24,6 +24,10 @@ set_toolset("cc", path.join(msvc_path, "/bin/Hostx64/x64/cl.exe"))
 set_toolset("cxx", path.join(msvc_path, "/bin/Hostx64/x64/cl.exe"))
 add_includedirs(path.join(msvc_path, "/include"))
 
+if is_mode("release") then
+    set_symbols("debug")
+    set_optimize("fastest")
+end
 
 target("mo_yanxi")
     set_kind("binary")
@@ -51,10 +55,12 @@ target("mo_yanxi")
 
     add_packages("glfw")
     add_packages("freetype")
+
 --     add_packages("lunasvg")
 --     add_packages("volk")
 
     add_includedirs("VulkanMemoryAllocator/include")
+    add_includedirs("rectpack2D/src")
     add_includedirs("includes")
 
 

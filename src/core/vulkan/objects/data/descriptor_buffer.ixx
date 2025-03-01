@@ -11,11 +11,14 @@ import mo_yanxi.vk.vma;
 import mo_yanxi.vk.ext;
 
 namespace mo_yanxi::vk{
+	export struct descriptor_mapper;
+
 	export
 	struct descriptor_buffer : buffer{
+	private:
+		friend descriptor_mapper;
 		std::vector<VkDeviceSize> offsets{};
 
-	private:
 		std::size_t uniformBufferDescriptorSize{};
 		std::size_t combinedImageSamplerDescriptorSize{};
 		std::size_t storageImageDescriptorSize{};
@@ -89,78 +92,6 @@ namespace mo_yanxi::vk{
 			return inputAttachmentDescriptorSize;
 		}
 
-		//
-		// void loadImage(
-		// 	const std::uint32_t binding,
-		// 	const VkDescriptorImageInfo& imageInfo,
-		// 	const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) const{
-		// 	auto [info, size] = get_image_info(imageInfo, descriptorType);
-		//
-		// 	ext::getDescriptorEXT(
-		// 		getDevice(),
-		// 		&info,
-		// 		size,
-		// 		getMappedData() + offsets[binding]
-		// 	);
-		// }
-
-		// template <std::ranges::input_range Rng>
-		// 	requires (std::convertible_to<std::ranges::range_const_reference_t<Rng>, const VkDescriptorImageInfo&>)
-		// void loadImage(
-		// 	const std::uint32_t binding,
-		// 	const Rng& imageInfos,
-		// 	const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) const{
-		// 	std::size_t currentOffset = 0;
-		// 	for(const VkDescriptorImageInfo& imageInfo : imageInfos){
-		// 		auto [info, size] = get_image_info(imageInfo, descriptorType);
-		//
-		// 		ext::getDescriptorEXT(
-		// 			getDevice(),
-		// 			&info,
-		// 			size,
-		// 			getMappedData() + offsets[binding] + currentOffset
-		// 		);
-		//
-		// 		currentOffset += size;
-		// 	}
-		// }
-
-		// void loadImage(
-		// 	const std::uint32_t binding,
-		// 	const VkImageView imageView, const VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		// 	const VkSampler sampler = nullptr,
-		// 	const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
-		// ) const{
-		// 	const VkDescriptorImageInfo image_descriptor{
-		// 			.sampler = sampler,
-		// 			.imageView = imageView,
-		// 			.imageLayout = imageLayout
-		// 		};
-		//
-		// 	loadImage(binding, image_descriptor, descriptorType);
-		// }
-
-		// template <std::invocable<descriptor_buffer&> Writer>
-		// void load(Writer&& writer){
-		// 	map();
-		// 	writer(*this);
-		// 	unmap();
-		// }
-
-		// template <typename... Args>
-		// 	requires (std::same_as<UniformBuffer, std::remove_cvref_t<Args>> && ...)
-		// void loadUniformBuffer(std::uint32_t initialBinding, const Args&... Ubos){
-		// 	map();
-		//
-		// 	[&, this]<std::size_t... Indices>(std::index_sequence<Indices...>){
-		// 		((descriptor_buffer::mapUniformBuffer(initialBinding++, Ubos, 0)), ...);
-		// 	}(std::index_sequence_for<Args...>{});
-		//
-		// 	unmap();
-		// }
-		//
-
-
 		[[nodiscard]] VkDescriptorBufferBindingInfoEXT get_bind_info(const VkBufferUsageFlags usage) const{
 			return {
 					.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
@@ -191,8 +122,20 @@ namespace mo_yanxi::vk{
 				setIndex, 1, &ZERO, &offset);
 		}
 
+		[[nodiscard]] VkDescriptorBufferBindingInfoEXT get_info(VkBufferUsageFlags usage) const noexcept{
+			return {
+				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
+				.pNext = nullptr,
+				.address = get_address(),
+				.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | usage
+			};
+		}
+	private:
+		std::pair<VkDescriptorGetInfoEXT, VkDeviceSize> get_image_info(
+			VkDescriptorImageInfo&& dangling, const VkDescriptorType descriptorType) const = delete;
+
 		[[nodiscard]] std::pair<VkDescriptorGetInfoEXT, VkDeviceSize> get_image_info(
-			const VkDescriptorImageInfo& imageInfo, const VkDescriptorType descriptorType) const{
+			const VkDescriptorImageInfo& imageInfo_non_rv, const VkDescriptorType descriptorType) const{
 			std::pair<VkDescriptorGetInfoEXT, VkDeviceSize> rst{
 					VkDescriptorGetInfoEXT{
 						.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT,
@@ -205,19 +148,19 @@ namespace mo_yanxi::vk{
 
 			switch(descriptorType){
 			case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER :{
-				rst.first.data.pCombinedImageSampler = &imageInfo;
+				rst.first.data.pCombinedImageSampler = &imageInfo_non_rv;
 				rst.second = combinedImageSamplerDescriptorSize;
 				break;
 			}
 
 			case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE :{
-				rst.first.data.pStorageImage = &imageInfo;
+				rst.first.data.pStorageImage = &imageInfo_non_rv;
 				rst.second = storageImageDescriptorSize;
 				break;
 			}
 
 			case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT :{
-				rst.first.data.pInputAttachmentImage = &imageInfo;
+				rst.first.data.pInputAttachmentImage = &imageInfo_non_rv;
 				rst.second = inputAttachmentDescriptorSize;
 				break;
 			}
@@ -229,19 +172,18 @@ namespace mo_yanxi::vk{
 		}
 	};
 
-	export
 	struct descriptor_mapper : buffer_mapper<descriptor_buffer>{
 		// using buffer_mapper::buffer_mapper;
 
-		const descriptor_mapper& add_uniform_buffer(
+		const descriptor_mapper& set_uniform_buffer(
 			const std::uint32_t binding,
 			const buffer& ubo,
 			const VkDeviceSize offset = 0
 		) const{
-			return this->add_uniform_buffer(binding, ubo.get_address() + offset, ubo.get_size());
+			return this->set_uniform_buffer(binding, ubo.get_address() + offset, ubo.get_size());
 		}
 
-		const descriptor_mapper& add_uniform_buffer(
+		const descriptor_mapper& set_uniform_buffer(
 			const std::uint32_t binding,
 			const VkDeviceAddress address,
 			const VkDeviceSize size
@@ -273,7 +215,7 @@ namespace mo_yanxi::vk{
 			return *this;
 		}
 
-		const descriptor_mapper& add_uniform_buffer_segments(
+		const descriptor_mapper& set_uniform_buffer_segments(
 			std::uint32_t initialBinding,
 			const buffer& ubo,
 			std::initializer_list<VkDeviceSize> segment_sizes) const{
@@ -281,12 +223,120 @@ namespace mo_yanxi::vk{
 			VkDeviceSize currentOffset{};
 
 			for (const auto& [idx, sz] : segment_sizes | std::views::enumerate){
-				(void)this->add_uniform_buffer(initialBinding + static_cast<std::uint32_t>(idx), ubo.get_address() + currentOffset, sz);
+				(void)this->set_uniform_buffer(initialBinding + static_cast<std::uint32_t>(idx), ubo.get_address() + currentOffset, sz);
 
 				currentOffset += sz;
 			}
 
 			return *this;
 		}
+
+
+
+		void set_image(
+			const std::uint32_t binding,
+			const VkDescriptorImageInfo& imageInfo,
+			const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) const{
+			auto [info, size] = buffer_obj->get_image_info(imageInfo, descriptorType);
+
+			ext::getDescriptorEXT(
+				buffer_obj->get_device(),
+				&info,
+				size,
+				mapped + buffer_obj->offsets[binding]
+			);
+		}
+
+		template <std::ranges::input_range Rng>
+			requires (std::convertible_to<std::ranges::range_const_reference_t<Rng>, const VkDescriptorImageInfo&>)
+		void set_image(
+			const std::uint32_t binding,
+			const Rng& imageInfos,
+			const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) const{
+			std::size_t currentOffset = 0;
+
+			for(const VkDescriptorImageInfo& imageInfo : imageInfos){
+				auto [info, size] = buffer_obj->get_image_info(imageInfo, descriptorType);
+
+				ext::getDescriptorEXT(
+					buffer_obj->get_device(),
+					&info,
+					size,
+					mapped + buffer_obj->offsets[binding] + currentOffset
+				);
+
+				currentOffset += size;
+			}
+		}
+
+		template <std::ranges::input_range Rng>
+			requires (std::convertible_to<std::ranges::range_const_reference_t<Rng>, VkImageView>)
+		void set_image(
+			const std::uint32_t binding,
+			const VkImageLayout layout,
+			VkSampler sampler,
+			const Rng& imageViews) const{
+			std::size_t currentOffset = 0;
+
+			for(VkImageView imageInfo : imageViews){
+				VkDescriptorImageInfo image_info{
+					.sampler = sampler,
+					.imageView = imageInfo,
+					.imageLayout = layout
+				};
+
+				auto [info, size] = buffer_obj->get_image_info(
+					image_info, sampler ? VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+
+				ext::getDescriptorEXT(
+					buffer_obj->get_device(),
+					&info,
+					size,
+					mapped + buffer_obj->offsets[binding] + currentOffset
+				);
+
+				currentOffset += size;
+			}
+			//
+			// if(binding + 1 < buffer_obj->offsets.size()){
+			//
+			// }
+		}
+
+		void set_image(
+			const std::uint32_t binding,
+			const VkImageView imageView,
+			const VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			const VkSampler sampler = nullptr,
+			const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+		) const{
+			const VkDescriptorImageInfo image_descriptor{
+					.sampler = sampler,
+					.imageView = imageView,
+					.imageLayout = imageLayout
+				};
+
+			set_image(binding, image_descriptor, descriptorType);
+		}
+
+		// template <std::invocable<descriptor_buffer&> Writer>
+		// void load(Writer&& writer){
+		// 	map();
+		// 	writer(*this);
+		// 	unmap();
+		// }
+
+		// template <typename... Args>
+		// 	requires (std::same_as<UniformBuffer, std::remove_cvref_t<Args>> && ...)
+		// void loadUniformBuffer(std::uint32_t initialBinding, const Args&... Ubos){
+		// 	map();
+		//
+		// 	[&, this]<std::size_t... Indices>(std::index_sequence<Indices...>){
+		// 		((descriptor_buffer::mapUniformBuffer(initialBinding++, Ubos, 0)), ...);
+		// 	}(std::index_sequence_for<Args...>{});
+		//
+		// 	unmap();
+		// }
+		//
 	};
 }

@@ -49,10 +49,10 @@ export namespace mo_yanxi::vk{
 		[[nodiscard]] command_buffer obtain(const VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY) const{
 			return {device, handle, level};
 		}
-		//
-		// [[nodiscard]] BlockedTransientCommand getTransient(VkQueue targetQueue) const{
-		// 	return BlockedTransientCommand{device, handle, targetQueue};
-		// }
+
+		[[nodiscard]] transient_command get_transient(VkQueue targetQueue, VkFence fence = nullptr) const{
+			return transient_command{device, handle, targetQueue, fence};
+		}
 
 		void reset_all(const VkCommandPoolResetFlags resetFlags = 0) const{
 			vkResetCommandPool(device, handle, resetFlags);

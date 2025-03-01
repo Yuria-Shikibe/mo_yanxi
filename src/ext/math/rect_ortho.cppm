@@ -66,6 +66,13 @@ namespace mo_yanxi::math{
 		constexpr rect_ortho(typename vec_t::const_pass_t src, typename vec_t::const_pass_t end) noexcept{
 			this->set_vert(src, end);
 		}
+		/**
+		 * @warning Create by vertex [src, end] instead of [src, size]
+		 */
+		constexpr rect_ortho(tags::unchecked_t, typename vec_t::const_pass_t bot_lft, typename vec_t::const_pass_t top_rit) noexcept :
+		src(bot_lft), size_(top_rit - bot_lft){
+			assert(bot_lft.within_equal(top_rit));
+		}
 
 		/**
 		 * @brief Create by [src, size]
@@ -103,7 +110,7 @@ namespace mo_yanxi::math{
 			return src;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr vec_t getEnd() const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr vec_t get_end() const noexcept{
 			return src + size_;
 		}
 
@@ -442,7 +449,7 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		FORCE_INLINE constexpr rect_ortho& move(const typename vec_t::PassType vec) noexcept{
+		FORCE_INLINE constexpr rect_ortho& move(typename vec_t::const_pass_t vec) noexcept{
 			src += vec;
 
 			return *this;
@@ -669,7 +676,7 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		FORCE_INLINE constexpr rect_ortho& shrink(const typename vec_t::PassType margin) noexcept{
+		FORCE_INLINE constexpr rect_ortho& shrink(typename vec_t::const_pass_t margin) noexcept{
 			(void)this->shrink_x(margin.x);
 			(void)this->shrink_y(margin.y);
 
