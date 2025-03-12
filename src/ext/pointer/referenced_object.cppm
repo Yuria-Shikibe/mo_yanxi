@@ -1,6 +1,8 @@
 module;
 
 #include <cassert>
+#include <Windows.h>
+
 #include "../adapted_attributes.hpp"
 export module mo_yanxi.referenced_ptr;
 
@@ -9,7 +11,7 @@ import std;
 
 namespace mo_yanxi{
 	export
-	template <typename T>
+	template <typename T, bool delete_on_release = true>
 	struct referenced_ptr{
 		using element_type = T;
 		using pointer = T*;
@@ -17,6 +19,7 @@ namespace mo_yanxi{
 		[[nodiscard]] constexpr referenced_ptr() = default;
 
 		[[nodiscard]] constexpr explicit referenced_ptr(T* object);
+		[[nodiscard]] constexpr explicit(false) referenced_ptr(T& object);
 
 		template <typename ...Args>
 		[[nodiscard]] explicit constexpr referenced_ptr(std::in_place_t, Args&&... args) : referenced_ptr{
@@ -53,15 +56,15 @@ namespace mo_yanxi{
 
 		constexpr ~referenced_ptr() noexcept;
 
-		referenced_ptr(const referenced_ptr& other) noexcept
+		constexpr referenced_ptr(const referenced_ptr& other) noexcept
 			: object{other.object}{
 			if(object) object->incr_ref();
 		}
 
-		referenced_ptr(referenced_ptr&& other) noexcept
+		constexpr referenced_ptr(referenced_ptr&& other) noexcept
 			: object{std::exchange(other.object, {})}{}
 
-		referenced_ptr& operator=(const referenced_ptr& other){
+		constexpr referenced_ptr& operator=(const referenced_ptr& other){
 			if(this == &other) return *this;
 			if(this->object == other.object) return *this;
 
@@ -70,7 +73,7 @@ namespace mo_yanxi{
 			return *this;
 		}
 
-		referenced_ptr& operator=(referenced_ptr&& other) noexcept{
+		constexpr referenced_ptr& operator=(referenced_ptr&& other) noexcept{
 			if(this == &other) return *this;
 			std::swap(object, other.object);
 			return *this;
@@ -82,11 +85,11 @@ namespace mo_yanxi{
 
 		constexpr bool operator==(const referenced_ptr&) const noexcept = default;
 
-		template <typename T1>
-			requires std::is_convertible_v<T*, T1*>
-		constexpr explicit(false) operator referenced_ptr<T1>() const noexcept{
-			return referenced_ptr<T1>{object};
-		}
+		// template <typename T1>
+		// 	requires std::is_convertible_v<T*, T1*>
+		// constexpr explicit(false) operator referenced_ptr<T1, delete_on_release>() const noexcept{
+		// 	return referenced_ptr<T1, delete_on_release>{object};
+		// }
 
 		/*
 		template <typename T1>
@@ -101,7 +104,7 @@ namespace mo_yanxi{
 	private:
 		T* object{};
 
-		template <typename Ty>
+		template <typename Ty, bool b>
 		friend struct referenced_ptr;
 	};
 
@@ -169,7 +172,7 @@ namespace mo_yanxi{
 			}
 		}
 
-		template <typename T>
+		template <typename T, bool b>
 		friend struct referenced_ptr;
 	};
 }
@@ -177,17 +180,26 @@ namespace mo_yanxi{
 module : private;
 
 
-template <typename T>
-constexpr mo_yanxi::referenced_ptr<T>::referenced_ptr(T* object): object{object}{
+template <typename T, bool delete_on_release>
+constexpr mo_yanxi::referenced_ptr<T, delete_on_release>::referenced_ptr(T* object): object{object}{
 	if(this->object)this->object->incr_ref();
 }
 
-template <typename T>
-constexpr mo_yanxi::referenced_ptr<T>::~referenced_ptr() noexcept{
+template <typename T, bool delete_on_release>
+constexpr mo_yanxi::referenced_ptr<T, delete_on_release>::referenced_ptr(T& object) : referenced_ptr(&object){
+}
+
+template <typename T, bool delete_on_release>
+constexpr mo_yanxi::referenced_ptr<T, delete_on_release>::~referenced_ptr() noexcept{
+
 	if(object){
-		if(object->decr_ref()){
-			delete object;
-			object = nullptr;
+		if constexpr (delete_on_release){
+			if(object->decr_ref()){
+				delete object;
+				object = nullptr;
+			}
+		}else{
+			object->decr_ref();
 		}
 	}
 }

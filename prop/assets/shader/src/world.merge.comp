@@ -1,0 +1,90 @@
+#pragma shader_stage(compute)
+#extension GL_ARB_separate_shader_objects : enable
+
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout (set = 0, binding = 0, rgba32f) restrict uniform writeonly image2D target;
+layout (set = 0, binding = 1, rgba32f) restrict uniform readonly image2D tex_base;
+layout (set = 0, binding = 2, rgba32f) restrict uniform readonly image2D tex_light_src;
+layout (set = 0, binding = 3, rgba32f) restrict uniform readonly image2D tex_light_bloom;
+layout (set = 0, binding = 4) uniform sampler2D tex_ssao;
+
+const vec3 tent_kernal[9] = {
+    vec3(-1,  1, 1.f / 16.f), vec3(0,  1, 2.f / 16.f), vec3(1,  1, 1.f / 16.f),
+    vec3(-1,  0, 2.f / 16.f), vec3(0,  0, 4.f / 16.f), vec3(1,  0, 2.f / 16.f),
+    vec3(-1, -1, 1.f / 16.f), vec3(0, -1, 2.f / 16.f), vec3(1, -1, 1.f / 16.f)
+};
+
+vec4 blur(const vec2 where, const vec2 size_inv, const float scale, sampler2D tex){
+    vec4 color = vec4(0);
+
+    for(int i = 0; i < 9; ++i){
+        vec3 ker = vec3(tent_kernal[i]);
+        vec4 sampled = texture(tex, where + scale * ker.xy * size_inv);
+        color += sampled * ker.z;
+    }
+
+    return color;
+}
+
+float smooth_max(float a, float b, float k) {
+    float m = max(a, b);
+    return log(exp(k * (a - m)) + exp(k * (b - m))) / k + m;
+}
+
+float smooth_min(float a, float b, float k) {
+    float m = min(a, b);
+    return -log(exp(-k * (a - m)) + exp(-k * (b - m))) / k + m;
+}
+
+vec4 screen(vec4 src, vec4 dst) {
+    vec3 color = 1.0 - (1.0 - src.rgb) * (1.0 - dst.rgb);
+    return vec4(color, smooth_max(src.a, dst.a, 15.f));
+}
+
+float lumRGB(vec4 v) {
+    return v.a * dot(v.rgb, vec3(0.212, 0.716, 0.072));
+}
+
+
+void main() {
+    const ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+
+
+    const vec2 size_inv = vec2(1) / vec2(imageSize(target));
+    const vec2 uv = (vec2(pos) + vec2(0.5f, 0.5f)) * size_inv;
+
+    vec4 color_base = imageLoad(tex_base, pos);
+    vec4 color_ssao = blur(uv, size_inv, 1.25f, tex_ssao);
+    vec4 color_light_src = imageLoad(tex_light_src, pos);
+    vec4 color_light_bloom = imageLoad(tex_light_bloom, pos);
+
+    // 提取颜色分量（假设SSAO为单通道灰度值）
+    float occlusion = color_ssao.r;          // SSAO遮蔽因子（0.0-1.0）
+    vec4 emissive_raw = color_light_src;  // 原始自发光颜色
+    vec4 emissive_bloom = color_light_bloom; // Bloom处理后的自发光
+    vec4 total_emissive = screen(emissive_raw * .35f, emissive_bloom * 1.05f);
+
+
+    float light_factor = smoothstep(0.35f, 1.f, color_light_bloom.a);
+    occlusion = min(occlusion + light_factor * .15f, 1.f);
+    occlusion = mix(1., occlusion, smoothstep(0.35f, 1.f, color_base.a));
+    // 应用SSAO到基础颜色（可根据需求调整遮蔽强度）
+    vec3 shaded_base = color_base.rgb * mix(1., occlusion, color_base.a);
+
+    // 混合自发光与Bloom（可添加Bloom强度控制）
+
+    // 最终颜色 = 基础颜色受遮蔽后的结果 + 自发光贡献
+    vec4 hdr_result = screen(vec4(shaded_base, color_base.a), total_emissive);
+
+    // 色调映射（示例：ACES近似曲线）
+//    const float gamma = 2.2;
+//    const float exposure = 1.0;
+//    hdr_result *= exposure;
+//    hdr_result = clamp(hdr_result * 0.6, 0.0, 1.0); // 简单压缩高光
+//    hdr_result = pow(hdr_result, vec3(1.0/gamma));
+
+    imageStore(target, pos, hdr_result);
+//    imageStore(target, pos, vec4(color_ssao.r, color_ssao.r, color_ssao.r, 1));
+}

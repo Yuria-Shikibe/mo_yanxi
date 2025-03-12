@@ -36,6 +36,8 @@ namespace mo_yanxi::vk{
 			VkPhysicalDeviceVulkan12Features features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
 
 			features.bufferDeviceAddress = true;
+			features.timelineSemaphore = true;
+			if(enable_validation_layers)features.bufferDeviceAddressCaptureReplay = true;
 
 			return features;
 		}()};
@@ -45,6 +47,7 @@ namespace mo_yanxi::vk{
 
 			features.samplerAnisotropy = true;
 			features.independentBlend = true;
+			features.sampleRateShading = true;
 
 			return features;
 		}()};

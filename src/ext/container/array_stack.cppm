@@ -1,4 +1,4 @@
-export module ext.array_stack;
+export module mo_yanxi.array_stack;
 
 import std;
 

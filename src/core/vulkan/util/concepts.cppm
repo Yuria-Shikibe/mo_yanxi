@@ -9,7 +9,7 @@ namespace mo_yanxi::vk{
 	concept contigious_range_of = requires{
 		requires std::ranges::sized_range<Rng>;
 		requires std::ranges::contiguous_range<Rng>;
-		requires std::same_as<Value, std::ranges::range_value_t<Rng>>;
+		requires std::convertible_to<Value, std::ranges::range_value_t<Rng>>;
 	};
 
 	export

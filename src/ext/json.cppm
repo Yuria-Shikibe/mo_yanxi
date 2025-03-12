@@ -5,7 +5,7 @@ module;
 export module ext.json;
 
 import std;
-import ext.heterogeneous.open_addr_hash;
+import mo_yanxi.heterogeneous.open_addr_hash;
 import mo_yanxi.meta_programming;
 
 namespace mo_yanxi::json{

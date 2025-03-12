@@ -67,7 +67,17 @@ namespace mo_yanxi::vk{
 				throw std::runtime_error("Instance is already initialized");
 			}
 
+			VkValidationFeaturesEXT validation_features_ext{
+				.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+				.pNext = nullptr,
+				.enabledValidationFeatureCount = 0,
+				.pEnabledValidationFeatures = nullptr,
+				.disabledValidationFeatureCount = static_cast<std::uint32_t>(disabled_validation_features.size()),
+				.pDisabledValidationFeatures = disabled_validation_features.data()
+			};
+
 			VkInstanceCreateInfo createInfo{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
+			// createInfo.pNext = &validation_features_ext;
 			createInfo.pApplicationInfo = &app_info;
 
 			if constexpr(enable_validation_layers){

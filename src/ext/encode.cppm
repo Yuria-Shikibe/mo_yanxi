@@ -7,7 +7,7 @@ module;
 
 #endif
 
-export module ext.encode;
+export module mo_yanxi.encode;
 
 import std;
 
@@ -34,10 +34,11 @@ MultiByteBuffer<ToType> convertTo(FromType charCode){
 	return buffer;
 }
 
-export namespace mo_yanxi::encode{
+namespace mo_yanxi::encode{
 
 	using CharBuffer = std::array<char, 4>;
 
+	export
 	[[nodiscard]] constexpr char32_t utf_8_to_32(const char* charCodes, const unsigned size = 4) noexcept{
 		const unsigned char c = charCodes[0];
 		switch(size){
@@ -49,11 +50,12 @@ export namespace mo_yanxi::encode{
 		}
 	}
 
+	export
 	[[nodiscard]] std::array<char, 4> utf_32_to_8(char32_t val) noexcept{
 		return convertTo<char>(val);
 	}
 
-
+	export
 	constexpr bool isUnicodeHead(const char code) noexcept{
 		constexpr char Mask = 0b0000'0001;
 
@@ -65,10 +67,12 @@ export namespace mo_yanxi::encode{
 		return true;
 	}
 
+	export
 	constexpr std::size_t count_code_points(std::string_view chars) noexcept{
 		return std::ranges::count_if(chars, isUnicodeHead);
 	}
 
+	export
 	/**
 	 * @brief Warning: this function assume that inItr is always derreferenceable
 	 * @param inItr Search Pos
@@ -83,6 +87,7 @@ export namespace mo_yanxi::encode{
 		return inItr;
 	}
 
+	export
 	/**
 	 * @brief
 	 * @param code Unicode Head
@@ -129,6 +134,7 @@ export namespace mo_yanxi::encode{
 		return 1;
 	}
 
+	export
 	template <std::ranges::contiguous_range Rng>
 		requires (std::ranges::sized_range<Rng> && sizeof(std::ranges::range_value_t<Rng>) == 1)
 	auto convertCharToChar32(Rng&& src){
@@ -156,7 +162,7 @@ export namespace mo_yanxi::encode{
 	}
 
 
-
+	export
 	[[nodiscard]] std::string utf_32_to_8(const std::u32string_view str) noexcept{
 		std::string s;
 

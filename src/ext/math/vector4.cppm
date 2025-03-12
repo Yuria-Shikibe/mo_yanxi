@@ -148,22 +148,22 @@ namespace mo_yanxi::math{
 				return *this;
 			}
 
-			template <std::derived_from<vector4> S>
+			template <typename S>
 			FORCE_INLINE constexpr S& set(this S& self, const T val) noexcept{
 				return self.set(val, val, val, val);
 			}
 
-			template <std::derived_from<vector4> S>
+			template <typename S>
 			FORCE_INLINE constexpr S& set(this S& self, const_pass_t tgt) noexcept{
 				return (self = tgt);
 			}
 
-			template <std::derived_from<vector4> S>
+			template <typename S>
 			FORCE_INLINE constexpr S& lerp(this S& self, const S& tgt, const floating_point_t alpha) noexcept{
 				return self = math::lerp(self, tgt, alpha);
 			}
 
-			template <std::derived_from<vector4> S>
+			template <typename S>
 			FORCE_INLINE constexpr S& clamp(this S& self) noexcept{
 				self.r = math::clamp(self.r);
 				self.g = math::clamp(self.g);

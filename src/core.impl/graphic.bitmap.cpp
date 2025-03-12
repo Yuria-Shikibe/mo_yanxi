@@ -10,7 +10,7 @@ mo_yanxi::graphic::bitmap::bitmap(std::string_view path){
 	const auto ptr = io::image::load_png(path, width, height, bpp, channels);
 
 	create(width, height);
-	std::memcpy(data(), ptr.get(), size_bytes());
+	std::memcpy(data(), ptr.get(), width * height * bpp);
 }
 
 void mo_yanxi::graphic::bitmap::write(const std::string_view path, bool autoCreateFile) const{

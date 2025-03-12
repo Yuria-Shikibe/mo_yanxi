@@ -295,7 +295,7 @@ namespace mo_yanxi::math {
 		const T1 fromA, const T1 toa,
 		const T2 fromB, const T2 tob
 	) noexcept/*nvm*/ {
-		auto prog = (value - fromA) / (toa - fromA);
+		const auto prog = (value - fromA) / (toa - fromA);
 		if constexpr (std::floating_point<T2> && std::floating_point<decltype(prog)>){
 			return std::fma(prog, tob - fromB, fromB);
 		}else{
@@ -352,8 +352,8 @@ namespace mo_yanxi::math {
 	}
 
 	export
-	template <typename T>
-	MATH_ATTR constexpr T pow_integral(const T val, const std::unsigned_integral auto Exponent) noexcept {
+	template <typename T, std::unsigned_integral E>
+	MATH_ATTR constexpr T pow_integral(const T val, const E Exponent) noexcept {
 		if(Exponent == 0) {
 			return 1;
 		}else if (Exponent == 1) {
@@ -365,6 +365,16 @@ namespace mo_yanxi::math {
 			const T v = math::pow_integral<T>(val, (Exponent - 1) / 2);
 			return val * v * v;
 		}
+	}
+
+	export
+	template <typename T, std::unsigned_integral E>
+	MATH_ATTR constexpr T div_integral(const T val, const T div, const E times) noexcept {
+		T rst = val;
+		for(E i = 0; i < times; ++i){
+			rst /= div;
+		}
+		return rst;
 	}
 
 	/** Returns the next power of two. Returns the specified value if the value is already a power of two. */
@@ -467,13 +477,18 @@ namespace mo_yanxi::math {
 	export
 	template <mo_yanxi::number T>
 	MATH_ATTR constexpr T clamp_positive(const T val) noexcept {
-		return math::max(val, 0);
+		return math::max<T>(val, 0);
 	}
 
 
 	/** Approaches a value at linear speed. */
 	export MATH_ATTR constexpr auto approach(const auto from, const auto to, const auto speed) noexcept {
 		return from + math::clamp(to - from, -speed, speed);
+	}
+
+	/** Approaches a value at linear speed. */
+	export FORCE_INLINE constexpr void approach_inplace(auto& from, const auto to, const auto speed) noexcept {
+		from += math::clamp(to - from, -speed, speed);
 	}
 
 	export

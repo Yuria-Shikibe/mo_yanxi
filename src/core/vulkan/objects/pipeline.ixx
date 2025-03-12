@@ -89,7 +89,7 @@ namespace mo_yanxi::vk{
 				.sampleShadingEnable = false,
 				.minSampleShading = 1.0f,
 				.pSampleMask = nullptr,
-				.alphaToCoverageEnable = true,
+				.alphaToCoverageEnable = false,
 				.alphaToOneEnable = false
 			};
 
@@ -231,16 +231,25 @@ namespace mo_yanxi::vk{
 					.viewMask = 0,
 					.colorAttachmentCount = static_cast<std::uint32_t>(attachmentFormats.size()),
 					.pColorAttachmentFormats = attachmentFormats.data(),
-					.depthAttachmentFormat = VK_FORMAT_D24_UNORM_S8_UINT,
-					.stencilAttachmentFormat = VK_FORMAT_UNDEFINED
+					.depthAttachmentFormat = depth_format,
+					.stencilAttachmentFormat = stencil_format
 				};
+
+			std::vector tempDynamicStates{dynamicStates};
+			if(!staticViewport){
+				tempDynamicStates.push_back(VK_DYNAMIC_STATE_VIEWPORT);
+			}
+
+			if(!staticScissor){
+				tempDynamicStates.push_back(VK_DYNAMIC_STATE_SCISSOR);
+			}
 
 			VkPipelineDynamicStateCreateInfo dynamicInfo{
 					.sType =  VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
 					.pNext = nullptr,
 					.flags = 0,
-					.dynamicStateCount = static_cast<std::uint32_t>(dynamicStates.size()),
-					.pDynamicStates = dynamicStates.data()
+					.dynamicStateCount = static_cast<std::uint32_t>(tempDynamicStates.size()),
+					.pDynamicStates = tempDynamicStates.data()
 				};
 
 			VkPipelineColorBlendStateCreateInfo blendInfo{

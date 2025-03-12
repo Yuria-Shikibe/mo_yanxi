@@ -10,7 +10,7 @@ import std;
 
 export namespace mo_yanxi::math{
 
-	template <mo_yanxi::number T>
+	template <number T>
 	struct vector2
 	{
 		T x;
@@ -645,16 +645,26 @@ export namespace mo_yanxi::math{
 			return this->set(math::round<T>(rstX), math::round<T>(rstY));
 		}
 
-		template <number V>
+		template <std::floating_point V>
 		FORCE_INLINE constexpr vector2& scl(const V val) noexcept {
 			return this->scl(val, val);
 		}
 
-		template <number V>
+		template <std::floating_point V>
 		FORCE_INLINE constexpr vector2& scl(const V ox, const V oy) noexcept {
 			x = static_cast<T>(static_cast<V>(x) * ox);
 			y = static_cast<T>(static_cast<V>(y) * oy);
 			return *this;
+		}
+
+		template <std::integral V>
+		FORCE_INLINE constexpr vector2& scl(const V val) noexcept {
+			return this->scl(static_cast<floating_point_t>(val), static_cast<floating_point_t>(val));
+		}
+
+		template <std::integral V>
+		FORCE_INLINE constexpr vector2& scl(const V ox, const V oy) noexcept {
+			return this->scl(static_cast<floating_point_t>(ox), static_cast<floating_point_t>(oy));
 		}
 
 		FORCE_INLINE constexpr vector2& flip_x() noexcept {
@@ -863,6 +873,22 @@ export namespace mo_yanxi::math{
 				return vector2<TN>{static_cast<TN>(x), static_cast<TN>(y)};
 			}
 		}
+
+		template <std::signed_integral TN>
+		constexpr explicit(false) operator vector2<TN>() const noexcept requires(std::signed_integral<T> && sizeof(TN) >= sizeof(T)){
+			return as<TN>();
+		}
+
+		template <std::floating_point TN>
+		constexpr explicit(false) operator vector2<TN>() const noexcept requires(std::floating_point<T> && sizeof(TN) >= sizeof(T)){
+			return as<TN>();
+		}
+
+		template <std::unsigned_integral TN>
+		constexpr explicit(false) operator vector2<TN>() const noexcept requires(std::unsigned_integral<T> && sizeof(TN) >= sizeof(T)){
+			return as<TN>();
+		}
+
 		template <spec_of<vector2> TN>
 		[[nodiscard]] FORCE_INLINE constexpr auto as() const noexcept{
 			return as<typename TN::value_type>();
@@ -965,12 +991,13 @@ export namespace mo_yanxi::math{
 	using nor_vec2 = vector2<float>;
 
 	using point2 = vector2<int>;
-	using iszie2 = vector2<int>;
-	using uszie2 = vector2<unsigned int>;
+	using isize2 = vector2<int>;
+	using usize2 = vector2<unsigned int>;
 	using upoint2 = vector2<unsigned int>;
 	using short_point2 = vector2<short>;
 	using ushort_point2 = vector2<unsigned short>;
 	using u32size2 = vector2<std::uint32_t>;
+	using u32point2 = vector2<std::uint32_t>;
 
 
 	namespace vectors{

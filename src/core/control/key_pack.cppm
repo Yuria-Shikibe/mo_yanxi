@@ -51,6 +51,7 @@ namespace mo_yanxi::core::ctrl{
 			};
 	}
 
+	export
 	struct key_pack{
 		packed_key_t code{};
 

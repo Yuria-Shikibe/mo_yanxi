@@ -234,7 +234,8 @@ namespace mo_yanxi {
 
         struct split_point;
         using map_type =
-            fixed_open_hash_map<point_type, split_point, math::vectors::constant2<point_type::value_type>::max_vec2>;
+            std::unordered_map<point_type, split_point>;
+            // fixed_open_hash_map<point_type, split_point, math::vectors::constant2<point_type::value_type>::max_vec2>;
 
         map_type map{};
 
@@ -258,6 +259,7 @@ namespace mo_yanxi {
              * @return [rst, possible to find]
              */
             void locateNextInner(const T second){
+
                 inner = outer->second.lower_bound(second);
             }
 
@@ -325,9 +327,9 @@ namespace mo_yanxi {
             bool check_merge(allocator2d& alloc) noexcept{
                 if(idle && is_split_idle()){
                     //resume split
-                    alloc.erase_split(src_top_lft(), {split.x, top_rit.y});
-                    alloc.erase_split(src_top_rit(), top_rit);
-                    alloc.erase_split(src_bot_rit(), {top_rit.x, split.y});
+                    if(region_top_lft().area())alloc.erase_split(src_top_lft(), {split.x, top_rit.y});
+                    if(region_top_rit().area())alloc.erase_split(src_top_rit(), top_rit);
+                    if(region_bot_rit().area())alloc.erase_split(src_bot_rit(), {top_rit.x, split.y});
                     alloc.erase_mark(bot_lft, split);
 
                     split = top_rit;
@@ -385,7 +387,7 @@ namespace mo_yanxi {
                 return {tags::unchecked, {bot_lft.x, split.y}, {split.x, top_rit.y}};
             }
 
-            void acquire_and_split(allocator2d& alloc, const math::uszie2 extent){
+            void acquire_and_split(allocator2d& alloc, const math::usize2 extent){
                 assert(idle);
 
                 if(is_leaf()){
@@ -488,7 +490,7 @@ namespace mo_yanxi {
         }
 
         void erase_mark(const point_type src, const point_type dst){
-            auto size = dst - src;
+            const auto size = dst - src;
 
             erase(nodes_XY, src, size.x, size.y);
             erase(nodes_YX, src, size.y, size.x);
@@ -506,13 +508,15 @@ namespace mo_yanxi {
         }
 
     public:
-        [[nodiscard]] allocator2d(const extent_type extent) :
+        [[nodiscard]] allocator2d() = default;
+
+        [[nodiscard]] explicit(false) allocator2d(const extent_type extent) :
         extent_(extent), remain_area_(extent.area()){
             map.reserve(1024);
             add_split({}, {}, extent);
         }
 
-        std::optional<point_type> allocate(const math::uszie2 extent) noexcept{
+        std::optional<point_type> allocate(const math::usize2 extent) noexcept{
             if(extent.beyond(extent_))return std::nullopt;
             if(remain_area_ < extent.area())return std::nullopt;
 
@@ -527,13 +531,14 @@ namespace mo_yanxi {
         }
 
         void deallocate(const point_type value) noexcept{
-            if(auto itr = map.find(value); itr != map.end()){
-                if(auto chamber = itr->second.mark_idle(*this)){
-                    auto extent = chamber->get_extent().area();
+            if(const auto itr = map.find(value); itr != map.end()){
+                if(const auto chamber = itr->second.mark_idle(*this)){
+                    const auto extent = chamber->get_extent().area();
                     remain_area_ += extent;
                 }
 
             }else{
+                assert(false);
                 //TODO warning deallocate invalid handle?
             }
         }

@@ -16,12 +16,19 @@ set_warnings("all")
 set_encodings("utf-8")
 
 add_requires("glfw")
+add_requires("msdfgen", { configs = { extensions = true } })
 add_requires("freetype")
 
+-- set_toolchains("clang-cl")
 local msvc_path = "D:/lib/msvc/VC/Tools/MSVC/14.44.34823"
+local llvm_path = "D:/lib/LLVM/bin"
+
 set_toolchains("msvc")
+
 set_toolset("cc", path.join(msvc_path, "/bin/Hostx64/x64/cl.exe"))
 set_toolset("cxx", path.join(msvc_path, "/bin/Hostx64/x64/cl.exe"))
+-- set_toolset("cc", path.join(llvm_path, "/bin/clang-cl.exe"))
+-- set_toolset("cxx", path.join(llvm_path, "/bin/clang-cl.exe"))
 add_includedirs(path.join(msvc_path, "/include"))
 
 if is_mode("release") then
@@ -49,11 +56,19 @@ target("mo_yanxi")
     add_cxflags("/diagnostics:column")
     add_cxflags("/arch:AVX2")
 
+    add_cxflags("/wd4244")
+    add_cxflags("/wd4100")
+    add_cxflags("/wd4458")
+    add_cxflags("/wd4267")
+    add_cxflags("/wd4189")
+    add_cxflags("/wd5030")
+
     add_files("src/**.cppm")
     add_files("src/**.ixx")
     add_files("src/**.cpp")
 
     add_packages("glfw")
+    add_packages("msdfgen")
     add_packages("freetype")
 
 --     add_packages("lunasvg")

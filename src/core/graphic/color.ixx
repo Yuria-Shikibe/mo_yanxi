@@ -39,19 +39,19 @@ namespace mo_yanxi::graphic{
 
 		using rgba8_bits = unsigned int;
 
-		constexpr color() noexcept : color(1, 1, 1, 1){
-		}
-
-		constexpr explicit color(const rgba8_bits rgba8888V) noexcept{
-			from_rgba8888(rgba8888V);
-		}
-
-		constexpr color(const float r, const float g, const float b, const float a) noexcept
-			: vector4<float>(r, g, b, a){
-		}
-
-		constexpr color(const float r, const float g, const float b) noexcept : color(r, g, b, 1){
-		}
+		// constexpr color() noexcept : color(1, 1, 1, 1){
+		// }
+		//
+		// constexpr explicit color(const rgba8_bits rgba8888V) noexcept{
+		// 	from_rgba8888(rgba8888V);
+		// }
+		//
+		// constexpr color(const float r, const float g, const float b, const float a) noexcept
+		// 	: vector4<float>(r, g, b, a){
+		// }
+		//
+		// constexpr color(const float r, const float g, const float b) noexcept : color(r, g, b, 1){
+		// }
 
 	private:
 		template <bool doClamp>
@@ -85,12 +85,17 @@ namespace mo_yanxi::graphic{
 
 		[[nodiscard]] FORCE_INLINE constexpr color to_light_color_copy() const noexcept{
 			color ret{*this};
-			ret.r = static_cast<float>(math::floor(light_color_range * r, 10));
-			ret.g = static_cast<float>(math::floor(light_color_range * g, 10));
-			ret.b = static_cast<float>(math::floor(light_color_range * b, 10));
-			ret.a = static_cast<float>(math::floor(light_color_range * a, 10));
 
-			return ret;
+			return ret.to_light_color();
+		}
+		[[nodiscard]] FORCE_INLINE constexpr color to_light_color_copy(const bool cond) const noexcept{
+			if(cond){
+				color ret{*this};
+
+				return ret.to_light_color();
+			}else{
+				return *this;
+			}
 		}
 
 		FORCE_INLINE friend constexpr std::size_t hash_value(const color& obj){
@@ -164,19 +169,22 @@ namespace mo_yanxi::graphic{
 			return to_rgba8888();
 		}
 
-		FORCE_INLINE constexpr color& from_rgb888(const rgba8_bits value) noexcept{
-			r = static_cast<float>(value >> 16 & max_val) / max_val_f;
-			g = static_cast<float>(value >> 8 & max_val) / max_val_f;
-			b = static_cast<float>(value >> 0 & max_val) / max_val_f;
-			return *this;
+		FORCE_INLINE static constexpr color from_rgb888(const rgba8_bits value, float a = 1) noexcept{
+			color c{};
+			c.r = static_cast<float>(value >> 16 & max_val) / max_val_f;
+			c.g = static_cast<float>(value >> 8 & max_val) / max_val_f;
+			c.b = static_cast<float>(value >> 0 & max_val) / max_val_f;
+			c.a = a;
+			return c;
 		}
 
-		FORCE_INLINE constexpr color& from_rgba8888(const rgba8_bits value) noexcept{
-			r = static_cast<float>(value >> r_Offset & max_val) / max_val_f;
-			g = static_cast<float>(value >> g_Offset & max_val) / max_val_f;
-			b = static_cast<float>(value >> b_Offset & max_val) / max_val_f;
-			a = static_cast<float>(value >> a_Offset & max_val) / max_val_f;
-			return *this;
+		FORCE_INLINE static constexpr color from_rgba8888(const rgba8_bits value) noexcept{
+			color c{};
+			c.r = static_cast<float>(value >> r_Offset & max_val) / max_val_f;
+			c.g = static_cast<float>(value >> g_Offset & max_val) / max_val_f;
+			c.b = static_cast<float>(value >> b_Offset & max_val) / max_val_f;
+			c.a = static_cast<float>(value >> a_Offset & max_val) / max_val_f;
+			return c;
 		}
 
 		[[nodiscard]] FORCE_INLINE float diff(const color& other) const noexcept{
@@ -251,7 +259,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		FORCE_INLINE constexpr color& set(const rgba8_bits rgba) noexcept{
-			return from_rgba8888(rgba);
+			return *this = from_rgba8888(rgba);
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr float sum() const noexcept{
@@ -642,20 +650,20 @@ namespace mo_yanxi::graphic{
 	};
 
 	export namespace colors{
-		constexpr color WHITE{1, 1, 1, 1};
-		constexpr color LIGHT_GRAY{0xbfbfbfff};
-		constexpr color GRAY{0x7f7f7fff};
-		constexpr color DARK_GRAY{0x3f3f3fff};
-		constexpr color BLACK{0, 0, 0, 1};
-		constexpr color CLEAR{0, 0, 0, 0};
+		constexpr color white{1, 1, 1, 1};
+		constexpr color light_gray{color::from_rgba8888(0xbfbfbfff)};
+		constexpr color gray{color::from_rgba8888(0x7f7f7fff)};
+		constexpr color dark_gray{color::from_rgba8888(0x3f3f3fff)};
+		constexpr color black{0, 0, 0, 1};
+		constexpr color clear{0, 0, 0, 0};
 
 		constexpr color BLUE{0, 0, 1, 1};
 		constexpr color NAVY{0, 0, 0.5f, 1};
-		constexpr color ROYAL{0x4169e1ff};
-		constexpr color SLATE{0x708090ff};
-		constexpr color SKY{0x87ceebff};
+		constexpr color ROYAL{color::from_rgba8888(0x4169e1ff)};
+		constexpr color SLATE{color::from_rgba8888(0x708090ff)};
+		constexpr color SKY{color::from_rgba8888(0x87ceebff)};
 
-		constexpr color AQUA{0x85A2F3ff};
+		constexpr color AQUA{color::from_rgba8888(0x85A2F3ff)};
 		constexpr color BLUE_SKY = color::from_lerp_span(0.745f, BLUE, SKY);
 		constexpr color AQUA_SKY = color::from_lerp_span(0.5f, AQUA, SKY);
 
@@ -663,37 +671,37 @@ namespace mo_yanxi::graphic{
 		constexpr color TEAL{0, 0.5f, 0.5f, 1};
 
 		constexpr color GREEN{0x00ff00ff};
-		constexpr color PALE_GREEN{0xa1ecabff};
-		constexpr color LIGHT_GREEN{0X62F06CFF};
-		constexpr color ACID{0x7fff00ff};
-		constexpr color LIME{0x32cd32ff};
-		constexpr color FOREST{0x228b22ff};
-		constexpr color OLIVE{0x6b8e23ff};
+		constexpr color PALE_GREEN{color::from_rgba8888(0xa1ecabff)};
+		constexpr color LIGHT_GREEN{color::from_rgba8888(0X62F06CFF)};
+		constexpr color ACID{color::from_rgba8888(0x7fff00ff)};
+		constexpr color LIME{color::from_rgba8888(0x32cd32ff)};
+		constexpr color FOREST{color::from_rgba8888(0x228b22ff)};
+		constexpr color OLIVE{color::from_rgba8888(0x6b8e23ff)};
 
-		constexpr color YELLOW{0xffff00ff};
-		constexpr color GOLD{0xffd700ff};
-		constexpr color GOLDENROD{0xdaa520ff};
-		constexpr color ORANGE{0xffa500ff};
+		constexpr color YELLOW{color::from_rgba8888(0xffff00ff)};
+		constexpr color GOLD{color::from_rgba8888(0xffd700ff)};
+		constexpr color GOLDENROD{color::from_rgba8888(0xdaa520ff)};
+		constexpr color ORANGE{color::from_rgba8888(0xffa500ff)};
 
-		constexpr color BROWN{0x8b4513ff};
-		constexpr color TAN{0xd2b48cff};
-		constexpr color BRICK{0xb22222ff};
+		constexpr color BROWN{color::from_rgba8888(0x8b4513ff)};
+		constexpr color TAN{color::from_rgba8888(0xd2b48cff)};
+		constexpr color BRICK{color::from_rgba8888(0xb22222ff)};
 
-		constexpr color RED{0xff0000ff};
-		constexpr color RED_DUSK{0xDE6663ff};
-		constexpr color SCARLET{0xff341cff};
-		constexpr color CRIMSON{0xdc143cff};
-		constexpr color CORAL{0xff7f50ff};
-		constexpr color SALMON{0xfa8072ff};
-		constexpr color PINK{0xff69b4ff};
+		constexpr color RED{color::from_rgba8888(0xff0000ff)};
+		constexpr color RED_DUSK{color::from_rgba8888(0xDE6663ff)};
+		constexpr color SCARLET{color::from_rgba8888(0xff341cff)};
+		constexpr color CRIMSON{color::from_rgba8888(0xdc143cff)};
+		constexpr color CORAL{color::from_rgba8888(0xff7f50ff)};
+		constexpr color SALMON{color::from_rgba8888(0xfa8072ff)};
+		constexpr color PINK{color::from_rgba8888(0xff69b4ff)};
 		constexpr color MAGENTA{1, 0, 1, 1};
 
-		constexpr color PURPLE{0xa020f0ff};
-		constexpr color VIOLET{0xee82eeff};
-		constexpr color MAROON{0xb03060ff};
+		constexpr color PURPLE{color::from_rgba8888(0xa020f0ff)};
+		constexpr color VIOLET{color::from_rgba8888(0xee82eeff)};
+		constexpr color MAROON{color::from_rgba8888(0xb03060ff)};
 
-		constexpr color ENERGY{0XF0C743FF};
-		constexpr color AMMUNITION{0XF0A24BFF};
+		constexpr color ENERGY{color::from_rgba8888(0XF0C743FF)};
+		constexpr color AMMUNITION{color::from_rgba8888(0XF0A24BFF)};
 	}
 }
 

@@ -2,7 +2,7 @@
 // Created by Matrix on 2024/10/25.
 //
 
-export module ext.func_initialzer;
+export module mo_yanxi.func_initialzer;
 
 import std;
 export import mo_yanxi.meta_programming;

@@ -2,7 +2,7 @@ module;
 
 #include "../adapted_attributes.hpp"
 
-export module ext.heterogeneous.open_addr_hash;
+export module mo_yanxi.heterogeneous.open_addr_hash;
 
 export import mo_yanxi.heterogeneous;
 export import mo_yanxi.open_addr_hash_map;

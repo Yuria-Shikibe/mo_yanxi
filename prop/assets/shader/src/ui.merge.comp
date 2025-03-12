@@ -1,0 +1,44 @@
+#pragma shader_stage(compute)
+#extension GL_ARB_separate_shader_objects : enable
+
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout (set = 0, binding = 0, rgba32f) restrict uniform writeonly image2D target;
+layout (set = 0, binding = 1, rgba32f) restrict uniform readonly image2D tex_base;
+layout (set = 0, binding = 2, rgba32f) restrict uniform readonly image2D tex_light_src;
+layout (set = 0, binding = 3, rgba32f) restrict uniform readonly image2D tex_light_bloom;
+
+float smooth_max(float a, float b, float k) {
+    float m = max(a, b);
+    return log(exp(k * (a - m)) + exp(k * (b - m))) / k + m;
+}
+
+float smooth_min(float a, float b, float k) {
+    float m = min(a, b);
+    return -log(exp(-k * (a - m)) + exp(-k * (b - m))) / k + m;
+}
+
+vec4 screen(vec4 src, vec4 dst) {
+    vec3 color = 1.0 - (1.0 - src.rgb) * (1.0 - dst.rgb);
+    return vec4(color, smooth_max(src.a, dst.a, 15.f));
+}
+
+float lumRGB(vec4 v) {
+    return v.a * dot(v.rgb, vec3(0.212, 0.716, 0.072));
+}
+
+
+void main() {
+    const ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+
+    vec4 color_base = imageLoad(tex_base, pos);
+    vec4 color_light_src = imageLoad(tex_light_src, pos);
+    vec4 color_light_bloom = imageLoad(tex_light_bloom, pos);
+
+    vec4 total_emissive = screen(color_light_src * .35f, color_light_bloom * 1.05f);
+
+    vec4 hdr_result = screen(color_base, total_emissive);
+
+    imageStore(target, pos, hdr_result);
+}

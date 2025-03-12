@@ -4,11 +4,11 @@ import std;
 import mo_yanxi.meta_programming;
 
 export namespace mo_yanxi{
-	template <typename T, typename... Ts>
+	template <typename T, typename Ts>
 		requires (std::is_default_constructible_v<T>)
-	struct type_map : type_to_index<std::tuple<Ts...>>{
+	struct type_map : type_to_index<Ts>{
 	private:
-		using base = type_to_index<std::tuple<Ts...>>;
+		using base = type_to_index<Ts>;
 
 	public:
 		using value_type = T;
@@ -39,4 +39,7 @@ export namespace mo_yanxi{
 			return at<base::template index_of<V>>();
 		}
 	};
+
+	template <typename T, typename ...Ts>
+	using type_map_of = type_map<T, Ts...>;
 }

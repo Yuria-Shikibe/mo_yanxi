@@ -1,0 +1,38 @@
+#pragma shader_stage(compute)
+
+#include "lib/blend.glsl"
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout (binding = 0) uniform sampler2D in_base;
+layout (binding = 1) uniform sampler2D in_light;
+layout (binding = 2) uniform sampler2D in_background;
+
+restrict layout (binding = 3, rgba32f) uniform image2D out_base;
+restrict layout (binding = 4, rgba32f) uniform image2D out_light;
+
+
+vec4 applyShadow(vec4 baseColor, vec4 shadowColor) {
+    float shadowIntensity = shadowColor.a;
+    vec3 darkenedRGB = mix(vec3(1.f), shadowColor.rgb, shadowIntensity);
+    vec4 darkenedColor = vec4(darkenedRGB * baseColor.rgb, baseColor.a);
+
+    return darkenedColor;
+}
+
+void main() {
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+//    vec2 uv = (vec2(pos) + vec2(0.5f, 0.5f)) / vec2(imageSize(outputImageGeneral));
+
+    vec4 lightSrcColor = texelFetch(in_light, pos, 0);
+    vec4 backgroundDstColor = imageLoad(out_light, pos);
+    vec4 generalSrcColor = texelFetch(in_base, pos, 0);
+    vec4 generalDstColor = imageLoad(out_base, pos);
+    //TODO
+    imageStore(out_base, pos, generalSrcColor);
+    imageStore(out_light, pos, lightSrcColor);
+
+//    imageStore(out_base, pos, blend2(generalSrcColor, applyShadow(generalDstColor, backgroundSrcColor)));
+//    imageStore(out_light, pos, alphaBlend(backgroundSrcColor, backgroundDstColor));
+//    imageStore(outputImageBase, pos, baseSrcColor);
+}

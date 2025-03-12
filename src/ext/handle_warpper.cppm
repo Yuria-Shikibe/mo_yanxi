@@ -29,8 +29,7 @@ export namespace mo_yanxi{
 		constexpr wrapper& operator=(const wrapper& other) noexcept requires (enableCopy) = default;
 
 		constexpr wrapper(wrapper&& other) noexcept
-			: handle{std::move(other.handle)}{
-			other.handle = nullptr;
+			: handle{std::exchange(other.handle, {})}{
 		}
 
 		constexpr wrapper& operator=(wrapper&& other) noexcept{

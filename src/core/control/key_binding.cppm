@@ -30,6 +30,10 @@ namespace mo_yanxi::core::ctrl{
 
 		[[nodiscard]] key_binding() = default;
 
+
+		[[nodiscard]] key_binding(const key_code_t key, const key_code_t expectedAct, const key_code_t mode, const function_ptr func)
+			: key_binding{unpacked_key{key, expectedAct, mode}, func}{}
+
 		[[nodiscard]] key_binding(const key_code_t key, const key_code_t expectedAct, const function_ptr func)
 			: key_binding{unpacked_key{key, expectedAct, mode::ignore}, func}{}
 
@@ -105,7 +109,7 @@ namespace mo_yanxi::core::ctrl{
 					break;
 				}
 
-				case act::Release :{
+				case act::release :{
 					signals[key] = 0;
 					algo::erase_unique_unstable(pressed, key);
 					break;
@@ -138,7 +142,7 @@ namespace mo_yanxi::core::ctrl{
 					break;
 				}
 
-				case act::Release :{
+				case act::release :{
 					pushIn = Release;
 					// pressed[code] &= ~Continuous;
 					break;
@@ -177,7 +181,7 @@ namespace mo_yanxi::core::ctrl{
 					break;
 				case act::Continuous : actionTgt = Continuous;
 					break;
-				case act::Release : actionTgt = Release;
+				case act::release : actionTgt = Release;
 					break;
 				case act::Repeat : actionTgt = Repeat;
 					break;
@@ -224,15 +228,15 @@ namespace mo_yanxi::core::ctrl{
 			updateSignal(code, action);
 		}
 
-		void update(const float delta){
+		void update(const float delta_in_tick){
 			for(const key_code_t key : pressed){
 				for(const auto& bind : binds_continuous[key]){
 					this->exec(bind, act::Continuous, signals[key] & mode::Mask);
 				}
 			}
 
-			algo::erase_if_unstable(doubleClickTimers, [delta](DoubleClickTimer& timer){
-				timer.time -= delta;
+			algo::erase_if_unstable(doubleClickTimers, [delta_in_tick](DoubleClickTimer& timer){
+				timer.time -= delta_in_tick;
 				return timer.time <= 0.f;
 			});
 		}
@@ -267,7 +271,7 @@ namespace mo_yanxi::core::ctrl{
 
 		void register_bind(const key_code_t key, const key_code_t expectedMode, bind_func_t onPress, bind_func_t onRelease){
 			this->register_bind(key_binding{key, act::press, expectedMode, onPress});
-			this->register_bind(key_binding{key, act::Release, expectedMode, onRelease});
+			this->register_bind(key_binding{key, act::release, expectedMode, onRelease});
 		}
 
 		void register_bind(std::initializer_list<std::pair<key_code_t, key_code_t>> pairs, bind_func_t func){
@@ -291,22 +295,22 @@ namespace mo_yanxi::core::ctrl{
 
 	export
 	template <typename ...ParamTy>
-	class KeyMapping : public key_mapping_sockets<ParamTy...>, public referenced_object<false>{
+	class key_mapping : public key_mapping_sockets<ParamTy...>, public referenced_object<false>{
 		using base = key_mapping_sockets<ParamTy...>;
 		bool activated{true};
 
 	public:
-		void update(const float delta){
+		void update(const float delta_in_tick){
 			if(!activated) return;
 
-			base::update(delta);
+			base::update(delta_in_tick);
 		}
 
-		void setActivated(const bool active) noexcept{
+		void set_activated(const bool active) noexcept{
 			activated = active;
 		}
 
-		[[nodiscard]] bool isActivated() const noexcept{
+		[[nodiscard]] bool is_activated() const noexcept{
 			return activated;
 		}
 

@@ -134,6 +134,11 @@ namespace mo_yanxi::vk{
 			std::invoke(f, b);
 		}}{}
 
+		descriptor_layout(
+			VkDevice device,
+			std::regular_invocable<descriptor_layout_builder&> auto func
+		) : descriptor_layout{device, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, std::move(func)}{}
+
 		[[nodiscard]] std::uint32_t binding_count() const noexcept{
 			return bindings;
 		}
@@ -181,6 +186,12 @@ namespace mo_yanxi::vk{
 		void push(const VkPushConstantRange& constantRange){
 			constants.push_back(constantRange);
 		}
+
+
+		[[nodiscard]] std::span<const VkPushConstantRange> get_constant_ranges() const noexcept{
+			return constants;
+		}
+
 	};
 
 	export
@@ -208,8 +219,8 @@ namespace mo_yanxi::vk{
 		}
 
 		template<
-			contigious_range_of<VkDescriptorSetLayout> R1 = std::initializer_list<VkDescriptorSetLayout>,
-			contigious_range_of<VkPushConstantRange> R2 = std::initializer_list<VkPushConstantRange>>
+			contigious_range_of<const VkDescriptorSetLayout> R1 = std::initializer_list<const VkDescriptorSetLayout>,
+			contigious_range_of<const VkPushConstantRange> R2 = std::initializer_list<const VkPushConstantRange>>
 		[[nodiscard]] explicit(false) pipeline_layout(
 			VkDevice device,
 			const VkPipelineLayoutCreateFlags flags = 0,

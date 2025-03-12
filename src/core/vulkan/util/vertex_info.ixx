@@ -1,6 +1,7 @@
 module;
 
 #include <vulkan/vulkan.h>
+#include "../src/ext/enum_operator_gen.hpp"
 
 export module mo_yanxi.vk.vertex_info;
 
@@ -12,10 +13,12 @@ namespace mo_yanxi::vk{
 	namespace vertices{
 		using floating_type = float;
 
+
 		struct vertex_attribute{
 			std::uint32_t offset;
 			VkFormat format;
 		};
+
 
 		export
 		struct vertex_bind_info{
@@ -85,10 +88,21 @@ namespace mo_yanxi::vk{
 		};
 
 		export
+		enum struct mode_flag_bits : std::uint8_t{
+			none,
+			sdf = 1 << 0,
+			uniformed = 1 << 1,
+
+		};
+
+		BITMASK_OPS(export, mode_flag_bits);
+		BITMASK_OPS_ADDITIONAL(export, mode_flag_bits);
+
+		export
 		struct texture_indices{
 			std::uint8_t texture_index{};
 			std::uint8_t texture_layer{};
-			std::uint8_t reserved1{};
+			mode_flag_bits mode_flag{};
 			std::uint8_t reserved2{};
 		};
 
@@ -97,6 +111,14 @@ namespace mo_yanxi::vk{
 			math::vector2<floating_type> pos{};
 			floating_type depth{};
 			texture_indices tex_indices{};
+			math::vector4<floating_type> color{};
+			math::vector4<floating_type> override_color{};
+			math::vector2<floating_type> uv{};
+		};
+
+		export
+		struct vertex_world_transparent{
+			math::vector2<floating_type> pos{};
 			math::vector4<floating_type> color{};
 			math::vector4<floating_type> override_color{};
 			math::vector2<floating_type> uv{};
@@ -125,7 +147,7 @@ namespace mo_yanxi::vk{
 
 		export
 		constexpr vertex_bind_info vertex_ui_info{
-			sizeof(vertex_world),
+			sizeof(vertex_ui),
 			{
 				{0, VK_FORMAT_R32G32_SFLOAT},
 				{8, VK_FORMAT_R8G8B8A8_UINT},

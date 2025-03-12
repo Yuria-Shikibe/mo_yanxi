@@ -1,0 +1,53 @@
+#pragma shader_stage(compute)
+
+#include "lib/multisample.glsl"
+
+
+#define MaxKernalSize 64
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0) uniform sampler2D depthTex;
+layout(binding = 1, rgba32f) restrict uniform writeonly image2D outTex;
+
+layout(set = 0, binding = 2) uniform UBO {
+    vec4 kernal[MaxKernalSize];
+    int kernalSize;
+    float scale;
+} ubo;
+
+const float radius = 4.f;
+const float zDiffScl = 1.5f;
+const float zDiffThreshold = 0.025f;
+
+float lumRGB(vec3 v) {
+    return  dot(v.rgb, vec3(0.212, 0.716, 0.072));
+}
+
+void main() {
+    float occlusion = 0.0;
+
+
+    const ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    const vec2 uv = (vec2(pos) + vec2(0.5f, 0.5f)) / vec2(imageSize(outTex));
+
+    const float depth = texture(depthTex, uv).r;
+
+    for (int i = 0; i < ubo.kernalSize; ++i){
+        const vec2 smp = uv + ubo.kernal[i].xy * radius * ubo.scale;
+
+        const float sampleDepth = texture(depthTex, smp).r;
+
+        if(sampleDepth >= depth)continue;
+
+        float rangeCheck = smoothstep(zDiffThreshold, 1.0, radius / abs(depth - sampleDepth) * zDiffScl);
+        occlusion += rangeCheck;
+    }
+
+    const float factor = max(occlusion, 0) / ubo.kernalSize;
+    const float drakness = 1.0 - factor;
+
+    const vec4 outColor = vec4(vec3(smoothstep(0.25f, 0.95f, drakness)), factor);
+
+    imageStore(outTex, pos, vec4(1 - factor));
+}

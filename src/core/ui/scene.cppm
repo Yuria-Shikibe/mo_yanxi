@@ -1,0 +1,207 @@
+//
+// Created by Matrix on 2024/10/1.
+//
+
+export module mo_yanxi.ui.scene;
+
+// export import Core.UI.ToolTipManager;
+
+import mo_yanxi.math.vector2;
+import mo_yanxi.math.rect_ortho;
+
+export import mo_yanxi.core.ctrl.constants;
+export import mo_yanxi.core.ctrl.key_binding;
+export import mo_yanxi.ui.pre_decl;
+
+import mo_yanxi.owner;
+import mo_yanxi.handle_wrapper;
+
+import std;
+
+namespace mo_yanxi{
+	namespace graphic{
+		struct renderer_ui;
+	}
+
+	// class Bundle;
+}
+
+// export namespace Graphic{
+// 	struct RendererUI;
+// 	// struct Camera2D;
+// }
+
+namespace mo_yanxi::ui{
+	// struct elem;
+	
+	export struct scene_base{
+		struct MouseState{
+			math::vec2 src{};
+			bool pressed{};
+
+			void reset(const math::vec2 pos){
+				src = pos;
+				pressed = true;
+			}
+
+			void clear(const math::vec2 pos){
+
+				src = pos;
+				pressed = false;
+			}
+		};
+
+		std::string_view name{};
+
+		math::frect region{};
+
+		math::vec2 cursorPos{};
+		std::array<MouseState, core::ctrl::mouse::Count> mouseKeyStates{};
+
+
+		dependency<owner<group*>> root{};
+
+		// dependency<core::ctrl::key_mapping<>*> keyMapping{};
+		//focus fields
+		// struct elem* currentInputFocused{nullptr};
+		elem* currentScrollFocus{nullptr};
+		elem* currentCursorFocus{nullptr};
+		elem* currentKeyFocus{nullptr};
+
+		std::vector<elem*> lastInbounds{};
+		std::unordered_set<elem*> independentLayout{};
+		std::unordered_set<elem*> asyncTaskOwners{};
+
+		graphic::renderer_ui* renderer{};
+		// Graphic::RendererUI* renderer{};
+		// Bundle* bundle{};
+
+		[[nodiscard]] scene_base() = default;
+
+		[[nodiscard]] scene_base(
+			const std::string_view name,
+			const owner<group*> root,
+			graphic::renderer_ui* renderer = nullptr)
+			: name{name},
+			  root{root},
+			renderer(renderer)
+		{}
+
+		scene_base(const scene_base& other) = delete;
+
+		scene_base(scene_base&& other) noexcept = default;
+
+		scene_base& operator=(const scene_base& other) = delete;
+
+		scene_base& operator=(scene_base&& other) noexcept = default;
+	};
+
+
+	export struct scene : scene_base{
+		// ToolTipManager tooltipManager{};
+
+		[[nodiscard]] explicit scene(
+			std::string_view name,
+			owner<group*> root,
+			graphic::renderer_ui* renderer = nullptr
+		);
+
+		~scene();
+
+		// [[nodiscard]] math::frect getBound() const noexcept{
+		// 	return math::frect{pos, size};
+		// }
+
+		[[nodiscard]] math::vec2 getCursorDragTransform(const core::ctrl::key_code_t key) const noexcept{
+			return cursorPos - mouseKeyStates[key].src;
+		}
+
+		[[nodiscard]] std::string_view getClipboard() const noexcept;
+
+		void setClipboard(std::string_view sv) const noexcept;
+
+		// void setIMEPos(Geom::Point2 pos) const;
+
+		void registerAsyncTaskElement(elem* element);
+
+		void notifyLayoutUpdate(elem* element);
+
+		[[nodiscard]] bool isMousePressed() const noexcept{
+			return std::ranges::any_of(mouseKeyStates, std::identity{}, &MouseState::pressed);
+		}
+
+		// void joinTasks();
+
+		[[nodiscard]] core::ctrl::key_code_t get_input_mode() const noexcept;
+
+		void dropAllFocus(const elem* target);
+
+		void trySwapFocus(elem* newFocus);
+
+		void swapFocus(elem* newFocus);
+
+		bool onEsc();
+
+		void onMouseAction(core::ctrl::key_code_t key, core::ctrl::key_code_t action, core::ctrl::key_code_t mode);
+
+		void onKeyAction(core::ctrl::key_code_t key, core::ctrl::key_code_t action, core::ctrl::key_code_t mode);
+
+		void onUnicodeInput(char32_t val) const;
+
+		void onScroll(math::vec2 scroll) const;
+
+		void onCursorPosUpdate(math::vec2 newPos);
+		void onCursorPosUpdate(){
+			onCursorPosUpdate(cursorPos);
+		}
+
+		void resize(math::vec2 size);
+
+		void set_position(const math::vec2 pos){
+			this->region.src = pos;
+		}
+
+		void update(float delta_in_ticks);
+
+		// void setCameraFocus(Graphic::Camera2D* camera) const;
+
+		[[nodiscard]] bool isCursorCaptured() const noexcept;
+		[[nodiscard]] elem* getCursorCaptureRoot() const noexcept;
+
+		void layout();
+
+		void draw() const;
+		void draw(math::frect clipSpace) const;
+
+		[[nodiscard]] bool hasScrollFocus() const noexcept{
+			return this->currentScrollFocus != nullptr;
+		}
+
+		[[nodiscard]] bool hasKeyFocus() const noexcept{
+			return this->currentKeyFocus != nullptr;
+		}
+
+		scene(const scene& other) = delete;
+
+		scene(scene&& other) noexcept;
+
+		scene& operator=(const scene& other) = delete;
+
+		scene& operator=(scene&& other) noexcept;
+
+		void dropEventFocus(const elem* target){
+			if(currentCursorFocus == target)currentCursorFocus = nullptr;
+			if(currentScrollFocus == target)currentScrollFocus = nullptr;
+			if(currentKeyFocus == target)currentKeyFocus = nullptr;
+		}
+
+		double getGlobalTime() const noexcept;
+
+	private:
+		void updateInbounds(std::vector<elem*>&& next);
+
+		// void moveOwnerShip();
+	};
+
+
+}

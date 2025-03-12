@@ -126,6 +126,11 @@ namespace mo_yanxi::graphic{
 			return screenSize / 2.f;
 		}
 
+		template <typename T>
+		[[nodiscard]] T map_scale(const T& src, const T& dst) const noexcept{
+			return math::map(std::log(scale), minScale, maxScale, src, dst);
+		}
+
 		void update(const float delta, bool applyShake = true){
 			setOrtho(screenSize.x, screenSize.y);
 
@@ -179,10 +184,10 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] const math::mat3& get_world_to_uniformed() const noexcept {
 			return worldToScreen;
 		}
-		//
-		// [[nodiscard]] math::mat3& get_uniformed_to_world() noexcept {
-		// 	return screenToWorld;
-		// }
+
+		[[nodiscard]] math::mat3 get_world_to_uniformed_flip_y() const noexcept {
+			return math::mat3{}.set_orthogonal(viewport.get_src(), viewport.size());
+		}
 
 		[[nodiscard]] const math::mat3& get_uniformed_to_world() const noexcept {
 			return screenToWorld;

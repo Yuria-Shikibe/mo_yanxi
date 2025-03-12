@@ -144,7 +144,7 @@ namespace mo_yanxi{
 		}
 
 	private:
-		events::named_event_manager<std::move_only_function, resize_event> eventManager{};
+		events::named_event_manager<std::move_only_function<void() const>, resize_event> eventManager{};
 
 		exclusive_handle_member<GLFWwindow*> handle{};
 		VkExtent2D size{};

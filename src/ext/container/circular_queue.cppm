@@ -3,7 +3,7 @@ module;
 #include <cassert>
 #include "../adapted_attributes.hpp"
 
-export module ext.circular_queue;
+export module mo_yanxi.circular_queue;
 
 import std;
 
@@ -73,7 +73,7 @@ namespace mo_yanxi{
 			return rst;
 		}
 
-		void resize(const size_type newCapacity){
+		constexpr void resize(const size_type newCapacity){
 			if(newCapacity == capacity_) return;
 			auto newData = std::allocator_traits<allocator_type>::allocate(alloc, newCapacity);
 
@@ -140,7 +140,7 @@ namespace mo_yanxi{
 			return *this;
 		}
 
-		circular_queue& operator=(circular_queue&& other) noexcept{
+		constexpr circular_queue& operator=(circular_queue&& other) noexcept{
 			if(this == &other) return *this;
 
 			std::swap(data_, other.data_);

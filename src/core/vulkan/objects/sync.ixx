@@ -74,12 +74,31 @@ namespace mo_yanxi::vk{
 	public:
 		[[nodiscard]] semaphore() = default;
 
-		[[nodiscard]] explicit semaphore(VkDevice device) : device{device}{
+		[[nodiscard]] explicit(false) semaphore(VkDevice device) : device{device}{
 			VkSemaphoreCreateInfo semaphoreInfo{
 					.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 					.pNext = nullptr,
 					.flags = 0
 				};
+
+			if(const auto rst = vkCreateSemaphore(device, &semaphoreInfo, nullptr, &handle)){
+				throw vk_error(rst, "Failed to create Semaphore!");
+			}
+		}
+		[[nodiscard]] explicit(false) semaphore(VkDevice device, const std::uint64_t initValue) : device{device}{
+
+			VkSemaphoreTypeCreateInfo semaphoreInfo2{
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+				.pNext = nullptr,
+				.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+				.initialValue = initValue
+			};
+
+			VkSemaphoreCreateInfo semaphoreInfo{
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+				.pNext = &semaphoreInfo2,
+				.flags = 0
+			};
 
 			if(const auto rst = vkCreateSemaphore(device, &semaphoreInfo, nullptr, &handle)){
 				throw vk_error(rst, "Failed to create Semaphore!");
@@ -132,18 +151,18 @@ namespace mo_yanxi::vk{
 			return value;
 		}
 
-		// void wait() const{
-		// 	const VkSemaphoreWaitInfo info{
-		// 		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
-		// 		.pNext = nullptr,
-		// 		.flags = ,
-		// 		.semaphoreCount = ,
-		// 		.pSemaphores = ,
-		// 		.pValues =
-		// 	}
-		//
-		// 	vkWaitSemaphores(device, &signalInfo);
-		// }
+		void wait(const std::uint64_t value, const std::uint64_t timeout = std::numeric_limits<std::uint64_t>::max()) const{
+			const VkSemaphoreWaitInfo info{
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+				.pNext = nullptr,
+				.flags = 0,
+				.semaphoreCount = 1,
+				.pSemaphores = &handle,
+				.pValues = &value
+			};
+
+			vkWaitSemaphores(device, &info, timeout);
+		}
 	};
 
 	export
@@ -217,6 +236,33 @@ namespace mo_yanxi::vk{
 
 		[[nodiscard]] VkDevice get_device() const noexcept{
 			return device;
+		}
+
+		template <typename P>
+		bool wait_set(std::chrono::duration<std::chrono::microseconds::rep, P> timeout) const noexcept{
+			const auto src = std::chrono::high_resolution_clock::now();
+			while(!is_set()){
+				if(std::chrono::high_resolution_clock::now() - src > timeout){
+					return false;
+				}
+				std::this_thread::sleep_for(std::chrono::microseconds(10));
+			}
+			return true;
+		}
+
+		void wait_set() const noexcept(true){
+#if DEBUG_CHECK
+			const auto src = std::chrono::high_resolution_clock::now();
+#endif
+			while(!is_set()){
+				// std::cerr << "abc";
+				std::this_thread::sleep_for(std::chrono::microseconds(10));
+#if DEBUG_CHECK
+				if(std::chrono::high_resolution_clock::now() - src > std::chrono::seconds{1}){
+					throw std::runtime_error{"Wait Time Excess 1 second"};
+				}
+#endif
+			}
 		}
 
 		event(const event& other) = delete;

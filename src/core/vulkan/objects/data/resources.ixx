@@ -73,7 +73,7 @@ namespace mo_yanxi::vk{
 			create(create_info, alloc_create_info);
 		}
 
-		[[nodiscard]] VkDeviceSize get_size() const noexcept{
+		[[nodiscard]] constexpr VkDeviceSize get_size() const noexcept{
 			return size;
 		}
 
@@ -124,10 +124,27 @@ namespace mo_yanxi::vk{
 			}
 		}
 
+		buffer_type& base() noexcept{
+			assert(buffer_obj);
+			return *buffer_obj;
+		}
+
+		const buffer_type& base() const noexcept{
+			assert(buffer_obj);
+			return *buffer_obj;
+		}
+
 		template <typename T>
 			requires (std::is_trivially_copyable_v<T> && !std::is_pointer_v<T>)
 		const buffer_mapper& load(const T& data, const std::ptrdiff_t dst_byte_offset = 0) const noexcept{
 			std::memcpy(mapped + dst_byte_offset, &data, sizeof(T));
+			return *this;
+		}
+
+		template <typename T, typename O>
+			requires (std::is_trivially_copyable_v<T> && !std::is_pointer_v<T>)
+		const buffer_mapper& load(const T& data, T O::* mptr, const std::ptrdiff_t chunk_index = 0) const noexcept{
+			std::memcpy(mapped + chunk_index * sizeof(O) + std::bit_cast<std::uint32_t>(mptr), &data, sizeof(T));
 			return *this;
 		}
 
@@ -162,6 +179,14 @@ namespace mo_yanxi::vk{
 	export struct image : resource_base<VkImage>{
 		static constexpr VkImageSubresourceRange default_image_subrange{
 			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseMipLevel = 0,
+			.levelCount = 1,
+			.baseArrayLayer = 0,
+			.layerCount = 1
+		};
+
+		static constexpr VkImageSubresourceRange depth_image_subrange{
+			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
 			.baseMipLevel = 0,
 			.levelCount = 1,
 			.baseArrayLayer = 0,
@@ -265,17 +290,22 @@ namespace mo_yanxi::vk{
 				dstQueueFamilyIndex);
 		}
 
-		void init_layout_shader(
+		void init_layout(
 			VkCommandBuffer command_buffer,
+
+			VkPipelineStageFlags2 stage,
+			VkAccessFlags2 access,
 			VkImageLayout dstLayout,
-			std::uint32_t mipLevels = 1, std::uint32_t arrayLayers = 1
+
+			std::uint32_t mipLevels = 1,
+			std::uint32_t arrayLayers = 1
 			) const noexcept{
 			cmd::memory_barrier(
 				command_buffer, handle,
 				VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
 				VK_ACCESS_2_NONE,
-				VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-				VK_ACCESS_2_SHADER_READ_BIT,
+				stage,
+				access,
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				dstLayout,
 				{
@@ -501,7 +531,7 @@ namespace mo_yanxi::vk{
 		};
 
 		const std::size_t formatSize{get_format_size(image_format)};
-		const auto staging_buffer = templates::create_staging_buffer(alloc, formatSize * target_row_major.size());
+		const auto staging_buffer = templates::create_staging_buffer(alloc, formatSize * target_row_major.size() / 4);
 
 		cmd::memory_barrier(command_buffer, image,
 			currentStage,

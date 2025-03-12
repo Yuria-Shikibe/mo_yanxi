@@ -14,6 +14,7 @@ import mo_yanxi.vk.validation;
 import mo_yanxi.vk.exception;
 import mo_yanxi.vk.util;
 import mo_yanxi.vk.util.cmd.resources;
+import mo_yanxi.vk.util.cmd.render;
 import mo_yanxi.vk.swap_chain_info;
 import mo_yanxi.vk.concepts;
 import mo_yanxi.vk.vma;
@@ -61,6 +62,7 @@ namespace mo_yanxi::vk{
 		VkImageLayout dst_layout{VK_IMAGE_LAYOUT_UNDEFINED};
 	};
 
+
 	export
 	class context{
 	private:
@@ -76,6 +78,8 @@ namespace mo_yanxi::vk{
 
 		command_pool main_graphic_command_pool{};
 		command_pool main_graphic_command_pool_transient{};
+		command_pool main_compute_command_pool{};
+		command_pool main_compute_command_pool_transient{};
 
 		//Swap Chains
 		VkSwapchainKHR last_swap_chain{nullptr};
@@ -87,7 +91,7 @@ namespace mo_yanxi::vk{
 		circular_array<InFlightData, 2> sync_arr{};
 		swap_chain_staging_image_data final_staging_image{};
 
-		events::named_event_manager<std::move_only_function, window_instance::resize_event> eventManager{};
+		events::named_event_manager<std::move_only_function<void() const>, window_instance::resize_event> eventManager{};
 
 	public:
 
@@ -132,7 +136,7 @@ namespace mo_yanxi::vk{
 				}
 			}
 
-			submit_command(
+			cmd::submit_command(
 				device.primary_graphics_queue(),
 				swap_chain_frames[imageIndex].post_command,
 				current_syncs.fence,
@@ -163,7 +167,7 @@ namespace mo_yanxi::vk{
             VkPipelineStageFlags wait_before = VK_PIPELINE_STAGE_2_NONE,
             VkPipelineStageFlags signal_after = VK_PIPELINE_STAGE_2_NONE
         ) const{
-			submit_command(device.primary_graphics_queue(), commandBuffer, fence, toWait, wait_before, toSignal, signal_after);
+			cmd::submit_command(device.primary_graphics_queue(), commandBuffer, fence, toWait, wait_before, toSignal, signal_after);
 		}
 
 		void wait_on_graphic() const{
@@ -193,8 +197,24 @@ namespace mo_yanxi::vk{
 			return main_graphic_command_pool;
 		}
 
+		[[nodiscard]] const command_pool& get_compute_command_pool() const noexcept{
+			return main_compute_command_pool;
+		}
+
+		[[nodiscard]] const command_pool& get_compute_command_pool_transient() const noexcept{
+			return main_compute_command_pool_transient;
+		}
+
 		[[nodiscard]] const command_pool& get_graphic_command_pool_transient() const noexcept{
 			return main_graphic_command_pool_transient;
+		}
+
+		[[nodiscard]] transient_command get_transient_graphic_command_buffer() const noexcept{
+			return main_graphic_command_pool_transient.get_transient(graphic_queue());
+		}
+
+		[[nodiscard]] transient_command get_transient_compute_command_buffer() const noexcept{
+			return main_compute_command_pool_transient.get_transient(compute_queue());
 		}
 
 		[[nodiscard]] std::uint32_t graphic_family() const noexcept{
@@ -423,7 +443,9 @@ namespace mo_yanxi::vk{
 						image_data.dst_access,
 						image_data.clear ? VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 						image_data.dst_layout,
-						subresource_range
+						subresource_range,
+						graphic_family(),
+						image_data.owner_queue_family
 					);
 					dependency_gen.apply(bf);
 				}
@@ -441,7 +463,9 @@ namespace mo_yanxi::vk{
 
 			create_device();
 
+			main_compute_command_pool = {get_device(), compute_family(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT};
 			main_graphic_command_pool = {get_device(), graphic_family(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT};
+			main_compute_command_pool_transient = {get_device(), compute_family(), VK_COMMAND_POOL_CREATE_TRANSIENT_BIT};
 			main_graphic_command_pool_transient = {get_device(), graphic_family(), VK_COMMAND_POOL_CREATE_TRANSIENT_BIT};
 
 			for (auto & frame_data : sync_arr){

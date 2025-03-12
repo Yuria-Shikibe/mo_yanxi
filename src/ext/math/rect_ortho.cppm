@@ -652,6 +652,12 @@ namespace mo_yanxi::math{
 
 			return *this;
 		}
+		FORCE_INLINE constexpr rect_ortho& expand(const vector2<T> vec) noexcept{
+			(void)this->expand_x(vec.x);
+			(void)this->expand_y(vec.y);
+
+			return *this;
+		}
 
 		FORCE_INLINE constexpr rect_ortho& shrink_x(T marginX) noexcept{
 			marginX = math::min(marginX, size_.x / TWO);

@@ -236,6 +236,14 @@ export namespace mo_yanxi::dim2{
 			return this->at(pos.x, pos.y);
 		}
 
+		[[nodiscard]] constexpr value_type& operator[](const size_type x, const size_type y) noexcept{
+			return this->at(x, y);
+		}
+
+		[[nodiscard]] constexpr const value_type& operator[](const size_type x, const size_type y) const noexcept{
+			return this->at(x, y);
+		}
+
 		/**
 		 * @brief row major
 		 */
@@ -274,11 +282,11 @@ export namespace mo_yanxi::dim2{
 
 
 		[[nodiscard]] constexpr auto to_byte_mdspan_row_major() noexcept{
-			return std::mdspan{reinterpret_cast<std::byte*>(data()), height() * sizeof(T), width() * sizeof(T)};
+			return std::mdspan{reinterpret_cast<std::byte*>(data()), height(), width() * sizeof(T)};
 		}
 
 		[[nodiscard]] constexpr auto to_byte_mdspan_row_major() const noexcept{
-			return std::mdspan{reinterpret_cast<const std::byte*>(data()), height() * sizeof(T), width() * sizeof(T)};
+			return std::mdspan{reinterpret_cast<const std::byte*>(data()), height(), width() * sizeof(T)};
 		}
 
 		[[nodiscard]] constexpr auto to_mdspan_row_major() noexcept{

@@ -2,7 +2,7 @@ module;
 
 export module ext.fast_pop_stack;
 
-import ext.array_stack;
+import mo_yanxi.array_stack;
 
 import std;
 

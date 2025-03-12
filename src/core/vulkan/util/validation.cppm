@@ -15,6 +15,10 @@ namespace mo_yanxi::vk{
 		(const char*)"VK_LAYER_KHRONOS_validation",
 	};
 
+	export constexpr std::array disabled_validation_features{
+		VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES_EXT
+	};
+
 	VKAPI_ATTR VkBool32 VKAPI_CALL validationCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 		VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -64,6 +68,7 @@ namespace mo_yanxi::vk{
 			if constexpr (enable_validation_layers){
 				const VkDebugUtilsMessengerCreateInfoEXT createInfo{
 					.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+					.pNext = nullptr,
 					.flags = flags,
 					.messageSeverity = messageSeverity,
 					.messageType = messageType,

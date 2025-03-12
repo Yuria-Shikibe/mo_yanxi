@@ -1,6 +1,7 @@
 module;
 
 #include <vulkan/vulkan.h>
+#include <cassert>
 
 export module mo_yanxi.vk.descriptor_buffer;
 
@@ -18,6 +19,7 @@ namespace mo_yanxi::vk{
 	private:
 		friend descriptor_mapper;
 		std::vector<VkDeviceSize> offsets{};
+		std::uint32_t chunk_count{};
 
 		std::size_t uniformBufferDescriptorSize{};
 		std::size_t combinedImageSamplerDescriptorSize{};
@@ -30,20 +32,19 @@ namespace mo_yanxi::vk{
 		[[nodiscard]] descriptor_buffer(
 			vk::allocator& allocator,
 			VkDescriptorSetLayout layout,
-			std::uint32_t bindings
-		){
+			std::uint32_t bindings,
+			std::uint32_t chunk_count = 1
+		) : chunk_count{chunk_count}{
 
 			const auto device = allocator.get_device();
 			const auto physical_device = allocator.get_physical_device();
 
-
 			VkDeviceSize dbo_size;
-			ext::getDescriptorSetLayoutSizeEXT(device, layout, &dbo_size);
-
+			getDescriptorSetLayoutSizeEXT(device, layout, &dbo_size);
 
 			this->buffer::operator=(buffer{allocator, {
 				.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-				.size = dbo_size,
+				.size = dbo_size * chunk_count,
 				.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 			}, {
 				.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
@@ -61,7 +62,8 @@ namespace mo_yanxi::vk{
 					.pNext = &descriptor_buffer_properties,
 				};
 
-				ext::getPhysicalDeviceProperties2KHR(physical_device, &device_properties);
+				getPhysicalDeviceProperties2KHR(physical_device, &device_properties);
+
 				uniformBufferDescriptorSize = descriptor_buffer_properties.uniformBufferDescriptorSize;
 				combinedImageSamplerDescriptorSize = descriptor_buffer_properties.combinedImageSamplerDescriptorSize;
 				storageImageDescriptorSize = descriptor_buffer_properties.storageImageDescriptorSize;
@@ -72,7 +74,7 @@ namespace mo_yanxi::vk{
 			offsets.resize(bindings);
 			// Get descriptor bindings offsets as descriptors are placed inside set layout by those offsets.
 			for(auto&& [i, offset] : offsets | std::views::enumerate){
-				ext::getDescriptorSetLayoutBindingOffsetEXT(device, layout, static_cast<std::uint32_t>(i), offsets.data() + i);
+				getDescriptorSetLayoutBindingOffsetEXT(device, layout, static_cast<std::uint32_t>(i), offsets.data() + i);
 			}
 		}
 
@@ -92,6 +94,10 @@ namespace mo_yanxi::vk{
 			return inputAttachmentDescriptorSize;
 		}
 
+		explicit(false) operator VkDescriptorBufferBindingInfoEXT() const noexcept{
+			return get_bind_info(VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT_KHR | VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT);
+		}
+
 		[[nodiscard]] VkDescriptorBufferBindingInfoEXT get_bind_info(const VkBufferUsageFlags usage) const{
 			return {
 					.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
@@ -101,21 +107,62 @@ namespace mo_yanxi::vk{
 				};
 		}
 
-		void bind_to(const VkCommandBuffer commandBuffer, const VkBufferUsageFlags usage) const{
-			const auto info = get_bind_info(usage);
-			ext::cmdBindDescriptorBuffersEXT(commandBuffer, 1, &info);
+		[[nodiscard]] constexpr VkDeviceSize get_chunk_offset(const std::uint32_t chunkIndex) const noexcept{
+			assert(chunkIndex < chunk_count);
+			return  chunkIndex * get_chunk_size();
 		}
+
+		[[nodiscard]] constexpr VkDeviceSize get_chunk_size() const noexcept{
+			return get_size() / chunk_count;
+		}
+
+		[[nodiscard]] constexpr std::uint32_t get_chunk_count() const noexcept{
+			return chunk_count;
+		}
+
+	private:
+		void bind_to(
+			const VkCommandBuffer commandBuffer,
+			const VkBufferUsageFlags usage) const{
+			const auto info = get_bind_info(usage);
+			cmd::bindDescriptorBuffersEXT(commandBuffer, 1, &info);
+		}
+	public:
 
 		void bind_to(
 			VkCommandBuffer commandBuffer,
-			const VkBufferUsageFlags usage,
+			const VkPipelineBindPoint bindingPoint,
 			VkPipelineLayout layout,
 			const std::uint32_t setIndex,
-			const VkPipelineBindPoint bindingPoint,
-			const VkDeviceSize offset = 0) const{
+
+			const VkDeviceSize offset = 0,
+			const VkBufferUsageFlags usage = VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT_KHR | VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT
+		) const{
 			static constexpr std::uint32_t ZERO = 0;
 			bind_to(commandBuffer, usage);
-			ext::cmdSetDescriptorBufferOffsetsEXT(
+			cmd::setDescriptorBufferOffsetsEXT(
+				commandBuffer,
+				bindingPoint,
+				layout,
+				setIndex, 1, &ZERO, &offset);
+		}
+
+		void bind_chunk_to(
+			VkCommandBuffer commandBuffer,
+
+			const VkPipelineBindPoint bindingPoint,
+			VkPipelineLayout layout,
+			const std::uint32_t setIndex,
+
+			const std::uint32_t chunkIndex = 0,
+			const VkBufferUsageFlags usage = VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT_KHR | VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT
+		) const{
+			static constexpr std::uint32_t ZERO = 0;
+			bind_to(commandBuffer, usage);
+
+			const VkDeviceSize offset = get_chunk_offset(chunkIndex);
+
+			cmd::setDescriptorBufferOffsetsEXT(
 				commandBuffer,
 				bindingPoint,
 				layout,
@@ -178,15 +225,17 @@ namespace mo_yanxi::vk{
 		const descriptor_mapper& set_uniform_buffer(
 			const std::uint32_t binding,
 			const buffer& ubo,
-			const VkDeviceSize offset = 0
+			const VkDeviceSize ubo_offset = 0,
+			const std::uint32_t chunkIndex = 0
 		) const{
-			return this->set_uniform_buffer(binding, ubo.get_address() + offset, ubo.get_size());
+			return this->set_uniform_buffer(binding, ubo.get_address() + ubo_offset, ubo.get_size(), chunkIndex);
 		}
 
 		const descriptor_mapper& set_uniform_buffer(
 			const std::uint32_t binding,
 			const VkDeviceAddress address,
-			const VkDeviceSize size
+			const VkDeviceSize size,
+			const std::uint32_t chunkIndex = 0
 		) const{
 			const VkDescriptorAddressInfoEXT addr_info{
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT,
@@ -205,11 +254,11 @@ namespace mo_yanxi::vk{
 				}
 			};
 
-			ext::getDescriptorEXT(
+			vk::getDescriptorEXT(
 				buffer_obj->get_device(),
 				&info,
 				buffer_obj->get_uniform_buffer_descriptor_size(),
-				mapped + buffer_obj->offsets[binding]
+				mapped + buffer_obj->offsets[binding] + buffer_obj->get_chunk_offset(chunkIndex)
 			);
 
 			return *this;
@@ -218,12 +267,13 @@ namespace mo_yanxi::vk{
 		const descriptor_mapper& set_uniform_buffer_segments(
 			std::uint32_t initialBinding,
 			const buffer& ubo,
-			std::initializer_list<VkDeviceSize> segment_sizes) const{
+			std::initializer_list<VkDeviceSize> segment_sizes,
+			const std::uint32_t chunkIndex = 0) const{
 
 			VkDeviceSize currentOffset{};
 
 			for (const auto& [idx, sz] : segment_sizes | std::views::enumerate){
-				(void)this->set_uniform_buffer(initialBinding + static_cast<std::uint32_t>(idx), ubo.get_address() + currentOffset, sz);
+				(void)this->set_uniform_buffer(initialBinding + static_cast<std::uint32_t>(idx), ubo.get_address() + currentOffset, sz, chunkIndex);
 
 				currentOffset += sz;
 			}
@@ -231,51 +281,83 @@ namespace mo_yanxi::vk{
 			return *this;
 		}
 
+		const descriptor_mapper& set_storage_image(
+					const std::uint32_t binding,
+					VkImageView imageView,
+					const VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+					const std::uint32_t chunkIndex = 0,
+					const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) const{
 
+			VkDescriptorImageInfo imageInfo{
+				.sampler = nullptr,
+				.imageView = imageView,
+				.imageLayout = imageLayout
+			};
 
-		void set_image(
-			const std::uint32_t binding,
-			const VkDescriptorImageInfo& imageInfo,
-			const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) const{
 			auto [info, size] = buffer_obj->get_image_info(imageInfo, descriptorType);
 
-			ext::getDescriptorEXT(
+			vk::getDescriptorEXT(
 				buffer_obj->get_device(),
 				&info,
 				size,
-				mapped + buffer_obj->offsets[binding]
+				mapped + buffer_obj->offsets[binding] + buffer_obj->get_chunk_offset(chunkIndex)
 			);
+
+			return *this;
+		}
+
+		const descriptor_mapper& set_image(
+			const std::uint32_t binding,
+			const VkDescriptorImageInfo& imageInfo,
+			const std::uint32_t chunkIndex = 0,
+			const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) const{
+			auto [info, size] = buffer_obj->get_image_info(imageInfo, descriptorType);
+
+			vk::getDescriptorEXT(
+				buffer_obj->get_device(),
+				&info,
+				size,
+				mapped + buffer_obj->offsets[binding] + buffer_obj->get_chunk_offset(chunkIndex)
+			);
+
+			return *this;
 		}
 
 		template <std::ranges::input_range Rng>
 			requires (std::convertible_to<std::ranges::range_const_reference_t<Rng>, const VkDescriptorImageInfo&>)
-		void set_image(
+		const descriptor_mapper& set_image(
 			const std::uint32_t binding,
 			const Rng& imageInfos,
+			const std::uint32_t chunkIndex = 0,
 			const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) const{
 			std::size_t currentOffset = 0;
 
 			for(const VkDescriptorImageInfo& imageInfo : imageInfos){
 				auto [info, size] = buffer_obj->get_image_info(imageInfo, descriptorType);
 
-				ext::getDescriptorEXT(
+				vk::getDescriptorEXT(
 					buffer_obj->get_device(),
 					&info,
 					size,
-					mapped + buffer_obj->offsets[binding] + currentOffset
+					mapped + buffer_obj->offsets[binding] + currentOffset + buffer_obj->get_chunk_offset(chunkIndex)
 				);
 
 				currentOffset += size;
 			}
+
+			return *this;
 		}
 
 		template <std::ranges::input_range Rng>
 			requires (std::convertible_to<std::ranges::range_const_reference_t<Rng>, VkImageView>)
-		void set_image(
+		const descriptor_mapper& set_image(
 			const std::uint32_t binding,
 			const VkImageLayout layout,
 			VkSampler sampler,
-			const Rng& imageViews) const{
+			const Rng& imageViews,
+			const std::uint32_t chunkIndex = 0,
+			const VkDescriptorType type = VK_DESCRIPTOR_TYPE_MAX_ENUM
+			) const{
 			std::size_t currentOffset = 0;
 
 			for(VkImageView imageInfo : imageViews){
@@ -286,28 +368,27 @@ namespace mo_yanxi::vk{
 				};
 
 				auto [info, size] = buffer_obj->get_image_info(
-					image_info, sampler ? VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+					image_info, type == VK_DESCRIPTOR_TYPE_MAX_ENUM ? sampler ? VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : type);
 
-				ext::getDescriptorEXT(
+				vk::getDescriptorEXT(
 					buffer_obj->get_device(),
 					&info,
 					size,
-					mapped + buffer_obj->offsets[binding] + currentOffset
+					mapped + buffer_obj->offsets[binding] + currentOffset + buffer_obj->get_chunk_offset(chunkIndex)
 				);
 
 				currentOffset += size;
 			}
-			//
-			// if(binding + 1 < buffer_obj->offsets.size()){
-			//
-			// }
+
+			return *this;
 		}
 
-		void set_image(
+		const descriptor_mapper& set_image(
 			const std::uint32_t binding,
-			const VkImageView imageView,
+			VkImageView imageView,
+			const std::uint32_t chunkIndex = 0,
 			const VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			const VkSampler sampler = nullptr,
+			VkSampler sampler = nullptr,
 			const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
 		) const{
 			const VkDescriptorImageInfo image_descriptor{
@@ -316,7 +397,7 @@ namespace mo_yanxi::vk{
 					.imageLayout = imageLayout
 				};
 
-			set_image(binding, image_descriptor, descriptorType);
+			return set_image(binding, image_descriptor, chunkIndex, descriptorType);
 		}
 
 		// template <std::invocable<descriptor_buffer&> Writer>

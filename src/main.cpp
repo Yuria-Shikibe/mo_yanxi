@@ -3,10 +3,8 @@
 
 // #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
-
-extern "C++"{
-#include <finders_interface.h>
-}
+#include <freetype/freetype.h>
+#include <msdfgen/ext/import-font.h>
 
 import std;
 
@@ -31,20 +29,122 @@ import mo_yanxi.vk.descriptor_buffer;
 import mo_yanxi.vk.pipeline.layout;
 import mo_yanxi.vk.pipeline;
 import mo_yanxi.vk.dynamic_rendering;
+import mo_yanxi.vk.util;
 import mo_yanxi.vk.util.uniform;
+import mo_yanxi.vk.batch;
+import mo_yanxi.vk.sampler;
 
 import mo_yanxi.vk.vertex_info;
 import mo_yanxi.vk.ext;
 
+import mo_yanxi.assets.graphic;
 import mo_yanxi.assets.directories;
+import mo_yanxi.assets.ctrl;
 import mo_yanxi.graphic.shaderc;
 import mo_yanxi.graphic.color;
+import mo_yanxi.graphic.post_processor.bloom;
 
 import mo_yanxi.core.window;
 import mo_yanxi.allocator_2D;
 import mo_yanxi.algo;
 
 import mo_yanxi.graphic.camera;
+import mo_yanxi.core.global;
+import mo_yanxi.core.global.ui;
+
+import mo_yanxi.graphic.renderer;
+import mo_yanxi.graphic.renderer.world;
+import mo_yanxi.graphic.renderer.ui;
+import mo_yanxi.graphic.draw;
+import mo_yanxi.graphic.draw.func;
+import mo_yanxi.graphic.draw.nine_patch;
+import mo_yanxi.graphic.draw.transparent;
+import mo_yanxi.graphic.image_atlas;
+import mo_yanxi.graphic.image_nine_region;
+
+import mo_yanxi.font;
+import mo_yanxi.font.manager;
+import mo_yanxi.font.typesetting;
+
+import mo_yanxi.graphic.msdf;
+
+void draw_glyph_layout(
+	mo_yanxi::graphic::renderer_world& renderer,
+	const mo_yanxi::font::typesetting::glyph_layout& layout,
+	const mo_yanxi::math::vec2 offset,
+	bool toLight,
+	float opacityScl = 1.f){
+	using namespace mo_yanxi;
+	using namespace mo_yanxi::graphic;
+	color tempColor{};
+
+	draw::default_transparent_acquirer acquirer{renderer.batch, {}};
+
+	const font::typesetting::glyph_elem* last_elem{};
+
+	for (const auto& row : layout.rows()){
+		const auto lineOff = row.src + offset;
+
+		// acquirer << draw::white_region;
+		//
+		// draw::line::rect_ortho(acquirer, row.bound.to_region(lineOff));
+		// draw::line::line_ortho(acquirer.get(), lineOff, lineOff.copy().add_x(row.bound.width));
+
+		for (auto && glyph : row.glyphs){
+			if(!glyph.glyph)continue;
+			last_elem = &glyph;
+
+			acquirer << glyph.glyph.get_cache();
+
+			tempColor = glyph.color;
+
+			if(opacityScl != 1.f){
+				tempColor.a *= opacityScl;
+			}
+
+			if(glyph.code.code == U'\0'){
+				tempColor.mul_rgb(.65f);
+			}
+
+
+			draw::fill::quad(
+				acquirer.get(),
+				lineOff + glyph.region.vert_00(),
+				lineOff + glyph.region.vert_10(),
+				lineOff + glyph.region.vert_11(),
+				lineOff + glyph.region.vert_01(),
+				tempColor.to_light_color_copy(toLight)
+			);
+
+			// acquirer << draw::white_region;
+			// draw::line::rect_ortho(acquirer, glyph.region.copy().move(lineOff));
+
+		}
+
+
+	}
+
+
+	if(layout.is_clipped() && last_elem){
+		const auto lineOff = layout.rows().back().src + offset;
+
+		draw::fill::fill(
+			acquirer[-1],
+			lineOff + last_elem->region.vert_00(),
+			lineOff + last_elem->region.vert_10(),
+			lineOff + last_elem->region.vert_11(),
+			lineOff + last_elem->region.vert_01(),
+			last_elem->color.copy().mulA(opacityScl).to_light_color_copy(toLight),
+			{},
+			{},
+			last_elem->color.copy().mulA(opacityScl).to_light_color_copy(toLight)
+		);
+	}
+
+	acquirer << draw::white_region;
+	//
+	draw::line::rect_ortho(acquirer, mo_yanxi::math::frect{mo_yanxi::tags::from_extent, offset, layout.get_clamp_size()});
+}
 
 
 void compile_shaders(){
@@ -60,345 +160,200 @@ void compile_shaders(){
 
 void init_assets(){
 	mo_yanxi::assets::load_dir(R"(D:\projects\mo_yanxi\prop)");
-}
-
-void init_test_image(mo_yanxi::vk::context& context, mo_yanxi::vk::image& image){
-	using namespace mo_yanxi;
-
-	graphic::color colora, colorb;
-	auto c = colora.lerp(colorb, 1.f);
-
-	graphic::bitmap test{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"};
-	image = {
-			context.get_allocator(), {
-				.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-				.pNext = nullptr,
-				.flags = 0,
-				.imageType = VK_IMAGE_TYPE_2D,
-				.format = VK_FORMAT_R8G8B8A8_UNORM,
-				.extent = {test.width(), test.height(), 1},
-				.mipLevels = 1,
-				.arrayLayers = 1,
-				.samples = VK_SAMPLE_COUNT_1_BIT,
-				.tiling = VK_IMAGE_TILING_OPTIMAL,
-				.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-			},
-			{
-				.usage = VMA_MEMORY_USAGE_GPU_ONLY
-			}
-		};
-
-	auto command_buffer = context.get_graphic_command_pool_transient().obtain();
-	vk::buffer buffer{vk::templates::create_staging_buffer(context.get_allocator(), test.size_bytes())};
-	{
-		vk::buffer_mapper mapper{buffer};
-		mapper.load_range(test.to_span());
-	}
-
-	command_buffer.begin();
-	image.init_layout_write(command_buffer);
-
-	vk::cmd::copy_buffer_to_image(command_buffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {
-		                              VkBufferImageCopy{
-			                              .imageSubresource = {
-				                              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				                              .mipLevel = 0,
-				                              .baseArrayLayer = 0,
-				                              .layerCount = 1
-			                              },
-			                              .imageOffset = {},
-			                              .imageExtent = image.get_extent()
-		                              }
-	                              });
-
-	command_buffer.end();
-	context.submit_graphics(command_buffer);
-	context.wait_on_graphic();
+	mo_yanxi::assets::ctrl::load();
 }
 
 void main_loop(){
 	using namespace mo_yanxi;
 
 	vk::context context{vk::ApplicationInfo};
-	vk::ext::load(context.get_instance());
+	graphic::image_atlas atlas{context};
+	graphic::image_page& main_page = atlas.create_image_page("main");
 
-	/*
-	vk::texture texture{context.get_allocator(), {4096, 4096}};
-	vk::image image{};
-	init_test_image(context, image);
+	font::font_manager font_manager{atlas};
 	{
-		vk::fence fence{context.get_device(), false};
+		auto p = font_manager.page().register_named_region("white", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\assets\texture\white.png)"});
+		p.first.uv.shrink(64);
+		font_manager.page().mark_protected("white");
 
-		auto cmd = context.get_graphic_command_pool_transient().get_transient(context.graphic_queue(), fence);
-		texture.init_layout(cmd);
+		graphic::draw::white_region = p.first;
 
-		allocator2d allocator2d{{texture.get_image().get_extent().width, texture.get_image().get_extent().height}};
-		std::vector<vk::texture_bitmap_write> tasks{};
+		auto& face_tele = font_manager.register_face("tele", R"(D:\projects\mo_yanxi\prop\assets\fonts\telegrama.otf)");
+		auto& face_srch = font_manager.register_face("srch", R"(D:\projects\mo_yanxi\prop\assets\fonts\SourceHanSerifSC-SemiBold.otf)");
+		auto& face_timesi = font_manager.register_face("timesi", R"(D:\projects\mo_yanxi\prop\assets\fonts\timesi.ttf)");
+		auto& face_ui = font_manager.register_face("segui", R"(D:\projects\mo_yanxi\prop\assets\fonts\seguisym.ttf)");
 
-		(assets::dir::texture / "test").for_all_subs([&](io::file&& file){
-			if(file.extension() != ".png")return;
-			vk::texture_bitmap_write task{};
-			task.bitmap = graphic::bitmap{file.path()};
-			if(task.bitmap.area() > 2045 * 2048)return;
-
-			if(auto pos = allocator2d.allocate(task.bitmap.extent())){
-				task.offset = pos.value().as<int>();
-				tasks.push_back(std::move(task));
-			}
-		});
-
-		auto _ = texture.write(cmd, tasks);
-		cmd = context.get_graphic_command_pool_transient().get_transient(context.graphic_queue(), fence);
-
-		graphic::bitmap bitmap{4096, 4096};
-
-		auto handle = vk::dump_image(
-			context.get_allocator(), cmd,
-			texture.get_image(), VK_FORMAT_R8G8B8A8_UNORM,
-			{{}, bitmap.width(), bitmap.height()},
-			bitmap.to_mdspan_row_major(),
-
-			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-			VK_ACCESS_2_SHADER_READ_BIT,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			0
-		);
-
-		cmd = {};
-		handle.resume();
-		bitmap.write(R"(D:\projects\mo_yanxi\prop\test.png)", true);
-	}
-	*/
-
-	vk::shader_module test_mesh{context.get_device(), assets::dir::shader_spv / "test.mesh.spv"};
-	vk::shader_module test_frag{context.get_device(), assets::dir::shader_spv / "test.frag.spv"};
-
-	vk::shader_module world_vert{context.get_device(), assets::dir::shader_spv / "world.vert.spv"};
-	vk::shader_module world_frag{context.get_device(), assets::dir::shader_spv / "world.frag.spv"};
-
-
-	vk::command_buffer command_buffer{context.get_graphic_command_pool().obtain()};
-	vk::fence fence{context.get_device(), false};
-
-
-	vk::buffer indices_buffer{vk::templates::create_index_buffer(context.get_allocator(), vk::indices::default_indices_group.size())};
-	vk::buffer vertices_buffer{
-		vk::templates::create_vertex_buffer(context.get_allocator(), sizeof(vk::vertices::vertex_world) * 4)};
-	vk::buffer indirect_buffer{context.get_allocator(), {
-		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size = sizeof(VkDrawIndexedIndirectCommand),
-		.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
-	}, {.usage = VMA_MEMORY_USAGE_CPU_TO_GPU}};
-
-
-	{
-		vk::buffer buffer{vk::templates::create_staging_buffer(context.get_allocator(), indices_buffer.get_size())};
-		(void)vk::buffer_mapper{buffer}.load_range(vk::indices::default_indices_group);
-		{
-			vk::scoped_recorder scoped_recorder{command_buffer};
-
-			vk::cmd::dependency_gen dependency_gen{};
-			dependency_gen.push_staging(buffer);
-			dependency_gen.push_on_initialization(indices_buffer);
-			dependency_gen.apply(scoped_recorder);
-
-			buffer.copy_to(scoped_recorder, indices_buffer, {VkBufferCopy{
-				.srcOffset = 0,
-				.dstOffset = 0,
-				.size = buffer.get_size()
-			}});
-
-			dependency_gen.push_post_write(indices_buffer, VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT, VK_ACCESS_2_INDEX_READ_BIT);
-			dependency_gen.apply(scoped_recorder);
-		}
-
-		context.submit_graphics(command_buffer, fence);
-		fence.wait_and_reset();
+		face_tele.fallback = &face_srch;
+		face_srch.fallback = &face_ui;
+		font::typesetting::default_font_manager = &font_manager;
+		font::typesetting::default_font = &face_tele;
 	}
 
-	vk::color_attachment color_attachment{
-		context.get_allocator(),
-		context.get_extent(),
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+	graphic::allocated_image_region& p = font_manager.page().register_named_region("boarder", graphic::msdf::create_boarder(12.f)).first;
+	graphic::image_nine_region nine_region{
+		p,
+		Align::padding<std::uint32_t>{}.set(16).expand(graphic::msdf::sdf_image_boarder),
+		graphic::msdf::sdf_image_boarder
 	};
 
+	font::typesetting::parser parser{};
+	font::typesetting::apd_default_modifiers(parser);
+	auto rst = parser(
+		"，楼上的\n#<[#ffff00bb><[123>下来 搞核算 叮咚鸡叮咚鸡，#<[tele>Dgdgjjj\ndsjydyddyd",
+		font::typesetting::layout_policy::auto_feed_line | font::typesetting::layout_policy::reserve,
+		{1600, 200});
 
-	{
-		{
-			vk::scoped_recorder scoped_recorder{command_buffer};
-			color_attachment.init_layout(scoped_recorder);
-		}
-		context.submit_graphics(command_buffer, fence);
-		fence.wait_and_reset();
-	}
+	vk::load_ext(context.get_instance());
+	assets::graphic::load(context);
 
-
-	struct proj{
-		vk::padded_mat3 view;
-	};
-
-	vk::descriptor_layout descriptor_layout_proj{
-		context.get_device(),
-		VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
-		[](vk::descriptor_layout_builder& builder){
-			builder.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
-		}
-	};
-	vk::descriptor_layout descriptor_layout_image{
-		context.get_device(),
-		VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
-		[](vk::descriptor_layout_builder& builder){
-			builder.push_seq(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 4);
-		}
-	};
-
-	vk::uniform_buffer ubo{
-		context.get_allocator(),
-		sizeof(proj)
-	};
-
-	vk::descriptor_buffer descriptor_buffer_proj{
-		context.get_allocator(),
-		descriptor_layout_proj, descriptor_layout_proj.binding_count()};
-	vk::descriptor_buffer descriptor_buffer_image{
-		context.get_allocator(),
-		descriptor_layout_image, descriptor_layout_image.binding_count()};
-
-	(void)vk::descriptor_mapper{descriptor_buffer_proj}
-		.set_uniform_buffer(0, ubo);
-
-	proj proj{};
-	math::mat3 mat;
-	mat.set_orthogonal_flip_y({}, math::vector2{context.get_extent().width, context.get_extent().height}.as<float>());
-	proj.view = mat;
-
-	(void)vk::buffer_mapper{ubo}.load(proj);
+	graphic::renderer_export exports;
+	graphic::renderer_world renderer_world{context, exports};
+	graphic::renderer_ui renderer_ui{context, exports};
 
 
 
-	vk::pipeline_layout pipeline_layout{context.get_device(), 0, {descriptor_layout_proj, descriptor_layout_image}};
-	vk::graphic_pipeline_template pipeline_template{};
-	pipeline_template.set_viewport({0, 0, static_cast<float>(context.get_extent().width), static_cast<float>(context.get_extent().height), 0, 1});
-	pipeline_template.set_scissor(context.get_screen_area());
-	pipeline_template.set_shaders({world_vert, world_frag});
-	pipeline_template.set_vertex_info(
-		vk::vertices::vertex_world_info.get_default_bind_desc(),
-		vk::vertices::vertex_world_info.get_default_attr_desc()
-	);
-	pipeline_template.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM);
 
-	vk::pipeline pipeline{context.get_device(), pipeline_layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, pipeline_template};
 
-	(void)vk::buffer_mapper{indirect_buffer}.load(VkDrawIndexedIndirectCommand{
-		.indexCount = 6,
-		.instanceCount = 1,
-		.firstIndex = 0,
-		.vertexOffset = 0,
-		.firstInstance = 0
-	});
 
-	(void)vk::buffer_mapper{vertices_buffer}.load(std::array<vk::vertices::vertex_world, 4>{
-		vk::vertices::vertex_world{math::vec2{100, 500} + math::vec2{0, 0}},
-		vk::vertices::vertex_world{math::vec2{100, 500} + math::vec2{50, 0}},
-		vk::vertices::vertex_world{math::vec2{100, 500} + math::vec2{50, 50}},
-		vk::vertices::vertex_world{math::vec2{100, 500} + math::vec2{0, 50}},
-	});
 
-	auto record_cmd = [&]{
-		{
-			vk::scoped_recorder scoped_recorder{command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
-
-			vk::dynamic_rendering dynamic_rendering{{color_attachment.get_image_view()}};
-			dynamic_rendering.begin_rendering(scoped_recorder, context.get_screen_area());
-			pipeline.bind(scoped_recorder, VK_PIPELINE_BIND_POINT_GRAPHICS);
-			vk::ext::cmdBindThenSetDescriptorBuffers(
-				scoped_recorder,
-				VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
-				{
-					descriptor_buffer_proj.get_bind_info(VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT),
-					descriptor_buffer_image.get_bind_info(VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT)
-				});
-
-			constexpr VkDeviceSize zero{};
-			vkCmdBindVertexBuffers(
-				scoped_recorder, 0, 1, vertices_buffer.as_data(), &zero);
-
-			vkCmdBindIndexBuffer(
-				scoped_recorder, indices_buffer, 0,
-				VK_INDEX_TYPE_UINT32);
-
-			vkCmdDrawIndexedIndirect(
-				scoped_recorder, indirect_buffer, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
-
-			vkCmdEndRendering(scoped_recorder);
-		}
-	};
 
 	context.register_post_resize("test", [&](window_instance::resize_event event){
-		vkDeviceWaitIdle(context.get_device());
-		{
-			auto cmd = context.get_graphic_command_pool_transient().get_transient(context.graphic_queue());
-		   color_attachment.resize(cmd, event.size);
-		}
+		core::global::camera.resize_screen(event.size.width, event.size.height);
 
-		record_cmd();
+		renderer_world.resize(event.size);
+		renderer_ui.resize(event.size);
 
 		context.set_staging_image({
-				.image = color_attachment.get_image(),
-				.extent = color_attachment.get_image().get_extent2(),
-				.clear = true,
-				.owner_queue_family = context.graphic_family(),
-				.src_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.src_access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-				.dst_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.dst_access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-				.src_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				.dst_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-			}, false);
+			                          .image = exports.results[renderer_ui.get_name()].image,
+			                          .extent = event.size,
+			                          .clear = false,
+			                          .owner_queue_family = context.compute_family(),
+			                          .src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			                          .src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			                          .dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			                          .dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			                          .src_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			                          .dst_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		                          }, false);
 	});
 
-	record_cmd();
+	core::global::camera.resize_screen(context.get_extent().width, context.get_extent().height);
 	context.set_staging_image({
-		.image = color_attachment.get_image(),
-		.extent = color_attachment.get_image().get_extent2(),
-		.clear = true,
-		.owner_queue_family = context.graphic_family(),
-		.src_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-		.src_access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-		.dst_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-		.dst_access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-		.src_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		.dst_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		.image = exports.results[renderer_ui.get_name()].image,
+		.extent = context.get_extent(),
+		.clear = false,
+		.owner_queue_family = context.compute_family(),
+		.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+		.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+		.src_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		.dst_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 	});
 
+	graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.light.png)"}).first;
+	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
+	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
 
 	while(!context.window().should_close()){
 		context.window().poll_events();
+		core::global::timer.fetch_time();
+		core::global::input.update(core::global::timer.global_delta_tick());
+		core::global::camera.update(core::global::timer.global_delta_tick());
+		renderer_world.batch.frag_data.current.enable_depth = true;
+		renderer_world.batch.update_proj({core::global::camera.get_world_to_uniformed_flip_y()});
 
-		context.submit_graphics(command_buffer);
+		renderer_ui.batch.vert_data.current = {core::global::camera.get_world_to_uniformed_flip_y()};
+
+		renderer_world.ssao.set_scale(core::global::camera.map_scale(0.15f, 2.5f) * 1.5f);
+		renderer_world.bloom.set_scale(core::global::camera.map_scale(0.195f, 2.f));
+		renderer_world.batch.frag_data.current.camera_scale = core::global::camera.get_scale();
+
+		draw_glyph_layout(renderer_world, rst, {}, false);
+		// graphic::draw::default_transparent_acquirer acquirer{renderer_world.batch, {}};
+		graphic::draw::ui_acquirer acquirer{renderer_ui.batch, {}};
+
+		acquirer.proj.mode_flag = vk::vertices::mode_flag_bits::sdf;
+		graphic::draw::nine_patch(acquirer, nine_region, {tags::from_extent, {100, 100}, {500, 500}}, graphic::colors::AQUA.to_light_color_copy());
+
+		acquirer.proj.mode_flag = vk::vertices::mode_flag_bits::none;
+		acquirer << base_region2;
+		graphic::draw::fill::rect_ortho(acquirer.get(), math::frect{20, 30, 70, 90}, graphic::colors::white.to_light_color_copy());
+
+		// {
+		// 	graphic::draw::world_acquirer acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
+		// 	//
+		// 	for(int i = 0; i < 10; ++i){
+		// 		acquirer.proj.depth = static_cast<float>(i + 1) / 20.f - 0.04f;
+		//
+		// 		auto off = math::vector2{i * 500, i * 400}.as<float>();
+		//
+		// 		graphic::draw::fill::quad(
+		// 			acquirer.get(),
+		// 			off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
+		// 			off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
+		// 			off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
+		// 			off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
+		// 			graphic::colors::white
+		// 		);
+		// 	}
+		// }
+		//
+		//
+		// renderer_world.batch.batch.consume_all();
+		//
+		// {
+		// 	graphic::draw::world_acquirer<> acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(light_region)};
+		// 	//
+		// 	for(int i = 0; i < 10; ++i){
+		// 		acquirer.proj.depth = static_cast<float>(i + 1) / 20.f - 0.04f;
+		//
+		// 		auto off = math::vector2{i * 500, i * 400}.as<float>();
+		//
+		// 		graphic::draw::fill::quad(
+		// 			acquirer.get(),
+		// 			off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
+		// 			off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
+		// 			off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
+		// 			off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
+		// 			graphic::colors::white.copy().to_light_color()
+		// 		);
+		// 	}
+		// }
+
+		renderer_world.batch.batch.consume_all();
+		renderer_world.batch.consume_all_transparent();
+		renderer_world.post_process();
+
+		renderer_ui.batch.batch.consume_all();
+		renderer_ui.batch.blit();
+		renderer_ui.post_process();
+
 
 		context.flush();
 	}
 
 	vkDeviceWaitIdle(context.get_device());
+
+	assets::graphic::dispose();
 }
 
 int main(){
 	using namespace mo_yanxi;
+	font::font_face face{R"(D:\projects\mo_yanxi\prop\assets\fonts\telegrama.otf)"};
 
+	// graphic::msdf::ff();
+	// auto mp = graphic::msdf::load_svg(R"(D:\projects\mo_yanxi\prop\assets\svg\test.svg)", 10, 10);
+	// mp.write(R"(D:\projects\mo_yanxi\prop\assets\svg\test.png)", true);
+	// graphic::test(reinterpret_cast<::msdfgen::FontHandle*>(face.handle()));
 	init_assets();
 	compile_shaders();
 
-
 	core::glfw::init();
+	core::global::ui::init();
 
 	main_loop();
 
+	core::global::ui::dispose();
 	core::glfw::terminate();
-
-	// size_chunked_vector v{4096};
-	// for(int i = 0; i < 15; ++i){
-	// 	v.insert_or_assign(4096, {static_cast<unsigned>(i)});
-	//
-	// }
 }

@@ -127,6 +127,34 @@ namespace mo_yanxi::vk::cmd{
 	}
 
 	export
+	[[nodiscard]] VkImageLayout deduce_image_dst_layout(
+		VkPipelineStageFlags2 stage,
+		VkAccessFlags2 access){
+
+		switch(stage){
+		case VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT:{
+			switch(access){
+			case VK_ACCESS_2_SHADER_READ_BIT:
+				return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			default:
+				return VK_IMAGE_LAYOUT_GENERAL;
+			}
+			break;
+		}
+		case VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT:{
+			switch(access){
+				case VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT:
+					return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				default: throw vk_error{VK_ERROR_FEATURE_NOT_PRESENT, "Deduce Failed"};
+			}
+		}
+		default: throw vk_error{VK_ERROR_FEATURE_NOT_PRESENT, "Deduce Failed"};
+
+		}
+		std::unreachable();
+	}
+
+	export
 	struct dependency_gen{
 		std::vector<VkMemoryBarrier2> memory_barriers;
 		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
@@ -265,6 +293,72 @@ namespace mo_yanxi::vk::cmd{
 				});
 		}
 
+		void push_graphic_to_compute(
+			const VkImage image,
+			const std::uint32_t srcQueueFamilyIndex,
+			const std::uint32_t dstQueueFamilyIndex,
+			const VkAccessFlags2 dstAccess = VK_ACCESS_2_SHADER_READ_BIT,
+			const VkImageLayout srcLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			const VkImageSubresourceRange& range = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+
+		){
+			VkImageLayout dstLayout = deduce_image_dst_layout(VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, dstAccess);
+
+			image_memory_barriers.push_back({
+					.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+					.pNext = nullptr,
+					.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+					.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+					.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+					.dstAccessMask = dstAccess,
+					.oldLayout = srcLayout,
+					.newLayout = dstLayout,
+					.srcQueueFamilyIndex = srcQueueFamilyIndex,
+					.dstQueueFamilyIndex = dstQueueFamilyIndex,
+					.image = image,
+					.subresourceRange = range
+				});
+		}
+
+		void push_compute_to_graphic(
+			const VkImage image,
+			const std::uint32_t srcQueueFamilyIndex,
+			const std::uint32_t dstQueueFamilyIndex,
+			const VkAccessFlags2 srcAccess = VK_ACCESS_2_SHADER_READ_BIT,
+			const VkImageLayout dstLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			const VkImageSubresourceRange& range = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+
+		){
+			VkImageLayout srcLayout = deduce_image_dst_layout(VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, srcAccess);
+
+			image_memory_barriers.push_back({
+					.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+					.pNext = nullptr,
+					.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+					.srcAccessMask = srcAccess,
+					.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+					.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+					.oldLayout = dstLayout,
+					.newLayout = srcLayout,
+					.srcQueueFamilyIndex = srcQueueFamilyIndex,
+					.dstQueueFamilyIndex = dstQueueFamilyIndex,
+					.image = image,
+					.subresourceRange = range
+				});
+		}
+
 		void push(
 			const VkImage image,
 			const VkPipelineStageFlags2 srcStageMask,
@@ -304,7 +398,13 @@ namespace mo_yanxi::vk::cmd{
 		const VkAccessFlags2 dstAccessMask,
 		const VkImageLayout oldLayout,
 		const VkImageLayout newLayout,
-		const VkImageSubresourceRange& range,
+		const VkImageSubresourceRange& range = {
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseMipLevel = 0,
+			.levelCount = 1,
+			.baseArrayLayer = 0,
+			.layerCount = 1
+		},
 		const std::uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		const std::uint32_t dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED
 	){
@@ -445,8 +545,8 @@ namespace mo_yanxi::vk::cmd{
 								.srcOffsets = {
 									{srcRegion.offset.x, srcRegion.offset.y, 0},
 									{
-										static_cast<std::int32_t>(srcRegion.extent.width),
-										static_cast<std::int32_t>(srcRegion.extent.height), 1
+										srcRegion.offset.x + static_cast<std::int32_t>(srcRegion.extent.width),
+										srcRegion.offset.y + static_cast<std::int32_t>(srcRegion.extent.height), 1
 									}
 								},
 								.dstSubresource = {
@@ -458,8 +558,8 @@ namespace mo_yanxi::vk::cmd{
 								.dstOffsets = {
 									{dstRegion.offset.x, dstRegion.offset.y, 0},
 									{
-										static_cast<std::int32_t>(dstRegion.extent.width),
-										static_cast<std::int32_t>(dstRegion.extent.height), 1
+										dstRegion.offset.x + static_cast<std::int32_t>(dstRegion.extent.width),
+										dstRegion.offset.y + static_cast<std::int32_t>(dstRegion.extent.height), 1
 									}
 								}
 							}
@@ -510,36 +610,43 @@ namespace mo_yanxi::vk::cmd{
 		clear_func_color_t<Fn> clearValue,
 		const VkImageSubresourceRange& subrange,
 
-		VkPipelineStageFlags currentStage,
-		VkAccessFlags currentAccess,
-		VkImageLayout layout
+		const VkPipelineStageFlags srcStage,
+		const VkPipelineStageFlags dstStage,
+		const VkAccessFlags srcAccess,
+		const VkAccessFlags dstAccess,
+		const VkImageLayout expectedLayout,
+		const std::uint32_t runningQueue = VK_QUEUE_FAMILY_IGNORED,
+		const std::uint32_t srcQueue = VK_QUEUE_FAMILY_IGNORED,
+		const std::uint32_t dstQueue = VK_QUEUE_FAMILY_IGNORED
 	) noexcept{
 		VkImageMemoryBarrier imageMemoryBarrier{
 				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 				nullptr,
-				currentAccess,
+				srcAccess,
 				VK_ACCESS_TRANSFER_WRITE_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
+				srcQueue,
+				runningQueue,
 				image,
 				subrange
 			};
 
 		vkCmdPipelineBarrier(
 			commandBuffer,
-			currentStage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+			srcStage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
 			0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 
 		fn(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearValue, 1, &subrange);
 
 		imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		imageMemoryBarrier.dstAccessMask = currentAccess;
+		imageMemoryBarrier.dstAccessMask = dstAccess;
 		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		imageMemoryBarrier.newLayout = layout;
+		imageMemoryBarrier.newLayout = expectedLayout;
+		imageMemoryBarrier.srcQueueFamilyIndex = runningQueue,
+		imageMemoryBarrier.srcQueueFamilyIndex = dstQueue,
 
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, currentStage,
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage,
 		                     0,
 		                     0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 	}
@@ -551,12 +658,17 @@ namespace mo_yanxi::vk::cmd{
 		const VkClearColorValue& clearValue,
 		const VkImageSubresourceRange& subrange,
 
-		VkPipelineStageFlags currentStage,
-		VkAccessFlags currentAccess,
-		VkImageLayout layout
+		const VkPipelineStageFlags srcStage,
+		const VkPipelineStageFlags dstStage,
+		const VkAccessFlags srcAccess,
+		const VkAccessFlags dstAccess,
+		const VkImageLayout expectedLayout,
+		const std::uint32_t runningQueue = VK_QUEUE_FAMILY_IGNORED,
+		const std::uint32_t srcQueue = VK_QUEUE_FAMILY_IGNORED,
+		const std::uint32_t dstQueue = VK_QUEUE_FAMILY_IGNORED
 	) noexcept{
-		clear_image(vkCmdClearColorImage, commandBuffer, image, clearValue, subrange, currentStage, currentAccess,
-		            layout);
+		clear_image(vkCmdClearColorImage, commandBuffer, image, clearValue, subrange,
+			srcStage, dstStage, srcAccess, dstAccess, expectedLayout, runningQueue, srcQueue, dstQueue);
 	}
 
 	export
@@ -566,11 +678,16 @@ namespace mo_yanxi::vk::cmd{
 		const VkClearDepthStencilValue& clearValue,
 		const VkImageSubresourceRange& subrange,
 
-		VkPipelineStageFlags currentStage,
-		VkAccessFlags currentAccess,
-		VkImageLayout layout
+		const VkPipelineStageFlags srcStage,
+		const VkPipelineStageFlags dstStage,
+		const VkAccessFlags srcAccess,
+		const VkAccessFlags dstAccess,
+		const VkImageLayout expectedLayout,
+		const std::uint32_t runningQueue = VK_QUEUE_FAMILY_IGNORED,
+		const std::uint32_t srcQueue = VK_QUEUE_FAMILY_IGNORED,
+		const std::uint32_t dstQueue = VK_QUEUE_FAMILY_IGNORED
 	) noexcept{
-		clear_image(vkCmdClearDepthStencilImage, commandBuffer, image, clearValue, subrange, currentStage,
-		            currentAccess, layout);
+		clear_image(vkCmdClearDepthStencilImage, commandBuffer, image, clearValue, subrange,
+			srcStage, dstStage, srcAccess, dstAccess, expectedLayout, runningQueue, srcQueue, dstQueue);
 	}
 }

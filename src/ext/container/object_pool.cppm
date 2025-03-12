@@ -6,7 +6,7 @@ module;
 
 export module ext.object_pool;
 
-import ext.array_stack;
+import mo_yanxi.array_stack;
 import ext.atomic_caller;
 import std;
 

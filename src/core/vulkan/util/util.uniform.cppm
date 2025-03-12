@@ -62,7 +62,12 @@ namespace mo_yanxi::vk{
 			c1{mat.c1}, c2{mat.c2}, c3{mat.c3}
 		{}
 
-		constexpr friend bool operator==(const padded_mat3&, const padded_mat3&) noexcept = default;
+		constexpr friend bool operator==(const padded_mat3& lhs, const padded_mat3& rhs) noexcept{
+			return lhs.c1 == rhs.c1
+				&& lhs.c2 == rhs.c2
+				&& lhs.c3 == rhs.c3;
+		}
+
 	};
 
 	struct UniformProjectionBlock {

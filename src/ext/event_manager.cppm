@@ -7,13 +7,69 @@ export module mo_yanxi.event;
 
 import std;
 import mo_yanxi.concepts;
+import mo_yanxi.meta_programming;
 import mo_yanxi.type_map;
 import mo_yanxi.heterogeneous;
 
 
 //TODO delayed event submitter
 namespace mo_yanxi::events{
+	template <class T>
+	class def_reference_wrapper{
+	public:
+		static_assert(std::is_object_v<T> || std::is_function_v<T>,
+			"reference_wrapper<T> requires T to be an object type or a function type.");
+
+		using type = T;
+
+		[[nodiscard]] constexpr def_reference_wrapper() = default;
+
+		template <class U>
+			requires (std::same_as<std::remove_cvref_t<U>, T>)
+		explicit(false) constexpr def_reference_wrapper(U&& v){
+			T& r = static_cast<U&&>(v);
+			ptr      = std::addressof(r);
+		}
+
+		constexpr operator T&() const noexcept {
+			assert(ptr);
+			return *ptr;
+		}
+
+		[[nodiscard]] constexpr T& get() const noexcept {
+			assert(ptr);
+			return *ptr;
+		}
+
+	private:
+		T* ptr{};
+	//
+	// public:
+	// 	template <class... Tpes>
+	// 	constexpr auto operator()(Tpes&&... _Args) const
+	// 		noexcept(noexcept(_STD invoke(*ptr, static_cast<Tpes&&>(_Args)...))) //
+	// 		-> decltype(_STD invoke(*ptr, static_cast<Tpes&&>(_Args)...)) {
+	// 			return _STD invoke(*ptr, static_cast<Tpes&&>(_Args)...);
+	// 		}
+	};
+
+	
+	template <typename Ty>
+	using decay_ref = std::conditional_t<std::is_reference_v<Ty>, def_reference_wrapper<std::remove_reference_t<Ty>>, std::decay_t<Ty>>;
+
+	template <typename Tuple>
+	constexpr auto decay(){
+		if constexpr (std::tuple_size_v<Tuple> == 0){
+			return std::tuple<>{};
+		}else{
+			return [] <std::size_t... Indices>(std::index_sequence<Indices...>){
+				return std::tuple<decay_ref<std::tuple_element_t<Indices, Tuple>> ...>{};
+			}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+		}
+	}
+
 	export struct event_type_tag{};
+
 
 	export
 	template <typename T>
@@ -23,7 +79,7 @@ namespace mo_yanxi::events{
 
 	export
 	template <typename T>
-	concept event_argument = /*std::derived_from<T, event_type> &&*/ std::is_final_v<T> || std::is_fundamental_v<T>;
+	concept event_argument = /*std::derived_from<T, eventTpe> &&*/ std::is_final_v<T> || std::is_fundamental_v<T>;
 
 	struct EventProjection{
 		template <std::ranges::range Rng>
@@ -295,8 +351,8 @@ namespace mo_yanxi::events{
 
 
 namespace mo_yanxi::events{
-	// using event_erased_func_type = void(const void*);
-	// using T = std::add_const_t<event_erased_func_type>;
+	// using event_erased_funcTpe = void(const void*);
+	// using T = std::add_const_t<event_erased_funcTpe>;
 
 
 	template <template<typename > typename T>
@@ -305,84 +361,178 @@ namespace mo_yanxi::events{
 		std::same_as<T<void()>, std::move_only_function<void()>>,
 		void(const void*) const,
 		void(const void*)>>;
-;
+
+	template <typename T, typename Append>
+	using select_wrapped_func =
+	std::conditional_t<
+		spec_of<T, std::move_only_function>,
+		std::move_only_function<void(const void*, Append&) const>,
+		std::function<void(const void*, Append&)>>;
+
+	template <typename T, typename Append>
+	using replace_wrapped_func =
+	std::conditional_t<
+		spec_of<T, std::move_only_function>,
+		std::move_only_function<Append const>,
+		std::function<Append>>;
+
 	template <
-		template<typename > typename FuncWrapperTy = std::function,
-		template <typename, typename...> typename Container = std::vector,
-		typename ContainerProj = std::identity,
-		typename... EventTs>
+		typename Cont,
+		typename Proj,
+		typename EventsTuple,
+		typename ContextTuple
+	>
 	struct event_manager_base{
+		// static_assert(requires{
+		// 	typename wrapped_func<FuncWrapperTy>;
+		// }, "invalid function wrapper template type");
 
-		static_assert(requires{
-			typename wrapped_func<FuncWrapperTy>;
-		}, "invalid function wrapper template type");
-
-		using value_type = wrapped_func<FuncWrapperTy>;
-		using container_type = Container<value_type>;
-		using mapping_type = type_map<container_type, EventTs...>;
+		// using valueTpe = wrapped_func<FuncWrapperTy>;
+		using containerTpe = Cont;
+		using mappingTpe = type_map<containerTpe, EventsTuple>;
 
 	protected:
-		mapping_type events{};
+		using contextTpe = typename decltype(decay<ContextTuple>());
+		contextTpe context{};
+		mappingTpe events{};
 
-		ADAPTED_NO_UNIQUE_ADDRESS ContainerProj proj{};
+		ADAPTED_NO_UNIQUE_ADDRESS Proj proj{};
 
 	public:
+		template <typename ...T>
+			requires std::constructible_from<contextTpe, T...>
+		void set_context(T&& ...args) noexcept(std::is_nothrow_constructible_v<contextTpe, T...>){
+			context = {std::forward<T>(args)...};
+		}
+
 		template <event_argument T>
-			// requires (mapping_type::template is_type_valid<T>)
-		const container_type& group_at() const noexcept{
+			// requires (mappingTpe::template isTpe_valid<T>)
+		const containerTpe& group_at() const noexcept{
 			return events.template at<T>();
 		}
 
 		template <event_argument T>
-			// requires (mapping_type::template is_type_valid<T>)
-		container_type& group_at() noexcept{
+			// requires (mappingTpe::template isTpe_valid<T>)
+		containerTpe& group_at() noexcept{
 			return events.template at<T>();
 		}
 
 	public:
 		template <event_argument T>
-			// requires (mapping_type::template is_type_valid<T>)
+			// requires (mappingTpe::template isTpe_valid<T>)
 		void fire(const T& event) const{
-			for (const wrapped_func<FuncWrapperTy>& listener : std::invoke(proj, group_at<T>())){
-				//fuck msvc
-				listener(const_cast<void*>(static_cast<const void*>(&event)));
+			//fuck msvc
+
+			for (const auto& listener : std::invoke(proj, group_at<T>())){
+				listener(const_cast<void*>(static_cast<const void*>(&event)), context);
 			}
 		}
 
+		template <event_argument T>
+		void operator()(const T& event) const{
+			this->fire(event);
+		}
+
+	protected:
+		template <typename T, typename Fn>
+		static auto convert(Fn&& fn) noexcept{
+			return [fun = std::forward<Fn>(fn)](const void* event, const contextTpe& context){
+				if constexpr (std::tuple_size_v<contextTpe>){
+					[&, this] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+						fun(*static_cast<const T*>(event), std::get<Idx>(context)...);
+					}(std::make_index_sequence<std::tuple_size_v<contextTpe>>{});
+				}else{
+					fun(*static_cast<const T*>(event));
+				}
+			};
+		}
 	};
 
+	template <typename T, typename ...Rest>
+	struct drop_first : std::type_identity<std::tuple<Rest...>>{};
+
+	template <typename ...TupleTy>
+	struct drop_first<std::tuple<TupleTy...>> : drop_first<TupleTy...>{};
+
+	template <typename Fn>
+	struct unwrap_fn;
+
+	template <template<typename > typename Wrap, typename Fn>
+	struct unwrap_fn<Wrap<Fn>>{
+		using funcTpe = Fn;
+	};
+
+
+	template <typename TupleTy>
+	using drop_first_t = typename drop_first<TupleTy>::type;
+
+	template <typename Wrap>
+	using unwrap_fn_t = typename unwrap_fn<Wrap>::funcTpe;
+
+
+	template <typename FnWrap>
+	auto getTy(){
+		using args = typename function_traits<FnWrap>::args_type;
+
+		if constexpr (std::tuple_size_v<args> == 1){
+			return std::type_identity_t<void(const void*)>();
+		}else{
+			return std::type_identity_t<void(const void*, const drop_first_t<args>&)>();
+		}
+	}
+
+	template <typename FnWrap>
+	using Fnty = decltype(events::getTy<FnWrap>());
+
+	template <template<typename > typename Cont, typename FnWrap, typename Proj, typename ...Events>
+	using ebase = event_manager_base<
+		Cont<select_wrapped_func<FnWrap, const typename function_traits<unwrap_fn_t<FnWrap>>::args_type&>>,
+		Proj,
+		std::tuple<Events...>,
+		typename function_traits<unwrap_fn_t<FnWrap>>::args_type
+	>;
+
 	export
-	template<template<typename > typename FuncWrapperTy = std::function, typename... EventTs>
-	struct event_manager : event_manager_base<FuncWrapperTy, std::vector, std::identity, EventTs...>{
+	template<typename FuncWrapperTy, typename... EventTs>
+	struct event_manager : ebase<std::vector, FuncWrapperTy, std::identity, EventTs...>{
 	private:
-		using base = event_manager_base<FuncWrapperTy, std::vector, std::identity, EventTs...>;
+		using base = ebase<std::vector, FuncWrapperTy, std::identity, EventTs...>;
 
 	public:
-		template <event_argument T, std::invocable<const T&> Func>
+		template <event_argument T, typename Func>
+			requires requires(Func&& func){
+				base::template convert<T>(std::forward<Func>(func));
+			}
 		void on(Func&& func){
-			std::vector<wrapped_func<FuncWrapperTy>>& tgt = this->template group_at<T>();
+			auto& tgt = this->template group_at<T>();
 
-			tgt.emplace_back([fun = std::forward<decltype(func)>(func)](const void* event){
-				fun(*static_cast<const T*>(event));
-			});
+			tgt.emplace_back(base::template convert<T>(std::forward<Func>(func)));
 		}
 	};
 
 	export
-	template<template<typename > typename FuncWrapperTy = std::function, typename... EventTs>
-	struct named_event_manager : event_manager_base<FuncWrapperTy, string_hash_map, std::decay_t<decltype(std::views::values)>, EventTs...>{
-		template <event_argument T, std::invocable<const T&> Func>
-		void on(const std::string_view name, Func&& func){
-			string_hash_map<wrapped_func<FuncWrapperTy>>& tgt = this->template group_at<T>();
+	template<typename FuncWrapperTy, typename... EventTs>
+	struct named_event_manager : ebase<string_hash_map, FuncWrapperTy, std::decay_t<decltype(std::views::values)>, EventTs...>{
+	protected:
+		using base = ebase<string_hash_map, FuncWrapperTy, std::decay_t<decltype(std::views::values)>, EventTs...>;
 
-			tgt.insert_or_assign(name, [fun = std::forward<Func>(func)](const void* event){
-				fun(*static_cast<const T*>(event));
-			});
+		using fn = select_wrapped_func<FuncWrapperTy, const typename function_traits<unwrap_fn_t<FuncWrapperTy>>::args_type&>;
+		using cont = string_hash_map<fn>;
+
+	public:
+		template <event_argument T, typename Func>
+			requires requires(Func&& func){
+				base::template convert<T>(std::forward<Func>(func));
+			}
+		void on(const std::string_view name, Func&& func){
+			cont& tgt = this->template group_at<T>();
+
+			tgt.insert_or_assign(name, base::template convert<T>(std::forward<Func>(func)));
 		}
 
 		template <event_argument T>
-		std::optional<wrapped_func<FuncWrapperTy>> erase(const std::string_view name){
-			string_hash_map<wrapped_func<FuncWrapperTy>>& tgt = this->template group_at<T>();
+		std::optional<fn> erase(const std::string_view name){
+			cont& tgt = this->template group_at<T>();
 
 			if(const auto eitr = tgt.find(name); eitr != tgt.end()){
 				std::optional opt{std::move(eitr->second)};
