@@ -230,7 +230,7 @@ namespace mo_yanxi::font::typesetting{
 		// public:
 
 		using pos_t = decltype(codes)::size_type;
-		using token_iterator = decltype(tokens)::iterator;
+		using token_iterator = decltype(tokens)::const_iterator;
 
 		token_iterator get_token(const pos_t pos, const token_iterator& last){
 			return std::ranges::lower_bound(last, tokens.end(), pos, {}, &posed_token_argument::pos);
@@ -374,7 +374,7 @@ namespace mo_yanxi::font::typesetting{
 		optional_stack<glyph_size_type> size_history{};
 		optional_stack<font_face*> font_history{};
 
-		math::vec2 captured_size{};
+		// math::vec2 captured_size{};
 
 		//TODO replace this
 		math::vec2 pen_pos{};
@@ -489,20 +489,22 @@ namespace mo_yanxi::font::typesetting{
 		 */
 		auto_feed_line = 1 << 0,
 
+		block_line_feed = 1 << 1,
+
 		/**
 		 * @brief reserve character beyond clip-space
 		 */
-		reserve = 1 << 1,
+		reserve = 1 << 2,
 
 		//Not implemented
-		horizontal = 0 << 2,
-		vertical = 1 << 2,
+		horizontal = 0 << 3,
+		vertical = 1 << 3,
 
 		//Not implemented
 		/**
 		 * @brief reverse layout direction
 		 */
-		reversed = 1 << 3,
+		reversed = 1 << 4,
 	};
 
 	BITMASK_OPS(export, layout_policy)
@@ -576,15 +578,22 @@ namespace mo_yanxi::font::typesetting{
 
 		math::vec2 captured_size{};
 		math::vec2 clamp_size{};
-		Align::Pos align{Align::Pos::top_left};
+		align::pos align{align::pos::top_left};
 
-		float drawScale{1.f};
+		// float drawScale{1.f};
 		bool clip{};
 		layout_policy policy_{};
 
 	public:
 		// math::vec2 maximumSize{};
 		// math::vec2 minimumSize{};
+
+		void clear(){
+			elements.clear();
+			captured_size = {};
+			clip = false;
+		}
+
 
 		[[nodiscard]] glyph_layout() = default;
 
@@ -596,15 +605,37 @@ namespace mo_yanxi::font::typesetting{
 			return captured_size;
 		}
 
-		[[nodiscard]] constexpr math::vec2 draw_extent() const noexcept{
-			return extent().copy().scl(drawScale);
-		}
+		// [[nodiscard]] constexpr math::vec2 draw_extent() const noexcept{
+		// 	return extent().copy().scl(drawScale);
+		// }
 
 		[[nodiscard]] math::vec2 get_clamp_size() const noexcept{
 			return clamp_size;
 		}
 
-		void set_align(const Align::Pos align){
+		void set_clamp_size(math::vec2 bound) noexcept{
+			if(!is_bound_compatible(bound)){
+				clear();
+			}
+
+			clamp_size = bound;
+		}
+
+		void set_text(std::string&& text){
+			this->text = std::move(text);
+			clear();
+		}
+
+		bool set_policy(const layout_policy policy) noexcept{
+			if(policy_ != policy){
+				clear();
+				policy_ = policy;
+				return true;
+			}
+			return false;
+		}
+
+		void set_align(const align::pos align){
 			if(this->align == align) return;
 			this->align = align;
 
@@ -612,15 +643,15 @@ namespace mo_yanxi::font::typesetting{
 		}
 
 		void update_align(){
-			if(align & Align::Pos::center_x){
+			if(align & align::pos::center_x){
 				for(auto& element : elements){
 					element.src.x = (captured_size.x - element.bound.width) / 2.f;
 				}
-			} else if(align & Align::Pos::left){
+			} else if(align & align::pos::left){
 				for(auto& element : elements){
 					element.src.x = 0;
 				}
-			} else if(align & Align::Pos::right){
+			} else if(align & align::pos::right){
 				for(auto& element : elements){
 					element.src.x = (captured_size.x - element.bound.width);
 				}
@@ -635,10 +666,14 @@ namespace mo_yanxi::font::typesetting{
 			return clip;
 		}
 
-		[[nodiscard]] bool is_size_compatible(const math::vec2 clip_size) const noexcept{
-			if(captured_size.within(clamp_size)){
+		explicit operator bool() const noexcept{
+			return !elements.empty();
+		}
+
+		[[nodiscard]] bool is_bound_compatible(const math::vec2 clip_size) const noexcept{
+			/*if(captured_size.within(clamp_size)){
 				return true;
-			}else if((policy_ & layout_policy::auto_feed_line) == layout_policy::auto_feed_line){
+			}else */if((policy_ & layout_policy::auto_feed_line) == layout_policy::auto_feed_line){
 				if(clip){
 					if((policy_ & layout_policy::reserve) == layout_policy::reserve){
 						if((policy_ & layout_policy::vertical) == layout_policy::vertical){
@@ -652,7 +687,7 @@ namespace mo_yanxi::font::typesetting{
 						}
 					}
 				}else{
-					return true;
+					return clamp_size.within_equal(clip_size) && row_size() == std::ranges::count(text, '\n');
 				}
 			}else if((policy_ & layout_policy::reserve) == layout_policy::reserve){
 				return true;
@@ -660,8 +695,13 @@ namespace mo_yanxi::font::typesetting{
 			return false;
 		}
 
-		[[nodiscard]] bool is_layout_compatible(const std::string_view text, const math::vec2 clip_size) const{
-			const bool size_cpt{is_size_compatible(clip_size)};
+		[[nodiscard]] bool is_layout_compatible(
+			const std::string_view text,
+			const math::vec2 clip_size,
+			layout_policy policy) const{
+			if(policy != policy_)return false;
+
+			const bool size_cpt{is_bound_compatible(clip_size)};
 
 			return size_cpt && this->text == text;
 		}
@@ -969,7 +1009,22 @@ namespace mo_yanxi::font::typesetting{
 			return tokens.end();
 		}
 
-		std::optional<float> append_glyph_horizontal(
+		struct append_result{
+			glyph_line extend;
+			bool success;
+
+			constexpr explicit operator bool() const noexcept{
+				return success;
+			}
+
+			constexpr void update_context(parse_context& context) const noexcept{
+				context.line_rect.ascender = math::max(context.line_rect.ascender, extend.ascender);
+				context.line_rect.descender = math::max(context.line_rect.descender, extend.descender);
+				context.pen_pos.x += extend.width;
+			}
+		};
+
+		append_result append_glyph_horizontal(
 			glyph_layout& layout,
 			parse_context& context,
 			const code_point code,
@@ -1004,24 +1059,28 @@ namespace mo_yanxi::font::typesetting{
 				current.region.src.x = 0;
 			}
 
+			append_result result{
+				.extend = {
+					.width = advance,
+					.ascender = placementPos.y - current.region.get_src_y(),
+					.descender = current.region.get_end_y() - placementPos.y
+				},
+			};
+
 			if(
 				(layout.policy() & layout_policy::reserve) == layout_policy{} ||
 				(layout.policy() & layout_policy::auto_feed_line) != layout_policy{}
 			){
 				if(!no_clip && context.pen_pos.x + advance > layout.get_clamp_size().x){
-					return std::optional{advance};
+					return result;
 				}
 			}
 
-
-			current.color = context.get_color();
-
-			context.line_rect.ascender = math::max(context.line_rect.ascender, placementPos.y - current.region.get_src_y());
-			context.line_rect.descender = math::max(context.line_rect.descender, current.region.get_end_y() - placementPos.y);
-
-			context.pen_pos.x += advance;
 			current.region.expand(font_draw_expand * font_region_scale);
-			return std::nullopt;
+			current.color = context.get_color();
+			result.success = true;
+
+			return result;
 		}
 
 		void redirect(
@@ -1038,19 +1097,26 @@ namespace mo_yanxi::font::typesetting{
 			}
 		}
 
-		bool end_line(
+	}
+
+
+	struct parser : parser_base{
+	private:
+		static bool end_line(
 			glyph_layout& layout,
 			parse_context& context,
 			const bool append,
 			const bool no_clip = false
 			){
+			if(layout.empty())return false;
+
 			auto& line = layout.rows().back();
 			const auto defualt_height = context.get_line_spacing();
 
 			if(layout.row_size() == 1){
 				const float f1 = std::max(defualt_height, context.line_rect.descender + context.line_rect.ascender) - context.line_rect.descender;
 				const float f2 = std::max(defualt_height, context.line_rect.ascender);
-				line.src.y = math::lerp(f1, f2, 0.5f);
+				line.src.y = math::lerp(f1, f2, 0.35f);
 			}else{
 				auto& lastLine = std::next(layout.rows().crbegin()).operator*();
 
@@ -1061,7 +1127,7 @@ namespace mo_yanxi::font::typesetting{
 
 			//TODO clip
 			if((layout.policy() & layout_policy::reserve) == layout_policy{}){
-				if(!no_clip && max_height > layout.get_clamp_size().y){
+				if(!no_clip && max_height > layout.get_clamp_size().y + 0.005f){
 					//discard line
 					layout.pop_line();
 					return false;
@@ -1069,8 +1135,10 @@ namespace mo_yanxi::font::typesetting{
 			}
 
 
-			context.captured_size.y = max_height;
-			context.captured_size.max_x(context.pen_pos.x);
+			//TODO duplicated captured size
+			layout.captured_size.y = max_height;
+			layout.captured_size.max_x(context.pen_pos.x);
+			layout.captured_size.min(layout.get_clamp_size());
 
 			context.line_rect.width = context.pen_pos.x;
 			line.bound = context.line_rect;
@@ -1084,29 +1152,7 @@ namespace mo_yanxi::font::typesetting{
 			return true;
 		}
 
-		void end_parse(glyph_layout& layout){
-			const float offset = layout[0].bound.ascender;
-			for (auto && row : layout.rows()){
-				row.src.y += offset;
-			}
-		}
-
-	}
-
-
-	struct parser : parser_base{
-
-		glyph_layout operator()(
-			std::string_view str,
-			layout_policy policy = {},
-			math::vec2 clip_space = math::vectors::constant2<float>::max_vec2) const{
-			tokenized_text formatted_text{str};
-			parse_context context{};
-
-
-			glyph_layout layout{};
-			layout.clamp_size = clip_space;
-			layout.policy_ = policy;
+		std::vector<code_point>::difference_type parse(glyph_layout& layout, parse_context& context, const tokenized_text& formatted_text) const {
 
 			std::uint32_t currentRowIndex{};
 			tokenized_text::token_iterator lastTokenItr = formatted_text.tokens.begin();
@@ -1115,6 +1161,11 @@ namespace mo_yanxi::font::typesetting{
 
 			auto view = formatted_text.codes | std::views::enumerate;
 			auto itr = view.begin();
+
+			auto end_idx = [&](){
+				return itr - view.begin();
+			};
+
 			for(; itr != view.end(); ++itr){
 				auto [layout_index, code] = *itr;
 
@@ -1130,61 +1181,65 @@ namespace mo_yanxi::font::typesetting{
 
 				lastTokenItr = func::exec_tokens(layout, context, *this, lastTokenItr, formatted_text, layout_index);
 
-				auto t = policy & layout_policy::reserve;
-
-				if(auto excessive = func::append_glyph_horizontal(layout, context, code, layout_index, currentRowIndex)){
-					if((policy & layout_policy::auto_feed_line) != layout_policy{}){
-						if(excessive.value() > layout.get_clamp_size().x){
+				//TODO
+				if(auto append_result = func::append_glyph_horizontal(layout, context, code, layout_index, currentRowIndex)){
+					append_result.update_context(context);
+				}else{
+					if((layout.policy() & layout_policy::auto_feed_line) != layout_policy{}){
+						if(append_result.extend.width > layout.get_clamp_size().x){
 							layout.clip = true;
-							return layout;
+							return end_idx();
 						}
 
 						{//roll back to last seperator
 							auto& line = layout.get_row(currentRowIndex);
 
 							while(true){
+								line.glyphs.pop_back();
+
 								if(itr == view.begin()){
 									layout.clip = true;
-									return layout;
+									return end_idx();
 								}
 
 								const auto c = (--itr).base()->code;
-								line.glyphs.pop_back();
 
 								if(c == U'\n' || c == U'\0'){
 									layout.clip = true;
-									return layout;
+									return end_idx();
 								}
-								if(is_unicode_separator(c))break;
+								if((layout.policy() & layout_policy::block_line_feed) == layout_policy{} || is_unicode_separator(c))break;
 							}
 
 							if(!line.glyphs.empty() && line.glyphs.back().code.code == U'\0'){
 								layout.elements.resize(currentRowIndex);
 								layout.clip = true;
-								return layout;
+								return end_idx();
 							}
 						}
 
-						if(!func::end_line(layout, context, true)){
+						if(!end_line(layout, context, true)){
 							layout.clip = true;
-							return layout;
+							return end_idx();
 						}
 						currentRowIndex++;
 
-
-						if(func::append_glyph_horizontal(
-							layout, context,
-							{line_feed_character, code.unit_index}, layout_index, currentRowIndex, false, true)){
-
+						if(auto result =
+							func::append_glyph_horizontal(
+								layout, context,
+								{line_feed_character, code.unit_index}, layout_index, currentRowIndex, false, true)
+						){
+							result.update_context(context);
+						}else{
 							layout.get_row(currentRowIndex).glyphs.pop_back();
 
 							layout.clip = true;
-							return layout;
-							}
+							return end_idx();
+						}
 
-						requires_context_redo = true;
+						if((layout.policy() & layout_policy::block_line_feed) != layout_policy{})requires_context_redo = true;
 						continue;
-					}else if((policy & layout_policy::reserve) != layout_policy{}){
+					}else if((layout.policy() & layout_policy::reserve) != layout_policy{}){
 
 					}else{
 						auto& line = layout.get_row(currentRowIndex);
@@ -1196,8 +1251,8 @@ namespace mo_yanxi::font::typesetting{
 							}
 							if(itr++.base()->code == U'\n')break;
 						}
-						if(!func::end_line(layout, context, true)){
-							return layout;
+						if(!end_line(layout, context, true)){
+							return end_idx();
 						}
 						currentRowIndex++;
 
@@ -1207,24 +1262,56 @@ namespace mo_yanxi::font::typesetting{
 				}
 
 				if(code.code == U'\n'){
-					if(!func::end_line(layout, context, true)){
-						return layout;
+					if(!end_line(layout, context, true)){
+						return end_idx();
 					}
 					currentRowIndex++;
 				}
 			}
 
-			if(layout.row_size() > 0 && layout.rows().back().size() > 0 && layout.rows().back().glyphs.back().code.code == '\0'){
-				func::end_line(layout, context, false);
-			}else{
-				func::append_glyph_horizontal(layout, context, formatted_text.codes.back(), itr - view.begin() + 1, currentRowIndex, true);
-				func::end_line(layout, context, false);
-			}
+			return end_idx();
 
-			return layout;
 		}
 
+		void end_parse(glyph_layout& layout, parse_context& context, const tokenized_text& formatted_text, layout_index_t idx) const {
+			if(layout.row_size() > 0 && layout.rows().back().size() > 0 && layout.rows().back().glyphs.back().code.code == '\0'){
+				if(!end_line(layout, context, false)){
+					end_line(layout, context, false);
+				}
+			}else{
+				auto& line = layout.get_row(0);
+				func::append_glyph_horizontal(layout, context, formatted_text.codes.back(), idx, layout.row_size() - 1, true)
+					.update_context(context);
+				if(!end_line(layout, context, false)){
+					end_line(layout, context, false);
+				}
+			}
+		}
+	public:
+		void operator()(glyph_layout& layout) const{
+			layout.elements.clear();
+			parse_context context{};
+			tokenized_text formatted_text{layout.get_text()};
 
+			auto idx = parse(layout, context, formatted_text);
+			end_parse(layout, context, formatted_text, idx + 1);
+
+
+
+		}
+
+		glyph_layout operator()(
+			std::string_view str,
+			layout_policy policy = {},
+			math::vec2 clip_space = math::vectors::constant2<float>::max_vec2) const{
+			glyph_layout layout{};
+			layout.clamp_size = clip_space;
+			layout.policy_ = policy;
+			layout.set_text(std::string{str});
+
+			this->operator()(layout);
+			return layout;
+		}
 	};
 
 	//全词换行
@@ -1346,4 +1433,11 @@ namespace mo_yanxi::font::typesetting{
 				func::end_script(layout, context);
 			};
 	}
+
+	export inline const parser global_parser{[]{
+		parser p;
+		apd_default_modifiers(p);
+		return p;
+	}()
+	};
 }

@@ -12,7 +12,7 @@ import <msdfgen/msdfgen-ext.h>;
 
 namespace mo_yanxi::graphic::msdf{
 	export constexpr inline std::uint32_t sdf_image_boarder = 16;
-	export constexpr inline double sdf_image_range = 0.15f;
+	export constexpr inline double sdf_image_range = 0.425f;
 
 	void write_to_bitmap(bitmap& bitmap, const msdfgen::Bitmap<float, 3>& region){
 		for(unsigned y = 0; y < bitmap.height(); ++y){

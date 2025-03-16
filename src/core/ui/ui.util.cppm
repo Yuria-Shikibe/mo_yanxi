@@ -132,7 +132,7 @@ namespace mo_yanxi::ui::util{
 	 */
 	template <typename T>
 		requires (std::equality_comparable<T> && std::is_move_assignable_v<T> && !std::is_trivial_v<T>)
-	constexpr bool tryModify(T& target, T&& value) noexcept(noexcept(target == value) && std::is_nothrow_move_assignable_v<T>){
+	constexpr bool tryModify(T& target, T&& value) noexcept(noexcept(target != value) && std::is_nothrow_move_assignable_v<T>){
 		if(target != value){
 			target = std::move(value);
 			return true;
@@ -147,7 +147,7 @@ namespace mo_yanxi::ui::util{
 	 */
 	template <typename T>
 		requires (std::equality_comparable<T> && std::is_copy_assignable_v<T>)
-	constexpr bool tryModify(T& target, const T& value) noexcept(noexcept(target == value) && std::is_nothrow_copy_assignable_v<T>){
+	constexpr bool tryModify(T& target, const T& value) noexcept(noexcept(target != value) && std::is_nothrow_copy_assignable_v<T>){
 		if(target != value){
 			target = value;
 			return true;

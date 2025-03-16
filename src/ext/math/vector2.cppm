@@ -1026,6 +1026,8 @@ export namespace mo_yanxi::math{
 			// static constexpr Vector2D<T> front_vec2{1, 0};
 			// static constexpr Vector2D<T> back_vec2{-1, 0};
 
+			static constexpr vector2<T> inf_positive_vec2{+std::numeric_limits<T>::infinity(), +std::numeric_limits<T>::infinity()};
+
 			static constexpr vector2<T> max_vec2{std::numeric_limits<T>::max(), std::numeric_limits<T>::max()};
 			static constexpr vector2<T> min_vec2{std::numeric_limits<T>::min(), std::numeric_limits<T>::min()};
 			static constexpr vector2<T> lowest_vec2{std::numeric_limits<T>::lowest(), std::numeric_limits<T>::lowest()};

@@ -49,6 +49,7 @@ void mo_yanxi::assets::graphic::load(vk::context& context){
 	shaders::comp::ui_merge = {context.get_device(), dir::shader_spv / "ui.merge.comp.spv"};
 
 	samplers::texture_sampler = {context.get_device(), vk::preset::default_texture_sampler};
+	samplers::ui_sampler = {context.get_device(), vk::preset::ui_texture_sampler};
 	samplers::blit_sampler = {context.get_device(), vk::preset::default_blit_sampler};
 }
 
@@ -69,4 +70,5 @@ void mo_yanxi::assets::graphic::dispose(){
 
 	samplers::texture_sampler = {};
 	samplers::blit_sampler = {};
+	samplers::ui_sampler = {};
 }

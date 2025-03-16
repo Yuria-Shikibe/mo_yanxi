@@ -502,7 +502,7 @@ namespace mo_yanxi::vk{
 
 
 				buffer_mapper{indirect_buffer}.load(VkDrawIndexedIndirectCommand{
-					.indexCount = region.vertex_group_count * 4 * 6,
+					.indexCount = region.vertex_group_count * 6,
 					.instanceCount = 1,
 					.firstIndex = 0,
 					.vertexOffset = 0,
@@ -511,6 +511,7 @@ namespace mo_yanxi::vk{
 
 
 				std::memcpy(mapped_data + draw_call.chunk_index * vertex_chunk_size, region.host_vertices.get(), size);
+				// std::memset(mapped_data + draw_call.chunk_index * vertex_chunk_size + size, 0, vertex_chunk_size - size);
 				vertex_buffer.flush(size, draw_call.chunk_index * vertex_chunk_size);
 
 
@@ -607,7 +608,7 @@ namespace mo_yanxi::vk{
 			size_type pre_size;
 
 			value_type* post;
-			difference_type index;
+			size_type index;
 
 			friend constexpr bool operator==(const iterator_impl& lhs, const iterator_impl& rhs) noexcept{
 				return lhs.index == rhs.index;
@@ -666,7 +667,7 @@ namespace mo_yanxi::vk{
 			}
 
 			constexpr value_type& operator[](const difference_type off) const noexcept{
-				auto offed = index  + off;
+				size_type offed = index + off;
 				return *(offed < pre_size ? pre + offed : post + (offed - pre_size));
 			}
 

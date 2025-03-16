@@ -13,22 +13,6 @@ import mo_yanxi.graphic.renderer.ui;
 import mo_yanxi.graphic.draw;
 // import Graphic.Renderer.UI;
 
-
-// void mo_yanxi::ui::DefElementDrawer::draw(const elem& element, Rect rect, float opa) const {
-// 	using namespace Graphic;
-//
-// 	AutoParam param{element.getBatch(), Draw::WhiteRegion};
-// 	auto color = element.getCursorState().focused ? Colors::YELLOW : element.graphicProp().styleColor;
-//
-// 	if(element.getCursorState().pressed){
-// 		color.a = 0.3f * element.graphicProp().getOpacity();
-// 		Drawer::rectOrtho(++param, rect, color);
-// 	}
-//
-// 	color.a = 1.f * element.graphicProp().getOpacity();
-// 	Drawer::Line::rectOrtho(param, 2.f, rect, color);
-//
-// }
 //
 // float mo_yanxi::ui::EmptyElementDrawer::contentOpacity(const struct elem& element) const{
 // 	if(element.disabled){
@@ -38,19 +22,36 @@ import mo_yanxi.graphic.draw;
 // 	return 1.f;
 // }
 
-// Graphic::Batch_Direct& mo_yanxi::ui::elem::getBatch() const noexcept(true){
-// 	assert(getScene());
-// 	assert(getScene()->renderer);
-// 	return getScene()->renderer->batch;
-// }
-//
-// Graphic::RendererUI& mo_yanxi::ui::elem::getRenderer() const noexcept{
-// 	return *getScene()->renderer;
-// }
-
 namespace mo_yanxi{
+	void ui::debug_elem_drawer::draw(const elem& element, rect region, float opacityScl) const{
+		using namespace graphic;
+		draw_acquirer acquirer{element.get_renderer().batch, graphic::draw::white_region};
+		draw::line::rect_ortho(acquirer, region);
+
+		if(element.cursor_state.focused){
+			draw::fill::rect_ortho(acquirer.get(), region, colors::white.copy().mulA(.35f));
+		}
+	}
+
+	void ui::cursor_states::registerFocusEvent(elem_event_manager& event_manager){
+		event_manager.on<events::focus_begin>([](auto, elem& self){
+			self.cursor_state.focused = true;
+		});
+
+		event_manager.on<events::focus_end>([](auto, elem& self){
+			self.cursor_state.focused = false;
+			// stagnateTime = focusedTime = 0.f;
+		});
+
+		event_manager.on<events::moved>([](auto, elem& self){
+			self.cursor_state.time_stagnate = 0;
+			// stagnateTime = 0.f;
+		});
+	}
+
+
 	graphic::renderer_ui& ui::elem::get_renderer() const noexcept{
-		return *reinterpret_cast<graphic::renderer_ui*>(get_scene()->renderer); //fuck fake positive...
+		return *get_scene()->renderer; //fuck fake positive...
 	}
 
 	ui::group* ui::elem::get_root_parent() const noexcept{
@@ -73,6 +74,10 @@ namespace mo_yanxi{
 				element->update_opacity(graphicProp().get_opacity());
 			}
 		}
+	}
+
+	void ui::elem::mark_independent_layout_changed(){
+		get_scene()->independentLayout.insert(this);
 	}
 
 	math::vec2 ui::elem::get_local_from_global(math::vec2 global_input) const noexcept{
@@ -162,8 +167,8 @@ namespace mo_yanxi{
 		if(toDirection & spread_direction::local) layoutState.notify_self_changed();
 
 		if(parent){
-			if(toDirection & spread_direction::super || toDirection & spread_direction::child_content){
-				if(parent->layoutState.notify_children_changed(toDirection & spread_direction::child_content)){
+			if(toDirection & spread_direction::super || toDirection & spread_direction::from_content){
+				if(parent->layoutState.notify_children_changed(toDirection & spread_direction::from_content)){
 					parent->notify_layout_changed(toDirection - spread_direction::child);
 				}
 			}
@@ -191,7 +196,7 @@ namespace mo_yanxi{
 			activated = checkers.activatedChecker(*this);
 		}
 
-		cursorState.update(delta_in_ticks);
+		cursor_state.update(delta_in_ticks);
 
 		// if(cursorState.focused){
 		// 	//TODO dependent above?
@@ -258,6 +263,20 @@ namespace mo_yanxi{
 	// void ui::elem::dropToolTipIfMoved() const{
 	// 	if(tooltipProp.useStagnateTime) getScene()->tooltipManager.requestDrop(*this);
 	// }
+
+	void ui::elem::draw_pre(const rect clipSpace, rect redirect) const{
+		if(property.graphicData.drawer)property.graphicData.drawer->draw(*this, get_bound(), property.graphicData.get_opacity());
+	}
+
+	bool ui::elem::update_abs_src(const math::vec2 parent_content_abs_src){
+		if(util::tryModify(property.absolute_src, parent_content_abs_src + property.relative_src)){
+			for(const auto& element : get_children()){
+				element->update_abs_src(content_src_pos());
+			}
+			return true;
+		}
+		return false;
+	}
 
 	std::vector<ui::elem*> ui::elem::dfsFindDeepestElement(math::vec2 cursorPos){
 		std::vector<elem*> rst{};

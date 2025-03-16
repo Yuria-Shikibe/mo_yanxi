@@ -629,14 +629,14 @@ export namespace mo_yanxi::dim2{
 			tile::malloc(width * height);
 		}
 
-		[[nodiscard]] constexpr tile(const size_type width, const size_type height, const value_type init)
-			requires std::is_copy_assignable_v<value_type> :
+		[[nodiscard]] constexpr tile(const size_type width, const size_type height, const value_type& init)
+			/*requires std::is_copy_assignable_v<value_type>*/ :
 			tile{width, height}{
 			std::ranges::fill(this->begin(), this->end(), init);
 		}
 
 		[[nodiscard]] constexpr tile(const size_type width, const size_type height, const value_type* data)
-			requires std::is_copy_assignable_v<value_type> :
+			/*requires std::is_copy_assignable_v<value_type>*/ :
 			tile{width, height}{
 			this->copy(data, this->size());
 		}

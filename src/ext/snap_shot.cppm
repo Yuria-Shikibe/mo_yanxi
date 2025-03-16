@@ -2,7 +2,7 @@
 // Created by Matrix on 2024/6/14.
 //
 
-export module ext.snap_shot;
+export module mo_yanxi.snap_shot;
 
 import std;
 

@@ -67,6 +67,9 @@ namespace mo_yanxi::vk{
 				&& lhs.c2 == rhs.c2
 				&& lhs.c3 == rhs.c3;
 		}
+		constexpr explicit (false) operator math::mat3() const noexcept{
+			return {c1, c2, c3};
+		}
 
 	};
 

@@ -22,7 +22,7 @@ namespace mo_yanxi::ui{
 		void clearChildren() noexcept override{
 			toRemove.clear();
 			children.clear();
-			notify_layout_changed(spread_direction::super | spread_direction::child_content);
+			notify_layout_changed(spread_direction::super | spread_direction::from_content);
 		}
 
 		void postRemove(elem* elem) override{
@@ -41,9 +41,11 @@ namespace mo_yanxi::ui{
 		}
 
 		elem& addChildren(elem_ptr&& elem) override{
+			//TODO move this to other place?
 			setChildrenFillParentSize(*elem, content_size());
-			elem->update_abs_src(abs_pos() + property.boarder.bot_lft());
-			notify_layout_changed(spread_direction::upper | spread_direction::child_content);
+
+			elem->update_abs_src(content_src_pos());
+			notify_layout_changed(spread_direction::upper | spread_direction::from_content);
 			return *children.emplace_back(std::move(elem));
 		}
 
@@ -78,7 +80,9 @@ namespace mo_yanxi::ui{
 
 	export
 	struct loose_group : basic_group{
-		using basic_group::basic_group;
+		[[nodiscard]] loose_group(scene* scene, group* group)
+			: basic_group(scene, group, "loose_group"){
+		}
 	};
 
 	// export

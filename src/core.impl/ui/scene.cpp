@@ -11,29 +11,18 @@ import mo_yanxi.algo;
 
 import mo_yanxi.core.global;
 
-// import Core.PlatformSpec;
-
-// void mo_yanxi::ui::scene::joinTasks(){
-// 	for(auto&& asyncTaskOwner : asyncTaskOwners){
-// 		asyncTaskOwner->getFuture();
-// 	}
-//
-// 	asyncTaskOwners.clear();
-// }
 
 mo_yanxi::ui::scene::scene(
 	const std::string_view name,
 	const owner<group*> root,
-	graphic::renderer_ui* renderer
-
-	/*, Graphic::RendererUI* renderer, Bundle* bundle*/) :
+	graphic::renderer_ui* renderer) :
 	scene_base{name, root, renderer}{
 
 	// keyMapping = &core::input.register_sub_input(name);
 	// tooltipManager.scene = this;
 
 	if(!root)return;
-	root->skipInboundCapture = true;
+	root->skip_inbound_capture = true;
 	root->interactivity = interactivity::children_only;
 	root->set_scene(this);
 }
@@ -163,7 +152,9 @@ void mo_yanxi::ui::scene::onUnicodeInput(char32_t val) const{
 
 void mo_yanxi::ui::scene::onScroll(const math::vec2 scroll) const{
 	const auto mode = get_input_mode();
-	if(currentScrollFocus) currentScrollFocus->events().fire(events::scroll{scroll, mode});
+	if(currentScrollFocus){
+		currentScrollFocus->events().fire(events::scroll{scroll, mode});
+	}
 }
 
 void mo_yanxi::ui::scene::onCursorPosUpdate(const math::vec2 newPos){
@@ -209,12 +200,12 @@ void mo_yanxi::ui::scene::onCursorPosUpdate(const math::vec2 newPos){
 	currentCursorFocus->notify_cursor_moved(delta);
 }
 
-void mo_yanxi::ui::scene::resize(const math::vec2 size){
-	if(region.size() == size) return;
-
-	this->region.set_size(size);
-	root->resize(size);
-	// tooltipManager.clear();
+void mo_yanxi::ui::scene::resize(const math::frect region){
+	if(util::tryModify(this->region, region)){
+		root->property.relative_src = region.src;
+		root->update_abs_src({});
+		root->resize(region.size());
+	}
 }
 
 void mo_yanxi::ui::scene::update(const float delta_in_ticks){
@@ -258,9 +249,8 @@ void mo_yanxi::ui::scene::layout(){
 }
 
 void mo_yanxi::ui::scene::draw() const{
-	// draw(renderer->batch.getCurrentScissor());
+	draw(region);
 }
-
 void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 	// const auto bound = ();
 

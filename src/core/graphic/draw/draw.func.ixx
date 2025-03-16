@@ -121,5 +121,19 @@ namespace mo_yanxi::graphic::draw{
 			line::line_ortho(auto_param[2], rect.vert_11(), rect.vert_10(), stroke, color, color);
 			line::line_ortho(auto_param[3], rect.vert_10(), rect.vert_00(), stroke, color, color);
 		}
+		//
+		// export
+		// template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+		// FORCE_INLINE void rect_ortho2(
+		// 	auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+		// 	const math::frect rect,
+		// 	const float stroke = 2.f,
+		// 	const color color = colors::white){
+		// 	acquirer_guard _{auto_param, 4};
+		// 	line::line_ortho(auto_param[0], rect.vert_00(), rect.vert_01(), stroke, color, color);
+		// 	line::line_ortho(auto_param[1], rect.vert_01(), rect.vert_11(), stroke, color, color);
+		// 	line::line_ortho(auto_param[2], rect.vert_11(), rect.vert_10(), stroke, color, color);
+		// 	line::line_ortho(auto_param[3], rect.vert_10(), rect.vert_00(), stroke, color, color);
+		// }
 	}
 }

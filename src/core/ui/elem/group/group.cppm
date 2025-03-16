@@ -49,7 +49,7 @@ namespace mo_yanxi::ui{
 			}
 		}
 
-		void draw_content(const Rect clipSpace, Rect redirect) const override{
+		void draw_content(const rect clipSpace, rect redirect) const override{
 			const auto space = property.content_bound_absolute().intersection_with(clipSpace);
 			drawChildren(space, redirect);
 		}
@@ -59,7 +59,7 @@ namespace mo_yanxi::ui{
 		// }
 
 	protected:
-		/*virtual*/ void drawChildren(const Rect clipSpace, const Rect redirect) const{
+		/*virtual*/ void drawChildren(const rect clipSpace, const rect redirect) const{
 			for(const auto& element : get_children()){
 				element->draw(clipSpace, redirect);
 			}
@@ -81,22 +81,22 @@ namespace mo_yanxi::ui{
 					setChildrenFillParentSize(*element, newSize);
 				}
 
-				try_layout();
+				// try_layout();
 				return true;
 			}
 
 			return false;
 		}
 
-		bool update_abs_src(const math::vec2 parentAbsSrc) override{
-			if(elem::update_abs_src(parentAbsSrc)){
-				for(const auto& element : get_children()){
-					element->update_abs_src(abs_pos());
-				}
-				return true;
-			}
-			return false;
-		}
+		// bool update_abs_src(const math::vec2 parentAbsSrc) override{
+		// 	if(elem::update_abs_src(parentAbsSrc)){
+		// 		for(const auto& element : get_children()){
+		// 			element->update_abs_src(abs_pos());
+		// 		}
+		// 		return true;
+		// 	}
+		// 	return false;
+		// }
 
 
 		// template <std::derived_from<elem> E>
@@ -126,6 +126,11 @@ namespace mo_yanxi::ui{
 
 			const auto [vx, vy] = boundSize;
 			const auto [ox, oy] = item.get_size();
+
+
+			if(fx)item.context_size_restriction.width = {size_category::mastering, vx};
+			if(fy)item.context_size_restriction.height = {size_category::mastering, vy};
+
 			item.resize({
 					fx ? vx : ox,
 					fy ? vy : oy
@@ -140,6 +145,10 @@ namespace mo_yanxi::ui{
 
 			const auto [vx, vy] = boundSize;
 			const auto [ox, oy] = item.get_size();
+
+			if(fx)item.context_size_restriction.width = {size_category::mastering, vx};
+			if(fy)item.context_size_restriction.height = {size_category::mastering, vy};
+
 			item.resize_quiet({
 					fx ? vx : ox,
 					fy ? vy : oy

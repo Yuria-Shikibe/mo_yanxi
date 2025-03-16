@@ -53,6 +53,7 @@ namespace mo_yanxi::events{
 	// 		}
 	};
 
+	static_assert(std::constructible_from<std::tuple<def_reference_wrapper<int>>, int&>);
 	
 	template <typename Ty>
 	using decay_ref = std::conditional_t<std::is_reference_v<Ty>, def_reference_wrapper<std::remove_reference_t<Ty>>, std::decay_t<Ty>>;
@@ -389,20 +390,20 @@ namespace mo_yanxi::events{
 
 		// using valueTpe = wrapped_func<FuncWrapperTy>;
 		using containerTpe = Cont;
-		using mappingTpe = type_map<containerTpe, EventsTuple>;
+		using mapping_type = type_map<containerTpe, EventsTuple>;
 
 	protected:
-		using contextTpe = typename decltype(decay<ContextTuple>());
-		contextTpe context{};
-		mappingTpe events{};
+		using context_type = typename decltype(decay<ContextTuple>());
+		context_type context{};
+		mapping_type events{};
 
 		ADAPTED_NO_UNIQUE_ADDRESS Proj proj{};
 
 	public:
 		template <typename ...T>
-			requires std::constructible_from<contextTpe, T...>
-		void set_context(T&& ...args) noexcept(std::is_nothrow_constructible_v<contextTpe, T...>){
-			context = {std::forward<T>(args)...};
+			requires std::constructible_from<context_type, T...>
+		void set_context(T&& ...args) noexcept(std::is_nothrow_constructible_v<context_type, T...>){
+			context = context_type{std::forward<T>(args)...};
 		}
 
 		template <event_argument T>
@@ -436,11 +437,11 @@ namespace mo_yanxi::events{
 	protected:
 		template <typename T, typename Fn>
 		static auto convert(Fn&& fn) noexcept{
-			return [fun = std::forward<Fn>(fn)](const void* event, const contextTpe& context){
-				if constexpr (std::tuple_size_v<contextTpe>){
-					[&, this] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+			return [fun = std::forward<Fn>(fn)](const void* event, const context_type& context){
+				if constexpr (std::tuple_size_v<context_type>){
+					[&] <std::size_t ...Idx>(std::index_sequence<Idx...>){
 						fun(*static_cast<const T*>(event), std::get<Idx>(context)...);
-					}(std::make_index_sequence<std::tuple_size_v<contextTpe>>{});
+					}(std::make_index_sequence<std::tuple_size_v<context_type>>{});
 				}else{
 					fun(*static_cast<const T*>(event));
 				}

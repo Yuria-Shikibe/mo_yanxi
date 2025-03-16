@@ -22,7 +22,7 @@ void mo_yanxi::core::glfw::charCallback(GLFWwindow* window, unsigned int codepoi
 
 void mo_yanxi::core::glfw::mouseBottomCallBack(GLFWwindow* window, const int button, const int action, const int mods){
 	global::input.inform_mouse_action(button, action, mods);
-	// if(Global::UI::root)Global::UI::root->inputMouse(button, action, mods);
+	if(global::ui::root)global::ui::root->input_mouse(button, action, mods);
 }
 
 void mo_yanxi::core::glfw::cursorPosCallback(GLFWwindow* window, const double xPos, const double yPos){

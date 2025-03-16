@@ -563,10 +563,9 @@ namespace mo_yanxi::vk{
 			// Use an ordered map to automatically sort candidates by increasing score
 			std::multimap<std::uint32_t, struct physical_device, std::greater<std::uint32_t>> candidates{};
 
-			for(const auto& device : devices | std::ranges::views::transform([](auto& d){
-				return vk::physical_device{d};
-			})){
-				candidates.insert(std::make_pair(device.rate_device(), device));
+			for(const auto& device : devices){
+				auto d = vk::physical_device{device};
+				candidates.insert(std::make_pair(d.rate_device(), d));
 			}
 
 			// Check if the best candidate is suitable at all

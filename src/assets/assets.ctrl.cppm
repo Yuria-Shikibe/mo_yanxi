@@ -5,6 +5,8 @@
 export module mo_yanxi.assets.ctrl;
 
 export import mo_yanxi.core.global;
+export import mo_yanxi.core.global.ui;
+export import mo_yanxi.ui.root;
 
 import std;
 
@@ -51,8 +53,21 @@ namespace mo_yanxi::assets::ctrl{
 		});
 
 		core::global::input.scroll_listeners.emplace_back([](const float x, const float y) -> void {
-			core::global::camera.set_target_scale(core::global::camera.get_target_scale() + y * 0.05f);
+			if(!core::global::ui::root->focusIdle()){
+				core::global::ui::root->input_scroll(x, y);
+			}else{
+				core::global::camera.set_target_scale(core::global::camera.get_target_scale() + y * 0.05f);
+			}
+
 		 });
+		//
+		// input->scrollListeners.emplace_back([](const float x, const float y) -> void {
+		// 	  if(!UI::root->focusIdle()){
+		// 		  UI::root->inputScroll(x, y);
+		// 	  }else if(Focus::camera){
+		// 		  Focus::camera->setTargetScale(Focus::camera->getTargetScale() + y * 0.05f);
+		// 	  }
+		//   });
 	}
 
  //    namespace CC = Core::Ctrl;

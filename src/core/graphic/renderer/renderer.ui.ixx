@@ -2,6 +2,7 @@ module;
 
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
+#include <cassert>
 
 export module mo_yanxi.graphic.renderer.ui;
 
@@ -26,13 +27,43 @@ namespace mo_yanxi::graphic{
 		constexpr friend bool operator==(const ui_vertex_uniform& lhs, const ui_vertex_uniform& rhs) noexcept = default;
 	};
 
-	struct ui_fragment_uniform{
-		std::uint32_t enable_depth{};
-		float camera_scale{};
-		std::uint32_t cap1{};
-		std::uint32_t cap2{};
+	struct scissor{
+		math::vec2 src{};
+		math::vec2 dst{};
+		float distance{};
+		constexpr friend bool operator==(const scissor& lhs, const scissor& rhs) noexcept = default;
 
-		math::frect scissor{};
+	};
+
+	 struct scissor_raw{
+		math::frect rect{};
+		float distance{};
+
+	 	void uniform(const math::mat3& mat) noexcept{
+	 		auto src = mat * rect.get_src();
+	 		auto dst = mat * rect.get_end();
+	 		rect = {src, dst};
+	 	}
+
+		constexpr friend bool operator==(const scissor_raw& lhs, const scissor_raw& rhs) noexcept = default;
+
+		constexpr explicit(false) operator scissor() const noexcept{
+	 		return scissor{rect.get_src(), rect.get_end(), distance};
+	 	}
+	};
+
+
+	struct ui_fragment_uniform{
+		// std::uint32_t enable_depth{};
+		// float camera_scale{};
+		// std::uint32_t cap1{};
+		// std::uint32_t cap2{};
+
+		scissor scissor{};
+
+		std::uint32_t cap{};
+
+		math::vec2 viewport_extent{};
 
 		constexpr friend bool operator==(const ui_fragment_uniform& lhs, const ui_fragment_uniform& rhs) noexcept = default;
 	};
@@ -119,13 +150,16 @@ namespace mo_yanxi::graphic{
 		vk::pipeline blit_pipeline{};
 		vk::command_buffer blit_command{};
 
+		std::vector<math::mat3> transforms{};
+		std::vector<scissor_raw> scissors{};
+
 
 	public:
 		[[nodiscard]] ui_batch_proxy() = default;
 
 		[[nodiscard]] explicit ui_batch_proxy(vk::context& context) :
 			batch_proxy(vk::batch{
-					context, assets::graphic::buffers::indices_buffer, assets::graphic::samplers::texture_sampler, 4,
+					context, assets::graphic::buffers::indices_buffer, assets::graphic::samplers::ui_sampler, 4,
 					sizeof(vk::vertices::vertex_ui), 512
 				}),
 			color_base{context.get_allocator(), context.get_extent(), VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT},
@@ -178,9 +212,7 @@ namespace mo_yanxi::graphic{
 			vert_data.bind_to(mapper, 0);
 			frag_data.bind_to(mapper, 1);
 
-			init_image_layout(context.get_transient_graphic_command_buffer(), context.get_transient_compute_command_buffer());
-			update_layer_commands(main_layer);
-			create_blit_command();
+			on_resize(context.get_extent());
 		}
 
 		void resize(const VkExtent2D extent){
@@ -190,16 +222,46 @@ namespace mo_yanxi::graphic{
 			blit_base.resize(extent);
 			blit_light.resize(extent);
 
-			init_image_layout(context().get_transient_graphic_command_buffer(), context().get_transient_compute_command_buffer());
-			update_layer_commands(main_layer);
-			create_blit_command();
+			on_resize(extent);
 		}
 
 		void blit() const{
 			vk::cmd::submit_command(context().compute_queue(), blit_command);
 		}
 
+		void push_scissor(const scissor_raw& scissor){
+			if(scissors.back() != scissor){
+				batch.consume_all();
+			}
+			scissors.push_back(scissor);
+		}
+
+		void pop_scissor(){
+			if(scissors.size() >= 2 && scissors.back() == scissors.crbegin()[1]){
+
+			}else{
+				batch.consume_all();
+			}
+
+			scissors.pop_back();
+			assert(scissors.size() > 0);
+		}
+
 	private:
+		void on_resize(const VkExtent2D extent){
+			init_image_layout(context().get_transient_graphic_command_buffer(), context().get_transient_compute_command_buffer());
+			update_layer_commands(main_layer);
+			create_blit_command();
+
+			vert_data.current = {{math::mat3{}.set_orthogonal({}, math::vector2{extent.width, extent.height}.as<float>())}};
+			scissors.assign(1, {
+				.rect = math::frect{
+					math::vector2{extent.width, extent.height}.as<float>()
+				},
+				.distance = 0.f
+			});
+		}
+
 		void update_layer_commands(batch_layer& batch_layer){
 			vk::dynamic_rendering dynamic_rendering{
 					{color_base.get_image_view(), color_light.get_image_view(), color_background.get_image_view()}
@@ -243,6 +305,11 @@ namespace mo_yanxi::graphic{
 
 		VkCommandBuffer submit(const std::size_t index){
 			vert_data.update<true>(index);
+			auto csr = scissors.back();
+			const math::mat3 proj = vert_data.current.view;
+			csr.uniform(proj);
+			frag_data.current.scissor = csr;
+			frag_data.current.viewport_extent = ~proj.get_ortho_scale() * 2;
 			frag_data.update<true>(index);
 
 			return main_layer.submit(context(), index);
@@ -264,7 +331,7 @@ namespace mo_yanxi::graphic{
 			blit_pipeline.bind(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE);
 			blit_descriptor_buffer.bind_to(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE, blit_pipeline_layout, 0);
 
-			auto group = graphic::post_processor::get_work_group_size(std::bit_cast<math::u32size2>(blit_base.get_image().get_extent2()));
+			auto group = post_processor::get_work_group_size(std::bit_cast<math::u32size2>(blit_base.get_image().get_extent2()));
 			vkCmdDispatch(scoped_recorder, group.x, group.y, 1);
 
 			for(const auto attachment : attachments){
@@ -308,7 +375,7 @@ namespace mo_yanxi::graphic{
 				context,
 				assets::graphic::shaders::comp::bloom,
 				assets::graphic::samplers::blit_sampler,
-				6, 0.5f
+				6, 0.35f
 			},
 			merge_descriptor_layout(context.get_device(), [](vk::descriptor_layout_builder& builder){
 				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
@@ -327,7 +394,7 @@ namespace mo_yanxi::graphic{
 				assets::graphic::shaders::comp::ui_merge.get_create_info()),
 			merge_command(context.get_compute_command_pool().obtain()){
 
-			bloom.set_strength(.85f, .85f);
+			bloom.set_strength(.75f, .75f);
 
 			init_layout(context.get_transient_compute_command_buffer());
 			create_merge_commands();

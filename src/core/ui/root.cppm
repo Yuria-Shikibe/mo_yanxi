@@ -8,6 +8,7 @@ export import mo_yanxi.ui.pre_decl;
 export import mo_yanxi.ui.scene;
 
 import mo_yanxi.math.vector2;
+import mo_yanxi.math.rect_ortho;
 
 import mo_yanxi.heterogeneous;
 import std;
@@ -36,7 +37,7 @@ namespace mo_yanxi::ui{
 
 			auto itr = scenes.insert_or_assign(std::move(name), std::move(scene));
 			if(focusIt){
-				focus = std::to_address(itr.first->second);
+				focus = std::addressof(itr.first->second);
 			}
 		}
 
@@ -65,7 +66,7 @@ namespace mo_yanxi::ui{
 			focus->onScroll({x, y});
 		}
 
-		void input_mouse(const int key, const int action, const int mode) const{
+		void input_mouse(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) const{
 			assert(focus != nullptr);
 			focus->onMouseAction(key, action, mode);
 		}
@@ -94,9 +95,9 @@ namespace mo_yanxi::ui{
 			throw std::invalid_argument{"In-exist Scene Name"};
 		}
 
-		void resize(const math::vec2 size, const std::string_view name = SceneName::Main){
+		void resize(const math::frect region, const std::string_view name = SceneName::Main){
 			if(const auto rst = scenes.try_find(name)){
-				rst->resize(size);
+				rst->resize(region);
 			}
 		}
 

@@ -12,5 +12,6 @@
 * 更好的SSAO
 * Modern UI
 * 序列化
+* Mesh Shader的批处理，把texture indices转换到图元属性上
 
 

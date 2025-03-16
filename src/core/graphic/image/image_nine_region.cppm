@@ -14,7 +14,7 @@ import std;
 import mo_yanxi.meta_programming;
 
 namespace mo_yanxi::graphic{
-	constexpr Align::Scale DefaultScale = Align::Scale::stretch;
+	constexpr align::Scale DefaultScale = align::Scale::stretch;
 
 
 	// using T = float;
@@ -45,7 +45,7 @@ namespace mo_yanxi::graphic{
 					})
 			}{}
 
-		[[nodiscard]] constexpr nine_patch_raw(Align::padding<T> edge, const rect external) noexcept
+		[[nodiscard]] constexpr nine_patch_raw(align::padding<T> edge, const rect external) noexcept
 			{
 			constexpr T err = std::numeric_limits<T>::epsilon() * 4;
 			if(edge.width() >= external.width()){
@@ -70,10 +70,10 @@ namespace mo_yanxi::graphic{
 
 
 		[[nodiscard]] constexpr nine_patch_raw(
-			const Align::spacing edge,
+			const align::spacing edge,
 			const rect rect,
 			const math::vector2<T> centerSize,
-			const Align::Scale centerScale) noexcept
+			const align::Scale centerScale) noexcept
 			: nine_patch_raw{edge, rect}{
 
 			nine_patch_raw::set_center_scale(centerSize, centerScale);
@@ -83,16 +83,16 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] constexpr nine_patch_raw(
 			const rect internal, const rect external,
 			const math::vector2<T> centerSize,
-			const Align::Scale centerScale) noexcept
+			const align::Scale centerScale) noexcept
 			: nine_patch_raw{internal, external}{
 
 			nine_patch_raw::set_center_scale(centerSize, centerScale);
 		}
 
-		constexpr void set_center_scale(const math::vector2<T> centerSize, const Align::Scale centerScale) noexcept{
+		constexpr void set_center_scale(const math::vector2<T> centerSize, const align::Scale centerScale) noexcept{
 			if(centerScale != DefaultScale){
-				const auto sz = Align::embedTo(centerScale, centerSize, center().size());
-				const auto offset = Align::getOffsetOf<to_signed_t<T>>(Align::Pos::center, sz.as_signed(), center().as_signed());
+				const auto sz = align::embedTo(centerScale, centerSize, center().size());
+				const auto offset = align::get_offset_of<to_signed_t<T>>(align::pos::center, sz.as_signed(), center().as_signed());
 				center() = {tags::from_extent, static_cast<math::vector2<T>>(offset), sz};
 			}
 		}
@@ -112,9 +112,9 @@ namespace mo_yanxi::graphic{
 
 	export
 	struct nine_patch_brief{
-		Align::spacing edge{};
+		align::spacing edge{};
 		math::vec2 inner_size{};
-		Align::Scale center_scale{DefaultScale};
+		align::Scale center_scale{DefaultScale};
 
 		[[nodiscard]] constexpr nine_patch_raw<float> get_patches(const nine_patch_raw<float>::rect bound) const noexcept{
 			return nine_patch_raw{edge, bound, inner_size, center_scale};
@@ -131,11 +131,11 @@ namespace mo_yanxi::graphic{
 			math::urect external,
 			math::urect internal,
 			const math::usize2 centerSize = {},
-			const Align::Scale centerScale = DefaultScale
+			const align::Scale centerScale = DefaultScale
 		){
 			this->center_scale = centerScale;
 			this->inner_size = centerSize.as<float>();
-			this->edge = Align::padBetween(internal.as<float>(), external.as<float>());
+			this->edge = align::padBetween(internal.as<float>(), external.as<float>());
 		}
 
 
@@ -157,7 +157,7 @@ namespace mo_yanxi::graphic{
 			math::urect internal_in_relative,
 			const float external_margin = 0.f,
 			const math::usize2 centerSize = {},
-			const Align::Scale centerScale = DefaultScale,
+			const align::Scale centerScale = DefaultScale,
 			const float edgeShrinkScale = 0.25f
 		) : image_view(imageRegion), margin(external_margin){
 
@@ -190,10 +190,10 @@ namespace mo_yanxi::graphic{
 
 		image_nine_region(
 			const region_type& imageRegion,
-			const Align::padding<std::uint32_t> margin,
+			const align::padding<std::uint32_t> margin,
 			const float external_margin = 0.f,
 			const math::usize2 centerSize = {},
-			const Align::Scale centerScale = DefaultScale,
+			const align::Scale centerScale = DefaultScale,
 			const float edgeShrinkScale = 0.25f
 		) : image_nine_region{imageRegion, math::urect{
 			tags::from_extent, margin.bot_lft(), imageRegion.uv.get_region().size().sub(margin.get_size())

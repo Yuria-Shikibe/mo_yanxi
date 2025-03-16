@@ -20,6 +20,7 @@ export import mo_yanxi.ui.event_types;
 export import mo_yanxi.ui.clamped_size;
 export import mo_yanxi.ui.util;
 export import mo_yanxi.ui.elem_ptr;
+export import mo_yanxi.ui.layout.policies;
 // export import Core.UI.Drawer;
 // export import Core.UI.Flags;
 // export import Core.UI.Util;
@@ -46,7 +47,8 @@ import std;
 
 namespace mo_yanxi{
 	namespace graphic{
-		struct renderer_ui;
+		export struct renderer_ui;
+		// struct renderer_ui;
 	}
 }
 
@@ -59,27 +61,26 @@ namespace mo_yanxi::ui{
 
 	export constexpr inline bool IgnoreClipWhenDraw = false;
 
-	export using Rect = math::frect;
+	export using rect = math::frect;
 
 	//TODO boarder requirement ?
 	export struct debug_elem_drawer final : public style_drawer<struct elem>{
-		void draw(const struct elem& element, Rect region, float opacityScl) const override{
-		}
+		void draw(const struct elem& element, rect region, float opacityScl) const override;
 	};
 
 	export struct empty_drawer final : public style_drawer<struct elem>{
-		void draw(const struct elem& element, Rect region, float opacityScl) const override{
+		void draw(const struct elem& element, rect region, float opacityScl) const override{
 		}
 
 		// float content_opacity(const elem& element) const override{}
 	};
 
-	export constexpr inline Align::spacing DefaultBoarder{BoarderStroke, BoarderStroke, BoarderStroke, BoarderStroke};
+	export constexpr inline align::spacing DefaultBoarder{BoarderStroke, BoarderStroke, BoarderStroke, BoarderStroke};
 
 	export constexpr inline debug_elem_drawer DefaultStyleDrawer;
 	export constexpr inline empty_drawer EmptyStyleDrawer;
 
-	export const inline style_drawer<struct elem>* GlobalStyleDrawer;
+	export inline const style_drawer<elem>* global_style_drawer;
 
 	namespace events{
 		// export
@@ -103,7 +104,7 @@ namespace mo_yanxi::ui{
 		events::moved>;
 
 	const style_drawer<struct elem>* getDefaultStyleDrawer(){
-		return GlobalStyleDrawer ? GlobalStyleDrawer : &DefaultStyleDrawer;
+		return global_style_drawer ? global_style_drawer : &DefaultStyleDrawer;
 	}
 
 	export struct elem_graphic_data{
@@ -183,7 +184,7 @@ namespace mo_yanxi::ui{
 	};
 
 	export
-	struct cursor_state{
+	struct cursor_states{
 		float maximum_duration{60.};
 		/**
 		 * @brief in tick
@@ -213,20 +214,7 @@ namespace mo_yanxi::ui{
 			}
 		}
 
-		void registerFocusEvent(elem_event_manager& event_manager){
-			// event_manager.on<events::focus_begin>([](auto, elem& self){
-			// 	focused = true;
-			// });
-			//
-			// event_manager.on<events::EndFocus>([this](auto){
-			// 	focused = false;
-			// 	stagnateTime = focusedTime = 0.f;
-			// });
-			//
-			// event_manager.on<events::Moved>([this](auto){
-			// 	stagnateTime = 0.f;
-			// });
-		}
+		void registerFocusEvent(elem_event_manager& event_manager);
 
 		void registerDefEvent(elem_event_manager& event_manager){
 			// event_manager.on<events::EndFocus>([this](auto){
@@ -249,6 +237,8 @@ namespace mo_yanxi::ui{
 			// });
 		}
 	};
+
+
 
 	export struct elem_prop{
 	protected:
@@ -273,7 +263,7 @@ namespace mo_yanxi::ui{
 		bool maintain_focus_until_mouse_drop{};
 
 		clamped_fsize size{};
-		Align::spacing boarder{DefaultBoarder};
+		align::spacing boarder{DefaultBoarder};
 
 		float scale_context{1.};
 		float scale_local{1.};
@@ -290,32 +280,36 @@ namespace mo_yanxi::ui{
 			absolute_src = parentOriginalPoint + relative_src;
 		}
 
+		[[nodiscard]] constexpr math::vec2 content_src_offset() const noexcept{
+			return boarder.top_lft();
+		}
+
 		[[nodiscard]] constexpr math::vec2 content_abs_src() const noexcept{
-			return absolute_src + boarder.top_lft();
+			return absolute_src + content_src_offset();
 		}
 
-		[[nodiscard]] constexpr Rect bound_relative() const noexcept{
-			return Rect{tags::from_extent, relative_src, size.get_size()};
+		[[nodiscard]] constexpr rect bound_relative() const noexcept{
+			return rect{tags::from_extent, relative_src, size.get_size()};
 		}
 
-		[[nodiscard]] constexpr Rect bound_absolute() const noexcept{
-			return Rect{tags::from_extent, absolute_src, size.get_size()};
+		[[nodiscard]] constexpr rect bound_absolute() const noexcept{
+			return rect{tags::from_extent, absolute_src, size.get_size()};
 		}
 
-		[[nodiscard]] constexpr Rect content_bound_relative() const noexcept{
-			return Rect{tags::from_extent, relative_src + boarder.top_lft(), content_size()};
+		[[nodiscard]] constexpr rect content_bound_relative() const noexcept{
+			return rect{tags::from_extent, relative_src + content_src_offset(), content_size()};
 		}
 
-		[[nodiscard]] constexpr Rect content_bound_absolute() const noexcept{
-			return Rect{tags::from_extent, absolute_src + boarder.top_lft(), content_size()};
+		[[nodiscard]] constexpr rect content_bound_absolute() const noexcept{
+			return rect{tags::from_extent, absolute_src + content_src_offset(), content_size()};
 		}
 
 		[[nodiscard]] constexpr bool
-		content_bound_contains(const Rect& clipRegion, const math::vec2 pos) const noexcept{
+		content_bound_contains(const rect& clipRegion, const math::vec2 pos) const noexcept{
 			return clipRegion.contains_loose(pos) && content_bound_absolute().contains_loose(pos);
 		}
 
-		[[nodiscard]] constexpr bool bound_contains(const Rect& clipRegion, const math::vec2 pos) const noexcept{
+		[[nodiscard]] constexpr bool bound_contains(const rect& clipRegion, const math::vec2 pos) const noexcept{
 			return clipRegion.contains_loose(pos) && bound_absolute().contains_loose(pos);
 		}
 
@@ -344,15 +338,17 @@ namespace mo_yanxi::ui{
 		}
 	};
 
-	export struct elem
-		// :
+	export struct elem_datas{
 
-		// StatedToolTipOwner<elem>,
-		// math::QuadTreeAdaptable<elem>
-	{
 		elem_prop property{};
-		cursor_state cursorState{};
+		cursor_states cursor_state{};
 
+		stated_extent context_size_restriction{};
+		/**
+		 * @brief size restriction in a layout context, usually is gain from a cell
+		 */
+		// math::vec2 context_bound{math::vectors::constant2<float>::inf_positive_vec2};
+		// bool expandable{false};
 	protected:
 		group* parent{};
 		scene* scene_{};
@@ -370,35 +366,69 @@ namespace mo_yanxi::ui{
 		bool sleep{};
 
 		//TODO move this to property?
-		bool skipInboundCapture{};
+		bool skip_inbound_capture{};
 
 		//Layout Spec
 		layout_state layoutState{};
 		interactivity interactivity{interactivity::enabled};
 
-		[[nodiscard]] elem() = default;
+	protected:
+		[[nodiscard]] explicit elem_datas(const std::string_view tyName)
+			: property(tyName){
+		}
+
+		[[nodiscard]] elem_datas() = default;
+	};
+
+	export struct elem : elem_datas
+		// :
+
+		// StatedToolTipOwner<elem>,
+		// math::QuadTreeAdaptable<elem>
+	{
+
+		[[nodiscard]] elem(){
+			cursor_state.registerFocusEvent(events());
+			event_slots.set_context(*this);
+		}
 
 		[[nodiscard]] elem(
 			scene* scene,
 			group* group = nullptr,
 			const std::string_view tyName = "")
-			: property{tyName}{
+			: elem_datas{tyName}{
 			elem::set_scene(scene);
 			elem::set_parent(group);
 
-			cursorState.registerFocusEvent(events());
+			cursor_state.registerFocusEvent(events());
+			event_slots.set_context(*this);
 		}
 
 		virtual ~elem(){
 			clear_external_references();
 		}
 
+		elem(const elem& other) = delete;
+
+		elem& operator=(const elem& other) = delete;
+
+		elem(elem&& other) noexcept: elem_datas{std::move(other)}{
+			event_slots.set_context(*this);
+		}
+
+		elem& operator=(elem&& other) noexcept{
+			if(this == &other) return *this;
+			elem_datas::operator =(std::move(other));
+			event_slots.set_context(*this);
+			return *this;
+		}
+
 		// [[nodiscard]] Graphic::Batch_Direct& getBatch() const noexcept;
 		//
 		[[nodiscard]] graphic::renderer_ui& get_renderer() const noexcept;
 
-		[[nodiscard]] const cursor_state& get_cursor_state() const noexcept{
-			return cursorState;
+		[[nodiscard]] const cursor_states& get_cursor_state() const noexcept{
+			return cursor_state;
 		}
 
 		void set_style(const style_drawer<elem>& drawer){
@@ -412,8 +442,8 @@ namespace mo_yanxi::ui{
 			property.set_empty_drawer();
 		}
 
-		bool resize_quiet(const math::vec2 size){
-			auto last = std::exchange(layoutState.acceptMask_inherent, spread_direction::none);
+		bool resize_quiet(const math::vec2 size, spread_direction mask = spread_direction::none){
+			auto last = std::exchange(layoutState.acceptMask_inherent, mask);
 			auto rst = resize(size);
 			layoutState.acceptMask_inherent = last;
 			return rst;
@@ -425,6 +455,20 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] constexpr math::vec2 content_size() const noexcept{
 			return property.content_size();
+		}
+
+		[[nodiscard]] constexpr math::vec2 content_potential_size() const noexcept{
+			return content_potential_size(context_size_restriction);
+		}
+		[[nodiscard]] constexpr math::vec2 content_potential_size(stated_extent extent) const noexcept{
+			auto sz = property.content_size();
+			if(extent.width.dependent()){
+				sz.x = std::numeric_limits<float>::infinity();
+			}
+			if(extent.height.dependent()){
+				sz.y = std::numeric_limits<float>::infinity();
+			}
+			return sz;
 		}
 
 		[[nodiscard]] constexpr bool maintain_focus_by_mouse() const noexcept{
@@ -444,6 +488,8 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] group* get_root_parent() const noexcept;
 
 		virtual void update_opacity(float val);
+
+		void mark_independent_layout_changed();
 
 		void set_parent(group* p) noexcept{
 			parent = p;
@@ -494,8 +540,8 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] math::vec2 get_local_from_global(math::vec2 global_input) const noexcept;
 
 
-		[[nodiscard]] constexpr math::vec2 contentSrcPos() const noexcept{
-			return property.absolute_src + property.boarder.bot_lft();
+		[[nodiscard]] constexpr math::vec2 content_src_pos() const noexcept{
+			return property.absolute_src + property.content_src_offset();
 		}
 
 		void remove_self_from_parent();
@@ -521,7 +567,7 @@ namespace mo_yanxi::ui{
 		// }
 
 		[[nodiscard]] constexpr bool ignore_inbound() const noexcept{
-			return skipInboundCapture;
+			return skip_inbound_capture;
 		}
 
 		[[nodiscard]] constexpr bool interactable() const noexcept{
@@ -536,7 +582,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] bool contains(math::vec2 absPos) const noexcept;
 
-		[[nodiscard]] bool contains_self(math::vec2 absPos, float margin = 0.f) const noexcept;
+		[[nodiscard]] virtual bool contains_self(math::vec2 absPos, float margin = 0.f) const noexcept;
 
 		[[nodiscard]] virtual bool contains_parent(math::vec2 cursorPos) const;
 
@@ -590,6 +636,10 @@ namespace mo_yanxi::ui{
 			}
 		}
 
+		virtual std::optional<math::vec2> pre_acquire_size(stated_extent extent){
+			return std::nullopt;
+		}
+
 		// [[nodiscard]] virtual math::vec2 requestSpace(const StatedSize sz, math::vec2 minimumSize,
 		// 											  math::vec2 currentAllocatedSize){
 		// 	auto cur = get_size();
@@ -605,40 +655,33 @@ namespace mo_yanxi::ui{
 		// }
 
 
-		virtual void try_draw(const Rect clipSpace, Rect redirect) const{
+		virtual void try_draw(const rect clipSpace, rect redirect) const{
 			if(!is_visible()) return;
 			// if(IgnoreClipWhenDraw || inboundOf(clipSpace)){
-				draw(redirect);
+			draw(clipSpace, redirect);
 			// }
 		}
 
-		void draw(const Rect clipSpace) const{
+		void draw(const rect clipSpace) const{
 			draw(clipSpace, get_bound());
 		}
 
-		void draw(const Rect clipSpace, Rect redirect) const{
+		void draw(const rect clipSpace, rect redirect) const{
 			draw_pre(clipSpace, redirect);
 			draw_content(clipSpace, redirect);
 			draw_post(clipSpace, redirect);
 		}
 
-		virtual void draw_pre(const Rect clipSpace, Rect redirect) const{
+		virtual void draw_pre(const rect clipSpace, rect redirect) const;
+
+		virtual void draw_content(const rect clipSpace, rect redirect) const{
 
 		}
-		virtual void draw_content(const Rect clipSpace, Rect redirect) const{
-
-		}
-		virtual void draw_post(const Rect clipSpace, Rect redirect) const{
+		virtual void draw_post(const rect clipSpace, rect redirect) const{
 
 		}
 
-		virtual bool update_abs_src(const math::vec2 parentAbsSrc){
-			if(util::tryModify(property.absolute_src, parentAbsSrc + property.relative_src)){
-				// notifyLayoutChanged(spread_direction::local);
-				return true;
-			}
-			return false;
-		}
+		virtual bool update_abs_src(math::vec2 parent_content_abs_src);
 		//
 		// virtual void drawMain(Rect clipSpace) const;
 		//
@@ -739,7 +782,7 @@ namespace mo_yanxi::ui{
 	public:
 		std::vector<elem*> dfsFindDeepestElement(math::vec2 cursorPos);
 
-		[[nodiscard]] Rect get_bound() const noexcept{
+		[[nodiscard]] rect get_bound() const noexcept{
 			return prop().bound_absolute();
 		}
 

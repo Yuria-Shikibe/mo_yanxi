@@ -20,16 +20,11 @@ import std;
 
 namespace mo_yanxi{
 	namespace graphic{
-		struct renderer_ui;
+		export struct renderer_ui;
 	}
 
-	// class Bundle;
 }
 
-// export namespace Graphic{
-// 	struct RendererUI;
-// 	// struct Camera2D;
-// }
 
 namespace mo_yanxi::ui{
 	// struct elem;
@@ -155,7 +150,7 @@ namespace mo_yanxi::ui{
 			onCursorPosUpdate(cursorPos);
 		}
 
-		void resize(math::vec2 size);
+		void resize(math::frect region);
 
 		void set_position(const math::vec2 pos){
 			this->region.src = pos;

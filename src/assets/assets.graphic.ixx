@@ -37,6 +37,7 @@ namespace mo_yanxi::assets::graphic{
 
 	namespace samplers{
 		export vk::sampler texture_sampler{};
+		export vk::sampler ui_sampler{};
 		export vk::sampler blit_sampler{};
 	}
 

@@ -24,7 +24,7 @@ namespace mo_yanxi::ui{
 
 	export
 	template <typename InitFunc>
-	struct elem_init_func_trait : func_initializer_trait<InitFunc>{
+	struct elem_init_func_trait : protected func_initializer_trait<InitFunc>{
 		using elem_type = typename func_initializer_trait<InitFunc>::target_type;
 	};
 
@@ -36,16 +36,16 @@ namespace mo_yanxi::ui{
 			: element{element}{}
 
 		template <invocable_elem_init_func InitFunc>
-		[[nodiscard]] elem_ptr(struct scene* scene, struct group* group, InitFunc initFunc)
-			: elem_ptr{group, scene, std::in_place_type<typename elem_init_func_trait<InitFunc>::elem_type>}{
+		[[nodiscard]] elem_ptr(scene* scene, group* group, InitFunc initFunc)
+			: elem_ptr{scene, group, std::in_place_type<typename elem_init_func_trait<InitFunc>::elem_type>}{
 			std::invoke(initFunc,
 			            static_cast<std::add_lvalue_reference_t<typename elem_init_func_trait<InitFunc>::elem_type>>(*element));
 		}
 
 		template <typename T, typename ...Args>
-			requires (std::constructible_from<T, group*, scene*, Args...>)
+			requires (std::constructible_from<T, scene*, group*, Args...>)
 		[[nodiscard]] elem_ptr(scene* scene, group* group, std::in_place_type_t<T>, Args&& ...args)
-			: element{new T{group, scene, std::forward<Args>(args)...}}{
+			: element{new T{scene, group, std::forward<Args>(args)...}}{
 			if(group){
 				check_group_set();
 			}

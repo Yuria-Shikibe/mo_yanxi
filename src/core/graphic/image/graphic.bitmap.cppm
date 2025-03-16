@@ -81,7 +81,21 @@ namespace mo_yanxi::graphic{
         using extent_type = math::vector2<size_type>;
         using point_type = math::vector2<size_type>;
 
-        using tile::tile;
+        [[nodiscard]] bitmap() = default;
+
+        [[nodiscard]] bitmap(size_type width, size_type height, const value_type& init)
+            : tile<color_bits>(width, height, init){
+        }
+
+        [[nodiscard]] bitmap(size_type width, size_type height)
+            : tile(width, height){
+        }
+
+        [[nodiscard]] bitmap(size_type width, size_type height, const value_type* data)
+            : tile(width, height, data){
+        }
+
+
 
         [[nodiscard]] explicit bitmap(std::string_view path);
         [[nodiscard]] explicit bitmap(const char* path) : bitmap(std::string_view(path)) {}

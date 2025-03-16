@@ -17,10 +17,10 @@ namespace mo_yanxi::ui{
 		/**
 		 * @brief notify parent that it's children requires some content layout update
 		 */
-		child_content = 1u << 3,
+		from_content = 1u << 3,
 
 		all = local | super | child,
-		all_visible = all | child_content,
+		all_visible = all | from_content,
 
 		lower = local | child,
 		upper = local | super,
