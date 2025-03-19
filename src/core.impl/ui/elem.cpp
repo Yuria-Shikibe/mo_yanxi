@@ -33,7 +33,7 @@ namespace mo_yanxi{
 		}
 	}
 
-	void ui::cursor_states::registerFocusEvent(elem_event_manager& event_manager){
+	void ui::cursor_states::register_default_cursor_events(elem_event_manager& event_manager){
 		event_manager.on<events::focus_begin>([](auto, elem& self){
 			self.cursor_state.focused = true;
 		});
@@ -45,7 +45,10 @@ namespace mo_yanxi{
 
 		event_manager.on<events::moved>([](auto, elem& self){
 			self.cursor_state.time_stagnate = 0;
-			// stagnateTime = 0.f;
+			if(self.get_tooltip_prop().use_stagnate_time){
+				self.cursor_state.time_tooltip = 0.;
+				self.tooltip_notify_drop();
+			}
 		});
 	}
 
@@ -77,6 +80,7 @@ namespace mo_yanxi{
 	}
 
 	void ui::elem::mark_independent_layout_changed(){
+		layoutState.notify_self_changed();
 		get_scene()->independentLayout.insert(this);
 	}
 
@@ -148,7 +152,7 @@ namespace mo_yanxi{
 	}
 
 	bool ui::elem::contains(const math::vec2 absPos) const noexcept{
-		return (!parent || parent->contains_parent(absPos)) && contains_self(absPos);
+		return (!parent || parent->contains_parent(absPos)) && contains_self(absPos, 0.);
 	}
 
 	bool ui::elem::contains_self(const math::vec2 absPos, const float margin) const noexcept{
@@ -198,22 +202,22 @@ namespace mo_yanxi{
 
 		cursor_state.update(delta_in_ticks);
 
-		// if(cursorState.focused){
-		// 	//TODO dependent above?
-		// 	get_scene()->tooltipManager.tryAppendToolTip(*this, false);
-		// }
+		if(cursor_state.focused){
+			//TODO dependent above?
+			get_scene()->tooltip_manager.try_append_tooltip(*this, false);
+		}
 
-		// for(float actionDelta = delta_in_ticks; !actions.empty();){
-		// 	const auto& current = actions.front();
-		//
-		// 	actionDelta = current->update(actionDelta, *this);
-		//
-		// 	if(actionDelta >= 0)[[unlikely]] {
-		// 		actions.pop();
-		// 	} else{
-		// 		break;
-		// 	}
-		// }
+		for(float actionDelta = delta_in_ticks; !actions.empty();){
+			const auto& current = actions.front();
+
+			actionDelta = current->update(actionDelta, *this);
+
+			if(actionDelta >= 0) [[unlikely]] {
+				actions.pop();
+			} else{
+				break;
+			}
+		}
 	}
 
 	// void ui::elem::drawMain(const Rect clipSpace) const{
@@ -244,21 +248,7 @@ namespace mo_yanxi{
 	// 	}
 	// }
 	//
-	// bool ui::elem::hasTooltip() const noexcept{
-	// 	if(scene){
-	// 		if(scene->tooltipManager.hasInstance(*this)) return true;
-	// 	}
-	//
-	// 	return false;
-	// }
-	//
-	// bool ui::elem::dropTooltip() const noexcept{
-	// 	if(scene){
-	// 		return scene->tooltipManager.requestDrop(*this);
-	// 	}
-	//
-	// 	return false;
-	// }
+
 	//
 	// void ui::elem::dropToolTipIfMoved() const{
 	// 	if(tooltipProp.useStagnateTime) getScene()->tooltipManager.requestDrop(*this);
@@ -278,12 +268,17 @@ namespace mo_yanxi{
 		return false;
 	}
 
-	std::vector<ui::elem*> ui::elem::dfsFindDeepestElement(math::vec2 cursorPos){
+	std::vector<ui::elem*> ui::elem::dfs_find_deepest_element(math::vec2 cursorPos){
 		std::vector<elem*> rst{};
 
 		iterateAll_DFSImpl(cursorPos, rst, this);
 
 		return rst;
+	}
+
+	bool ui::elem::tooltip_should_maintain(math::vec2 cursorPos) const{
+		assert(tooltip_handle.handle);
+		return !tooltip_prop_.auto_release || tooltip_handle.handle->is_focused_key();
 	}
 
 	void ui::iterateAll_DFSImpl(math::vec2 cursorPos, std::vector<elem*>& selected, elem* current){

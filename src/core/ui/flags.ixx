@@ -135,4 +135,9 @@ namespace mo_yanxi::ui{
 		children_only,
 		enabled
 	};
+
+	export enum struct esc_flag{
+		sustain,
+		droppable,
+	};
 }

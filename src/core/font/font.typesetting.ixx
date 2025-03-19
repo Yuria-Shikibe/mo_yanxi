@@ -1,6 +1,8 @@
 module;
 
 #include "../src/ext/enum_operator_gen.hpp"
+#include "../src/ext/adapted_attributes.hpp"
+#include <freetype/freetype.h>
 
 export module mo_yanxi.font.typesetting;
 
@@ -9,7 +11,7 @@ export import mo_yanxi.encode;
 export import mo_yanxi.graphic.color;
 export import mo_yanxi.math;
 export import mo_yanxi.heterogeneous.open_addr_hash;
-export import Align;
+export import align;
 import std;
 
 namespace mo_yanxi{
@@ -64,6 +66,7 @@ namespace mo_yanxi{
 	};
 }
 
+
 namespace mo_yanxi::font::typesetting{
 	constexpr char_code line_feed_character = U'\u2925';
 
@@ -99,6 +102,14 @@ namespace mo_yanxi::font::typesetting{
 		graphic::color color{};
 		math::frect region{};
 
+		math::vec2 correct_scale{};
+
+		[[nodiscard]] FORCE_INLINE math::frect get_draw_bound() const noexcept{
+			CHECKED_ASSUME(correct_scale.x >= 0);
+			CHECKED_ASSUME(correct_scale.y >= 0);
+			return region.copy().expand(font_draw_expand * correct_scale);
+		}
+
 		[[nodiscard]] glyph_elem() = default;
 
 		[[nodiscard]] glyph_elem(
@@ -109,24 +120,6 @@ namespace mo_yanxi::font::typesetting{
 			  layout_pos(layout_pos),
 			  glyph(std::move(glyph)){
 		}
-
-		// Math::Range heightAlign{};
-
-		// [[nodiscard]] constexpr math::vec2 v00() const noexcept{
-		// 	return src;
-		// }
-		//
-		// [[nodiscard]] constexpr math::vec2 v01() const noexcept{
-		// 	return {src.x, end.y};
-		// }
-		//
-		// [[nodiscard]] constexpr math::vec2 v10() const noexcept{
-		// 	return {end.x, src.y};
-		// }
-		//
-		// [[nodiscard]] constexpr math::vec2 v11() const noexcept{
-		// 	return end;
-		// }
 
 		[[nodiscard]] constexpr float midX() const noexcept{
 			return region.get_center_x();
@@ -140,7 +133,6 @@ namespace mo_yanxi::font::typesetting{
 			return layout_pos.index;
 		}
 	};
-
 
 	export struct glyph_line{
 		float width;
@@ -314,7 +306,11 @@ namespace mo_yanxi::font::typesetting{
 
 						if(codeByte == sentinel.end){
 							if(!currentToken || tokenRegionBegin == InvalidPos){
-								throw std::invalid_argument("Parse String Tokens Failed");
+								tokenRegionBegin = InvalidPos;
+								currentToken = nullptr;
+								recordingToken = TokenState::normal;
+								if(sentinel.reserve)goto record;
+								else continue;
 							}
 
 							currentToken->data = string.substr(tokenRegionBegin, off - tokenRegionBegin);
@@ -326,6 +322,8 @@ namespace mo_yanxi::font::typesetting{
 						if(!sentinel.reserve) continue;
 					}
 				}
+
+				record:
 
 				const auto codeSize = encode::getUnicodeLength<>(reinterpret_cast<const char&>(charCode));
 
@@ -365,14 +363,14 @@ namespace mo_yanxi::font::typesetting{
 	export struct parse_context{
 	private:
 
-	public:
 		glyph_size_type default_size{64, 0};
-		tokenized_text text{};
 
-		optional_stack<graphic::color> colorHistory{};
 		optional_stack<math::vec2> offsetHistory{};
 		optional_stack<glyph_size_type> size_history{};
+
+	public:
 		optional_stack<font_face*> font_history{};
+		optional_stack<graphic::color> colorHistory{};
 
 		// math::vec2 captured_size{};
 
@@ -407,6 +405,17 @@ namespace mo_yanxi::font::typesetting{
 
 		[[nodiscard]] math::vec2 get_current_offset() const noexcept{
 			return currentOffset * throughout_scale;
+		}
+
+		void push_size(glyph_size_type sz){
+			if(sz.x == 0 && sz.y == 0){
+				sz = default_size;
+			}
+			size_history.push(sz);
+		}
+
+		void pop_size(){
+			size_history.pop();
 		}
 
 		void set_throughout_scale(const float scl) noexcept{
@@ -446,7 +455,7 @@ namespace mo_yanxi::font::typesetting{
 		}
 
 		void push_scaled_current_size(const float scl){
-			size_history.push(size_history.top(default_size).scl(scl));
+			push_size(size_history.top(default_size).scl(scl));
 		}
 
 		void push_scaled_offset(const math::vec2 offScale){
@@ -479,8 +488,6 @@ namespace mo_yanxi::font::typesetting{
 		}
 
 	};
-
-
 
 	export enum struct layout_policy{
 		/**
@@ -522,15 +529,15 @@ namespace mo_yanxi::font::typesetting{
 			row_type glyphs{};
 
 			[[nodiscard]] math::frect getRectBound() const noexcept{
-				return {src.x, src.y - bound.descender, bound.width, bound.height()};
+				return {src.x, src.y - bound.ascender, bound.width, bound.height()};
 			}
 
 			[[nodiscard]] float top() const noexcept{
-				return src.y + bound.ascender;
+				return src.y - bound.ascender;
 			}
 
 			[[nodiscard]] float bottom() const noexcept{
-				return src.y - bound.descender;
+				return src.y + bound.descender;
 			}
 
 			[[nodiscard]] std::size_t size() const noexcept{
@@ -572,8 +579,9 @@ namespace mo_yanxi::font::typesetting{
 			}
 		};
 
-	private:
 		std::string text{};
+
+	private:
 		std::vector<row> elements{};
 
 		math::vec2 captured_size{};
@@ -643,15 +651,15 @@ namespace mo_yanxi::font::typesetting{
 		}
 
 		void update_align(){
-			if(align & align::pos::center_x){
+			if((align & align::pos::center_x) != align::pos{}){
 				for(auto& element : elements){
 					element.src.x = (captured_size.x - element.bound.width) / 2.f;
 				}
-			} else if(align & align::pos::left){
+			} else if((align & align::pos::left) != align::pos{}){
 				for(auto& element : elements){
 					element.src.x = 0;
 				}
-			} else if(align & align::pos::right){
+			} else if((align & align::pos::right) != align::pos{}){
 				for(auto& element : elements){
 					element.src.x = (captured_size.x - element.bound.width);
 				}
@@ -780,14 +788,14 @@ namespace mo_yanxi::font::typesetting{
 
 		[[nodiscard]] const glyph_elem* find_valid_elem(const layout_index_t index) const noexcept{
 			auto lowerRow = std::ranges::upper_bound(elements, index, {}, [](const row& row){
-				return row.glyphs.empty() ? std::numeric_limits<layout_index_t>::max() : row.glyphs.front().index();
+				return row.glyphs.front().index();
 			});
 
 			if(lowerRow == elements.begin()) return nullptr;
 			--lowerRow;
 
 			const auto upperRow = std::ranges::upper_bound(lowerRow, elements.end(), index, {}, [](const row& row){
-				return row.glyphs.empty() ? std::numeric_limits<layout_index_t>::max() : row.glyphs.front().index();
+				return row.glyphs.front().index();
 			});
 
 			const auto dst = std::distance(lowerRow, upperRow);
@@ -937,12 +945,13 @@ namespace mo_yanxi::font::typesetting{
 
 		export void end_script(glyph_layout& layout, parse_context& context){
 			context.pop_offset();
-			context.size_history.pop();
+			context.pop_size();
 		}
 
 	}
 
 	struct parser_base{
+		bool reserve_tokens{};
 		string_open_addr_hash_map<token_modifier> modifiers{};
 
 		void exec_token(
@@ -965,7 +974,7 @@ namespace mo_yanxi::font::typesetting{
 					name.remove_prefix(1);
 					func::push_color(context, name);
 				}else if(std::isdigit(name[0])){
-					context.size_history.push({static_cast<glyph_size_type::value_type>(func::string_cast(name, 64)), 0});
+					context.push_size({static_cast<glyph_size_type::value_type>(func::string_cast(name, 64)), 0});
 				}else if(name.starts_with('^')){
 					func::begin_superscript(layout, context);
 				}else if(name.starts_with('_')){
@@ -1043,8 +1052,8 @@ namespace mo_yanxi::font::typesetting{
 			);
 
 			const auto font_region_scale = context.get_current_correction_scale();
-			float advance = current.glyph.metrics.advance.x * font_region_scale.x * context.get_throughout_scale();
-			if(is_space(code.code)){
+			float advance = current.glyph.metrics().advance.x * font_region_scale.x * context.get_throughout_scale();
+			if(code.code == U'\0' || code.code == U'\n'){
 				advance = math::min(advance, layout.get_clamp_size().x - context.pen_pos.x);
 			}
 
@@ -1053,7 +1062,8 @@ namespace mo_yanxi::font::typesetting{
 			const auto localPenPos = context.pen_pos - line.src;
 			const auto placementPos = localPenPos + off;
 
-			current.region = current.glyph.metrics.place_to(placementPos, font_region_scale);
+			current.region = current.glyph.metrics().place_to(placementPos, font_region_scale);
+			current.correct_scale = font_region_scale;
 			if(current.region.get_src_x() < 0){
 				advance -= current.region.get_src_x();
 				current.region.src.x = 0;
@@ -1076,7 +1086,6 @@ namespace mo_yanxi::font::typesetting{
 				}
 			}
 
-			current.region.expand(font_draw_expand * font_region_scale);
 			current.color = context.get_color();
 			result.success = true;
 
@@ -1227,7 +1236,7 @@ namespace mo_yanxi::font::typesetting{
 						if(auto result =
 							func::append_glyph_horizontal(
 								layout, context,
-								{line_feed_character, code.unit_index}, layout_index, currentRowIndex, false, true)
+								{line_feed_character, code.unit_index}, itr - view.begin() + 1, currentRowIndex, false, true)
 						){
 							result.update_context(context);
 						}else{
@@ -1291,7 +1300,7 @@ namespace mo_yanxi::font::typesetting{
 		void operator()(glyph_layout& layout) const{
 			layout.elements.clear();
 			parse_context context{};
-			tokenized_text formatted_text{layout.get_text()};
+			tokenized_text formatted_text{layout.get_text(), {.reserve = reserve_tokens}};
 
 			auto idx = parse(layout, context, formatted_text);
 			end_parse(layout, context, formatted_text, idx + 1);
@@ -1324,7 +1333,7 @@ namespace mo_yanxi::font::typesetting{
 
 			const std::string_view arg = token.get_first_arg();
 			if(arg.empty()){
-				ctx.size_history.pop();
+				ctx.pop_size();
 				return;
 			}
 			if(arg.starts_with('[')){
@@ -1332,9 +1341,9 @@ namespace mo_yanxi::font::typesetting{
 
 				switch(count){
 				case 1 : [[fallthrough]];
-				case 2 : ctx.size_history.push(std::bit_cast<glyph_size_type>(arr));
+				case 2 : ctx.push_size(std::bit_cast<glyph_size_type>(arr));
 					break;
-				default : ctx.size_history.pop();
+				default : ctx.pop_size();
 				}
 			}
 		};
@@ -1343,7 +1352,7 @@ namespace mo_yanxi::font::typesetting{
 			const std::string_view arg = token.get_first_arg();
 
 			if(arg.empty()){
-				context.size_history.pop();
+				context.pop_size();
 				return;
 			}
 
@@ -1437,6 +1446,13 @@ namespace mo_yanxi::font::typesetting{
 	export inline const parser global_parser{[]{
 		parser p;
 		apd_default_modifiers(p);
+		return p;
+	}()
+	};
+	export inline const parser global_empty_parser{[]{
+		parser p;
+		apd_default_modifiers(p);
+		p.reserve_tokens = true;
 		return p;
 	}()
 	};

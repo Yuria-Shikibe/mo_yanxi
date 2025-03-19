@@ -96,8 +96,22 @@ namespace mo_yanxi::ui{
 	};
 
 	export struct stated_extent{
-		stated_size width{};
-		stated_size height{};
+		stated_size width{size_category::passive, 1};
+		stated_size height{size_category::passive, 1};
+
+		[[nodiscard]] constexpr stated_extent() noexcept = default;
+
+		[[nodiscard]] constexpr stated_extent(const stated_size width, const stated_size height) noexcept
+			: width(width),
+			  height(height){
+		}
+
+		[[nodiscard]] constexpr stated_extent(const float width, const float height) noexcept
+			: width(std::isinf(width) ? size_category::external : size_category::mastering, width),
+			  height(std::isinf(height) ? size_category::external : size_category::mastering, height){
+		}
+
+
 
 		constexpr friend bool operator==(const stated_extent& lhs, const stated_extent& rhs) noexcept = delete;
 

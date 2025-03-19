@@ -7,7 +7,7 @@ export module mo_yanxi.ui.layout.cell;
 export import mo_yanxi.ui.layout.policies;
 
 export import mo_yanxi.math.rect_ortho;
-export import Align;
+export import align;
 import std;
 
 namespace mo_yanxi::ui{
@@ -91,6 +91,7 @@ namespace mo_yanxi::ui{
 			stated_extent.width.value = scale;
 			return *this;
 		}
+
 		constexpr auto& set_height_passive(float weight = 1.){
 			stated_extent.height.type = size_category::passive;
 			stated_extent.height.value = weight;

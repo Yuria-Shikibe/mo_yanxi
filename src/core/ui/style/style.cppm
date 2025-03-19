@@ -9,7 +9,7 @@ export import mo_yanxi.ui.comp.drawer;
 import mo_yanxi.graphic.image_region;
 import mo_yanxi.graphic.image_nine_region;
 export import mo_yanxi.graphic.color;
-export import Align;
+export import align;
 
 import std;
 
@@ -55,8 +55,8 @@ namespace mo_yanxi::ui{
 
 		struct round_style : style_drawer<elem>{
 			align::spacing boarder{DefaultBoarder};
-			palette_with<graphic::image_nine_region> base{};
-			palette_with<graphic::image_nine_region> edge{};
+			palette_with<graphic::image_multi_region> base{};
+			palette_with<graphic::image_multi_region> edge{};
 
 			float disabledOpacity{.5f};
 

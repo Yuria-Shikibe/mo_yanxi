@@ -377,6 +377,15 @@ namespace mo_yanxi::ui{
 					ext.*extent_major = head_major.max_size;
 					ext.*extent_minor = head_minor.max_size;
 
+					//TODO
+					if((elem.cell.stated_extent.*extent_minor).dependent()){
+						ext.*extent_minor = {size_category::external};
+					}
+					if((elem.cell.stated_extent.*extent_major).dependent()){
+						ext.*extent_major = {size_category::external};
+					}
+
+
 					//TODO adjust cell bound according to cell size
 					elem.cell.allocated_region.src = current_position + src_off + entire_offset;
 					elem.cell.allocated_region.set_size(size);

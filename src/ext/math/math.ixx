@@ -977,7 +977,7 @@ namespace mo_yanxi::math {
 		}
 
 		MATH_ATTR constexpr T length() const noexcept{
-			return math::dst_safe(to - from);
+			return math::dst_safe(from, to);
 		}
 
 		MATH_ATTR constexpr T clamp(const T val) const noexcept{

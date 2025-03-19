@@ -11,8 +11,8 @@ import <msdfgen/msdfgen.h>;
 import <msdfgen/msdfgen-ext.h>;
 
 namespace mo_yanxi::graphic::msdf{
-	export constexpr inline std::uint32_t sdf_image_boarder = 16;
-	export constexpr inline double sdf_image_range = 0.425f;
+	export constexpr inline std::uint32_t sdf_image_boarder = 8;
+	export constexpr inline double sdf_image_range = 1.5f;
 
 	void write_to_bitmap(bitmap& bitmap, const msdfgen::Bitmap<float, 3>& region){
 		for(unsigned y = 0; y < bitmap.height(); ++y){
@@ -29,132 +29,33 @@ namespace mo_yanxi::graphic::msdf{
 		}
 	}
 
-	export
-	[[nodiscard]] bitmap load_shape(msdfgen::Shape&& shape, unsigned w, unsigned h, double range = sdf_image_range){
-		bitmap bitmap = {w + sdf_image_boarder, h + sdf_image_boarder};
-
-		msdfgen::edgeColoringByDistance(shape, 2.);
-
-		const auto bound = shape.getBounds();
-
-		const double width = bound.r - bound.l;
-		const double height = bound.t - bound.b;
-
-		auto scale = bitmap.extent().sub(sdf_image_boarder, sdf_image_boarder).as<double>().div(width, height);
-		// shape.normalize();
-		msdfgen::Projection projection(
-			msdfgen::Vector2(
-				scale.x,
-				-scale.y)
-			, msdfgen::Vector2(
-				-bound.l + sdf_image_boarder / 2. / scale.x,
-				-bound.b - height - sdf_image_boarder / 2. / scale.y
-			)
-		);
-
-		// 6. 生成MSDF位图
-		msdfgen::Bitmap<float, 3> fbitmap(bitmap.width(), bitmap.height());
-		msdfgen::generateMSDF(fbitmap, shape, projection, range);
-
-		msdfgen::simulate8bit(fbitmap);
-		msdf::write_to_bitmap(bitmap, fbitmap);
-		return bitmap;
+	void write_to_bitmap(bitmap& bitmap, const msdfgen::Bitmap<float, 1>& region){
+		for(unsigned y = 0; y < bitmap.height(); ++y){
+			for(unsigned x = 0; x < bitmap.width(); ++x){
+				auto& bit = bitmap[x, y];
+				bit.r = bit.g = bit.b = math::round<std::uint8_t>(region(x, y)[0] * static_cast<float>(std::numeric_limits<std::uint8_t>::max()));
+				bit.a = std::numeric_limits<std::uint8_t>::max();
+			}
+		}
 	}
+
+	export
+	[[nodiscard]] bitmap load_shape(msdfgen::Shape&& shape, unsigned w, unsigned h, double range = sdf_image_range);
 
 
 	export
 	[[nodiscard]] bitmap load_glyph(
 		msdfgen::FontHandle* face,
 		msdfgen::unicode_t code,
-		unsigned w,
-		unsigned h,
+		unsigned target_w,
+		unsigned target_h,
+		unsigned font_w,
+		unsigned font_h,
 		double range = sdf_image_range
-		){
-		using namespace msdfgen;
-		Shape shape;
-		if(loadGlyph(shape, face, code, FONT_SCALING_EM_NORMALIZED)){
-			bitmap bitmap = {w + sdf_image_boarder, h + sdf_image_boarder};
-
-			auto bound = shape.getBounds();
-
-
-			double width = bound.r - bound.l;
-			double height = bound.t - bound.b;
-
-			auto scale = bitmap.extent().sub(sdf_image_boarder, sdf_image_boarder).as<double>().div(width, height);
-
-			shape.normalize();
-
-			using sdf_bitmap = Bitmap<float, 3>;
-
-			edgeColoringInkTrap(shape, 2.0);
-			sdf_bitmap msdf(bitmap.width(), bitmap.height());
-
-
-			shape.inverseYAxis = false;
-			shape.orientContours();
-
-			SDFTransformation t(
-				Projection(
-					Vector2{
-						scale.x,
-						-scale.y
-					}, Vector2(
-						-bound.l + sdf_image_boarder / 2. / scale.x,
-						-bound.b - height - sdf_image_boarder / 2. / scale.y
-					)), Range(range));
-			msdfgen::generateMSDF(msdf, shape, t);
-			msdfgen::simulate8bit(msdf);
-
-			msdf::write_to_bitmap(bitmap, msdf);
-
-
-			return bitmap;
-		}
-
-		return {};
-	}
+		);
 
 	export
-	[[nodiscard]] bitmap load_svg(const char* path, unsigned w, unsigned h){
-		msdfgen::Shape shape;
-		msdfgen::Shape::Bounds svgViewBox;
-
-		// msdfgen::loadSvgShape()
-		// 从SVG文件加载图形
-		if(msdfgen::loadSvgShape(shape, svgViewBox, path)){
-			bitmap bitmap = {w + sdf_image_boarder, h + sdf_image_boarder};
-
-			// shape.orientContours(); // 关键：修复路径缠绕方向
-
-			const auto bound = shape.getBounds();
-
-			const double width = bound.r - bound.l;
-			const double height = bound.t - bound.b;
-
-			auto scale = bitmap.extent().sub(sdf_image_boarder, sdf_image_boarder).as<double>().div(width, height);
-
-			msdfgen::Projection projection(
-				msdfgen::Vector2(
-					scale.x,
-					-scale.y)
-				, msdfgen::Vector2(
-					-bound.l + sdf_image_boarder / 2. / scale.x,
-					-bound.b - height - sdf_image_boarder / 2. / scale.y
-				)
-			);
-
-			// 6. 生成MSDF位图
-			msdfgen::Bitmap<float, 3> fbitmap(bitmap.width(), bitmap.height());
-			msdfgen::generateMSDF(fbitmap, shape, projection, sdf_image_range);
-
-			msdfgen::simulate8bit(fbitmap);
-			msdf::write_to_bitmap(bitmap, fbitmap);
-			return bitmap;
-		}
-
-		return {};
-	}
+	[[nodiscard]] bitmap load_svg(const char* path, unsigned w, unsigned h, double range = 2.);
 
 
 	void add_contour(msdfgen::Shape& shape, double size, double radius, double k, double margin = 0.f, msdfgen::Vector2 offset = {}){
@@ -220,45 +121,8 @@ namespace mo_yanxi::graphic::msdf{
 	constexpr double boarder_range = 4;
 
 	export
-	bitmap create_boarder(double radius = 15., double k = .7f, double width = 2.){
-		using namespace msdfgen;
-
-		// 创建形状对象
-		Shape shape;
-		shape.inverseYAxis = true; // 翻转Y轴坐标（视需求而定）
-
-
-		add_contour(shape, boarder_size, radius, k);
-		add_contour(shape, boarder_size, radius - width, k, width);
-		// 验证形状有效性
-		if(!shape.validate()) return {};
-
-		shape.orientContours();
-		auto mp = load_shape(std::move(shape), boarder_size, boarder_size, 12);
-
-		// 清理资源
-		return mp;
-	}
+	bitmap create_boarder(double radius = 15., double k = .7f, double width = 2.);
 
 	export
-	bitmap create_solid_boarder(double radius = 15., double k = .7f){
-		using namespace msdfgen;
-
-		// 创建形状对象
-		Shape shape;
-		shape.inverseYAxis = true; // 翻转Y轴坐标（视需求而定）
-
-		constexpr double strokeWidth = 2.0; // 轮廓线宽
-
-		add_contour(shape, boarder_size, radius, k);
-		// add_contour(shape, 64, radius - strokeWidth, k, strokeWidth);
-		// 验证形状有效性
-		if(!shape.validate()) return {};
-
-		shape.orientContours();
-		auto mp = load_shape(std::move(shape), boarder_size, boarder_size, 12);
-
-		// 清理资源
-		return mp;
-	}
+	bitmap create_solid_boarder(double radius = 15., double k = .7f);
 }

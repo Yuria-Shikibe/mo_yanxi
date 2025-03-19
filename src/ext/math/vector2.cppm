@@ -247,6 +247,18 @@ export namespace mo_yanxi::math{
 			return *this;
 		}
 
+		FORCE_INLINE constexpr vector2& set_x(const T val) noexcept {
+			x = val;
+
+			return *this;
+		}
+
+		FORCE_INLINE constexpr vector2& set_y(const T val) noexcept {
+			y = val;
+
+			return *this;
+		}
+
 		FORCE_INLINE constexpr vector2& add(const_pass_t other) noexcept {
 			return this->add(other.x, other.y);
 		}
@@ -1032,7 +1044,7 @@ export namespace mo_yanxi::math{
 			static constexpr vector2<T> min_vec2{std::numeric_limits<T>::min(), std::numeric_limits<T>::min()};
 			static constexpr vector2<T> lowest_vec2{std::numeric_limits<T>::lowest(), std::numeric_limits<T>::lowest()};
 
-			static constexpr vector2<T> SNaN_vec2{std::numeric_limits<T>::signaling_NaN(), std::numeric_limits<T>::signaling_NaN()};
+			static constexpr vector2<T> SNaN{std::numeric_limits<T>::signaling_NaN(), std::numeric_limits<T>::signaling_NaN()};
 			static constexpr vector2<T> QNaN_vec2{std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::quiet_NaN()};
 		};
 	}

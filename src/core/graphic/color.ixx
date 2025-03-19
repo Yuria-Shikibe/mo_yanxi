@@ -118,6 +118,10 @@ namespace mo_yanxi::graphic{
 				std::from_chars(v1.data(), v1.data() + v1.size(), rgba[index], 16);
 			}
 
+			if(hexStr.size() <= 6){
+				rgba[3] = std::numeric_limits<std::uint8_t>::max();
+			}
+
 			return rgba;
 		}
 

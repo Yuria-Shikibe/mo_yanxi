@@ -61,17 +61,6 @@ namespace mo_yanxi::ui{
 			update_children(delta_in_ticks);
 		}
 
-		bool try_layout() override{
-			if(layoutState.check_children_changed()){
-				layoutState.clear();
-				layout();
-				layout_children();
-				return true;
-			}
-
-			return group::try_layout();
-		}
-
 	protected:
 		decltype(children)::iterator find(elem* elem) noexcept{
 			return std::ranges::find(children, elem, &elem_ptr::get);

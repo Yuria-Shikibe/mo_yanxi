@@ -13,6 +13,9 @@ export import mo_yanxi.graphic.image_region;
 import std;
 
 namespace mo_yanxi::graphic::draw{
+
+	export using mode_flags = vk::vertices::mode_flag_bits;
+
 	export struct per_primitive_t{};
 	export per_primitive_t per_primitive;
 

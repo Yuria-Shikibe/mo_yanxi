@@ -41,10 +41,10 @@ namespace mo_yanxi::ui{
 			return elem::contains_parent(cursorPos) && get_viewport().contains_loose(cursorPos);
 		}
 
-		[[nodiscard]] bool contains_self(math::vec2 absPos, float margin) const noexcept override{
-			rect region = {tags::from_extent, abs_pos(), get_viewport_size() + property.boarder.top_lft()};
-			return property.content_bound_absolute().expand(margin, margin).contains_loose(absPos) && !region.expand(margin, margin).contains_loose(absPos);
-		}
+		// [[nodiscard]] bool contains_self(math::vec2 absPos, float margin) const noexcept override{
+		// 	rect region{tags::from_extent, abs_pos(), get_viewport_size() + property.content_src_offset()};
+		// 	return property.content_bound_absolute().expand(margin, margin).contains_loose(absPos) && !region.expand(margin, margin).contains_loose(absPos);
+		// }
 
 		[[nodiscard]] scroll_pane(scene* scene, group* group)
 			: group(scene, group, "scroll_pane"){
@@ -132,6 +132,9 @@ namespace mo_yanxi::ui{
 
 		void draw_post(rect clipSpace, rect redirect) const override;
 
+		void layout() override{
+			group::layout();
+		}
 
 		template <math::vector2<bool> fillParent = {true, false}, elem_init_func Fn>
 		typename elem_init_func_trait<Fn>::elem_type& set_elem(Fn&& init){
@@ -162,23 +165,26 @@ namespace mo_yanxi::ui{
 		}
 
 	private:
-		[[nodiscard]] math::vec2 get_bound() const noexcept{
-			switch(layout_policy_){
-			case layout_policy::horizontal :
-				return {property.content_width(), std::numeric_limits<float>::infinity()};
-			case layout_policy::vertical :
-				return {std::numeric_limits<float>::infinity(), property.content_height()};
-			case layout_policy::none:
-				return math::vectors::constant2<float>::inf_positive_vec2;
-			default: std::unreachable();
-			}
+		// [[nodiscard]] math::vec2 get_bound() const noexcept{
+		// 	switch(layout_policy_){
+		// 	case layout_policy::horizontal :
+		// 		return {property.content_width(), std::numeric_limits<float>::infinity()};
+		// 	case layout_policy::vertical :
+		// 		return {std::numeric_limits<float>::infinity(), property.content_height()};
+		// 	case layout_policy::none:
+		// 		return math::vectors::constant2<float>::inf_positive_vec2;
+		// 	default: std::unreachable();
+		// 	}
+		// }
+
+		void layout_children() override{
+			update_item_layout();
 		}
 
 		bool resize(const math::vec2 size) override{
 			if(elem::resize(size)){
 				update_item_layout();
 
-				elem::layout();
 				return true;
 			}
 

@@ -4,13 +4,14 @@
 
 export module mo_yanxi.ui.scene;
 
-// export import Core.UI.ToolTipManager;
+export import mo_yanxi.ui.tooltip_manager;
 
 import mo_yanxi.math.vector2;
 import mo_yanxi.math.rect_ortho;
 
 export import mo_yanxi.core.ctrl.constants;
 export import mo_yanxi.core.ctrl.key_binding;
+export import mo_yanxi.ui.flags;
 export import mo_yanxi.ui.pre_decl;
 
 import mo_yanxi.owner;
@@ -54,6 +55,7 @@ namespace mo_yanxi::ui{
 		std::array<MouseState, core::ctrl::mouse::Count> mouseKeyStates{};
 
 
+
 		dependency<owner<group*>> root{};
 
 		// dependency<core::ctrl::key_mapping<>*> keyMapping{};
@@ -68,8 +70,8 @@ namespace mo_yanxi::ui{
 		std::unordered_set<elem*> asyncTaskOwners{};
 
 		graphic::renderer_ui* renderer{};
-		// Graphic::RendererUI* renderer{};
-		// Bundle* bundle{};
+
+		tooltip_manager tooltip_manager{};
 
 		[[nodiscard]] scene_base() = default;
 
@@ -111,9 +113,9 @@ namespace mo_yanxi::ui{
 			return cursorPos - mouseKeyStates[key].src;
 		}
 
-		[[nodiscard]] std::string_view getClipboard() const noexcept;
+		[[nodiscard]] std::string_view get_clipboard() const noexcept;
 
-		void setClipboard(std::string_view sv) const noexcept;
+		void set_clipboard(const char* sv) const noexcept;
 
 		// void setIMEPos(Geom::Point2 pos) const;
 
@@ -135,19 +137,19 @@ namespace mo_yanxi::ui{
 
 		void swapFocus(elem* newFocus);
 
-		bool onEsc();
+		esc_flag on_esc();
 
-		void onMouseAction(core::ctrl::key_code_t key, core::ctrl::key_code_t action, core::ctrl::key_code_t mode);
+		void on_mouse_action(core::ctrl::key_code_t key, core::ctrl::key_code_t action, core::ctrl::key_code_t mode);
 
-		void onKeyAction(core::ctrl::key_code_t key, core::ctrl::key_code_t action, core::ctrl::key_code_t mode);
+		void on_key_action(core::ctrl::key_code_t key, core::ctrl::key_code_t action, core::ctrl::key_code_t mode);
 
-		void onUnicodeInput(char32_t val) const;
+		void on_unicode_input(char32_t val) const;
 
-		void onScroll(math::vec2 scroll) const;
+		void on_scroll(math::vec2 scroll) const;
 
-		void onCursorPosUpdate(math::vec2 newPos);
-		void onCursorPosUpdate(){
-			onCursorPosUpdate(cursorPos);
+		void on_cursor_pos_update(math::vec2 newPos);
+		void on_cursor_pos_update(){
+			on_cursor_pos_update(cursorPos);
 		}
 
 		void resize(math::frect region);
@@ -160,7 +162,7 @@ namespace mo_yanxi::ui{
 
 		// void setCameraFocus(Graphic::Camera2D* camera) const;
 
-		[[nodiscard]] bool isCursorCaptured() const noexcept;
+		[[nodiscard]] bool is_cursor_captured() const noexcept;
 		[[nodiscard]] elem* getCursorCaptureRoot() const noexcept;
 
 		void layout();

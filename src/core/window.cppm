@@ -127,7 +127,7 @@ namespace mo_yanxi{
 			: eventManager{std::move(other.eventManager)},
 			  handle{std::move(other.handle)},
 			  size{std::move(other.size)}{
-			core::glfw::set_call_back(handle, this);
+			if(handle)core::glfw::set_call_back(handle, this);
 		}
 
 		window_instance& operator=(window_instance&& other) noexcept{
@@ -135,7 +135,7 @@ namespace mo_yanxi{
 			eventManager = std::move(other.eventManager);
 			handle = std::move(other.handle);
 			size = std::move(other.size);
-			core::glfw::set_call_back(handle, this);
+			if(handle)core::glfw::set_call_back(handle, this);
 			return *this;
 		}
 

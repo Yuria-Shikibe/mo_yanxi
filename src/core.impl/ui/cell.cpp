@@ -10,11 +10,11 @@ void mo_yanxi::ui::basic_cell::apply_to_base(group& group, elem& elem, stated_ex
 	//TODO scaling and offset depending on the align
 	elem.resize((allocated_region.size() * scaling - margin.get_size()).max({}));
 
-	if(!real_cell_extent.width.mastering() || !real_cell_extent.width.dependent()){
+	if(!real_cell_extent.width.mastering() && !real_cell_extent.width.dependent()){
 		real_cell_extent.width.promote(allocated_region.width());
 	}
 
-	if(!real_cell_extent.height.mastering() || !real_cell_extent.height.dependent()){
+	if(!real_cell_extent.height.mastering() && !real_cell_extent.height.dependent()){
 		real_cell_extent.height.promote(allocated_region.height());
 	}
 

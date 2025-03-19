@@ -16,8 +16,11 @@ set_warnings("all")
 set_encodings("utf-8")
 
 add_requires("glfw")
-add_requires("msdfgen", { configs = { extensions = true } })
+add_requires("msdfgen", {
+    configs = { extensions = true--[[ , skia = true ]]}
+ })
 add_requires("freetype")
+add_requires("nanosvg")
 
 -- set_toolchains("clang-cl")
 local msvc_path = "D:/lib/msvc/VC/Tools/MSVC/14.44.34823"
@@ -71,7 +74,7 @@ target("mo_yanxi")
     add_packages("msdfgen")
     add_packages("freetype")
 
---     add_packages("lunasvg")
+    add_packages("nanosvg")
 --     add_packages("volk")
 
     add_includedirs("VulkanMemoryAllocator/include")

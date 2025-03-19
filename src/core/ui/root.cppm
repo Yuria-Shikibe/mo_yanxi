@@ -58,27 +58,27 @@ namespace mo_yanxi::ui{
 
 		void input_key(const int key, const int action, const int mode) const{
 			assert(focus != nullptr);
-			focus->onKeyAction(key, action, mode);
+			focus->on_key_action(key, action, mode);
 		}
 
 		void input_scroll(const float x, const float y) const{
 			assert(focus != nullptr);
-			focus->onScroll({x, y});
+			focus->on_scroll({x, y});
 		}
 
 		void input_mouse(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) const{
 			assert(focus != nullptr);
-			focus->onMouseAction(key, action, mode);
+			focus->on_mouse_action(key, action, mode);
 		}
 
 		void input_unicode(const char32_t val) const{
 			assert(focus != nullptr);
-			focus->onUnicodeInput(val);
+			focus->on_unicode_input(val);
 		}
 
 		void cursor_pos_update(const float x, const float y) const{
 			assert(focus != nullptr);
-			focus->onCursorPosUpdate({x, y});
+			focus->on_cursor_pos_update({x, y});
 		}
 
 		scene* get_scene(const std::string_view sceneName){

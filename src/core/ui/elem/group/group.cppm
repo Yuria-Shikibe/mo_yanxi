@@ -54,6 +54,22 @@ namespace mo_yanxi::ui{
 			drawChildren(space, redirect);
 		}
 
+		bool try_layout() override{
+			if(layoutState.is_children_changed() || layoutState.is_changed()){
+				layoutState.clear();
+				layout();
+
+				return true;
+			}
+
+			return false;
+		}
+
+		void layout() override{
+			elem::layout();
+			layout_children();
+		}
+
 		// virtual std::optional<Geom::Vec2> getElementFitnessSize(const elem& element) const noexcept{
 		// 	return std::nullopt;
 		// }

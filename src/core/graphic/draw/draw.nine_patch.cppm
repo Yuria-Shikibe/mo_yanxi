@@ -16,7 +16,7 @@ namespace mo_yanxi::graphic::draw{
 	template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
 	void nine_patch(
 		auto_batch_acquirer<Vtx, UV, Proj>& param,
-		const image_nine_region& nineRegion,
+		const image_multi_region& nineRegion,
 		math::frect bound,
 		const color color){
 		if(color.a <= 0.0){
@@ -27,8 +27,8 @@ namespace mo_yanxi::graphic::draw{
 
 		param << nineRegion.image_view.view;
 
-		draw::acquirer_guard _{param, image_nine_region::size};
-		for(std::size_t i = 0; i < image_nine_region::size; ++i){
+		draw::acquirer_guard _{param, image_multi_region::size};
+		for(std::size_t i = 0; i < image_multi_region::size; ++i){
 			param << nineRegion.regions[i];
 			fill::rect_ortho(param[i], rects[i], color);
 		}

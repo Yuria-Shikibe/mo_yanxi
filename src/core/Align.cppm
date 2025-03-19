@@ -1,4 +1,8 @@
-export module Align;
+module;
+
+#include "../src/ext/enum_operator_gen.hpp"
+
+export module align;
 
 import mo_yanxi.concepts;
 export import mo_yanxi.math.vector2;
@@ -126,9 +130,13 @@ namespace mo_yanxi{
 			right = 0b0000'0010,
 			center_x = 0b0000'0100,
 
+			mask_x = left | right | center_x,
+
 			top = 0b0000'1000,
 			bottom = 0b0001'0000,
 			center_y = 0b0010'0000,
+
+			mask_y = top | bottom | center_y,
 
 			top_left = top | left,
 			top_center = top | center_x,
@@ -143,7 +151,41 @@ namespace mo_yanxi{
 			bottom_right = bottom | right,
 		};
 
-		enum class Scale : unsigned char{
+		BITMASK_OPS(export, pos);
+
+		constexpr pos operator-(const pos lhs) noexcept{
+			auto x = lhs & pos::mask_x;
+			auto y = lhs & pos::mask_y;
+
+			pos nx;
+			pos ny;
+			switch(x){
+			case pos::left : nx = pos::right;
+				break;
+			case pos::right : nx = pos::left;
+				break;
+			case pos::center_x : nx = pos::center_x;
+				break;
+			default : nx = pos::none;
+			}
+			switch(y){
+			case pos::bottom : ny = pos::top;
+				break;
+			case pos::top : ny = pos::bottom;
+				break;
+			case pos::center_y : ny = pos::center_y;
+				break;
+			default : ny = pos::none;
+			}
+
+			return nx | ny;
+		}
+
+		constexpr pos flip_y(const pos p) noexcept{
+			return -(p & pos::mask_y) | p & pos::mask_x;
+		}
+
+		enum class scale : unsigned char{
 			/** The source is not scaled. */
 			none,
 
@@ -193,9 +235,9 @@ namespace mo_yanxi{
 		};
 
 		template <number T>
-		constexpr math::vector2<T> embedTo(const Scale stretch, math::vector2<T> srcSize, math::vector2<T> toBound){
+		constexpr math::vector2<T> embedTo(const scale stretch, math::vector2<T> srcSize, math::vector2<T> toBound){
 			switch(stretch){
-			case Scale::fit :{
+			case scale::fit :{
 				const float targetRatio = align::floating_div(toBound.y, toBound.x);
 				const float sourceRatio =
 					align::floating_div(srcSize.y, srcSize.x);
@@ -205,7 +247,7 @@ namespace mo_yanxi{
 
 				return {align::floating_mul<T>(srcSize.x, scale), align::floating_mul<T>(srcSize.y, scale)};
 			}
-			case Scale::fill :{
+			case scale::fill :{
 				const float targetRatio =
 					align::floating_div(toBound.y, toBound.x);
 				const float sourceRatio =
@@ -216,30 +258,26 @@ namespace mo_yanxi{
 
 				return {align::floating_mul<T>(srcSize.x, scale), align::floating_mul<T>(srcSize.y, scale)};
 			}
-			case Scale::fillX :{
+			case scale::fillX :{
 				const float scale = align::floating_div(toBound.x, srcSize.x);
 				return {align::floating_mul<T>(srcSize.x, scale), align::floating_mul<T>(srcSize.y, scale)};
 			}
-			case Scale::fillY :{
+			case scale::fillY :{
 				const float scale = align::floating_div(toBound.y, srcSize.y);
 				return {align::floating_mul<T>(srcSize.x, scale), align::floating_mul<T>(srcSize.y, scale)};
 			}
-			case Scale::stretch : return toBound;
-			case Scale::stretchX : return {toBound.x, srcSize.y};
-			case Scale::stretchY : return {srcSize.x, toBound.y};
-			case Scale::clamped : if(srcSize.y > toBound.y || srcSize.x > toBound.x){
-					return align::embedTo<T>(Scale::fit, srcSize, toBound);
+			case scale::stretch : return toBound;
+			case scale::stretchX : return {toBound.x, srcSize.y};
+			case scale::stretchY : return {srcSize.x, toBound.y};
+			case scale::clamped : if(srcSize.y > toBound.y || srcSize.x > toBound.x){
+					return align::embedTo<T>(scale::fit, srcSize, toBound);
 				} else{
-					return align::embedTo<T>(Scale::none, srcSize, toBound);
+					return align::embedTo<T>(scale::none, srcSize, toBound);
 				}
-			case Scale::none : return srcSize;
+			case scale::none : return srcSize;
 			}
 
 			std::unreachable();
-		}
-
-		constexpr bool operator &(const pos l, const pos r){
-			return std::to_underlying(l) & std::to_underlying(r);
 		}
 
 		template <signed_number T>
@@ -249,39 +287,39 @@ namespace mo_yanxi{
 			const math::vector2<T> topRight){
 			math::vector2<T> move{};
 
-			if(align & pos::top){
+			if((align & pos::top) != pos{}){
 				move.y = -topRight.y;
-			} else if(align & pos::bottom){
+			} else if((align & pos::bottom) != pos{}){
 				move.y = bottomLeft.y;
 			}
 
-			if(align & pos::right){
+			if((align & pos::right) != pos{}){
 				move.x = -topRight.x;
-			} else if(align & pos::left){
+			} else if((align & pos::left) != pos{}){
 				move.x = bottomLeft.x;
 			}
 
 			return move;
 		}
 
-		constexpr math::vec2 get_offset_of(const pos align, const spacing margin){
-			float xMove = 0;
-			float yMove = 0;
-
-			if(align & pos::top){
-				yMove = -margin.top;
-			} else if(align & pos::bottom){
-				yMove = margin.bottom;
-			}
-
-			if(align & pos::right){
-				xMove = -margin.right;
-			} else if(align & pos::left){
-				xMove = margin.left;
-			}
-
-			return {xMove, yMove};
-		}
+		// constexpr math::vec2 get_offset_of(const pos align, const spacing margin){
+		// 	float xMove = 0;
+		// 	float yMove = 0;
+		//
+		// 	if((align & pos::top) != pos{}){
+		// 		yMove = -margin.top;
+		// 	} else if((align & pos::bottom) != pos{}){
+		// 		yMove = margin.bottom;
+		// 	}
+		//
+		// 	if((align & pos::right) != pos{}){
+		// 		xMove = -margin.right;
+		// 	} else if((align & pos::left) != pos{}){
+		// 		xMove = margin.left;
+		// 	}
+		//
+		// 	return {xMove, yMove};
+		// }
 
 		/**
 		 * @brief
@@ -292,15 +330,15 @@ namespace mo_yanxi{
 		constexpr math::vector2<T> get_offset_of(const pos align, const math::vector2<T>& bound){
 			math::vector2<T> offset{};
 
-			if(align & pos::top){
+			if((align & pos::bottom) != pos{}){
 				offset.y = -bound.y;
-			} else if(align & pos::center_y){
+			} else if((align & pos::center_y) != pos{}){
 				offset.y = -bound.y / static_cast<T>(2);
 			}
 
-			if(align & pos::right){
+			if((align & pos::right) != pos{}){
 				offset.x = -bound.x;
-			} else if(align & pos::center_x){
+			} else if((align & pos::center_x) != pos{}){
 				offset.x = -bound.x / static_cast<T>(2);
 			}
 
@@ -319,19 +357,19 @@ namespace mo_yanxi{
 
 
 		template <signed_number T>
-		[[nodiscard]] constexpr math::vector2<T> getVert(const pos align, const math::vector2<T>& size){
+		[[nodiscard]] constexpr math::vector2<T> get_vert(const pos align, const math::vector2<T>& size){
 			math::vector2<T> offset{};
 
 
-			if(align & pos::top){
+			if((align & pos::bottom) != pos{}){
 				offset.y = size.y;
-			} else if(align & pos::center_y){
+			} else if((align & pos::center_y) != pos{}){
 				offset.y = size.y / static_cast<T>(2);
 			}
 
-			if(align & pos::right){
+			if((align & pos::right) != pos{}){
 				offset.x = size.x;
-			} else if(align & pos::center_x){
+			} else if((align & pos::center_x) != pos{}){
 				offset.x = size.x / static_cast<T>(2);
 			}
 
@@ -345,8 +383,8 @@ namespace mo_yanxi{
 		 * @return
 		 */
 		template <signed_number T>
-		[[nodiscard]] constexpr math::vector2<T> getVert(const pos align, const math::rect_ortho<T>& bound){
-			return align::getVert<T>(align, bound.size()) + bound.get_src();
+		[[nodiscard]] constexpr math::vector2<T> get_vert(const pos align, const math::rect_ortho<T>& bound){
+			return align::get_vert<T>(align, bound.size()) + bound.get_src();
 		}
 
 		/**
@@ -361,22 +399,30 @@ namespace mo_yanxi{
 			const math::rect_ortho<T>& external){
 			math::vector2<T> offset{};
 
-			if(align & pos::bottom){
+			switch(align & pos::mask_y){
+			case pos::bottom :
 				offset.y = external.get_end_y() - internal_toAlignSize.y;
-			} else if(align & pos::top){
+				break;
+			case pos::top :
 				offset.y = external.get_src_y();
-			} else{
-				//centerY
+				break;
+			case pos::center_y :
 				offset.y = external.get_src_y() + (external.height() - internal_toAlignSize.y) / static_cast<T>(2);
+				break;
+			default : break;
 			}
 
-			if(align & pos::right){
+			switch(align & pos::mask_x){
+			case pos::right :
 				offset.x = external.get_end_x() - internal_toAlignSize.x;
-			} else if(align & pos::left){
+				break;
+			case pos::left :
 				offset.x = external.get_src_x();
-			} else{
-				//centerX
+				break;
+			case pos::center_x :
 				offset.x = external.get_src_x() + (external.width() - internal_toAlignSize.x) / static_cast<T>(2);
+				break;
+			default : break;
 			}
 
 			return offset;
@@ -392,15 +438,15 @@ namespace mo_yanxi{
 			const pos align,
 			math::vector2<T> scale
 		){
-			if(align & pos::bottom){
+			if((align & pos::bottom) != pos{}){
 				scale.y *= -1;
-			} else if(align & pos::center_y){
+			} else if((align & pos::center_y) != pos{}){
 				scale.y = 0;
 			}
 
-			if(align & pos::right){
+			if((align & pos::right) != pos{}){
 				scale.x *= -1;
-			} else if(align & pos::center_x){
+			} else if((align & pos::center_x) != pos{}){
 				scale.x = 0;
 			}
 
@@ -413,15 +459,15 @@ namespace mo_yanxi{
 			math::vector2<T> bound_size,
 			math::rect_ortho<T> to_transform_inner
 		){
-			if(align & pos::bottom){
+			if((align & pos::bottom) != pos{}){
 				to_transform_inner.src.y = bound_size.y - to_transform_inner.src.y - to_transform_inner.height();
-			} else if(align & pos::center_y){
+			} else if((align & pos::center_y) != pos{}){
 				to_transform_inner.src.y = (bound_size.y - to_transform_inner.height()) / static_cast<T>(2);
 			}
 
-			if(align & pos::right){
+			if((align & pos::right) != pos{}){
 				to_transform_inner.src.x = bound_size.x - to_transform_inner.src.x - to_transform_inner.width();
-			} else if(align & pos::center_x){
+			} else if((align & pos::center_x) != pos{}){
 				to_transform_inner.src.x = (bound_size.x - to_transform_inner.width()) / static_cast<T>(2);
 			}
 

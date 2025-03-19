@@ -32,7 +32,7 @@ namespace mo_yanxi::graphic{
 		region_type,
 		referenced_object<false>{
 	protected:
-		math::usize2 src{};
+		math::urect region{};
 		exclusive_handle_member<sub_page*> page{};
 
 	public:
@@ -44,7 +44,7 @@ namespace mo_yanxi::graphic{
 			const math::usize2 image_size,
 			const math::urect region
 			)
-			: combined_image_region{.view = imageView}, page{&page}, src(region.get_src()){
+			: combined_image_region{.view = imageView}, page{&page}, region(region){
 
 			uv.fetch_into(image_size, region);
 		}
@@ -55,6 +55,14 @@ namespace mo_yanxi::graphic{
 		allocated_image_region(allocated_image_region&& other) noexcept = default;
 		allocated_image_region& operator=(const allocated_image_region& other) = delete;
 		allocated_image_region& operator=(allocated_image_region&& other) noexcept = default;
+
+		[[nodiscard]] math::urect get_region() const noexcept{
+			return region;
+		}
+
+		[[nodiscard]] sub_page* get_page() const noexcept{
+			return page;
+		}
 
 		using referenced_object::droppable;
 		using referenced_object::decr_ref;
@@ -430,7 +438,7 @@ namespace mo_yanxi::graphic{
 
 
 	allocated_image_region::~allocated_image_region(){
-		if(page)page->deallocate(src);
+		if(page)page->deallocate(region.src);
 	}
 
 }

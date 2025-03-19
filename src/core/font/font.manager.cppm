@@ -17,16 +17,20 @@ import mo_yanxi.heterogeneous;
 export namespace mo_yanxi::font{
 
 	struct glyph : graphic::cached_image_region{
-		glyph_metrics metrics{};
 		glyph_ptr meta{};
 
 		[[nodiscard]] constexpr glyph() = default;
 
 		[[nodiscard]] constexpr glyph(const glyph_ptr& meta, graphic::allocated_image_region& region)
-			: cached_image_region{region}, metrics{meta->metrics}, meta{meta}{}
+			: cached_image_region{region}, meta{meta}{}
 
 		[[nodiscard]] constexpr explicit(false) glyph(const glyph_ptr& meta)
-			: cached_image_region{nullptr}, metrics{meta->metrics}, meta{meta}{}
+			: cached_image_region{nullptr}, meta{meta}{}
+
+		[[nodiscard]] const glyph_metrics& metrics() const noexcept{
+			assert(meta);
+			return meta->metrics;
+		}
 
 	};
 

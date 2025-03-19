@@ -148,7 +148,7 @@ namespace mo_yanxi::core::ctrl{
 					break;
 				}
 
-				case act::Repeat : pushIn = Repeat | Continuous;
+				case act::repeat : pushIn = Repeat | Continuous;
 					break;
 
 				default : break;
@@ -183,7 +183,7 @@ namespace mo_yanxi::core::ctrl{
 					break;
 				case act::release : actionTgt = Release;
 					break;
-				case act::Repeat : actionTgt = Repeat;
+				case act::repeat : actionTgt = Repeat;
 					break;
 				case act::DoubleClick : actionTgt = DoubleClick;
 					break;

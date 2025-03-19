@@ -51,6 +51,7 @@ import mo_yanxi.algo;
 import mo_yanxi.graphic.camera;
 import mo_yanxi.core.global;
 import mo_yanxi.core.global.ui;
+import mo_yanxi.core.global.graphic;
 
 import mo_yanxi.graphic.renderer;
 import mo_yanxi.graphic.renderer.world;
@@ -75,6 +76,10 @@ import mo_yanxi.ui.manual_table;
 import mo_yanxi.ui.table;
 import mo_yanxi.ui.elem.text_elem;
 import mo_yanxi.ui.scroll_pane;
+import mo_yanxi.ui.elem.text_input_area;
+import mo_yanxi.ui.elem.slider;
+import mo_yanxi.ui.elem.image_frame;
+import mo_yanxi.ui.elem.progress_bar;
 
 import test;
 
@@ -175,7 +180,12 @@ void init_assets(){
 	mo_yanxi::assets::ctrl::load();
 }
 
-void init_ui(mo_yanxi::ui::loose_group& root){
+void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& atlas){
+
+	using namespace mo_yanxi;
+	auto bitmap = graphic::msdf::load_svg(R"(D:\projects\mo_yanxi\prop\assets\svg\blender_icon_select_subtract.svg)", 96, 96);
+	auto& test_svg = atlas.find_page("ui")->register_named_region("test", bitmap).first;
+
 	using namespace mo_yanxi;
 	ui::elem_ptr e{root.get_scene(), &root, std::in_place_type<ui::manual_table>};
 	e->property.fill_parent = {true, true};
@@ -186,68 +196,55 @@ void init_ui(mo_yanxi::ui::loose_group& root){
 	spane.cell().align = align::pos::top_left;
 
 	spane->set_layout_policy(ui::layout_policy::horizontal);
-	auto& table = spane->emplace<ui::table>();
-
-	table.template_cell.pad.set(2);
-	{
-		auto ehdl = table.emplace<ui::elem>();
-		ehdl.cell().set_width(60);
-		// ehdl.cell().set_height_from_scale(1.);
-	}
 
 	{
-		auto text = table.emplace<ui::basic_text_elem>();
-		text.cell().set_external({true, true});
-		text->set_text("#<[32>dinasfas;lhfasdaahfasfa\n\n\ngdongji");
-		text->set_policy(font::typesetting::layout_policy::auto_feed_line);
-	}
-
-	{
-		auto ehdl = table.end_line().emplace<ui::elem>();
-		// ehdl.cell().set_width(60);
-		// ehdl.cell().set_height_from_scale(1.);
-	}
-	{
-		auto text = table.emplace<ui::basic_text_elem>();
-		text.cell().set_external({true, true});
-		text->set_text("#<[32>dinasfas;bbbbbbbb#<[#ffff00bb>bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
-		text->set_policy(font::typesetting::layout_policy::auto_feed_line);
-	}
-
-	{
-		auto ehdl = table.end_line().emplace<ui::elem>();
-		// ehdl.cell().set_width(80);
-		// ehdl.cell().set_height_from_scale(1.);
-	}
-	{
-		auto text = table.emplace<ui::basic_text_elem>();
-		text.cell().set_external({true, true});
-		text->set_text("#<[55>;bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
-		text->set_policy(font::typesetting::layout_policy::auto_feed_line);
-	}
-
-	{
-		auto ehdl = table.end_line().emplace<ui::elem>();
-		// ehdl.cell().set_width(80);
-		// ehdl.cell().set_height_from_scale(1.);
-	}
-
-	{
-		auto text = table.emplace<ui::table>();
-		text.cell().set_external({false, true});
-		text->function_init([](ui::basic_text_elem& text){
-			text.set_text("楼上的下来搞核算");
+		auto& text = spane->emplace<ui::table>();
+		text.function_init([](ui::text_input_area& text){
+			text.set_text(R"(#<[srch>楼上的下来搞核算abcde啊啊啊.,。，；："123"'t')");
 			text.set_policy(font::typesetting::layout_policy::auto_feed_line);
-		}).cell().set_external({false, true});
-		text->end_line().function_init([](ui::basic_text_elem& text){
-			text.set_text("叮咚鸡叮咚鸡");
-			text.set_policy(font::typesetting::layout_policy::auto_feed_line);
+
+			text.set_tooltip_state({
+				.layout_info = ui::tooltip_layout_info{
+					.follow = ui::tooltip_follow::dialog,
+					.owner_align = align::pos::center,
+				},
+				.auto_release = false,
+			}, [](ui::text_input_area& t){
+				t.set_text(R"(#<[srch>楼上的下来搞核算abcde啊啊啊.,。，；："123"'t')");
+				t.set_policy(font::typesetting::layout_policy::auto_feed_line);
+
+			});
 		}).cell().set_external({false, true});
 
-		text->end_line().function_init([](ui::basic_text_elem& text){
-			text.set_text("大狗大狗叫叫叫");
-			text.set_policy(font::typesetting::layout_policy::auto_feed_line);
-		}).cell().set_external({false, true});
+		{
+			auto image_hdl = text.end_line().emplace<ui::image_frame>();
+			image_hdl.cell().set_height(256);
+			image_hdl->set_drawable<ui::image_drawable>(graphic::draw::mode_flags::sdf, test_svg);
+		}
+
+		{
+			auto bar = text.end_line().emplace<ui::progress_bar>();
+			bar->reach_speed = .05f;
+			bar.cell().set_height(60);
+
+			auto slider = text.end_line().emplace<ui::slider>();
+			slider.cell().set_height(60);
+			slider->set_hori_only();
+
+			bar->set_progress_prov([e = &slider.elem()] -> ui::progress_bar_progress {
+				return {e->get_progress().x};
+			});
+		}
+
+		// text->end_line().function_init([](ui::basic_text_elem& text){
+		// 	text.set_text("叮咚鸡叮咚鸡");
+		// 	text.set_policy(font::typesetting::layout_policy::auto_feed_line);
+		// }).cell().set_external({false, true});
+		//
+		// text->end_line().function_init([](ui::basic_text_elem& text){
+		// 	text.set_text("大狗大狗叫叫叫");
+		// 	text.set_policy(font::typesetting::layout_policy::auto_feed_line);
+		// }).cell().set_external({false, true});
 	}
 
 	// {
@@ -299,7 +296,8 @@ void init_ui(mo_yanxi::ui::loose_group& root){
 void main_loop(){
 	using namespace mo_yanxi;
 
-	vk::context context{vk::ApplicationInfo};
+	auto& context = core::global::graphic::context;
+
 	graphic::image_atlas atlas{context};
 	graphic::image_page& main_page = atlas.create_image_page("main");
 
@@ -324,19 +322,7 @@ void main_loop(){
 
 	test::load_tex(atlas);
 
-	graphic::allocated_image_region& p = font_manager.page().register_named_region("boarder", graphic::msdf::create_boarder(12.f)).first;
-	graphic::image_nine_region nine_region{
-		p,
-		align::padding<std::uint32_t>{}.set(16).expand(graphic::msdf::sdf_image_boarder),
-		graphic::msdf::sdf_image_boarder
-	};
-
 	font::typesetting::parser parser{};
-	font::typesetting::apd_default_modifiers(parser);
-	// auto rst = parser(
-	// 	"，楼上的\n#<[#ffff00bb><[123>下来 搞核算 叮咚鸡叮咚鸡，#<[tele>Dgdgjjj\ndsjydyddyd",
-	// 	font::typesetting::layout_policy::auto_feed_line | font::typesetting::layout_policy::reserve,
-	// 	{1600, 200});
 
 	vk::load_ext(context.get_instance());
 	assets::graphic::load(context);
@@ -347,7 +333,7 @@ void main_loop(){
 
 	core::global::ui::root->add_scene(ui::scene{"main", new ui::loose_group{nullptr, nullptr}, &renderer_ui}, true);
 	core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()}.shrink(8));
-	init_ui(core::global::ui::root->root_of<ui::loose_group>("main"));
+	init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
 
 	context.register_post_resize("test", [&](window_instance::resize_event event){
 		core::global::ui::root->resize(math::frect{math::vector2{event.size.width, event.size.height}.as<float>()}.shrink(8));
@@ -400,21 +386,6 @@ void main_loop(){
 		renderer_world.ssao.set_scale(core::global::camera.map_scale(0.15f, 2.5f) * 1.5f);
 		renderer_world.bloom.set_scale(core::global::camera.map_scale(0.195f, 2.f));
 		renderer_world.batch.frag_data.current.camera_scale = core::global::camera.get_scale();
-
-		// draw_glyph_layout(renderer_world, rst, {}, false);
-		// graphic::draw::default_transparent_acquirer acquirer{renderer_world.batch, {}};
-		graphic::draw::ui_acquirer acquirer{renderer_ui.batch, graphic::draw::white_region};
-
-		// acquirer.proj.mode_flag = vk::vertices::mode_flag_bits::sdf;
-		// graphic::draw::nine_patch(acquirer, nine_region, {tags::from_extent, {100, 100}, {500, 500}}, graphic::colors::AQUA.to_light_color_copy());
-
-		// acquirer.proj.mode_flag = vk::vertices::mode_flag_bits::none;
-		// acquirer << base_region2;
-		// graphic::draw::fill::rect_ortho(acquirer.get(), math::frect{20, 30, 70, 90}, graphic::colors::white.to_light_color_copy());
-
-		// renderer_ui.batch.push_scissor({{200, 200, 400, 400}, 32});
-		//
-		// graphic::draw::fill::rect_ortho(acquirer.get(), {0, 0, 800, 800});
 
 		core::global::ui::root->update(core::global::timer.global_delta_tick());
 		core::global::ui::root->layout();
@@ -485,19 +456,19 @@ void main_loop(){
 
 int main(){
 	using namespace mo_yanxi;
-	font::font_face face{R"(D:\projects\mo_yanxi\prop\assets\fonts\telegrama.otf)"};
 
-	// graphic::msdf::ff();
-	// auto mp = graphic::msdf::load_svg(R"(D:\projects\mo_yanxi\prop\assets\svg\test.svg)", 10, 10);
-	// mp.write(R"(D:\projects\mo_yanxi\prop\assets\svg\test.png)", true);
-	// graphic::test(reinterpret_cast<::msdfgen::FontHandle*>(face.handle()));
+	// auto bitmap = graphic::msdf::load_svg(R"(D:\projects\mo_yanxi\prop\assets\svg\blender_icon_select_intersect.svg)", 128, 128);
+	// bitmap.write(, true);
+
 	init_assets();
 	compile_shaders();
 
 	core::glfw::init();
 	core::global::ui::init();
+	core::global::graphic::init();
 
 	main_loop();
 
+	core::global::graphic::dispose();
 	core::glfw::terminate();
 }

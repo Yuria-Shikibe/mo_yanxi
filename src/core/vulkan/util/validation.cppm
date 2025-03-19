@@ -40,7 +40,7 @@ namespace mo_yanxi::vk{
 
 	export
 	class validation_entry{
-		VkInstance instance{};
+		exclusive_handle_member<VkInstance> instance{};
 		exclusive_handle_member<VkDebugUtilsMessengerEXT> callback{};
 
 	public:

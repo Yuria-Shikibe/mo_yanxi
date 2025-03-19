@@ -9,7 +9,7 @@ export import mo_yanxi.math.vector2;
 export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.event;
 
-export import Align;
+export import align;
 
 export import mo_yanxi.graphic.color;
 
@@ -21,6 +21,12 @@ export import mo_yanxi.ui.clamped_size;
 export import mo_yanxi.ui.util;
 export import mo_yanxi.ui.elem_ptr;
 export import mo_yanxi.ui.layout.policies;
+export import mo_yanxi.ui.action;
+export import mo_yanxi.ui.tooltip_interface;
+export import mo_yanxi.core.ctrl.constants;
+
+
+export import mo_yanxi.meta_programming;
 // export import Core.UI.Drawer;
 // export import Core.UI.Flags;
 // export import Core.UI.Util;
@@ -193,6 +199,7 @@ namespace mo_yanxi::ui{
 		float time_focus{};
 		float time_stagnate{};
 
+		float time_tooltip{};
 
 		bool inbound{};
 		bool focused{};
@@ -208,13 +215,14 @@ namespace mo_yanxi::ui{
 			if(focused){
 				math::approach_inplace(time_focus, maximum_duration, delta_in_ticks);
 				math::approach_inplace(time_stagnate, maximum_duration, delta_in_ticks);
+				time_tooltip += delta_in_ticks;
 			} else{
 				math::approach_inplace(time_focus, 0, delta_in_ticks);
-				time_stagnate = 0.;
+				time_tooltip = time_stagnate = 0.f;
 			}
 		}
 
-		void registerFocusEvent(elem_event_manager& event_manager);
+		void register_default_cursor_events(elem_event_manager& event_manager);
 
 		void registerDefEvent(elem_event_manager& event_manager){
 			// event_manager.on<events::EndFocus>([this](auto){
@@ -353,7 +361,7 @@ namespace mo_yanxi::ui{
 		group* parent{};
 		scene* scene_{};
 
-		// std::queue<std::unique_ptr<Action<elem>>> actions{};
+		std::queue<std::unique_ptr<action::action<elem>>> actions{};
 
 	public:
 		elem_event_manager event_slots{};
@@ -380,15 +388,14 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] elem_datas() = default;
 	};
 
-	export struct elem : elem_datas
-		// :
+	export struct elem : elem_datas, stated_tooltip_owner<struct elem>
 
 		// StatedToolTipOwner<elem>,
 		// math::QuadTreeAdaptable<elem>
 	{
 
 		[[nodiscard]] elem(){
-			cursor_state.registerFocusEvent(events());
+			cursor_state.register_default_cursor_events(events());
 			event_slots.set_context(*this);
 		}
 
@@ -400,7 +407,7 @@ namespace mo_yanxi::ui{
 			elem::set_scene(scene);
 			elem::set_parent(group);
 
-			cursor_state.registerFocusEvent(events());
+			cursor_state.register_default_cursor_events(events());
 			event_slots.set_context(*this);
 		}
 
@@ -520,6 +527,20 @@ namespace mo_yanxi::ui{
 			return event_slots;
 		}
 
+		template <typename T, typename Fn>
+		void register_event(this T& self, Fn&& fn){
+			using trait = function_traits<Fn>;
+			using event_t = std::remove_cvref_t<typename function_arg_at<trait::args_count - 2, Fn>::type>;
+			using elem_t = typename function_arg_at_last<Fn>::type;
+
+			static_assert(std::derived_from<std::remove_cvref_t<T>, std::remove_cvref_t<elem_t>>, "self type incompatible");
+
+			static_cast<elem&>(self).events().on<event_t>([f = std::forward<Fn>(fn)](const event_t& event, elem& e){
+				auto& ty = static_cast<elem_t>(e);
+				std::invoke(f, event, ty);
+			});
+		}
+
 		/**
 		 * @brief just used to notify tooltip drop
 		 * @param delta cursor transform
@@ -582,7 +603,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] bool contains(math::vec2 absPos) const noexcept;
 
-		[[nodiscard]] virtual bool contains_self(math::vec2 absPos, float margin = 0.f) const noexcept;
+		[[nodiscard]] virtual bool contains_self(math::vec2 absPos, float margin) const noexcept;
 
 		[[nodiscard]] virtual bool contains_parent(math::vec2 cursorPos) const;
 
@@ -640,6 +661,12 @@ namespace mo_yanxi::ui{
 			return std::nullopt;
 		}
 
+		virtual void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode){
+
+		}
+
+		virtual void input_unicode(const char32_t val){
+		}
 		// [[nodiscard]] virtual math::vec2 requestSpace(const StatedSize sz, math::vec2 minimumSize,
 		// 											  math::vec2 currentAllocatedSize){
 		// 	auto cur = get_size();
@@ -655,144 +682,98 @@ namespace mo_yanxi::ui{
 		// }
 
 
-		virtual void try_draw(const rect clipSpace, rect redirect) const{
+		virtual void try_draw(const rect clipSpace, const rect redirect) const{
 			if(!is_visible()) return;
 			// if(IgnoreClipWhenDraw || inboundOf(clipSpace)){
 			draw(clipSpace, redirect);
 			// }
 		}
 
+		void try_draw(const rect clipSpace) const{
+			try_draw(clipSpace, get_bound());
+		}
+
 		void draw(const rect clipSpace) const{
 			draw(clipSpace, get_bound());
 		}
 
-		void draw(const rect clipSpace, rect redirect) const{
+		void draw(const rect clipSpace, const rect redirect) const{
 			draw_pre(clipSpace, redirect);
 			draw_content(clipSpace, redirect);
 			draw_post(clipSpace, redirect);
 		}
 
-		virtual void draw_pre(const rect clipSpace, rect redirect) const;
+	protected:
+		virtual void draw_pre(const rect clipSpace, const rect redirect) const;
 
-		virtual void draw_content(const rect clipSpace, rect redirect) const{
-
-		}
-		virtual void draw_post(const rect clipSpace, rect redirect) const{
+		virtual void draw_content(const rect clipSpace, const rect redirect) const{
 
 		}
+		virtual void draw_post(const rect clipSpace, const rect redirect) const{
 
+		}
+
+		void tooltip_on_drop() override{
+			stated_tooltip_owner::tooltip_on_drop();
+			cursor_state.time_tooltip = 0;
+		}
+
+	public:
 		virtual bool update_abs_src(math::vec2 parent_content_abs_src);
-		//
-		// virtual void drawMain(Rect clipSpace) const;
-		//
-		// virtual void drawPost() const{
-		// }
 
-		/*
-		template <ElemInitFunc InitFunc>
-		void setTooltipState(const ToolTipProperty& toolTipProperty, InitFunc&& initFunc) noexcept{
-			StatedToolTipOwner::setTooltipState(toolTipProperty, std::forward<InitFunc>(initFunc));
+		virtual esc_flag on_esc(){
+			if(has_tooltip()){
+				tooltip_notify_drop();
+				return esc_flag::sustain;
+			}
+			return esc_flag::droppable;
 		}
 
-		template <ElemInitFunc InitFunc>
-		void setTooltipState_asDialog(InitFunc&& initFunc) noexcept{
-			this->setTooltipState(ToolTipProperty{
-				                      .followTarget = mo_yanxi::ui::TooltipFollow::sceneDialog,
-				                      .followTargetAlign = Align::Pos::center,
-				                      .tooltipSrcAlign = Align::Pos::center,
-				                      .autoRelease = false,
-				                      .minHoverTime = mo_yanxi::ui::ToolTipProperty::DisableAutoTooltip,
-			                      }, std::forward<InitFunc>(initFunc));
-		}
 
-		void buildTooltip(bool belowScene = false) noexcept;
-
-		template <std::derived_from<Action<elem>> ActionType, typename... T>
-		void pushAction(T&&... args){
+		template <std::derived_from<action::action<elem>> ActionType, typename... T>
+		void push_action(T&&... args){
 			actions.push(std::make_unique<ActionType>(std::forward<T>(args)...));
 		}
 
 		template <typename... ActionType>
-			requires (std::derived_from<std::decay_t<ActionType>, Action<elem>> && ...)
-		void pushAction(ActionType&&... args){
-			actions.push(std::make_unique<std::decay_t<ActionType>>(std::forward<ActionType>(args))...);
+			requires (std::derived_from<std::decay_t<ActionType>, action::action<elem>> && ...)
+		void push_action(ActionType&&... args){
+			(actions.push(std::make_unique<std::decay_t<ActionType>>(std::forward<ActionType>(args))), ...);
 		}
 
-		// ------------------------------------------------------------------------------------------------------------------
-		// interface region
-		// ------------------------------------------------------------------------------------------------------------------
-
-
-
-
-		/**
-		 * @brief
-		 * @return false if should not fallback
-		 #1#
-		virtual bool onEsc(){
-			return true;
-		}
-
-		[[nodiscard]] std::optional<math::vec2> getFitnessSize() const noexcept;
-
-		// [[nodiscard]]  bool keyFocusShouldDrop(const math::vec2 pos) const noexcept{
-		// 	return !containsPos(pos);
-		// }
-
-
-		virtual void inputUnicode(const char32_t val){
-		}
-
-
-
-
-		virtual void getFuture(){
-		}
-
-		[[nodiscard]] TooltipAlignPos getAlignPolicy() const override;
-
-		[[nodiscard]] bool tooltipShouldDrop(const math::vec2 cursorPos) const override{
-			return tooltipProp.autoRelease && !containsPos(cursorPos) && !isFocusedKey();
-		}
-
-		[[nodiscard]] bool tooltipShouldBuild(const math::vec2 cursorPos) const override{
-			return true
-				&& hasTooltipBuilder()
-				&& tooltipProp.autoBuild()
-				&& (tooltipProp.useStagnateTime ? cursorState.stagnateTime : cursorState.focusedTime)
-				> tooltipProp.minHoverTime;
-		}
-
-	protected:
-		void tooltipNotifyDrop() override{
-			cursorState.focusedTime = cursorState.stagnateTime = -15.f;
-		}
-
-	public:
-		[[nodiscard]] bool hasTooltip() const noexcept;
-		bool dropTooltip() const noexcept;
-
-	protected:
-		[[nodiscard]] bool inboundOf(const Rect& clipSpace_abs) const noexcept{
-			return clipSpace_abs.overlap_Exclusive(property.bound_absolute());
-		}
-
-		void dropToolTipIfMoved() const;
-	*/
-	public:
-		std::vector<elem*> dfsFindDeepestElement(math::vec2 cursorPos);
+		std::vector<elem*> dfs_find_deepest_element(math::vec2 cursorPos);
 
 		[[nodiscard]] rect get_bound() const noexcept{
 			return prop().bound_absolute();
 		}
 
-		// [[nodiscard]] bool roughIntersectWith(const elem& other) const noexcept{
-		// 	return get_bound().overlap_Exclusive(other.get_bound());
-		// }
 
-		// [[nodiscard]] bool containsPoint(typename math::vec2 point) const{
-		// 	return contains(point);
-		// }
+		[[nodiscard]] tooltip_align tooltip_align_policy() const override{
+			switch(tooltip_prop_.layout_info.follow){
+			case tooltip_follow::owner :{
+				return {
+						.pos = align::get_vert(tooltip_prop_.layout_info.target_align, get_bound()),
+						.align = tooltip_prop_.layout_info.owner_align,
+						// .extent =
+					};
+			}
+
+			default : return {tooltip_prop_.layout_info.follow, tooltip_prop_.layout_info.owner_align};
+			}
+		}
+
+		[[nodiscard]] bool tooltip_should_maintain(math::vec2 cursorPos) const override;
+
+		[[nodiscard]] bool tooltip_owner_contains(math::vec2 cursorPos) const override{
+			return contains(cursorPos);
+		}
+
+		[[nodiscard]] bool tooltip_should_build(math::vec2 cursorPos) const override{
+			return true
+				&& has_tooltip_builder()
+				&& tooltip_prop_.auto_build()
+				&& cursor_state.time_tooltip > tooltip_prop_.min_hover_time;
+		}
 	};
 
 	void iterateAll_DFSImpl(math::vec2 cursorPos, std::vector<struct elem*>& selected, struct elem* current);

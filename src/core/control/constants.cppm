@@ -22,7 +22,7 @@ namespace mo_yanxi::core::ctrl{
 	namespace act{
 		export constexpr key_code_t press = GLFW_PRESS;
 		export constexpr key_code_t release = GLFW_RELEASE;
-		export constexpr key_code_t Repeat = GLFW_REPEAT;
+		export constexpr key_code_t repeat = GLFW_REPEAT;
 		export constexpr key_code_t Continuous = 3;
 		export constexpr key_code_t DoubleClick = 4;
 
@@ -453,7 +453,7 @@ namespace mo_yanxi::core::ctrl{
 			 */
 			names[act::press]       = "press";
 			names[act::release]     = "release";
-			names[act::Repeat]      = "repeat";
+			names[act::repeat]      = "repeat";
 			names[act::DoubleClick] = "double";
 			names[act::Continuous]  = "continuous";
 

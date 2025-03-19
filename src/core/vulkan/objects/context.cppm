@@ -66,9 +66,10 @@ namespace mo_yanxi::vk{
 	export
 	class context{
 	private:
+		instance instance{};
+
 		window_instance window_{};
 
-		instance instance{};
 		physical_device physical_device{};
 		logical_device device{};
 
@@ -88,7 +89,7 @@ namespace mo_yanxi::vk{
 		VkExtent2D swap_chain_extent{};
 		VkFormat swapChainImageFormat{};
 		std::vector<SwapChainFrameData> swap_chain_frames{};
-		circular_array<InFlightData, 2> sync_arr{};
+		circular_array<InFlightData, 3> sync_arr{};
 		swap_chain_staging_image_data final_staging_image{};
 
 		events::named_event_manager<std::move_only_function<void() const>, window_instance::resize_event> eventManager{};
@@ -263,9 +264,9 @@ namespace mo_yanxi::vk{
 		}
 
 		context(const context& other) = delete;
-		context(context&& other) noexcept = delete;
+		context(context&& other) noexcept = default;
 		context& operator=(const context& other) = delete;
-		context& operator=(context&& other) noexcept = delete;
+		context& operator=(context&& other) noexcept = default;
 
 		~context(){
 			if(device){

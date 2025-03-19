@@ -16,8 +16,8 @@ import std;
 namespace test{
 	using namespace mo_yanxi;
 
-	graphic::image_nine_region nineRegion_edge{};
-	graphic::image_nine_region nineRegion_base{};
+	graphic::image_multi_region nineRegion_edge{};
+	graphic::image_multi_region nineRegion_base{};
 	ui::style::round_style default_style{};
 
 	export void load_tex(graphic::image_atlas& atlas){

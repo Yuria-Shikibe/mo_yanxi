@@ -36,7 +36,8 @@ import mo_yanxi.open_addr_hash_map;
 import mo_yanxi.referenced_ptr;
 
 namespace mo_yanxi::font{
-	export constexpr inline math::vec2 font_draw_expand{graphic::msdf::sdf_image_boarder / 2.f, graphic::msdf::sdf_image_boarder / 2.f};
+	export constexpr inline math::vec2 font_draw_expand{graphic::msdf::sdf_image_boarder / 2., graphic::msdf::sdf_image_boarder / 2.f};
+	// export constexpr inline math::vec2 font_draw_expand{8, 8};
 
 	void check(FT_Error error);
 
@@ -105,13 +106,25 @@ namespace mo_yanxi::font{
 	export
 	template <typename T>
 	constexpr T get_snapped_size(const T len) noexcept{
-		return len;
+		// return len;
 
-		// if(len == 0)return 0;
-		// if(len <= static_cast<int>(64 * 1.5f))return 64;
-		// if(len <= static_cast<int>(128 * 1.5f))return 128;
+		if(len == 0)return 0;
+		if(len <= static_cast<int>(64 * 1.5f))return 64;
+		if(len <= static_cast<int>(128 * 1.5f))return 128;
 		// if(len <= static_cast<int>(256 * 1.5f))return 256;
-		// return 512;
+		return 256;
+	}
+
+
+	template <typename T>
+	constexpr double get_snapped_range(const T len) noexcept{
+		// return len;
+
+		if(len == 0)return 0.1;
+		if(len <= static_cast<int>(64 * 1.5f))return 0.45;
+		if(len <= static_cast<int>(128 * 1.5f))return 1.15;
+		// if(len <= static_cast<int>(256 * 1.5f))return 256;
+		return 2.25;
 	}
 
 	export struct glyph_identity{
@@ -125,6 +138,12 @@ namespace mo_yanxi::font{
 	template <std::floating_point T = float>
 	constexpr T normalize_len(const FT_Pos pos) noexcept {
 		return static_cast<T>(pos) / static_cast<T>(64.); // NOLINT(*-narrowing-conversions)
+	}
+
+	export
+	template <std::floating_point T = float>
+	constexpr T normalize_len_1616(const FT_Pos pos) noexcept {
+		return static_cast<T>(pos) / static_cast<T>(65536.); // NOLINT(*-narrowing-conversions)
 	}
 
 	export struct glyph_metrics{
@@ -168,7 +187,6 @@ namespace mo_yanxi::font{
 			return {tags::unchecked, src, end};
 		}
 	};
-
 
 	graphic::bitmap to_pixmap(const FT_Bitmap& map);
 
@@ -283,7 +301,7 @@ namespace mo_yanxi::font{
 	export struct bitmap_glyph : referenced_object<false>{
 		char_code code{};
 		graphic::bitmap bitmap{};
-		FT_Glyph_Metrics metrics{};
+		glyph_metrics metrics{};
 
 		[[nodiscard]] bitmap_glyph() = default;
 
@@ -349,15 +367,19 @@ namespace mo_yanxi::font{
 			face.set_size(size.x, size.y);
 			if(const auto shot = face.load_and_get(code, FT_LOAD_DEFAULT)){
 				if(shot.value()->bitmap.width * shot.value()->bitmap.rows != 0){
-					auto sz = std::hypot(shot.value()->bitmap.width, shot.value()->bitmap.rows);
 					graphic::bitmap bitmap =
 						graphic::msdf::load_glyph(
 							face.msdfHdl, code,
-							shot.value()->bitmap.width, shot.value()->bitmap.rows
-							// math::clamp(sz, graphic::msdf::sdf_image_range, 2.5)
+							shot.value()->bitmap.width, shot.value()->bitmap.rows,
+							shot.value()->face->size->metrics.x_ppem, shot.value()->face->size->metrics.y_ppem,
+							get_snapped_range(std::hypot(shot.value()->face->size->metrics.x_ppem, shot.value()->face->size->metrics.y_ppem))
 						);
+
+					// auto map = render_sdf(shot.value());
 					return glyphs[code].insert_or_assign(size, bitmap_glyph{code, std::move(bitmap), shot.value()->metrics}).first->second;
 				}
+
+
 			}
 
 			if(fallback){

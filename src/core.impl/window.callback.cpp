@@ -16,7 +16,7 @@ import mo_yanxi.core.ctrl.key_binding;
 import std;
 
 void mo_yanxi::core::glfw::charCallback(GLFWwindow* window, unsigned int codepoint){
-	// if(Global::UI::root)Global::UI::root->inputUnicode(codepoint);
+	if(global::ui::root)global::ui::root->input_unicode(codepoint);
 }
 
 
