@@ -10,6 +10,17 @@ import std;
 
 export namespace mo_yanxi::math{
 
+	template <typename T>
+	struct vec2_products{
+		T dot;
+		T cross;
+
+		void to_trigonometric(T length) noexcept{
+			dot /= length;
+			cross /= length;
+		}
+	};
+
 	template <number T>
 	struct vector2
 	{
@@ -266,27 +277,30 @@ export namespace mo_yanxi::math{
 		/**
 		 * @return self * mul + add
 		 */
-		FORCE_INLINE /*constexpr*/ vector2& fma(const_pass_t mul, const_pass_t add) noexcept {
-			x = math::fma(x, mul.x, add.x);
-			y = math::fma(y, mul.y, add.y);
+		FORCE_INLINE /*constexpr*/ vector2 fma(const_pass_t mul, const_pass_t add) const noexcept {
+			vector2 rst;
+			rst.x = math::fma(x, mul.x, add.x);
+			rst.y = math::fma(y, mul.y, add.y);
 
-			return *this;
+			return rst;
 		}
 
 		/**
 		 * @return other * scale + self
 		 */
 		template <typename Prog>
-		FORCE_INLINE /*constexpr*/ vector2& fma(const_pass_t other, const Prog scale) noexcept {
+		FORCE_INLINE /*constexpr*/ vector2 fma(const_pass_t other, const Prog scale) const noexcept {
+			vector2 rst;
+
 			if constexpr (std::floating_point<T> && std::floating_point<Prog>){
-				x = std::fma(other.x, scale, x);
-				y = std::fma(other.y, scale, y);
+				rst.x = std::fma(other.x, scale, x);
+				rst.y = std::fma(other.y, scale, y);
 			}else{
-				x += x * mul.x;
-				y += y * mul.y;
+				rst.x = x + x * mul.x;
+				rst.y = y + y * mul.y;
 			}
 
-			return *this;
+			return rst;
 		}
 
 		FORCE_INLINE constexpr vector2& sub(const T ox, const T oy) noexcept {
@@ -338,6 +352,11 @@ export namespace mo_yanxi::math{
 
 		FORCE_INLINE constexpr vector2& div(const_pass_t other) noexcept {
 			return this->div(other.x, other.y);
+		}
+
+
+		[[nodiscard]] FORCE_INLINE constexpr vec2_products<T> get_products_with(const_pass_t tgt) const noexcept{
+			return vec2_products<T>{this->dot(tgt), this->cross(tgt)};
 		}
 
 		/*
@@ -468,7 +487,7 @@ export namespace mo_yanxi::math{
 			}
 
 			const auto scl = std::sqrt(static_cast<floating_point_t>(alpha2) / static_cast<floating_point_t>(len2));
-			return this->fma(approach, scl);
+			return this->operator=(this->fma(approach, scl));
 		}
 
 		template <std::floating_point Fp>

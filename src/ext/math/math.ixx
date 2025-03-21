@@ -228,6 +228,38 @@ namespace mo_yanxi::math {
 		return {a, b};
 	}
 
+
+	export
+	template <mo_yanxi::small_object T>
+		requires requires(T t){
+		{t < t} -> std::convertible_to<bool>;
+		}
+	MATH_ATTR constexpr T max(const T v1, const T v2) noexcept(noexcept(v2 < v1)) {
+		if constexpr (std::floating_point<T>){
+			if (!std::is_constant_evaluated()){
+				return std::fmax(v1, v2);
+			}
+		}
+
+		return v2 < v1 ? v1 : v2;
+	}
+
+	export
+	template <mo_yanxi::small_object T>
+		requires requires(T t){
+		{t < t} -> std::convertible_to<bool>;
+		}
+	MATH_ATTR constexpr T min(const T v1, const T v2) noexcept(noexcept(v1 < v2)) {
+		if constexpr (std::floating_point<T>){
+			if (!std::is_constant_evaluated()){
+				return std::fmin(v1, v2);
+			}
+		}
+
+		return v1 < v2 ? v1 : v2;
+	}
+
+
 	export
 	template <typename T, typename... Args>
 		requires (std::is_arithmetic_v<T> && (std::is_arithmetic_v<Args> && ...))
@@ -235,10 +267,10 @@ namespace mo_yanxi::math {
 		const auto [min1, max1] = math::minmax(first, second);
 
 		if constexpr(sizeof ...(Args) == 1){
-			return {std::min(min1, args...), std::max(max1, args...)};
+			return {math::min(min1, args...), math::max(max1, args...)};
 		} else{
 			const auto [min2, max2] = math::minmax(args...);
-			return {std::min(min1, min2), std::max(max1, max2)};
+			return {math::min(min1, min2), math::max(max1, max2)};
 		}
 	}
 
@@ -422,36 +454,6 @@ namespace mo_yanxi::math {
 		}
 
 		return v;
-	}
-
-	export
-	template <mo_yanxi::small_object T>
-		requires requires(T t){
-			{t < t} -> std::convertible_to<bool>;
-		}
-	MATH_ATTR constexpr T max(const T v1, const T v2) noexcept(noexcept(v2 < v1)) {
-		if constexpr (std::floating_point<T>){
-			if (!std::is_constant_evaluated()){
-				return std::fmax(v1, v2);
-			}
-		}
-
-		return v2 < v1 ? v1 : v2;
-	}
-
-	export
-	template <mo_yanxi::small_object T>
-		requires requires(T t){
-			{t < t} -> std::convertible_to<bool>;
-		}
-	MATH_ATTR constexpr T min(const T v1, const T v2) noexcept(noexcept(v1 < v2)) {
-		if constexpr (std::floating_point<T>){
-			if (!std::is_constant_evaluated()){
-				return std::fmin(v1, v2);
-			}
-		}
-
-		return v1 < v2 ? v1 : v2;
 	}
 
 	export

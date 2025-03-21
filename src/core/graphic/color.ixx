@@ -7,8 +7,7 @@ export module mo_yanxi.graphic.color;
 
 import std;
 import mo_yanxi.math;
-import mo_yanxi.math.vector4;
-import mo_yanxi.math.vector4;
+export import mo_yanxi.math.vector4;
 
 namespace mo_yanxi::graphic{
 	/**

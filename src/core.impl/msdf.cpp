@@ -7,33 +7,33 @@ module;
 
 module mo_yanxi.graphic.msdf;
 
+import std;
 
-mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_shape(msdfgen::Shape&& shape, unsigned w, unsigned h,
-                                                              double range){
-	bitmap bitmap = {w + sdf_image_boarder, h + sdf_image_boarder};
 
-	msdfgen::edgeColoringByDistance(shape, 2.);
+mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_shape(
+	const msdfgen::Shape& shape,
+	unsigned w,
+	unsigned h,
+	double range, unsigned boarder){
+	bitmap bitmap = {w + boarder * 2, h + boarder * 2};
 
 	const auto bound = shape.getBounds();
 
 	const double width = bound.r - bound.l;
 	const double height = bound.t - bound.b;
 
-	auto scale = bitmap.extent().sub(sdf_image_boarder, sdf_image_boarder).as<double>().div(width, height);
-	// shape.normalize();
+	auto scale = bitmap.extent().sub(boarder * 2, boarder * 2).as<double>().div(width, height);
 	msdfgen::Projection projection(
 		msdfgen::Vector2(
 			scale.x,
 			-scale.y)
 		, msdfgen::Vector2(
-			-bound.l + sdf_image_boarder / 2. / scale.x,
-			-bound.b - height - sdf_image_boarder / 2. / scale.y
+			-bound.l + static_cast<double>(boarder) / scale.x,
+			-bound.b - height - static_cast<double>(boarder) / scale.y
 		)
 	);
 
-	// 6. 生成MSDF位图
 	msdfgen::Bitmap<float, 3> fbitmap(bitmap.width(), bitmap.height());
-	// msdfgen::generateSDF(fbitmap, shape, projection, range);
 	msdfgen::generateMSDF(fbitmap, shape, projection, range);
 
 	msdfgen::simulate8bit(fbitmap);
@@ -41,27 +41,29 @@ mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_shape(msdfgen::Shape&& s
 	return bitmap;
 }
 
-mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_glyph(msdfgen::FontHandle* face, msdfgen::unicode_t code,
-                                                              unsigned target_w, unsigned target_h, unsigned font_w,
-                                                              unsigned font_h, double range){
+mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_glyph(
+	msdfgen::FontHandle* face, msdfgen::unicode_t code,
+	unsigned target_w, unsigned target_h, unsigned boarder,
+	double font_w, double font_h,
+	double range){
 	using namespace msdfgen;
 	Shape shape;
 
 	if(loadGlyph(shape, face, code, FONT_SCALING_EM_NORMALIZED)){
-		bitmap bitmap = {target_w + sdf_image_boarder, target_h + sdf_image_boarder};
+		bitmap bitmap = {target_w + boarder * 2, target_h + boarder * 2};
 
 		shape.orientContours();
 		shape.normalize();
 
 		const auto bound = shape.getBounds();
 		const double height = bound.t - bound.b;
-		const auto scale = math::vector2{font_w, font_h}.as<double>();
+		const math::vector2 scale{font_w, font_h};
 
 		edgeColoringSimple(shape, 2.5);
 		Bitmap<float, 3> msdf(bitmap.width(), bitmap.height());
 
-		auto offx = -bound.l + sdf_image_boarder / 2. / scale.x;
-		auto offy = -bound.b - height - sdf_image_boarder / 2. / scale.y;
+		auto offx = -bound.l + static_cast<double>(boarder) / scale.x;
+		auto offy = -bound.b - height - static_cast<double>(boarder) / scale.y;
 
 		SDFTransformation t(
 			Projection(
@@ -80,10 +82,11 @@ mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_glyph(msdfgen::FontHandl
 		return bitmap;
 	}
 
-	return {};
+	//TODO ...
+	return {target_w + boarder * 2, target_h + boarder * 2};
 }
 
-mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_svg(const char* path, unsigned w, unsigned h, double range){
+msdfgen::Shape mo_yanxi::graphic::msdf::svg_to_shape(const char* path){
 	using namespace msdfgen;
 
 
@@ -98,29 +101,44 @@ mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_svg(const char* path, un
 			Contour& contour = shape.addContour();
 
 			for(const auto& [p1, p2, p3, p4] :
-			    std::span{reinterpret_cast<math::vec2*>(svgPath->pts), static_cast<std::size_t>(svgPath->npts)}
-			    | std::views::adjacent<4>
-			    | std::views::stride(3)){
+				std::span<math::vec2>{reinterpret_cast<math::vec2*>(svgPath->pts), static_cast<std::size_t>(svgPath->npts)}
+				| std::views::adjacent<4>
+				| std::views::stride(3)){
 				Point2 p1_(p1.x, svgImage->height - p1.y);
 				Point2 p2_(p2.x, svgImage->height - p2.y);
 				Point2 p3_(p3.x, svgImage->height - p3.y);
 				Point2 p4_(p4.x, svgImage->height - p4.y);
 
 				contour.addEdge(new CubicSegment(p1_, p2_, p3_, p4_));
-			}
+				}
 		}
 	}
 
 	nsvgDelete(svgImage);
-
-	shape.normalize();
 	shape.orientContours();
-	edgeColoringSimple(shape, 1.5);
+	edgeColoringByDistance(shape, 2.);
 
-	return load_shape(std::move(shape), w, h, range);
+	return shape;
 }
 
-mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::create_boarder(double radius, double k, double width){
+mo_yanxi::graphic::msdf::msdf_generator::msdf_generator(msdfgen::Shape&& shape, double range, unsigned boarder): shape(std::move(shape)),
+	range(range),
+	boarder(boarder){
+}
+
+mo_yanxi::graphic::msdf::msdf_generator::msdf_generator(const char* path, double range, unsigned boarder): shape(svg_to_shape(path)),
+	range(range),
+	boarder(boarder){
+}
+
+
+mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_svg(const char* path, unsigned w, unsigned h, double range){
+	return load_shape(svg_to_shape(path), w, h, range);
+}
+
+
+
+msdfgen::Shape mo_yanxi::graphic::msdf::create_boarder(double radius, double k, double width){
 	using namespace msdfgen;
 
 	// 创建形状对象
@@ -134,13 +152,12 @@ mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::create_boarder(double radius,
 	if(!shape.validate()) return {};
 
 	shape.orientContours();
-	auto mp = load_shape(std::move(shape), boarder_size, boarder_size, 8);
+	edgeColoringByDistance(shape, 2.);
 
-	// 清理资源
-	return mp;
+	return shape;
 }
 
-mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::create_solid_boarder(double radius, double k){
+msdfgen::Shape mo_yanxi::graphic::msdf::create_solid_boarder(double radius, double k){
 	using namespace msdfgen;
 
 	// 创建形状对象
@@ -155,8 +172,8 @@ mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::create_solid_boarder(double r
 	if(!shape.validate()) return {};
 
 	shape.orientContours();
-	auto mp = load_shape(std::move(shape), boarder_size, boarder_size, 8);
+	edgeColoringByDistance(shape, 2.);
 
 	// 清理资源
-	return mp;
+	return shape;
 }

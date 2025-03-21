@@ -20,7 +20,7 @@ export import mo_yanxi.heterogeneous;
 import std;
 
 namespace mo_yanxi::graphic{
-	constexpr math::usize2 DefaultTexturePageSize = math::vectors::constant2<std::uint32_t>::base_vec2 * (1 << 13);
+	constexpr math::usize2 DefaultTexturePageSize = math::vectors::constant2<std::uint32_t>::base_vec2 * (1 << 12);
 
 
 	export struct sub_page;
@@ -44,7 +44,7 @@ namespace mo_yanxi::graphic{
 			const math::usize2 image_size,
 			const math::urect region
 			)
-			: combined_image_region{.view = imageView}, page{&page}, region(region){
+			: combined_image_region{.view = imageView}, region(region), page{&page}{
 
 			uv.fetch_into(image_size, region);
 		}
@@ -80,7 +80,7 @@ namespace mo_yanxi::graphic{
 
 		[[nodiscard]] constexpr borrowed_image_region() = default;
 
-		constexpr operator combined_image_region<uniformed_rect_uv>(){
+		constexpr operator combined_image_region<uniformed_rect_uv>() const{
 			if(*this){
 				return *get();
 			}else{
@@ -144,21 +144,48 @@ namespace mo_yanxi::graphic{
 		std::optional<allocated_image_region> push(
 			VkCommandBuffer commandBuffer,
 			VkBuffer buffer,
-			const math::usize2 region,
+			const math::usize2 extent,
 			const std::uint32_t margin
 		){
-			if(const auto pos = allocate(region.copy().add(margin))){
-				const math::urect rst{tags::from_extent, pos.value(), region};
+			if(const auto pos = allocate(extent.copy().add(margin))){
+				const math::urect rst{tags::from_extent, pos.value(), extent};
 
 				texture.write(commandBuffer,
 					{vk::texture_buffer_write{
 						buffer,
-						{std::bit_cast<VkOffset2D>(pos->as<std::int32_t>()), std::bit_cast<VkExtent2D>(region)}
+						{std::bit_cast<VkOffset2D>(pos->as<std::int32_t>()), std::bit_cast<VkExtent2D>(extent)}
 					}});
 
 				return allocated_image_region{
 					*this, texture.get_image_view(),
 					std::bit_cast<math::usize2>(texture.get_image().get_extent2()), rst};
+			}
+
+			return std::nullopt;
+		}
+
+
+		std::optional<std::pair<allocated_image_region, vk::buffer>> push(
+			VkCommandBuffer commandBuffer,
+			vk::texture_source_prov auto bitmaps_prov,
+			const math::usize2 extent,
+			const std::uint32_t max_gen_depth,
+			const std::uint32_t margin
+		){
+			if(const auto pos = allocate(extent.copy().add(margin))){
+				const math::urect rst{tags::from_extent, pos.value(), extent};
+
+				VkRect2D rect{std::bit_cast<VkOffset2D>(pos->as<std::int32_t>()), std::bit_cast<VkExtent2D>(extent)};
+				vk::buffer buf = texture.write(commandBuffer, rect, std::ref(bitmaps_prov), max_gen_depth);
+
+				return std::optional<std::pair<allocated_image_region, vk::buffer>>{
+						std::in_place,
+						allocated_image_region{
+							*this, texture.get_image_view(),
+							std::bit_cast<math::usize2>(texture.get_image().get_extent2()), rst
+						},
+						std::move(buf)
+					};
 			}
 
 			return std::nullopt;
@@ -238,11 +265,36 @@ namespace mo_yanxi::graphic{
 			return std::move(rst.value());
 		}
 
+		[[nodiscard]] allocated_image_region allocate(
+			vk::texture_source_prov auto bitmaps_prov,
+			math::usize2 extent,
+			const std::uint32_t max_gen_depth
+		){
+			auto cmd_buf = context->get_transient_graphic_command_buffer();
+			for(auto& subpass : subpages){
+				if(auto rst = subpass.push(cmd_buf, std::ref(bitmaps_prov), extent, max_gen_depth, margin)){
+					cmd_buf = {};
+					return std::move(rst->first);
+				}
+			}
+
+			auto& newSubpage = add_page(cmd_buf);
+			auto rst = newSubpage.push(cmd_buf, std::ref(bitmaps_prov), extent, max_gen_depth, margin);
+			cmd_buf = {};
+
+			if(!rst){
+				throw std::invalid_argument("Invalid region size");
+			}
+
+			return std::move(rst->first);
+		}
+
 		allocated_image_region allocate(const bitmap& bitmap){
 			auto buffer = vk::templates::create_staging_buffer(context->get_allocator(), bitmap.size_bytes());
 			(void)vk::buffer_mapper{buffer}.load_range(bitmap.to_span());
 			return allocate(context->get_transient_graphic_command_buffer(), buffer, bitmap.extent());
 		}
+
 
 	public:
 		std::pair<allocated_image_region&, bool> register_named_region(std::string&& name, const bitmap& region){
@@ -258,6 +310,33 @@ namespace mo_yanxi::graphic{
 				return {itr->second, false};
 			}
 			auto [itr, rst] = named_image_regions.try_emplace(name, allocate(region));
+			return {itr->second, rst};
+		}
+
+		std::pair<allocated_image_region&, bool> register_named_region(
+			std::string&& name,
+			vk::texture_source_prov auto bitmaps_prov,
+			math::usize2 extent,
+			const std::uint32_t max_gen_depth = 2
+){
+			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
+				return {itr->second, false};
+			}
+			auto [itr, rst] = named_image_regions.try_emplace(std::move(name), this->allocate(std::move(bitmaps_prov), extent, max_gen_depth));
+			return {itr->second, rst};
+		}
+
+		std::pair<allocated_image_region&, bool> register_named_region(
+			const std::string_view name,
+			vk::texture_source_prov auto bitmaps_prov,
+			math::usize2 extent,
+			const std::uint32_t max_gen_depth = 2
+
+		){
+			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
+				return {itr->second, false};
+			}
+			auto [itr, rst] = named_image_regions.try_emplace(name, this->allocate(std::move(bitmaps_prov), extent, max_gen_depth));
 			return {itr->second, rst};
 		}
 

@@ -17,19 +17,21 @@ import mo_yanxi.heterogeneous;
 export namespace mo_yanxi::font{
 
 	struct glyph : graphic::cached_image_region{
-		glyph_ptr meta{};
+		glyph_wrap meta{};
+	private:
+		glyph_metrics metrics_{};
+	public:
 
 		[[nodiscard]] constexpr glyph() = default;
 
-		[[nodiscard]] constexpr glyph(const glyph_ptr& meta, graphic::allocated_image_region& region)
-			: cached_image_region{region}, meta{meta}{}
+		[[nodiscard]] constexpr glyph(const glyph_wrap& meta, graphic::allocated_image_region& region)
+			: cached_image_region{region}, meta{meta}, metrics_{(*meta.face)->glyph->metrics}{}
 
-		[[nodiscard]] constexpr explicit(false) glyph(const glyph_ptr& meta)
-			: cached_image_region{nullptr}, meta{meta}{}
+		[[nodiscard]] constexpr explicit(false) glyph(const glyph_wrap& meta)
+			: cached_image_region{nullptr}, meta{meta}, metrics_{(*meta.face)->glyph->metrics}{}
 
 		[[nodiscard]] const glyph_metrics& metrics() const noexcept{
-			assert(meta);
-			return meta->metrics;
+			return metrics_;
 		}
 
 	};
@@ -52,10 +54,13 @@ export namespace mo_yanxi::font{
 		}
 
 		[[nodiscard]] glyph get_glyph_exact(font_face& ff, const glyph_identity key){
-			auto name = ff.format(key.code, key.size);
-			const auto ptr  = ff.obtain(key.code, key.size);
-			if(ptr->bitmap.area() && !is_space(key.code)){
-				const auto aloc = page().register_named_region(std::move(name), ptr->bitmap);
+			const auto ptr = ff.obtain(key.code, key.size);
+
+			if(!is_space(key.code)){
+				auto name = ff.format(key.code, key.size);
+				auto gen = ptr.get_generator(key.size.x, key.size.y);
+
+				const auto aloc = page().register_named_region(std::move(name), gen.crop(key.code), ptr.get_extent());
 				return glyph{ptr, aloc.first};
 			}
 

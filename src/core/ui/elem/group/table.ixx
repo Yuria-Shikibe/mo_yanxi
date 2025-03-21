@@ -8,6 +8,56 @@ export import mo_yanxi.ui.util;
 import std;
 
 namespace mo_yanxi::ui{
+
+	[[nodiscard]] constexpr std::array<float align::spacing::*, 4> get_pad_ptr(layout_policy policy) noexcept{
+		if(policy == layout_policy::vertical){
+			return {
+				&align::spacing::top,
+				&align::spacing::bottom,
+
+				&align::spacing::left,
+				&align::spacing::right,
+			};
+		}else{
+			return {
+				&align::spacing::left,
+				&align::spacing::right,
+
+				&align::spacing::top,
+				&align::spacing::bottom,
+			};
+		}
+	}
+
+	[[nodiscard]] constexpr std::array<stated_size stated_extent::*, 2> get_extent_ptr(layout_policy policy) noexcept{
+		if(policy == layout_policy::vertical){
+			return {
+				&stated_extent::height,
+				&stated_extent::width,
+			};
+		}else{
+			return {
+				&stated_extent::width,
+				&stated_extent::height
+			};
+		}
+	}
+
+	template <typename T = float>
+	[[nodiscard]] constexpr auto get_vec_ptr(layout_policy policy) noexcept{
+		if(policy == layout_policy::vertical){
+			return std::array{
+				&math::vector2<T>::y,
+				&math::vector2<T>::x,
+			};
+		}else{
+			return std::array{
+				&math::vector2<T>::x,
+				&math::vector2<T>::y,
+			};
+		}
+	}
+
 	using table_size_t = unsigned;
 
 	export struct table_cell_adaptor : cell_adaptor<mastering_cell>{
@@ -118,54 +168,6 @@ namespace mo_yanxi::ui{
 		}
 
 	private:
-		[[nodiscard]] constexpr std::array<float align::spacing::*, 4> get_pad_ptr() const noexcept{
-			if(policy_ == layout_policy::vertical){
-				return {
-					&align::spacing::top,
-					&align::spacing::bottom,
-
-					&align::spacing::left,
-					&align::spacing::right,
-				};
-			}else{
-				return {
-					&align::spacing::left,
-					&align::spacing::right,
-
-					&align::spacing::top,
-					&align::spacing::bottom,
-				};
-			}
-		}
-
-		[[nodiscard]] constexpr std::array<stated_size stated_extent::*, 2> get_extent_ptr() const noexcept{
-			if(policy_ == layout_policy::vertical){
-				return {
-					&stated_extent::height,
-					&stated_extent::width,
-				};
-			}else{
-				return {
-					&stated_extent::width,
-					&stated_extent::height
-				};
-			}
-		}
-
-		template <typename T = float>
-		[[nodiscard]] constexpr auto get_vec_ptr() const noexcept{
-			if(policy_ == layout_policy::vertical){
-				return std::array{
-					&math::vector2<T>::y,
-					&math::vector2<T>::x,
-				};
-			}else{
-				return std::array{
-					&math::vector2<T>::x,
-					&math::vector2<T>::y,
-				};
-			}
-		}
 
 		pre_layout_result layout_masters(
 			const std::span<cell_adaptor_type> cells){
@@ -177,9 +179,9 @@ namespace mo_yanxi::ui{
 				pad_major_src,
 				pad_major_dst,
 				pad_minor_src,
-				pad_minor_dst] = get_pad_ptr();
+				pad_minor_dst] = get_pad_ptr(policy_);
 
-			const auto [extent_major, extent_minor] = get_extent_ptr();
+			const auto [extent_major, extent_minor] = get_extent_ptr(policy_);
 
 			for (auto&& [idx_minor, line] : view){
 				for (auto && [idx_major, elem] : line | std::views::enumerate){
@@ -201,13 +203,13 @@ namespace mo_yanxi::ui{
 			math::vector2<table_size_t> masterings{};
 
 			{
-				const auto [major_target, minor_target] = get_vec_ptr<>();
+				const auto [major_target, minor_target] = get_vec_ptr<>(policy_);
 
 				cap.*major_target = std::ranges::fold_left(get_majors() | std::views::transform(&table_head::get_captured_size), 0.f, std::plus{});
 				cap.*minor_target = std::ranges::fold_left(get_minors() | std::views::transform(&table_head::get_captured_size), 0.f, std::plus{});
 			}
 			{
-				const auto [major_target, minor_target] = get_vec_ptr<table_size_t>();
+				const auto [major_target, minor_target] = get_vec_ptr<table_size_t>(policy_);
 
 				masterings.*major_target = std::ranges::count_if(get_majors(), &table_head::mastering);
 				masterings.*minor_target = std::ranges::count_if(get_minors(), &table_head::mastering);
@@ -230,8 +232,8 @@ namespace mo_yanxi::ui{
 				return !current.line_feed;
 			}) | std::views::enumerate;
 
-			const auto [extent_major, extent_minor] = get_extent_ptr();
-			const auto [major_target, minor_target] = get_vec_ptr<>();
+			const auto [extent_major, extent_minor] = get_extent_ptr(policy_);
+			const auto [major_target, minor_target] = get_vec_ptr<>(policy_);
 
 
 			//TODO when size in major is inf, pre acquire its size and try promote it to master,
@@ -342,17 +344,14 @@ namespace mo_yanxi::ui{
 		void resize_and_set_elems(
 			const std::span<cell_adaptor_type> cells,
 			group& parent,
-			math::vec2 entire_offset = {}
+			math::frect region = {}
 			){
 			auto view = cells | std::views::chunk_by([](const cell_adaptor_type& current, const cell_adaptor_type&){
 				return !current.line_feed;
 			}) | std::views::enumerate;
 
-			const auto extent_major = &stated_extent::width;
-			const auto extent_minor = &stated_extent::height;
-
-			const auto major_target = &math::vec2::x;
-			const auto minor_target = &math::vec2::y;
+			const auto [extent_major, extent_minor] = get_extent_ptr(policy_);
+			const auto [major_target, minor_target] = get_vec_ptr<>(policy_);
 
 			math::vec2 current_position{};
 			for (auto&& [idx_minor, line] : view){
@@ -372,6 +371,9 @@ namespace mo_yanxi::ui{
 					dst_off.*major_target = head_major.max_pad_dst;
 					dst_off.*minor_target = head_minor.max_pad_dst;
 
+					if(elem.cell.saturate && std::ranges::size(line) == 1){
+						size.*major_target = region.size().*major_target - (src_off).*major_target - (dst_off).*major_target;
+					}
 
 					stated_extent ext;
 					ext.*extent_major = head_major.max_size;
@@ -381,28 +383,31 @@ namespace mo_yanxi::ui{
 					if((elem.cell.stated_extent.*extent_minor).dependent()){
 						ext.*extent_minor = {size_category::external};
 					}
-					if((elem.cell.stated_extent.*extent_major).dependent()){
+
+					if((elem.cell.stated_extent.*extent_major).dependent() && !elem.cell.saturate){
 						ext.*extent_major = {size_category::external};
 					}
 
 
 					//TODO adjust cell bound according to cell size
-					elem.cell.allocated_region.src = current_position + src_off + entire_offset;
+					elem.cell.allocated_region.src = current_position + src_off + region.get_src();
 					elem.cell.allocated_region.set_size(size);
 					elem.apply(parent, ext);
 
-					line_stride = math::max(line_stride, src_off.y + elem.cell.allocated_region.height() + dst_off.y);
-					current_position.x += src_off.x + elem.cell.allocated_region.width() + dst_off.x;
+					const auto total_off = src_off + dst_off + elem.cell.allocated_region.size();
+
+					line_stride = math::max(line_stride, total_off.*minor_target);
+					current_position.*major_target += total_off.*major_target;
 				}
 
-				current_position.x = 0;
-				current_position.y += line_stride;
+				current_position.*major_target = 0;
+				current_position.*minor_target += line_stride;
 				line_stride = 0;
 			}
 		}
 	};
 
-	export struct table : celled_group<table_cell_adaptor>{
+	export struct table : universal_group<table_cell_adaptor::cell_type, table_cell_adaptor>{
 
 		[[nodiscard]] table(scene* scene, group* group)
 			: universal_group(scene, group, "table"){
@@ -435,20 +440,95 @@ namespace mo_yanxi::ui{
 			cells.back().line_feed = true;
 			return *this;
 		}
+
+		void set_edge_pad(align::spacing pad){
+			const auto grid = util::countRowAndColumn_toVector(cells, &table_cell_adaptor::line_feed);
+			if(grid.empty()) return;
+			auto end_idx = std::ranges::max(grid) - 1;
+
+			auto view = cells | std::views::chunk_by([](const adaptor_type& current, const adaptor_type&){
+				return !current.line_feed;
+			}) | std::views::enumerate;
+
+			bool changed{};
+
+			for(auto&& [minor, line] : view){
+				for(auto&& [major, elem] : line | std::views::enumerate){
+					switch(layout_policy){
+					case layout_policy::horizontal :{
+						if(minor == 0){
+							changed |= util::tryModify(elem.cell.pad.top, pad.top);
+						}
+
+						if(minor == grid.size() - 1){
+							changed |= util::tryModify(elem.cell.pad.bottom, pad.bottom);
+						}
+
+						if(major == 0){
+							changed |= util::tryModify(elem.cell.pad.left, pad.left);
+						}
+
+						if(major == end_idx || (elem.cell.saturate && std::ranges::size(line) == 1)){
+							changed |= util::tryModify(elem.cell.pad.right, pad.right);
+						}
+						break;
+					}
+					case layout_policy::vertical :{
+						if(minor == 0){
+							changed |= util::tryModify(elem.cell.pad.left, pad.left);
+						}
+
+						if(minor == grid.size() - 1){
+							changed |= util::tryModify(elem.cell.pad.right, pad.right);
+						}
+
+						if(major == 0){
+							changed |= util::tryModify(elem.cell.pad.top, pad.top);
+						}
+
+						if(major == end_idx || (elem.cell.saturate && std::ranges::size(line) == 1)){
+							changed |= util::tryModify(elem.cell.pad.bottom, pad.bottom);
+						}
+					}
+					default : break;
+					}
+				}
+			}
+
+			if(changed){
+				notify_layout_changed(spread_direction::all_visible);
+			}
+		}
+
+		void set_edge_pad(float pad){
+			set_edge_pad({pad, pad, pad, pad});
+		}
+
 	protected:
 		math::vec2 pre_layout(table_layout_context& context, stated_extent constrain, bool size_to_constrain){
 			auto size = context.allocate_cells(cells, constrain.potential_max_size());
 
-			if(constrain.width.dependent()){
-				size.x += property.boarder.width();
+			const auto [extent_major, extent_minor] = get_extent_ptr(layout_policy);
+			const auto [major_target, minor_target] = get_vec_ptr<>(layout_policy);
+			const auto [
+							pad_major_src,
+							pad_major_dst,
+							pad_minor_src,
+							pad_minor_dst] = get_pad_ptr(layout_policy);
+
+			auto pad_major = property.boarder.*pad_major_src + property.boarder.*pad_major_dst;
+			auto pad_minor = property.boarder.*pad_minor_src + property.boarder.*pad_minor_dst;
+
+			if((constrain.*extent_major).dependent()){
+				size.*major_target += pad_major;
 			}else{
-				size.x = size_to_constrain ? constrain.width + property.boarder.width() : get_size().x;
+				size.*major_target = size_to_constrain ? (constrain.*extent_major) + pad_major : get_size().*major_target;
 			}
 
-			if(constrain.height.dependent()){
-				size.y += property.boarder.height();
+			if((constrain.*extent_minor).dependent()){
+				size.*minor_target += pad_minor;
 			}else{
-				size.y = size_to_constrain ? constrain.height + property.boarder.height() : get_size().y;
+				size.*minor_target = size_to_constrain ? (constrain.*extent_minor) + pad_minor : get_size().*minor_target;
 			}
 
 			return size;
@@ -482,9 +562,12 @@ namespace mo_yanxi::ui{
 			size.min(context_size_restriction.potential_max_size());
 			elem::resize_quiet(size);
 
-			auto off = align::get_offset_of(entire_align, size, rect{tags::from_extent, property.content_src_offset(), content_size()});
+			size -= property.boarder.get_size();
+			size.max({});
 
-			context.resize_and_set_elems(cells, *this);
+			auto off = align::get_offset_of(entire_align, size, rect{tags::from_extent, {}, content_size()});
+
+			context.resize_and_set_elems(cells, *this, rect{tags::from_extent, off, size});
 		}
 
 		 // grid{};

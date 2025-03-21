@@ -194,7 +194,7 @@ void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos){
 	for(const auto& [i, state] : mouseKeyStates | std::views::enumerate){
 		if(!state.pressed) continue;
 
-		dragEvent = {state.src, newPos, core::ctrl::key_pack{static_cast<core::ctrl::key_code_t>(i), core::ctrl::act::Ignore, mode}};
+		dragEvent = {state.src, newPos, core::ctrl::key_pack{static_cast<core::ctrl::key_code_t>(i), core::ctrl::act::ignore, mode}};
 		currentCursorFocus->events().fire(dragEvent);
 	}
 

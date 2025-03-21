@@ -17,7 +17,10 @@ set_encodings("utf-8")
 
 add_requires("glfw")
 add_requires("msdfgen", {
-    configs = { extensions = true--[[ , skia = true ]]}
+    configs = {
+        extensions = true ,
+        cxxflags = "/DMSDFGEN_USE_CPP11"
+    }
  })
 add_requires("freetype")
 add_requires("nanosvg")

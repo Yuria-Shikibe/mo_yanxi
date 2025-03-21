@@ -58,7 +58,7 @@ import mo_yanxi.graphic.renderer.world;
 import mo_yanxi.graphic.renderer.ui;
 import mo_yanxi.graphic.draw;
 import mo_yanxi.graphic.draw.func;
-import mo_yanxi.graphic.draw.nine_patch;
+import mo_yanxi.graphic.draw.multi_region;
 import mo_yanxi.graphic.draw.transparent;
 import mo_yanxi.graphic.image_atlas;
 import mo_yanxi.graphic.image_nine_region;
@@ -80,89 +80,9 @@ import mo_yanxi.ui.elem.text_input_area;
 import mo_yanxi.ui.elem.slider;
 import mo_yanxi.ui.elem.image_frame;
 import mo_yanxi.ui.elem.progress_bar;
+import mo_yanxi.ui.elem.button;
 
 import test;
-
-void draw_glyph_layout(
-	mo_yanxi::graphic::renderer_world& renderer,
-	const mo_yanxi::font::typesetting::glyph_layout& layout,
-	const mo_yanxi::math::vec2 offset,
-	bool toLight,
-	float opacityScl = 1.f){
-	using namespace mo_yanxi;
-	using namespace mo_yanxi::graphic;
-	color tempColor{};
-
-
-
-	draw::default_transparent_acquirer acquirer{renderer.batch, {}};
-
-	const font::typesetting::glyph_elem* last_elem{};
-
-	for (const auto& row : layout.rows()){
-		const auto lineOff = row.src + offset;
-
-		// acquirer << draw::white_region;
-		//
-		// draw::line::rect_ortho(acquirer, row.bound.to_region(lineOff));
-		// draw::line::line_ortho(acquirer.get(), lineOff, lineOff.copy().add_x(row.bound.width));
-
-		for (auto && glyph : row.glyphs){
-			if(!glyph.glyph)continue;
-			last_elem = &glyph;
-
-			acquirer << glyph.glyph.get_cache();
-
-			tempColor = glyph.color;
-
-			if(opacityScl != 1.f){
-				tempColor.a *= opacityScl;
-			}
-
-			if(glyph.code.code == U'\0'){
-				tempColor.mul_rgb(.65f);
-			}
-
-
-			draw::fill::quad(
-				acquirer.get(),
-				lineOff + glyph.region.vert_00(),
-				lineOff + glyph.region.vert_10(),
-				lineOff + glyph.region.vert_11(),
-				lineOff + glyph.region.vert_01(),
-				tempColor.to_light_color_copy(toLight)
-			);
-
-			// acquirer << draw::white_region;
-			// draw::line::rect_ortho(acquirer, glyph.region.copy().move(lineOff));
-
-		}
-
-
-	}
-
-
-	if(layout.is_clipped() && last_elem){
-		const auto lineOff = layout.rows().back().src + offset;
-
-		draw::fill::fill(
-			acquirer[-1],
-			lineOff + last_elem->region.vert_00(),
-			lineOff + last_elem->region.vert_10(),
-			lineOff + last_elem->region.vert_11(),
-			lineOff + last_elem->region.vert_01(),
-			last_elem->color.copy().mulA(opacityScl).to_light_color_copy(toLight),
-			{},
-			{},
-			last_elem->color.copy().mulA(opacityScl).to_light_color_copy(toLight)
-		);
-	}
-
-	acquirer << draw::white_region;
-	//
-	draw::line::rect_ortho(acquirer, mo_yanxi::math::frect{mo_yanxi::tags::from_extent, offset, layout.extent()});
-}
-
 
 void compile_shaders(){
 	using namespace mo_yanxi;
@@ -182,14 +102,24 @@ void init_assets(){
 
 void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& atlas){
 
+	using namespace std::literals;
 	using namespace mo_yanxi;
-	auto bitmap = graphic::msdf::load_svg(R"(D:\projects\mo_yanxi\prop\assets\svg\blender_icon_select_subtract.svg)", 96, 96);
-	auto& test_svg = atlas.find_page("ui")->register_named_region("test", bitmap).first;
 
-	using namespace mo_yanxi;
+	auto& ui_page = *atlas.find_page("ui");
+	auto& test_svg = ui_page.register_named_region(
+		"test"s,
+		graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\blender_icon_select_subtract.svg)"}, {100, 100}).first;
+
+	auto& line_svg = ui_page.register_named_region(
+		"line"s,
+		graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\line.svg)"}, {40u, 24u}).first;
+	ui_page.mark_protected("line");
+
+	graphic::image_caped_region region{line_svg, line_svg.get_region(), 12, 12, graphic::msdf::sdf_image_boarder};
+
 	ui::elem_ptr e{root.get_scene(), &root, std::in_place_type<ui::manual_table>};
 	e->property.fill_parent = {true, true};
-	auto& bed = static_cast<ui::manual_table&>(root.addChildren(std::move(e)));
+	auto& bed = static_cast<ui::manual_table&>(root.add_children(std::move(e)));
 
 	auto spane = bed.emplace<ui::scroll_pane>();
 	spane.cell().region_scale = {math::vec2{}, math::vec2{.5, .8}};
@@ -198,9 +128,13 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	spane->set_layout_policy(ui::layout_policy::horizontal);
 
 	{
-		auto& text = spane->emplace<ui::table>();
-		text.function_init([](ui::text_input_area& text){
-			text.set_text(R"(#<[srch>楼上的下来搞核算abcde啊啊啊.,。，；："123"'t')");
+
+		auto& table = spane->emplace<ui::table>();
+
+		table.emplace<ui::elem>();
+
+		table.function_init([](ui::text_input_area& text){
+			text.set_text(R"(楼上的下来搞核算abcde啊啊啊.,。，；："123"'t')");
 			text.set_policy(font::typesetting::layout_policy::auto_feed_line);
 
 			text.set_tooltip_state({
@@ -217,24 +151,38 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 		}).cell().set_external({false, true});
 
 		{
-			auto image_hdl = text.end_line().emplace<ui::image_frame>();
-			image_hdl.cell().set_height(256);
-			image_hdl->set_drawable<ui::image_drawable>(graphic::draw::mode_flags::sdf, test_svg);
+			auto image_hdl = table.end_line().emplace<ui::image_frame>();
+			image_hdl.cell().set_height(4);
+			image_hdl.cell().pad.set(12);
+			image_hdl.cell().margin.set_hori(12);
+			image_hdl.cell().saturate = true;
+
+			image_hdl->property.set_empty_drawer();
+			image_hdl->set_drawable<ui::image_caped_region_drawable>(graphic::draw::mode_flags::sdf, region, .075f);
+			image_hdl->style.scaling = align::scale::stretchX;
 		}
 
 		{
-			auto bar = text.end_line().emplace<ui::progress_bar>();
+			auto button = table.end_line().emplace<ui::button<ui::image_frame>>();
+			button->set_drawable<ui::image_drawable>(graphic::draw::mode_flags::sdf, test_svg);
+			button.cell().set_size(60);
+
+
+			auto bar = table.emplace<ui::progress_bar>();
 			bar->reach_speed = .05f;
 			bar.cell().set_height(60);
 
-			auto slider = text.end_line().emplace<ui::slider>();
+			auto slider = table.end_line().emplace<ui::slider>();
 			slider.cell().set_height(60);
+			slider.cell().pad.top = 8.;
 			slider->set_hori_only();
 
-			bar->set_progress_prov([e = &slider.elem()] -> ui::progress_bar_progress {
-				return {e->get_progress().x};
+			bar->set_progress_prov([&e = slider.elem()] -> ui::progress_bar_progress {
+				return {e.get_progress().x};
 			});
 		}
+
+		table.set_edge_pad(0);
 
 		// text->end_line().function_init([](ui::basic_text_elem& text){
 		// 	text.set_text("叮咚鸡叮咚鸡");
@@ -456,9 +404,6 @@ void main_loop(){
 
 int main(){
 	using namespace mo_yanxi;
-
-	// auto bitmap = graphic::msdf::load_svg(R"(D:\projects\mo_yanxi\prop\assets\svg\blender_icon_select_intersect.svg)", 128, 128);
-	// bitmap.write(, true);
 
 	init_assets();
 	compile_shaders();

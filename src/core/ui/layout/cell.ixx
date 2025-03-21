@@ -55,11 +55,17 @@ namespace mo_yanxi::ui{
 		stated_extent stated_extent{};
 		align::spacing pad{};
 
+		bool saturate{};
+
 		constexpr auto& set_size(math::vec2 sz) noexcept {
 			stated_extent.width = {size_category::mastering, sz.x};
 			stated_extent.height = {size_category::mastering, sz.y};
 
 			return *this;
+		}
+
+		constexpr auto& set_size(float sz) noexcept {
+			return set_size({sz, sz});
 		}
 
 		constexpr auto& set_width(float sz) noexcept {

@@ -17,13 +17,13 @@ namespace mo_yanxi::ui{
 	struct group : public elem{
 		using elem::elem;
 
-		virtual void postRemove(elem* element) = 0;
+		virtual void post_remove(elem* element) = 0;
 
-		virtual void instantRemove(elem* element) = 0;
+		virtual void instant_remove(elem* element) = 0;
 
-		virtual void clearChildren() noexcept = 0;
+		virtual void clear_children() noexcept = 0;
 
-		virtual elem& addChildren(elem_ptr&& element) = 0;
+		virtual elem& add_children(elem_ptr&& element) = 0;
 
 		[[nodiscard]] elem* find_children_by_name(const std::string_view name) const{
 			for (const elem_ptr& element : get_children()){
@@ -69,10 +69,6 @@ namespace mo_yanxi::ui{
 			elem::layout();
 			layout_children();
 		}
-
-		// virtual std::optional<Geom::Vec2> getElementFitnessSize(const elem& element) const noexcept{
-		// 	return std::nullopt;
-		// }
 
 	protected:
 		/*virtual*/ void drawChildren(const rect clipSpace, const rect redirect) const{

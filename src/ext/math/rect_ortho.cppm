@@ -72,6 +72,13 @@ namespace mo_yanxi::math{
 		constexpr rect_ortho(tags::unchecked_t, typename vec_t::const_pass_t bot_lft, typename vec_t::const_pass_t top_rit) noexcept :
 		src(bot_lft), size_(top_rit - bot_lft){
 			assert(bot_lft.within_equal(top_rit));
+		}		/**
+		 * @warning Create by vertex [src, end] instead of [src, size]
+		 */
+		constexpr rect_ortho(tags::unchecked_t, tags::from_extent_t, typename vec_t::const_pass_t src, typename vec_t::const_pass_t sz) noexcept :
+			src(src), size_(sz){
+			assert(sz.x >= 0);
+			assert(sz.y >= 0);
 		}
 
 		/**

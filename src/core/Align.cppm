@@ -99,6 +99,16 @@ namespace mo_yanxi{
 				return *this;
 			}
 
+			constexpr padding& set_hori(const T val) noexcept{
+				left = right = val;
+				return *this;
+			}
+
+			constexpr padding& set_vert(const T val) noexcept{
+				bottom = top = val;
+				return *this;
+			}
+
 			constexpr padding& set(const T l, const T r, const T b, const T t) noexcept{
 				left = l;
 				right = r;
@@ -267,8 +277,8 @@ namespace mo_yanxi{
 				return {align::floating_mul<T>(srcSize.x, scale), align::floating_mul<T>(srcSize.y, scale)};
 			}
 			case scale::stretch : return toBound;
-			case scale::stretchX : return {toBound.x, srcSize.y};
-			case scale::stretchY : return {srcSize.x, toBound.y};
+			case scale::stretchX : return {toBound.x, std::min(srcSize.y, toBound.y)};
+			case scale::stretchY : return {std::min(srcSize.x, toBound.x), toBound.y};
 			case scale::clamped : if(srcSize.y > toBound.y || srcSize.x > toBound.x){
 					return align::embedTo<T>(scale::fit, srcSize, toBound);
 				} else{

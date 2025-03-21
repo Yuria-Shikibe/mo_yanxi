@@ -5,7 +5,7 @@ import mo_yanxi.ui.elem;
 import mo_yanxi.ui.scene;
 import mo_yanxi.ui.graphic;
 import mo_yanxi.graphic.draw.func;
-import mo_yanxi.graphic.draw.nine_patch;
+import mo_yanxi.graphic.draw.multi_region;
 // import Core.UI.Graphic;
 // import Graphic.Draw.NinePatch;
 

@@ -468,6 +468,7 @@ namespace mo_yanxi::vk::cmd{
 		vkCmdPipelineBarrier2(command_buffer, &dependency);
 	}
 
+
 	export
 	template <std::ranges::forward_range Rng>
 		requires (!std::is_const_v<std::remove_reference_t<Rng>> && std::same_as<
@@ -477,21 +478,24 @@ namespace mo_yanxi::vk::cmd{
 		VkImage image,
 		Rng&& regions,
 		const std::uint32_t mipLevels,
+		const std::uint32_t base_mipLevel = 1,
 		const std::uint32_t baseLayer = 0,
 		const std::uint32_t layerCount = 1,
 
-		const VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-		const VkAccessFlags dstAccess = VK_ACCESS_SHADER_READ_BIT,
-		const VkImageLayout dstLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		const VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+		const VkAccessFlags2 access = VK_ACCESS_2_SHADER_READ_BIT,
+		const VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 	){
 		if(mipLevels <= 1) return;
 
-		VkImageMemoryBarrier barrier{
-				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		VkImageMemoryBarrier2 barrier{
+				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
 				.pNext = nullptr,
-				.srcAccessMask = dstAccess,
-				.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-				.oldLayout = dstLayout,
+				.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+				.srcAccessMask = access,
+				.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+				.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+				.oldLayout = layout,
 				.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -505,22 +509,24 @@ namespace mo_yanxi::vk::cmd{
 				}
 			};
 
-		for(std::uint32_t i = 1; i < mipLevels; i++){
+		VkDependencyInfo dependency{
+			.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+			.imageMemoryBarrierCount = 1,
+			.pImageMemoryBarriers = &barrier,
+		};
+
+
+		for(std::uint32_t i = base_mipLevel; i < mipLevels; i++){
 			barrier.subresourceRange.baseMipLevel = i - 1;
 
+			barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
 			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 			barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
 
-			vkCmdPipelineBarrier(
-				commandBuffer,
-				VK_PIPELINE_STAGE_TRANSFER_BIT,
-				VK_PIPELINE_STAGE_TRANSFER_BIT,
-				0,
-				0, nullptr,
-				0, nullptr,
-				1, &barrier);
+
+			vkCmdPipelineBarrier2(commandBuffer, &dependency);
 
 			for(VkRect2D& srcRegion : regions){
 				const VkRect2D dstRegion{
@@ -569,34 +575,130 @@ namespace mo_yanxi::vk::cmd{
 				srcRegion = dstRegion;
 			}
 
+			barrier.dstStageMask = stage;
 			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-			barrier.newLayout = dstLayout;
-			barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-			barrier.dstAccessMask = dstAccess;
+			barrier.newLayout = layout;
+			barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+			barrier.dstAccessMask = access;
 
-			vkCmdPipelineBarrier(
-				commandBuffer,
-				VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage,
-				0,
-				0, nullptr,
-				0, nullptr,
-				1, &barrier);
+			vkCmdPipelineBarrier2(commandBuffer, &dependency);
+
 		}
 
 		barrier.subresourceRange.baseMipLevel = mipLevels - 1;
 		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		barrier.newLayout = dstLayout;
-		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		barrier.dstAccessMask = dstAccess;
+		barrier.newLayout = layout;
+		barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = access;
 
-		vkCmdPipelineBarrier(
-			commandBuffer,
-			VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage,
-			0,
-			0, nullptr,
-			0, nullptr,
-			1, &barrier);
+		vkCmdPipelineBarrier2(commandBuffer, &dependency);
 	}
+
+	export
+	void generate_mipmaps(
+		VkCommandBuffer commandBuffer,
+		VkImage image,
+		VkBuffer buffer,
+		VkRect2D region,
+		const std::uint32_t mipLevels,
+		const std::uint32_t max_mipLevels,
+		const std::uint32_t baseLayer = 0,
+		const std::uint32_t layerCount = 1,
+
+		const VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+		const VkAccessFlags2 access = VK_ACCESS_2_SHADER_READ_BIT,
+		const VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		const VkDeviceSize bpi = 4
+	){
+		if(mipLevels <= 1) return;
+
+		cmd::memory_barrier(commandBuffer, image,
+			stage,
+			access,
+			VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+			VK_ACCESS_2_TRANSFER_WRITE_BIT,
+			layout,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			{
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel = 0,
+				.levelCount = mipLevels,
+				.baseArrayLayer = baseLayer,
+				.layerCount = layerCount,
+			}
+		);
+
+		VkDeviceSize offset = 0;
+		for(std::uint32_t i = 0; i < max_mipLevels - 1; ++i){
+			cmd::copy_buffer_to_image(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {VkBufferImageCopy{
+				.bufferOffset = offset,
+				.bufferRowLength = 0,
+				.bufferImageHeight = 0,
+				.imageSubresource = {
+					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+					.mipLevel = i,
+					.baseArrayLayer = baseLayer,
+					.layerCount = layerCount
+				},
+				.imageOffset = {
+					region.offset.x, region.offset.y, 0
+				},
+				.imageExtent = {
+					region.extent.width, region.extent.height, 1
+				}
+			}});
+
+			offset += region.extent.width * region.extent.height * bpi;
+
+			region.offset.x /= 2;
+			region.offset.y /= 2;
+			region.extent.width /= 2;
+			region.extent.height /= 2;
+
+			if(region.extent.width == 0 || region.extent.height == 0) break;
+		}
+
+		cmd::copy_buffer_to_image(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {VkBufferImageCopy{
+			.bufferOffset = offset,
+			.bufferRowLength = 0,
+			.bufferImageHeight = 0,
+			.imageSubresource = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.mipLevel = max_mipLevels - 1,
+				.baseArrayLayer = baseLayer,
+				.layerCount = layerCount
+			},
+			.imageOffset = {
+				region.offset.x, region.offset.y, 0
+			},
+			.imageExtent = {
+				region.extent.width, region.extent.height, 1
+			}
+		}});
+
+		if(max_mipLevels > 1)cmd::memory_barrier(
+			commandBuffer, image,
+			VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+			VK_ACCESS_2_TRANSFER_WRITE_BIT,
+			stage,
+			access,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			layout,
+			{
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel = 0,
+				.levelCount = max_mipLevels - 1,
+				.baseArrayLayer = baseLayer,
+				.layerCount = layerCount,
+			}
+		);
+
+		if(max_mipLevels >= mipLevels) return;
+
+		std::array arr{region};
+		generate_mipmaps(commandBuffer, image, arr, mipLevels, max_mipLevels, baseLayer, layerCount, stage, access, layout);
+	}
+
 
 	template <typename Fn>
 	using clear_func_color_t = std::add_lvalue_reference_t<std::remove_pointer_t<std::tuple_element_t<

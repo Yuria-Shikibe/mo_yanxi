@@ -38,7 +38,7 @@ namespace mo_yanxi::ui{
 		}
 
 	protected:
-		std::unique_ptr<image_drawable> image_drawable;
+		std::unique_ptr<drawable> image_drawable;
 
 		[[nodiscard]] static math::vec2 get_expected_size(const drawable& drawable, const image_display_style& style, math::vec2 bound) noexcept{
 			if(const auto sz = drawable.get_default_size()){

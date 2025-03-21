@@ -224,26 +224,7 @@ namespace mo_yanxi::ui{
 
 		void register_default_cursor_events(elem_event_manager& event_manager);
 
-		void registerDefEvent(elem_event_manager& event_manager){
-			// event_manager.on<events::EndFocus>([this](auto){
-			// 	pressed = false;
-			// });
-			//
-			// event_manager.on<events::Inbound>([this](auto){
-			// 	inbound = true;
-			// });
-			//
-			// event_manager.on<events::Exbound>([this](auto){
-			// 	inbound = false;
-			// });
-			//
-			// event_manager.on<events::Click>([this](const events::Click& click){
-			// 	switch(click.code.action()){
-			// 		case Ctrl::Act::Press: pressed = true; break;
-			// 		default: pressed = false;
-			// 	}
-			// });
-		}
+		void registerDefEvent(elem_event_manager& event_manager);
 	};
 
 
@@ -276,12 +257,12 @@ namespace mo_yanxi::ui{
 		float scale_context{1.};
 		float scale_local{1.};
 
-		elem_graphic_data graphicData{};
+		elem_graphic_data graphic_data{};
 
 
 		void set_empty_drawer(){
 			boarder = {};
-			graphicData.drawer = &EmptyStyleDrawer;
+			graphic_data.drawer = &EmptyStyleDrawer;
 		}
 
 		constexpr void set_abs_src(const math::vec2 parentOriginalPoint) noexcept{
@@ -439,7 +420,7 @@ namespace mo_yanxi::ui{
 		}
 
 		void set_style(const style_drawer<elem>& drawer){
-			property.graphicData.drawer = &drawer;
+			property.graphic_data.drawer = &drawer;
 			if(drawer.apply_to(*this)){
 				notify_layout_changed(spread_direction::all_visible);
 			}
@@ -520,7 +501,7 @@ namespace mo_yanxi::ui{
 		}
 
 		[[nodiscard]] const auto& graphicProp() const noexcept{
-			return property.graphicData;
+			return property.graphic_data;
 		}
 
 		elem_event_manager& events() noexcept{
@@ -568,7 +549,7 @@ namespace mo_yanxi::ui{
 		void remove_self_from_parent();
 		void remove_self_from_parent_instantly();
 
-		void registerAsyncTask();
+		// void registerAsyncTask();
 
 		void notify_remove();
 

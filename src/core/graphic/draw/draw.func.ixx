@@ -6,6 +6,8 @@ module;
 export module mo_yanxi.graphic.draw.func;
 export import mo_yanxi.graphic.draw;
 
+export import mo_yanxi.math.quad;
+
 import std;
 
 namespace mo_yanxi::graphic::draw{
@@ -62,6 +64,22 @@ namespace mo_yanxi::graphic::draw{
 				v00, v10, v11, v01,
 				color_scl, color_scl, color_scl, color_scl,
 				color_ovr, color_ovr, color_ovr, color_ovr
+			);
+		}
+
+
+		export
+		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+		FORCE_INLINE void quad(
+			const batch_draw_param<Vtx, UV, Proj>& param,
+			const math::fquad& quad,
+			col color_scl = colors::white,
+			col color_ovr = {}
+			) noexcept {
+			fill::quad(
+				param,
+				quad.v0, quad.v1, quad.v2, quad.v3,
+				color_scl, color_ovr
 			);
 		}
 

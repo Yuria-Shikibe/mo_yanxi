@@ -19,13 +19,13 @@ namespace mo_yanxi::ui{
 			interactivity = interactivity::children_only;
 		}
 
-		void clearChildren() noexcept override{
+		void clear_children() noexcept override{
 			toRemove.clear();
 			children.clear();
 			notify_layout_changed(spread_direction::super | spread_direction::from_content);
 		}
 
-		void postRemove(elem* elem) override{
+		void post_remove(elem* elem) override{
 			if(const auto itr = find(elem); itr != children.end()){
 				toRemove.push_back(std::move(*itr));
 				children.erase(itr);
@@ -33,14 +33,14 @@ namespace mo_yanxi::ui{
 			notify_layout_changed(spread_direction::all_visible);
 		}
 
-		void instantRemove(elem* elem) override{
+		void instant_remove(elem* elem) override{
 			if(const auto itr = find(elem); itr != children.end()){
 				children.erase(itr);
 			}
 			notify_layout_changed(spread_direction::all_visible);
 		}
 
-		elem& addChildren(elem_ptr&& elem) override{
+		elem& add_children(elem_ptr&& elem) override{
 			//TODO move this to other place?
 			setChildrenFillParentSize(*elem, content_size());
 

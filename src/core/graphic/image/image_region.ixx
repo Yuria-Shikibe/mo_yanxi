@@ -66,10 +66,10 @@ namespace mo_yanxi::graphic{
 			return math::rect_ortho<T>{v00 + rect.src, v11 + rect.src};
 		}
 
-		template <std::derived_from<uniformed_rect_uv> Ty>
-		constexpr void fetch_into(this Ty& self, const math::u32size2 bound_size, const math::urect region) noexcept{
-			self.vert00 = region.vert_00().as<float>() / bound_size.as<float>();
-			self.vert11 = region.vert_11().as<float>() / bound_size.as<float>();
+		template <std::derived_from<uniformed_rect_uv> Ty, typename N>
+		constexpr void fetch_into(this Ty& self, const math::vector2<N> bound_size, const math::rect_ortho<N>& region) noexcept{
+			self.vert00 = region.vert_00().template as<float>() / bound_size.template as<float>();
+			self.vert11 = region.vert_11().template as<float>() / bound_size.template as<float>();
 		}
 
 
@@ -102,11 +102,11 @@ namespace mo_yanxi::graphic{
 			return vert01;
 		}
 
-		template <std::derived_from<uniformed_rect_uv> Ty>
-		constexpr void fetch_into(this Ty& self, const math::u32size2 bound_size, const math::urect region) noexcept{
+		template <std::derived_from<uniformed_rect_uv> Ty, typename N>
+		constexpr void fetch_into(this Ty& self, const math::vector2<N> bound_size, const math::rect_ortho<N>& region) noexcept{
 			uniformed_rect_uv::fetch_into(self, bound_size, region);
-			self.vert10 = region.vert_10().as<float>() / bound_size.as<float>();
-			self.vert01 = region.vert_01().as<float>() / bound_size.as<float>();
+			self.vert10 = region.vert_10().template as<float>() / bound_size.template as<float>();
+			self.vert01 = region.vert_01().template as<float>() / bound_size.template as<float>();
 		}
 
 		template <std::derived_from<uniformed_rect_uv> Ty>
@@ -152,9 +152,10 @@ namespace mo_yanxi::graphic{
 			return this->Ty::proj_region(math::urect{tags::unchecked, {}, size});
 		}
 
-		constexpr void fetch_into(const math::u32size2 bound_size, const math::urect region) noexcept{
+		template <typename N>
+		constexpr void fetch_into(const math::vector2<N> bound_size, const math::rect_ortho<N>& region) noexcept{
 			this->Ty::fetch_into(bound_size, region);
-			size = bound_size;
+			size = bound_size.template as<decltype(size)::value_type>();
 		}
 
 		using Ty::shrink;

@@ -113,7 +113,7 @@ namespace mo_yanxi::ui{
 
 				if(util::tryModify(
 					scroll.base,
-						scroll.base.copy().fma(scrollVelocity, delta_in_ticks).clamp_xy({}, get_scrollable_size()) * get_vel_clamp())){
+						scroll.base.fma(scrollVelocity, delta_in_ticks).clamp_xy({}, get_scrollable_size()) * get_vel_clamp())){
 					scroll.resume();
 					updateChildrenAbsSrc();
 				}
@@ -256,18 +256,18 @@ namespace mo_yanxi::ui{
 			}
 		}
 
-		void postRemove(elem* element) override{
+		void post_remove(elem* element) override{
 			item = {};
 		}
 
-		void instantRemove(elem* element) override{
+		void instant_remove(elem* element) override{
 			item = {};
 		}
 
-		void clearChildren() noexcept override{
+		void clear_children() noexcept override{
 			item = {};
 		}
-		elem& addChildren(elem_ptr&& element) override{
+		elem& add_children(elem_ptr&& element) override{
 			return *item;
 		}
 

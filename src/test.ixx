@@ -16,25 +16,38 @@ import std;
 namespace test{
 	using namespace mo_yanxi;
 
-	graphic::image_multi_region nineRegion_edge{};
-	graphic::image_multi_region nineRegion_base{};
-	ui::style::round_style default_style{};
+	export graphic::image_nine_region nineRegion_edge{};
+	export graphic::image_nine_region nineRegion_base{};
+	export ui::style::round_style default_style{};
 
 	export void load_tex(graphic::image_atlas& atlas){
 		auto& page = atlas.create_image_page("ui");
 
-		graphic::allocated_image_region& boarder = page.register_named_region("edge", graphic::msdf::create_boarder(12.f)).first;
+		using namespace std::literals;
+
+
+		graphic::allocated_image_region& boarder = page.register_named_region(
+			"edge"s,
+			graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f), 8.},
+			math::usize2{128, 128}
+		).first;
+
 		nineRegion_edge = {
 			boarder,
-			align::padding<std::uint32_t>{}.set(16).expand(graphic::msdf::sdf_image_boarder),
-			graphic::msdf::sdf_image_boarder / 2
+			align::padding<std::uint32_t>{}.set(20).expand(graphic::msdf::sdf_image_boarder),
+			graphic::msdf::sdf_image_boarder
 		};
 
-		graphic::allocated_image_region& base = page.register_named_region("base", graphic::msdf::create_solid_boarder(12.f)).first;
+		graphic::allocated_image_region& base = page.register_named_region(
+			"base"s,
+			graphic::msdf::msdf_generator{graphic::msdf::create_solid_boarder(12.f), 8.},
+			math::usize2{128, 128}
+		).first;
+
 		nineRegion_base = {
 			base,
-			align::padding<std::uint32_t>{}.set(16).expand(graphic::msdf::sdf_image_boarder),
-			graphic::msdf::sdf_image_boarder / 2
+			align::padding<std::uint32_t>{}.set(20).expand(graphic::msdf::sdf_image_boarder),
+			graphic::msdf::sdf_image_boarder
 		};
 
 

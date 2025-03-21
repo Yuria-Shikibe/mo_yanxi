@@ -150,12 +150,12 @@ namespace mo_yanxi::ui{
 			return cells;
 		}
 
-		void clearChildren() noexcept override{
-			basic_group::clearChildren();
+		void clear_children() noexcept override{
+			basic_group::clear_children();
 			cells.clear();
 		}
 
-		void postRemove(elem* element) override{
+		void post_remove(elem* element) override{
 			if(const auto itr = find(element); itr != children.end()){
 				cells.erase(cells.begin() + std::distance(children.begin(), itr));
 
@@ -165,7 +165,7 @@ namespace mo_yanxi::ui{
 			notify_layout_changed(spread_direction::all_visible);
 		}
 
-		void instantRemove(elem* element) override{
+		void instant_remove(elem* element) override{
 			if(const auto itr = find(element); itr != children.end()){
 				cells.erase(cells.begin() + std::distance(children.begin(), itr));
 				children.erase(itr);
@@ -173,10 +173,10 @@ namespace mo_yanxi::ui{
 			notify_layout_changed(spread_direction::all_visible);
 		}
 
-		elem& addChildren(elem_ptr&& element) override{
+		elem& add_children(elem_ptr&& element) override{
 			//TODO is this always right? e.g. may cause wrong in dynmiac table
 			// element->layoutState.acceptMask_context -= spread_direction::child;
-			return basic_group::addChildren(std::move(element));
+			return basic_group::add_children(std::move(element));
 		}
 
 		template <std::derived_from<elem> E, std::derived_from<universal_group> G, typename ...Args>
@@ -230,7 +230,7 @@ namespace mo_yanxi::ui{
 	private:
 		template <std::derived_from<elem> E = elem, std::derived_from<universal_group> G>
 		std::pair<create_result<E, CellTy>, adaptor_type&> add(this G& self, elem_ptr&& ptr){
-			auto& adaptor = self.cells.emplace_back(&self.addChildren(std::move(ptr)), self.template_cell);
+			auto& adaptor = self.cells.emplace_back(&self.add_children(std::move(ptr)), self.template_cell);
 			return {create_result{static_cast<E&>(*adaptor.element), adaptor.cell}, adaptor};
 		}
 
@@ -238,7 +238,7 @@ namespace mo_yanxi::ui{
 
 	export
 	template <typename AdaptTy>
-		requires (std::derived_from<AdaptTy, cell_adaptor<typename AdaptTy::cell_type>>)
+		// requires (std::derived_from<AdaptTy, cell_adaptor<typename AdaptTy::cell_type>>)
 	using celled_group  = universal_group<typename AdaptTy::cell_type, AdaptTy>;
 
 }

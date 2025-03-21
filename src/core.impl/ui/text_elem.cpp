@@ -44,5 +44,5 @@ void mo_yanxi::ui::basic_text_elem::draw_content(const rect clipSpace, rect redi
 	// elem::draw_content(clipSpace, redirect);
 
 	draw_acquirer acquirer{get_renderer().batch, {}};
-	graphic::draw::glyph_layout(acquirer, glyph_layout, get_glyph_abs_src(), false, property.graphicData.get_opacity());
+	graphic::draw::glyph_layout(acquirer, glyph_layout, get_glyph_abs_src(), false, property.graphic_data.get_opacity());
 }

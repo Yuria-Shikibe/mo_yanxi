@@ -52,6 +52,28 @@ namespace mo_yanxi{
 		});
 	}
 
+	void ui::cursor_states::registerDefEvent(elem_event_manager& event_manager){
+		event_manager.on<events::focus_end>([](auto, elem& self){
+			self.cursor_state.pressed = false;
+		});
+
+		event_manager.on<events::inbound>([](auto, elem& self){
+			self.cursor_state.inbound = true;
+		});
+
+		event_manager.on<events::exbound>([](auto, elem& self){
+			self.cursor_state.inbound = false;
+		});
+
+		event_manager.on<events::click>([](const events::click& click, elem& self){
+			switch(click.code.action()){
+			case core::ctrl::act::press : self.cursor_state.pressed = true;
+				break;
+			default : self.cursor_state.pressed = false;
+			}
+		});
+	}
+
 
 	graphic::renderer_ui& ui::elem::get_renderer() const noexcept{
 		return *get_scene()->renderer; //fuck fake positive...
@@ -72,7 +94,7 @@ namespace mo_yanxi{
 	}
 
 	void ui::elem::update_opacity(const float val){
-		if(util::tryModify(property.graphicData.context_opacity, val)){
+		if(util::tryModify(property.graphic_data.context_opacity, val)){
 			for(const auto& element : get_children()){
 				element->update_opacity(graphicProp().get_opacity());
 			}
@@ -100,22 +122,22 @@ namespace mo_yanxi{
 	void ui::elem::remove_self_from_parent(){
 		assert(!is_root_element());
 
-		parent->postRemove(this);
+		parent->post_remove(this);
 	}
 
 	void ui::elem::remove_self_from_parent_instantly(){
 		assert(!is_root_element());
 
-		parent->instantRemove(this);
+		parent->instant_remove(this);
 	}
-
-	void ui::elem::registerAsyncTask(){
-	}
+	//
+	// void ui::elem::registerAsyncTask(){
+	// }
 
 	void ui::elem::notify_remove(){
 		assert(parent != nullptr);
 		clear_external_references();
-		parent->postRemove(this);
+		parent->post_remove(this);
 	}
 
 	void ui::elem::clear_external_references() noexcept{
@@ -255,7 +277,7 @@ namespace mo_yanxi{
 	// }
 
 	void ui::elem::draw_pre(const rect clipSpace, rect redirect) const{
-		if(property.graphicData.drawer)property.graphicData.drawer->draw(*this, get_bound(), property.graphicData.get_opacity());
+		if(property.graphic_data.drawer)property.graphic_data.drawer->draw(*this, get_bound(), property.graphic_data.get_opacity());
 	}
 
 	bool ui::elem::update_abs_src(const math::vec2 parent_content_abs_src){

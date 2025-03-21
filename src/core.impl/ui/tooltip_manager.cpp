@@ -12,42 +12,9 @@ import mo_yanxi.ui.action.graphic;
 import align;
 import mo_yanxi.algo;
 
-namespace mo_yanxi::ui{
-
-
-
-
-	// bool ToolTipManager::onEsc(){
-	// 	for (auto&& elem : actives | std::views::reverse){
-	// 		if(!elem.element->onEsc()){
-	// 			return false;
-	// 		}
-	// 	}
-	//
-	// 	if(!actives.empty()){
-	// 		dropBack();
-	// 		return false;
-	// 	}
-	//
-	// 	return true;
-	// }
-
-
-}
-
-// void mo_yanxi::ui::tooltip_instance::drop() const{
-// 	if(element && owner){
-// 		element->getScene()->tooltipManager.requestDrop(owner);
-// 	}
-// }
-//
-// void mo_yanxi::ui::tooltip_instance::drop() const{
-// }
 
 void mo_yanxi::ui::tooltip_instance::updatePosition(const tooltip_manager& manager){
 	assert(owner != nullptr);
-
-	// constexpr Align::Spacing spacing{0, 0, 0, 0};
 
 	const auto policy = owner->tooltip_align_policy();
 
@@ -112,6 +79,11 @@ mo_yanxi::ui::tooltip_instance& mo_yanxi::ui::tooltip_manager::append_tooltip(
 	auto& val = actives.emplace_back(std::move(rst), &owner);
 	val.updatePosition(*this);
 	scene->on_cursor_pos_update();
+
+	if(fade_in){
+		val.element->update_opacity(0.f);
+		val.element->push_action<action::alpha_action>(5, 1.);
+	}
 
 	drawSequence.push_back({val.element.get(), belowScene});
 	return val;
@@ -194,8 +166,9 @@ bool mo_yanxi::ui::tooltip_manager::drop(ActivesItr be, ActivesItr se){
 
 void mo_yanxi::ui::tooltip_manager::updateDropped(float delta_in_time){
 	for (auto&& tooltip : dropped){
-		tooltip.element->update(delta_in_time);
 		tooltip.remainTime -= delta_in_time;
+		tooltip.element->update(delta_in_time);
+		tooltip.element->update_opacity(tooltip.remainTime / RemoveFadeTime);
 		if(tooltip.remainTime <= 0){
 			std::erase(drawSequence, tooltip.element.get());
 		}

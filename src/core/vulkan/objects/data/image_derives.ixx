@@ -12,6 +12,16 @@ import mo_yanxi.vk.vma;
 import mo_yanxi.graphic.bitmap;
 
 namespace mo_yanxi::vk{
+	export
+	template <typename Prov>
+	concept texture_source_prov = std::is_invocable_r_v<graphic::bitmap, Prov, std::uint32_t, std::uint32_t, std::uint32_t>;
+
+	constexpr VkDeviceSize get_mipmap_pixels(VkDeviceSize src_area, std::uint32_t mipLevels) noexcept{
+		const auto pow4_m = 1ULL << (2 * mipLevels);
+		return 4 * src_area * (pow4_m - 1) / pow4_m / 3;
+	}
+
+	constexpr VkDeviceSize a = get_mipmap_pixels(64, 5);
 
 	export
 	struct image_handle{
@@ -127,6 +137,41 @@ namespace mo_yanxi::vk{
 			);
 		}
 
+		template <texture_source_prov Prov>
+		[[nodiscard("Staging buffers must be reserved until the device has finished the command")]]
+		buffer write(VkCommandBuffer command_buffer,
+			VkRect2D region,
+			Prov prov,
+			std::uint32_t maxProvMipLevel = 2,
+			const std::uint32_t baseLayer = 0,
+			const std::uint32_t layerCount = 0 /*0 for all*/){
+			if(region.extent.width == 0 || region.extent.height == 0){
+				return {};
+			}
+			maxProvMipLevel = std::min(maxProvMipLevel, mipLevel);
+
+			constexpr VkDeviceSize bpi = 4;
+
+			buffer staging{templates::create_staging_buffer(
+				*image.get_allocator(),
+				get_mipmap_pixels(region.extent.width * region.extent.height, maxProvMipLevel) * bpi)
+			};
+
+
+			VkDeviceSize off{};
+			for(std::uint32_t mip_lv = 0; mip_lv < maxProvMipLevel; ++mip_lv){
+				auto scl = 1u << mip_lv;
+				VkExtent2D extent{region.extent.width / scl, region.extent.height / scl};
+				const graphic::bitmap& bitmap = prov(extent.width, extent.height, mip_lv);
+				(void)buffer_mapper{staging}.load_range(bitmap.to_span(), static_cast<std::ptrdiff_t>(off));
+				off += region.extent.width * region.extent.height * bpi;
+			}
+			const auto lc = layerCount ? layerCount : layers;
+			cmd::generate_mipmaps(command_buffer, image, staging, region, mipLevel, maxProvMipLevel, baseLayer, lc);
+
+			return staging;
+		}
+
 		template <range_of<texture_bitmap_write> Rng = std::initializer_list<texture_bitmap_write>>
 		[[nodiscard("Staging buffers must be reserved until the device has finished the command")]]
 		std::vector<buffer> write(
@@ -211,10 +256,10 @@ namespace mo_yanxi::vk{
 
 			if(std::ranges::size(args) == 1){
 				std::array regions{static_cast<const texture_buffer_write&>(*std::ranges::begin(args)).region};
-				cmd::generate_mipmaps(command_buffer, get_image(), regions, mipLevel, baseLayer, lc);
+				cmd::generate_mipmaps(command_buffer, get_image(), regions, mipLevel, 1, baseLayer, lc);
 			}else{
 				std::vector<VkRect2D> regions;
-				cmd::generate_mipmaps(command_buffer, get_image(), regions, mipLevel, baseLayer, lc);
+				cmd::generate_mipmaps(command_buffer, get_image(), regions, mipLevel, 1, baseLayer, lc);
 			}
 		}
 	};

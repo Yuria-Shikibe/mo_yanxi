@@ -19,6 +19,14 @@ namespace mo_yanxi::ui{
 	//TODO using variant?
 	export
 	struct drawable{
+		vk::vertices::mode_flag_bits draw_flags{};
+
+		[[nodiscard]] drawable() = default;
+
+		[[nodiscard]] explicit drawable(vk::vertices::mode_flag_bits draw_flags)
+			: draw_flags(draw_flags){
+		}
+
 		virtual ~drawable() = default;
 
 		virtual void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) = 0;
@@ -30,13 +38,12 @@ namespace mo_yanxi::ui{
 
 	export
 	struct image_drawable : public drawable{
-		vk::vertices::mode_flag_bits draw_flags{};
 		graphic::cached_image_region image{};
 
 		[[nodiscard]] image_drawable() = default;
 
 		[[nodiscard]] image_drawable(vk::vertices::mode_flag_bits flags, graphic::allocated_image_region& image_region)
-			: draw_flags(flags), image(image_region){
+			: drawable(flags), image(image_region){
 		}
 
 		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) override;
@@ -99,21 +106,48 @@ namespace mo_yanxi::ui{
 	// 	}
 	// };
 	//
-	// struct TextureNineRegionDrawable_Owner : RegionDrawable{
-	// 	Graphic::ImageViewNineRegion region{};
-	//
-	// 	[[nodiscard]] TextureNineRegionDrawable_Owner() = default;
-	//
-	// 	[[nodiscard]] explicit(false) TextureNineRegionDrawable_Owner(const Graphic::ImageViewNineRegion& rect)
-	// 		: region(rect) {
-	// 	}
-	//
-	// 	void draw(Graphic::RendererUI& renderer, Geom::OrthoRectFloat rect, Graphic::Color color) const override;
-	//
-	// 	[[nodiscard]] Geom::Vec2 getRegionSize() const override{
-	// 		return region.getRecommendedSize();
-	// 	}
-	// };
+
+	export
+	struct image_caped_region_drawable : drawable{
+		graphic::image_caped_region region{};
+		float scale{1.f};
+
+		[[nodiscard]] image_caped_region_drawable() = default;
+
+		[[nodiscard]] image_caped_region_drawable(
+			vk::vertices::mode_flag_bits draw_flags,
+			const graphic::image_caped_region& region,
+			float scale = 1.)
+			: drawable(draw_flags),
+			  region(region), scale(scale){
+		}
+
+		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) override;
+
+		[[nodiscard]] std::optional<math::vec2> get_default_size() const override{
+			return region.get_size() * scale;
+		}
+	};
+
+	export
+	struct image_nine_region_drawable : drawable{
+		graphic::image_nine_region region{};
+
+		[[nodiscard]] image_nine_region_drawable() = default;
+
+		[[nodiscard]] image_nine_region_drawable(
+			vk::vertices::mode_flag_bits draw_flags,
+			const graphic::image_nine_region& region)
+			: drawable(draw_flags),
+			  region(region){
+		}
+
+		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) override;
+
+		[[nodiscard]] std::optional<math::vec2> get_default_size() const override{
+			return region.get_size();
+		}
+	};
 
 
 	// struct UniqueRegionDrawable : RegionDrawable{

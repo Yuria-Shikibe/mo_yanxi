@@ -22,15 +22,15 @@ export namespace mo_yanxi::ui::action{
 
 	protected:
 		void apply(elem& elem, const float progress) override{
-			elem.prop().graphicData.style_color_scl = initialColor.create_lerp(dst_color, progress);
+			elem.prop().graphic_data.style_color_scl = initialColor.create_lerp(dst_color, progress);
 		}
 
 		void begin(elem& elem) override{
-			initialColor = elem.prop().graphicData.style_color_scl;
+			initialColor = elem.prop().graphic_data.style_color_scl;
 		}
 
 		void end(elem& elem) override{
-			elem.prop().graphicData.style_color_scl = dst_color;
+			elem.prop().graphic_data.style_color_scl = dst_color;
 		}
 	};
 
@@ -54,7 +54,7 @@ export namespace mo_yanxi::ui::action{
 		}
 
 		void begin(elem& elem) override{
-			initialAlpha = elem.graphicProp().inherent_opacity;
+			initialAlpha = elem.graphicProp().get_opacity();
 		}
 
 		void end(elem& elem) override{

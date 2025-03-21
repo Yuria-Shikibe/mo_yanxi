@@ -28,13 +28,13 @@ namespace mo_yanxi::core::ctrl{
 
 		export constexpr unsigned Bits = 8;
 		export constexpr unsigned Mask = genMaskFromBits(Bits);
-		export constexpr key_code_t Ignore = std::numeric_limits<key_code_t>::max() & Mask;
+		export constexpr key_code_t ignore = std::numeric_limits<key_code_t>::max() & Mask;
 
 		export constexpr float multiPressMaxSpacing = 0.25f * 60;  //ticks!
 		export constexpr float doublePressMaxSpacing = 0.25f * 60; //ticks!
 
 		export [[nodiscard]] constexpr bool matched(const key_code_t act, const key_code_t expectedAct) noexcept{
-			return act == expectedAct || (expectedAct & Mask) == Ignore;
+			return act == expectedAct || (expectedAct & Mask) == ignore;
 		}
 
 		export [[nodiscard]] constexpr bool is_continuous(const key_code_t mode) noexcept{

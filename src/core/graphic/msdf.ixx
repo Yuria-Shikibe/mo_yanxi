@@ -1,17 +1,19 @@
 module;
 
+
 export module mo_yanxi.graphic.msdf;
 
 export import mo_yanxi.graphic.bitmap;
+
 import mo_yanxi.math;
 import std;
 
-
+//
 import <msdfgen/msdfgen.h>;
 import <msdfgen/msdfgen-ext.h>;
 
 namespace mo_yanxi::graphic::msdf{
-	export constexpr inline std::uint32_t sdf_image_boarder = 8;
+	export constexpr inline std::uint32_t sdf_image_boarder = 4;
 	export constexpr inline double sdf_image_range = 1.5f;
 
 	void write_to_bitmap(bitmap& bitmap, const msdfgen::Bitmap<float, 3>& region){
@@ -40,7 +42,11 @@ namespace mo_yanxi::graphic::msdf{
 	}
 
 	export
-	[[nodiscard]] bitmap load_shape(msdfgen::Shape&& shape, unsigned w, unsigned h, double range = sdf_image_range);
+	[[nodiscard]] bitmap load_shape(
+		const msdfgen::Shape& shape,
+		unsigned w, unsigned h,
+		double range = sdf_image_range,
+		unsigned boarder = sdf_image_boarder);
 
 
 	export
@@ -49,14 +55,85 @@ namespace mo_yanxi::graphic::msdf{
 		msdfgen::unicode_t code,
 		unsigned target_w,
 		unsigned target_h,
-		unsigned font_w,
-		unsigned font_h,
+		unsigned boarder,
+		double font_w,
+		double font_h,
 		double range = sdf_image_range
-		);
+	);
 
 	export
 	[[nodiscard]] bitmap load_svg(const char* path, unsigned w, unsigned h, double range = 2.);
 
+	export
+	[[nodiscard]] msdfgen::Shape svg_to_shape(const char* path);
+
+
+	export
+	struct msdf_generator{
+	private:
+		msdfgen::Shape shape{};
+	public:
+
+		double range = sdf_image_range;
+		unsigned boarder = sdf_image_boarder;
+
+		[[nodiscard]] msdf_generator() = default;
+
+		[[nodiscard]] msdf_generator(msdfgen::Shape&& shape, double range = sdf_image_range, unsigned boarder = sdf_image_boarder);
+
+		[[nodiscard]] msdf_generator(const char* path, double range = sdf_image_range, unsigned boarder = sdf_image_boarder);
+
+		graphic::bitmap operator ()(const unsigned w, const unsigned h, const unsigned mip_lv) const {
+			auto scl = 1 << mip_lv;
+			auto b = boarder / scl;
+			if(b * 2 >= w || b * 2 >= h){
+				b = 0;
+			}
+			return load_shape(shape, w - b * 2, h - b * 2, math::max(range / static_cast<double>(scl), 0.25), b);
+		}
+
+		graphic::bitmap operator ()(const unsigned w, const unsigned h) const {
+			return load_shape(shape, w, h, range, boarder);
+		}
+	};
+
+	struct msdf_glyph_generator_base{
+		msdfgen::FontHandle* face{};
+		unsigned font_w{};
+		unsigned font_h{};
+		double range = 0.45;
+		unsigned boarder = sdf_image_boarder;
+	};
+
+	struct msdf_glyph_generator_crop : msdf_glyph_generator_base{
+		msdfgen::unicode_t code{};
+
+		[[nodiscard]] msdf_glyph_generator_crop(const msdf_glyph_generator_base& base, msdfgen::unicode_t code)
+			: msdf_glyph_generator_base{base}, code(code){
+		}
+
+		bitmap operator()(const unsigned w, const unsigned h, const unsigned mip_lv) const{
+			auto scl = 1 << mip_lv;
+			auto b = boarder / scl;
+			if(b * 2 >= w || b * 2 >= h){
+				b = 0;
+			}
+			return load_glyph(face, code, w - b * 2, h - b * 2, b,
+				static_cast<double>(font_w) / static_cast<double>(scl),
+				static_cast<double>(font_h) / static_cast<double>(scl), range);
+		};
+	};
+
+	export
+	struct msdf_glyph_generator : msdf_glyph_generator_base{
+		[[nodiscard]] msdf_glyph_generator_crop crop(msdfgen::unicode_t code) const noexcept{
+			return {*this, code};
+		}
+
+		[[nodiscard]] math::usize2 get_boarded_extent(const unsigned w, const unsigned h) const noexcept{
+			return {w/* + boarder * 2*/, h/* + boarder * 2*/};
+		}
+	};
 
 	void add_contour(msdfgen::Shape& shape, double size, double radius, double k, double margin = 0.f, msdfgen::Vector2 offset = {}){
 		using namespace msdfgen;
@@ -81,8 +158,6 @@ namespace mo_yanxi::graphic::msdf{
 		tl_r += offset;
 		tl_b += offset;
 		bl_t += offset;
-
-		using Segment = QuadraticSegment;
 
 		Vector2 handle{k * radius, k * radius};
 
@@ -121,8 +196,8 @@ namespace mo_yanxi::graphic::msdf{
 	constexpr double boarder_range = 4;
 
 	export
-	bitmap create_boarder(double radius = 15., double k = .7f, double width = 2.);
+	msdfgen::Shape create_boarder(double radius = 15., double k = .7f, double width = 2.);
 
 	export
-	bitmap create_solid_boarder(double radius = 15., double k = .7f);
+	msdfgen::Shape create_solid_boarder(double radius = 15., double k = .7f);
 }

@@ -150,6 +150,10 @@ namespace mo_yanxi::graphic::draw{
 		}
 
 	public:
+		[[nodiscard]] explicit auto_batch_acquirer(vk::batch& batch)
+			: batch(&batch){
+		}
+
 		[[nodiscard]] auto_batch_acquirer(vk::batch& batch, const combined_image_region<UV>& region)
 			: auto_acquirer_trait<Vtx, UV, Proj>(region),
 			  batch(&batch){

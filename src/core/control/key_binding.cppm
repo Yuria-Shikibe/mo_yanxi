@@ -187,7 +187,7 @@ namespace mo_yanxi::core::ctrl{
 					break;
 				case act::DoubleClick : actionTgt = DoubleClick;
 					break;
-				case act::Ignore : actionTgt = press | Continuous | Release | Repeat | DoubleClick;
+				case act::ignore : actionTgt = press | Continuous | Release | Repeat | DoubleClick;
 					break;
 				default : std::unreachable();
 			}

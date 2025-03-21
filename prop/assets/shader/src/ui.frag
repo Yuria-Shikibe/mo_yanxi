@@ -41,7 +41,7 @@ void main() {
     const uint mode = in_indices.b;
     if(bool(mode & draw_mode_sdf)){
         float msdf = msdf(textures[in_indices[0]], in_uv, 1, bool(mode & draw_mode_uniformed));
-        msdf = smoothstep(-0.035, 0.035, msdf);
+        msdf = smoothstep(-0.0375, 0.0375, msdf);
         texColor = vec4(1, 1, 1, msdf);
     }else{
         texColor = texture(textures[in_indices[0]], in_uv);
