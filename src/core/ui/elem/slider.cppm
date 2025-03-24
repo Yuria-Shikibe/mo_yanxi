@@ -189,7 +189,7 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] bool is_clamped_to_vert() const noexcept{ return sensitivity.x == 0.0f; }
 
 	protected:
-		void draw_content(rect clipSpace, rect redirect) const override;
+		void draw_content(rect clipSpace) const override;
 	public:
 
 		[[nodiscard]] constexpr math::vec2 get_bar_size() const noexcept{

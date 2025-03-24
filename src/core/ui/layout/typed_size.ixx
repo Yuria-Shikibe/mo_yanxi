@@ -1,9 +1,6 @@
-//
-// Created by Matrix on 2025/3/13.
-//
-
 export module mo_yanxi.ui.layout.policies;
 
+export import align;
 import std;
 import mo_yanxi.math.vector2;
 
@@ -17,10 +14,11 @@ namespace mo_yanxi::ui{
 	};
 
 	export enum class layout_policy{
-		horizontal,
-		vertical,
+		hori_major,
+		vert_major,
 		none,
 	};
+
 
 	export enum class size_category{
 		passive,
@@ -155,4 +153,56 @@ namespace mo_yanxi::ui{
 	};
 
 	export constexpr stated_extent extent_by_external{{size_category::external}, {size_category::external}};
+
+
+	export {
+		[[nodiscard]] constexpr std::array<float align::spacing::*, 4> get_pad_ptr(layout_policy policy) noexcept{
+			if(policy == layout_policy::vert_major){
+				return {
+					&align::spacing::top,
+					&align::spacing::bottom,
+
+					&align::spacing::left,
+					&align::spacing::right,
+				};
+			}else{
+				return {
+					&align::spacing::left,
+					&align::spacing::right,
+
+					&align::spacing::top,
+					&align::spacing::bottom,
+				};
+			}
+		}
+
+		[[nodiscard]] constexpr std::array<stated_size stated_extent::*, 2> get_extent_ptr(layout_policy policy) noexcept{
+			if(policy == layout_policy::vert_major){
+				return {
+					&stated_extent::height,
+					&stated_extent::width,
+				};
+			}else{
+				return {
+					&stated_extent::width,
+					&stated_extent::height
+				};
+			}
+		}
+
+		template <typename T = float>
+		[[nodiscard]] constexpr auto get_vec_ptr(layout_policy policy) noexcept{
+			if(policy == layout_policy::vert_major){
+				return std::array{
+					&math::vector2<T>::y,
+					&math::vector2<T>::x,
+				};
+			}else{
+				return std::array{
+					&math::vector2<T>::x,
+					&math::vector2<T>::y,
+				};
+			}
+		}
+	}
 }

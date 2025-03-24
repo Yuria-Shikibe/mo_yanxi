@@ -42,7 +42,7 @@ namespace mo_yanxi::ui{
 
 		elem& add_children(elem_ptr&& elem) override{
 			//TODO move this to other place?
-			setChildrenFillParentSize(*elem, content_size());
+			setChildrenFillParentSize_legacy(*elem, content_size());
 
 			elem->update_abs_src(content_src_pos());
 			notify_layout_changed(spread_direction::upper | spread_direction::from_content);

@@ -18,6 +18,7 @@ set_encodings("utf-8")
 add_requires("glfw")
 add_requires("msdfgen", {
     configs = {
+        openmp = true,
         extensions = true ,
         cxxflags = "/DMSDFGEN_USE_CPP11"
     }

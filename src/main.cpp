@@ -80,7 +80,9 @@ import mo_yanxi.ui.elem.text_input_area;
 import mo_yanxi.ui.elem.slider;
 import mo_yanxi.ui.elem.image_frame;
 import mo_yanxi.ui.elem.progress_bar;
+import mo_yanxi.ui.elem.collapser;
 import mo_yanxi.ui.elem.button;
+import mo_yanxi.ui.elem.check_box;
 
 import test;
 
@@ -106,13 +108,23 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	using namespace mo_yanxi;
 
 	auto& ui_page = *atlas.find_page("ui");
+
+	auto& svg_up = ui_page.register_named_region(
+		"svg_up"s,
+		graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\up.svg)"}, {100, 100}).first;
+	auto& svg_down = ui_page.register_named_region(
+		"svg_down"s,
+		graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\down.svg)"}, {100, 100}).first;
+
+
 	auto& test_svg = ui_page.register_named_region(
 		"test"s,
 		graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\blender_icon_select_subtract.svg)"}, {100, 100}).first;
-
 	auto& line_svg = ui_page.register_named_region(
 		"line"s,
 		graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\line.svg)"}, {40u, 24u}).first;
+
+
 	ui_page.mark_protected("line");
 
 	graphic::image_caped_region region{line_svg, line_svg.get_region(), 12, 12, graphic::msdf::sdf_image_boarder};
@@ -125,11 +137,13 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	spane.cell().region_scale = {math::vec2{}, math::vec2{.5, .8}};
 	spane.cell().align = align::pos::top_left;
 
-	spane->set_layout_policy(ui::layout_policy::horizontal);
+	spane->set_layout_policy(ui::layout_policy::hori_major);
 
 	{
 
 		auto& table = spane->emplace<ui::table>();
+
+		table.template_cell.pad.set(4);
 
 		table.emplace<ui::elem>();
 
@@ -140,13 +154,13 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 			text.set_tooltip_state({
 				.layout_info = ui::tooltip_layout_info{
 					.follow = ui::tooltip_follow::dialog,
-					.owner_align = align::pos::center,
+					.align_tooltip = align::pos::center,
 				},
 				.auto_release = false,
 			}, [](ui::text_input_area& t){
 				t.set_text(R"(#<[srch>楼上的下来搞核算abcde啊啊啊.,。，；："123"'t')");
 				t.set_policy(font::typesetting::layout_policy::auto_feed_line);
-
+				t.property.fill_parent = {true, true};
 			});
 		}).cell().set_external({false, true});
 
@@ -158,24 +172,61 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 			image_hdl.cell().saturate = true;
 
 			image_hdl->property.set_empty_drawer();
-			image_hdl->set_drawable<ui::image_caped_region_drawable>(graphic::draw::mode_flags::sdf, region, .075f);
-			image_hdl->style.scaling = align::scale::stretchX;
+			image_hdl->default_style.scaling = align::scale::stretchX;
+			image_hdl->set_drawable<ui::image_caped_region_drawable>(graphic::draw::mode_flags::sdf | graphic::draw::mode_flags::slide_line, region, .075f);
 		}
 
 		{
+
+			auto slider = table.end_line().emplace<ui::slider>();
+			// slider.cell().set_height(60);
+			slider.cell().pad.top = 8.;
+			slider->set_hori_only();
+
+
+			auto collapser = table.emplace<ui::collapser>();
+			collapser.cell().set_external({false, true});
+
+			collapser->head().function_init([&](ui::image_frame& img){
+				img.property.set_empty_drawer();
+				img.set_drawable<ui::image_drawable>(0, graphic::draw::mode_flags::sdf, svg_up);
+				img.set_drawable<ui::image_drawable>(1, graphic::draw::mode_flags::sdf, svg_down);
+				img.add_collapser_image_swapper();
+			}).cell().set_width(60);
+			collapser->head().function_init([&](ui::basic_text_elem& txt){
+				txt.property.set_empty_drawer();
+				txt.set_text("#<[segui>Collapser Pane");
+				txt.set_policy(font::typesetting::layout_policy::auto_feed_line);
+			}).cell().set_external({false, true}).pad.left = 12;
+
+			collapser->content().function_init([&](ui::check_box& img){
+				img.set_drawable<ui::image_drawable>(0, graphic::draw::mode_flags::sdf, test_svg);
+				img.set_drawable<ui::image_drawable>(1, graphic::draw::mode_flags::sdf, svg_up);
+				img.set_drawable<ui::image_drawable>(2, graphic::draw::mode_flags::sdf, svg_down);
+				img.add_multi_select_tooltip({
+					// .follow = ui::tooltip_follow::owner,
+					// .target_align = ,
+					// .owner_align = ,
+					// .offset =
+				});
+			}).cell().set_height(96);
+
+			collapser->content().end_line().function_init([](ui::text_input_area& text){
+				text.set_text("楼上的叮咚鸡\n\n\n下来算abcde啊啊啊.,。，；：");
+				text.set_policy(font::typesetting::layout_policy::auto_feed_line);
+			}).cell().set_external({false, true}).set_pad({.top = 8});
+
+
+
+
 			auto button = table.end_line().emplace<ui::button<ui::image_frame>>();
 			button->set_drawable<ui::image_drawable>(graphic::draw::mode_flags::sdf, test_svg);
 			button.cell().set_size(60);
-
 
 			auto bar = table.emplace<ui::progress_bar>();
 			bar->reach_speed = .05f;
 			bar.cell().set_height(60);
 
-			auto slider = table.end_line().emplace<ui::slider>();
-			slider.cell().set_height(60);
-			slider.cell().pad.top = 8.;
-			slider->set_hori_only();
 
 			bar->set_progress_prov([&e = slider.elem()] -> ui::progress_bar_progress {
 				return {e.get_progress().x};
@@ -184,61 +235,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 
 		table.set_edge_pad(0);
 
-		// text->end_line().function_init([](ui::basic_text_elem& text){
-		// 	text.set_text("叮咚鸡叮咚鸡");
-		// 	text.set_policy(font::typesetting::layout_policy::auto_feed_line);
-		// }).cell().set_external({false, true});
-		//
-		// text->end_line().function_init([](ui::basic_text_elem& text){
-		// 	text.set_text("大狗大狗叫叫叫");
-		// 	text.set_policy(font::typesetting::layout_policy::auto_feed_line);
-		// }).cell().set_external({false, true});
 	}
-
-	// {
-	// 	auto hdl = bed.function_init([](ui::scroll_pane& t){
-	// 		t.set_layout_policy(ui::layout_policy::horizontal);
-	// 		t.set_elem([](ui::table& table){
-	//
-	// 			auto ehdl = table.emplace<ui::basic_text_elem>();
-	//
-	//
-	// 		});
-	// 	});
-	// 	hdl.cell().region_scale = {math::vec2{}, math::vec2{.5, .8}};
-	// 	hdl.cell().align = align::pos::top_left;
-	// }
-	//
-	// {
-	// 	auto hdl = bed.emplace<ui::table>();
-	// 	hdl.cell().region_scale = {math::vec2{.1, .1}, math::vec2{.5, .8}};
-	// 	hdl.cell().align = align::pos::bottom_right;
-	// 	{
-	// 		auto ehdl = hdl.elem().emplace<ui::basic_text_elem>();
-	// 		ehdl.cell().set_external({1, 1});
-	// 		ehdl.elem().set_text("#<[32>dinasfas;lhfjahfasfa\n\n\ngdongji");
-	// 		ehdl.elem().set_policy(font::typesetting::layout_policy::auto_feed_line);
-	// 	}
-	//
-	// 	{
-	// 		auto ehdl = hdl.elem().emplace<ui::elem>();
-	// 		ehdl.cell().set_width(60);
-	// 		ehdl.cell().set_height_from_scale(3.);
-	// 	}
-	//
-	// 	hdl.elem().end_line();
-	//
-	// 	{
-	// 		auto ehdl = hdl.elem().emplace<ui::elem>();
-	// 		ehdl.cell().pad.right = 12;
-	// 	}
-	//
-	// 	{
-	// 		auto ehdl = hdl.elem().emplace<ui::elem>();
-	// 		ehdl.cell().margin.set(4);
-	// 	}
-	// }
-
 }
 
 void main_loop(){
@@ -273,7 +270,6 @@ void main_loop(){
 	font::typesetting::parser parser{};
 
 	vk::load_ext(context.get_instance());
-	assets::graphic::load(context);
 
 	graphic::renderer_export exports;
 	graphic::renderer_world renderer_world{context, exports};
@@ -335,10 +331,14 @@ void main_loop(){
 		renderer_world.bloom.set_scale(core::global::camera.map_scale(0.195f, 2.f));
 		renderer_world.batch.frag_data.current.camera_scale = core::global::camera.get_scale();
 
+
+		renderer_ui.set_time(core::global::timer.global_time());
 		core::global::ui::root->update(core::global::timer.global_delta_tick());
 		core::global::ui::root->layout();
 
 		core::global::ui::root->draw();
+
+
 
 		// renderer_ui.batch.pop_scissor();
 
@@ -397,8 +397,6 @@ void main_loop(){
 
 	vkDeviceWaitIdle(context.get_device());
 
-	assets::graphic::dispose();
-	core::global::ui::dispose();
 
 }
 
@@ -409,11 +407,14 @@ int main(){
 	compile_shaders();
 
 	core::glfw::init();
-	core::global::ui::init();
 	core::global::graphic::init();
+	core::global::ui::init();
+	assets::graphic::load(core::global::graphic::context);
 
 	main_loop();
 
+	assets::graphic::dispose();
+	core::global::ui::dispose();
 	core::global::graphic::dispose();
 	core::glfw::terminate();
 }

@@ -109,23 +109,10 @@ namespace mo_yanxi::font{
 		// return len;
 
 		if(len == 0)return 0;
-		// if(len <= static_cast<int>(64 * 1.5f))return 64;
-		if(len <= static_cast<int>(256))return 64;
-		// if(len <= static_cast<int>(256 * 1.5f))return 256;
+		if(len <= static_cast<T>(256))return 64;
 		return 128;
 	}
 
-
-	template <typename T>
-	constexpr double get_snapped_range(const T len) noexcept{
-		// return len;
-
-		if(len == 0)return 0.1;
-		if(len <= static_cast<int>(64 * 1.5f))return 0.45;
-		if(len <= static_cast<int>(128 * 1.5f))return 1.15;
-		// if(len <= static_cast<int>(256 * 1.5f))return 256;
-		return 2.25;
-	}
 
 	export struct glyph_identity{
 		char_code code{};
@@ -163,6 +150,10 @@ namespace mo_yanxi::font{
 			vertBearing.x = normalize_len<float>(metrics.vertBearingX);
 			vertBearing.y = normalize_len<float>(metrics.vertBearingY);
 			advance.y = normalize_len<float>(metrics.vertAdvance);
+
+			if(metrics.height == 0 && metrics.horiBearingY == 0){
+				size.y = horiBearing.y = vertBearing.y;
+			}
 		}
 
 		[[nodiscard]] constexpr float ascender() const noexcept{
@@ -301,8 +292,6 @@ namespace mo_yanxi::font{
 	export struct glyph_wrap : referenced_object<false>{
 		char_code code{};
 		font_face_handle* face{};
-		// graphic::msdf::msdf_glyph_generator generator{};
-		// glyph_metrics metrics{};
 
 		[[nodiscard]] glyph_wrap() = default;
 
@@ -310,9 +299,7 @@ namespace mo_yanxi::font{
 			const char_code code,
 			font_face_handle& face) :
 			code{code},
-			face(&face)
-			// generator{face.msdfHdl, face->size->metrics.x_ppem, face->size->metrics.y_ppem},
-			/*metrics{face->glyph->metrics}*/{}
+			face(&face){}
 
 		[[nodiscard]] graphic::msdf::msdf_glyph_generator get_generator(const unsigned w, const unsigned h) const noexcept{
 			face->set_size(w, h);
@@ -347,9 +334,6 @@ namespace mo_yanxi::font{
 		// 	this->metrics.vertAdvance *= scale.y;
 		// }
 	};
-
-	export using glyph_ptr = referenced_ptr<glyph_wrap, false>;
-
 
 	export struct font_face{
 

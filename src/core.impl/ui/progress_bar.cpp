@@ -16,8 +16,8 @@ void mo_yanxi::ui::progress_bar_drawer::draw(const progress_bar& elem) const{
 	auto [from, to] = elem.getColor();
 
 	to.lerp(from, 1 - progress);
-	from.mulA(elem.graphicProp().get_opacity());
-	to.mulA(elem.graphicProp().get_opacity());
+	from.mulA(elem.gprop().get_opacity());
+	to.mulA(elem.gprop().get_opacity());
 
 	draw::fill::fill(
 		param.get(),
@@ -33,8 +33,8 @@ mo_yanxi::ui::rect mo_yanxi::ui::progress_bar_drawer::get_region(const progress_
 	return rect{tags::from_extent, elem.content_src_pos(), elem.getBarSize()};
 }
 
-void mo_yanxi::ui::progress_bar::draw_content(const rect clipSpace, const rect redirect) const{
-	elem::draw_content(clipSpace, redirect);
+void mo_yanxi::ui::progress_bar::draw_content(const rect clipSpace) const{
+	elem::draw_content(clipSpace);
 
 	assert(drawer != nullptr);
 	drawer->draw(*this);

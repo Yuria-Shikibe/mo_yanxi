@@ -2,8 +2,8 @@ module mo_yanxi.ui.elem.slider;
 
 import mo_yanxi.ui.graphic;
 
-void mo_yanxi::ui::slider::draw_content(const rect clipSpace, const rect redirect) const{
-	elem::draw_content(clipSpace, redirect);
+void mo_yanxi::ui::slider::draw_content(const rect clipSpace) const{
+	elem::draw_content(clipSpace);
 
 	using namespace graphic;
 
@@ -12,8 +12,8 @@ void mo_yanxi::ui::slider::draw_content(const rect clipSpace, const rect redirec
 	rect rect{get_bar_size()};
 
 	rect.src = content_src_pos() + get_bar_cur_pos();
-	draw::fill::rect_ortho(param.get(), rect, colors::gray.copy().mulA(graphicProp().get_opacity()));
+	draw::fill::rect_ortho(param.get(), rect, colors::gray.copy().mulA(gprop().get_opacity()));
 
 	rect.src = content_src_pos() + get_bar_last_pos();
-	draw::fill::rect_ortho(param.get(), rect, colors::light_gray.copy().mulA(graphicProp().get_opacity()));
+	draw::fill::rect_ortho(param.get(), rect, colors::light_gray.copy().mulA(gprop().get_opacity()));
 }

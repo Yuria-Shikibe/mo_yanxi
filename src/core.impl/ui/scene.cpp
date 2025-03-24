@@ -89,7 +89,7 @@ void mo_yanxi::ui::scene::swapFocus(elem* newFocus){
 		for(auto& state : mouseKeyStates){
 			state.clear(cursorPos);
 		}
-		/*if(currentCursorFocus->isInteractable())*/currentCursorFocus->events().fire(events::focus_end{cursorPos});
+		currentCursorFocus->events().fire(events::focus_end{cursorPos});
 	}
 
 	currentCursorFocus = newFocus;
@@ -230,7 +230,7 @@ mo_yanxi::ui::elem* mo_yanxi::ui::scene::getCursorCaptureRoot() const noexcept{
 
 void mo_yanxi::ui::scene::layout(){
 	std::size_t count{};
-	while(root->layoutState.is_children_changed() || !independentLayout.empty()){
+	while(root->layout_state.is_children_changed() || !independentLayout.empty()){
 		// root->tryLayout();
 
 		for(const auto layout : independentLayout){
@@ -247,6 +247,7 @@ void mo_yanxi::ui::scene::layout(){
 		}
 	}
 
+	// if(count)std::println(std::cerr, "{}", count);
 }
 
 void mo_yanxi::ui::scene::draw() const{

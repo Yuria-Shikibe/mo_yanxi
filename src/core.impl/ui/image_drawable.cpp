@@ -7,7 +7,7 @@ void mo_yanxi::ui::image_drawable::draw(
 	const elem& elem,
 	math::frect region,
 	graphic::color color_scl,
-	graphic::color color_ovr){
+	graphic::color color_ovr) const{
 
 	draw_acquirer acquirer{elem.get_renderer().get_batch(), image};
 	acquirer.proj.mode_flag = draw_flags;
@@ -15,7 +15,7 @@ void mo_yanxi::ui::image_drawable::draw(
 }
 
 void mo_yanxi::ui::image_caped_region_drawable::draw(const elem& elem, math::frect region, graphic::color color_scl,
-	graphic::color color_ovr){
+	graphic::color color_ovr) const{
 	draw_acquirer acquirer{elem.get_renderer().get_batch()};
 	acquirer.proj.mode_flag = draw_flags;
 
@@ -24,7 +24,7 @@ void mo_yanxi::ui::image_caped_region_drawable::draw(const elem& elem, math::fre
 }
 
 void mo_yanxi::ui::image_nine_region_drawable::draw(const elem& elem, math::frect region, graphic::color color_scl,
-	graphic::color color_ovr){
+	graphic::color color_ovr) const{
 
 	draw_acquirer acquirer{elem.get_renderer().get_batch()};
 	acquirer.proj.mode_flag = draw_flags;

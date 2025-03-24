@@ -83,7 +83,7 @@ namespace mo_yanxi::vk{
 		command_pool main_compute_command_pool_transient{};
 
 		//Swap Chains
-		VkSwapchainKHR last_swap_chain{nullptr};
+		exclusive_handle_member<VkSwapchainKHR> last_swap_chain{nullptr};
 		exclusive_handle_member<VkSwapchainKHR> swap_chain{};
 		exclusive_handle_member<VkSurfaceKHR> surface{};
 		VkExtent2D swap_chain_extent{};
@@ -154,6 +154,7 @@ namespace mo_yanxi::vk{
 				|| result == VK_SUBOPTIMAL_KHR
 				|| window_.check_resized()
 			){
+				(void)window_.check_resized();
 				recreate();
 			} else if(result != VK_SUCCESS){
 				throw vk_error(result, "Failed to present swap chain image!");
@@ -597,7 +598,7 @@ namespace mo_yanxi::vk{
 			vkDeviceWaitIdle(device);
 
 			if(last_swap_chain)vkDestroySwapchainKHR(device, last_swap_chain, nullptr);
-			last_swap_chain = swap_chain;
+			last_swap_chain.handle = swap_chain;
 
 			createSwapChain();
 

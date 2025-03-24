@@ -2,6 +2,7 @@
 
 #include "lib/rect.glsl"
 #include "lib/sdf.glsl"
+#include "lib/slide_line.glsl"
 #include "lib/draw_modes.glsl"
 
 #ifndef MaximumAllowedSamplersSize
@@ -21,15 +22,20 @@ layout(location = 1) out vec4 out_color_light;
 layout(location = 2) out vec4 out_color_background;
 
 
-layout(set = 0, binding = 1) uniform Scissor{
+layout(set = 0, binding = 1) uniform UBO{
     frect rect;
     float dst;
-    uint cap;
+    float time;
     vec2 extent;
-};
+}ubo;
+
 layout(set = 1, binding = 0) uniform sampler2D textures[4];
 
 const float LightColorRange = 2550.f;
+
+const sline_line_style line_style = sline_line_style(
+    45.f, 1.f, 60, 25
+);
 
 float dst_to_rect(vec2 pos, frect rect, vec2 scl){
     vec2 ppos = clamp(pos, rect.src, rect.dst);
@@ -39,6 +45,22 @@ float dst_to_rect(vec2 pos, frect rect, vec2 scl){
 void main() {
     vec4 texColor;
     const uint mode = in_indices.b;
+
+    float scale;
+    if(ubo.dst == 0.){
+        if(rectNotContains(ubo.rect, in_pos)){
+            discard;
+        }else{
+            scale = 1.f;
+        }
+    }else{
+        scale = 1 - smoothstep(0, 2.5, (dst_to_rect(in_pos, ubo.rect, ubo.extent) - ubo.dst));
+        if(scale < 1.f / 255.f){
+            discard;
+        }
+    }
+
+
     if(bool(mode & draw_mode_sdf)){
         float msdf = msdf(textures[in_indices[0]], in_uv, 1, bool(mode & draw_mode_uniformed));
         msdf = smoothstep(-0.0375, 0.0375, msdf);
@@ -47,15 +69,9 @@ void main() {
         texColor = texture(textures[in_indices[0]], in_uv);
     }
 
-    float scale;
-    if(dst == 0.){
-        if(rectNotContains(rect, in_pos)){
-            discard;
-        }else{
-            scale = 1.f;
-        }
-    }else{
-        scale = 1 - smoothstep(0, 2.5, (dst_to_rect(in_pos, rect, extent) - dst));
+    if(bool(mode & draw_mode_slide_line)){
+        float scl = is_in_slide_line_smooth(in_pos * ubo.extent, line_style, ubo.time * 60, 0.175f);
+        texColor.a *= scl;
     }
 
 

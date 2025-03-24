@@ -72,6 +72,18 @@ namespace mo_yanxi::ui{
 		// 	}
 		// };
 
+		struct collapser_state_changed{
+			 bool expanded;
+		};
+
+		struct check_box_state_changed{
+			 std::size_t index;
+		};
+
+
+
+		// struct
+
 		struct click final : mouse_event{
 			using mouse_event::mouse_event;
 		};

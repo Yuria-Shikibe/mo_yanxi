@@ -28,13 +28,16 @@ namespace mo_yanxi::core{
 		requires (std::is_floating_point_v<T>)
     // using T = float;
 	class application_timer{
+		using RawSec = double;
+		using RawTick = direct_access_time_unit<double, tick_ratio>;
+
 		using Tick = direct_access_time_unit<T, tick_ratio>;
 		using Sec = direct_access_time_unit<T>;
 
-	    Sec globalTime{};
-	    Sec globalDelta{};
-	    Sec updateTime{};
-	    Sec updateDelta{};
+	    RawSec globalTime{};
+	    RawSec globalDelta{};
+	    RawSec updateTime{};
+	    RawSec updateDelta{};
 
 		delta_setter deltaSetter{nullptr};
 		timer_setter timerSetter{nullptr};
@@ -81,7 +84,7 @@ namespace mo_yanxi::core{
 			globalDelta = deltaSetter(globalTime);
 			globalTime = timerSetter();
 
-			updateDelta = paused ? Sec{0} : globalDelta;
+			updateDelta = paused ? RawSec{0} : globalDelta;
 			updateTime += updateDelta;
 		}
 
@@ -92,14 +95,14 @@ namespace mo_yanxi::core{
 		    timeReseter(0);
 		}
 
-		[[nodiscard]] constexpr Sec global_delta() const noexcept{return {globalDelta};}
-		[[nodiscard]] constexpr Sec update_delta() const noexcept{return {updateDelta};}
+		[[nodiscard]] constexpr Sec global_delta() const noexcept{return Sec{globalDelta};}
+		[[nodiscard]] constexpr Sec update_delta() const noexcept{return Sec{updateDelta};}
 
-		[[nodiscard]] constexpr Sec global_time() const noexcept{return {globalTime};}
-		[[nodiscard]] constexpr Sec update_time() const noexcept{return {updateTime};}
+		[[nodiscard]] constexpr Sec global_time() const noexcept{return Sec{globalTime};}
+		[[nodiscard]] constexpr Sec update_time() const noexcept{return Sec{updateTime};}
 
-		[[nodiscard]] constexpr Tick global_delta_tick() const noexcept{return global_delta();}
-		[[nodiscard]] constexpr Tick update_delta_tick() const noexcept{return update_delta();}
+		[[nodiscard]] constexpr Tick global_delta_tick() const noexcept{return Tick{globalDelta * tick_ratio::den};}
+		[[nodiscard]] constexpr Tick update_delta_tick() const noexcept{return Tick{updateDelta * tick_ratio::den};}
 
 	};
 	

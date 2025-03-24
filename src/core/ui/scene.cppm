@@ -16,6 +16,7 @@ export import mo_yanxi.ui.pre_decl;
 
 import mo_yanxi.owner;
 import mo_yanxi.handle_wrapper;
+import mo_yanxi.open_addr_hash_map;
 
 import std;
 
@@ -29,6 +30,71 @@ namespace mo_yanxi{
 
 namespace mo_yanxi::ui{
 	// struct elem;
+
+	struct event_channel_manager{
+		using subscriber_map = fixed_open_hash_map<event_channel_t, std::vector<elem*>, std::numeric_limits<event_channel_t>::max()>;
+	private:
+		subscriber_map
+			subscribe_elems{};
+		fixed_open_hash_map<elem*, std::vector<event_channel_t>, nullptr>
+			registery{};
+
+	public:
+		bool insert(elem& elem, event_channel_t channel){
+			auto& registered_channels = registery[&elem];
+			if(auto itr = std::ranges::find(registered_channels, channel); itr == registered_channels.end()){
+				registered_channels.push_back(channel);
+				subscribe_elems[channel].push_back(&elem);
+				return true;
+			}else{
+				return false;
+			}
+		}
+
+		std::size_t erase(elem& elem, event_channel_t channel) noexcept{
+			if(auto itr = registery.find(&elem); itr != registery.end()){
+				auto rst = std::erase(itr->second, channel);
+				if(itr->second.empty())registery.erase(itr);
+
+				if(rst){
+					auto subscribers = subscribe_elems.find(channel);
+					auto count = std::erase(subscribers->second, &elem);
+					if(subscribers->second.empty()){
+						subscribe_elems.erase(subscribers);
+					}
+					return count;
+				}
+			}
+
+			return 0;
+		}
+
+		std::size_t erase(elem& elem) noexcept{
+			if(auto itr = registery.find(&elem); itr != registery.end()){
+				auto count = itr->second.size();
+				for (auto channel : itr->second){
+					auto subscribers = subscribe_elems.find(channel);
+					std::erase(subscribers->second, &elem);
+
+					if(subscribers->second.empty()){
+						subscribe_elems.erase(subscribers);
+					}
+				}
+				registery.erase(itr);
+
+				return count;
+			}
+
+			return 0;
+		}
+
+		std::span<elem*> get_elems_at(event_channel_t channel){
+			if(auto rst = subscribe_elems.find(channel); rst != subscribe_elems.end()){
+				return rst->second;
+			}
+			return {};
+		}
+	};
 	
 	export struct scene_base{
 		struct MouseState{

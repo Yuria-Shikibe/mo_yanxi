@@ -39,7 +39,11 @@ export namespace mo_yanxi::math{
 		}
 
 		FORCE_INLINE [[nodiscard]] constexpr vector2 operator-(const_pass_t tgt) const noexcept {
-			return {x - tgt.x, y - tgt.y};
+			if constexpr(std::same_as<bool, T>){
+				return {x && !tgt.x, y && !tgt.y};
+			}else{
+				return {x - tgt.x, y - tgt.y};
+			}
 		}
 
 		FORCE_INLINE [[nodiscard]] constexpr vector2 operator*(const_pass_t tgt) const noexcept {
@@ -1013,6 +1017,16 @@ export namespace mo_yanxi::math{
 		}
 	};
 
+
+	template <std::integral L, std::integral R>
+	FORCE_INLINE constexpr vector2<bool> operator&&(const vector2<L>& l, const vector2<R>& r) noexcept{
+		return {l.x && r.x, l.y && r.y};
+	}
+
+	template <std::integral L, std::integral R>
+	FORCE_INLINE constexpr vector2<bool> operator||(const vector2<L>& l, const vector2<R>& r) noexcept{
+		return {l.x || r.x, l.y || r.y};
+	}
 
 	using vec2 = vector2<float>;
 	using bool2 = vector2<bool>;

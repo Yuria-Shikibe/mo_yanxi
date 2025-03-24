@@ -691,7 +691,7 @@ namespace mo_yanxi::ui{
 			buffer.push_back(val);
 		}
 
-		void draw_content(const rect clipSpace, const rect redirect) const override;
+		void draw_content(const rect clipSpace) const override;
 		// void drawMain(Rect clipSpace) const override;
 
 	private:

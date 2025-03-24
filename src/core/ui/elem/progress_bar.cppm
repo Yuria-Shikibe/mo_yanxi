@@ -141,7 +141,7 @@ namespace mo_yanxi::ui{
 		}
 
 	protected:
-		void draw_content(const rect clipSpace, const rect redirect) const override;
+		void draw_content(const rect clipSpace) const override;
 
 		void update(float delta_in_ticks) override{
 			elem::update(delta_in_ticks);

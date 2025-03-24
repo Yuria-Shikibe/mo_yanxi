@@ -68,6 +68,11 @@ namespace mo_yanxi::ui{
 			return set_size({sz, sz});
 		}
 
+		constexpr auto& set_pad(align::spacing pad) noexcept {
+			this->pad = pad;
+			return *this;
+		}
+
 		constexpr auto& set_width(float sz) noexcept {
 			stated_extent.width = {size_category::mastering, sz};
 

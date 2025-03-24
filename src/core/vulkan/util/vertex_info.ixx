@@ -92,7 +92,7 @@ namespace mo_yanxi::vk{
 			none,
 			sdf = 1 << 0,
 			uniformed = 1 << 1,
-
+			slide_line = 1 << 2,
 		};
 
 		BITMASK_OPS(export, mode_flag_bits);

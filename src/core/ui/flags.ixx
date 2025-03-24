@@ -133,7 +133,8 @@ namespace mo_yanxi::ui{
 	export enum struct interactivity : std::uint8_t{
 		disabled,
 		children_only,
-		enabled
+		enabled,
+		intercepted
 	};
 
 	export enum struct esc_flag{

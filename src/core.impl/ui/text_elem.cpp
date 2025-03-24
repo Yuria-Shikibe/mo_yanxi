@@ -40,7 +40,7 @@ std::optional<mo_yanxi::font::typesetting::layout_pos_t> mo_yanxi::ui::basic_tex
 	};
 }
 
-void mo_yanxi::ui::basic_text_elem::draw_content(const rect clipSpace, rect redirect) const{
+void mo_yanxi::ui::basic_text_elem::draw_content(const rect clipSpace) const{
 	// elem::draw_content(clipSpace, redirect);
 
 	draw_acquirer acquirer{get_renderer().batch, {}};

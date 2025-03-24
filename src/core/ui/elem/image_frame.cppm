@@ -1,46 +1,73 @@
-//
-// Created by Matrix on 2024/9/24.
-//
-
 export module mo_yanxi.ui.elem.image_frame;
 
 export import mo_yanxi.ui.elem;
 export import mo_yanxi.ui.image_drawable;
 export import mo_yanxi.graphic.color;
 export import align;
-// export import Core.UI.RegionDrawable;
 
 import std;
 
 namespace mo_yanxi::ui{
-	//TODO ImageDisplay with static type
-
-	export
-	struct image_display_style{
-		align::scale scaling{align::scale::fit};
-		align::pos align{align::pos::center};
-		graphic::color mix_color{};
-		// float mixScale{};
-	};
 
 	export
 	struct image_frame : public elem{
-		image_display_style style{};
+		image_display_style default_style{};
 
+	protected:
+		std::size_t current_frame_index{};
+		std::vector<styled_drawable> drawables_{};
+		//
+		// [[nodiscard]] image_frame(scene* scene, group* group, const std::string_view tyName)
+		// 	: elem(scene, group, tyName){
+		// }
+
+		// using elem::elem;
+
+	public:
 		[[nodiscard]] image_frame(scene* scene, group* group)
 			: elem(scene, group, "image_frame"){
+		}
+
+		void add_collapser_image_swapper(){
+			spreadable_event_handler_on<events::collapser_state_changed>([](events::collapser_state_changed e, image_frame& self){
+				self.current_frame_index = e.expanded;
+				return false;
+			});
+		}
+
+		template <std::derived_from<drawable> Ty, typename ...T>
+			requires (std::constructible_from<Ty, T...>)
+		void set_drawable(const std::size_t idx, image_display_style style, T&& ...args){
+			drawables_.resize(math::max<std::size_t>(drawables_.size(), idx + 1));
+			drawables_[idx] = styled_drawable{style, std::make_unique<Ty>(std::forward<T>(args) ...)};
+		}
+
+		template <std::derived_from<drawable> Ty, typename ...T>
+			requires (std::constructible_from<Ty, T...>)
+		void set_drawable(const std::size_t idx, T&& ...args){
+			this->set_drawable<Ty>(idx, default_style, std::forward<T>(args) ...);
 		}
 
 		template <std::derived_from<drawable> Ty, typename ...T>
 			requires (std::constructible_from<Ty, T...>)
 		void set_drawable(T&& ...args){
-			image_drawable = std::make_unique<Ty>(std::forward<T>(args) ...);
+			this->set_drawable<Ty>(0, std::forward<T>(args) ...);
+		}
+
+		[[nodiscard]] std::size_t get_frame_index() const noexcept{
+			return current_frame_index;
 		}
 
 	protected:
-		std::unique_ptr<drawable> image_drawable;
 
-		[[nodiscard]] static math::vec2 get_expected_size(const drawable& drawable, const image_display_style& style, math::vec2 bound) noexcept{
+		void try_swap_image(const std::size_t ldx, const std::size_t rdx){
+			if(ldx >= drawables_.size() || rdx >= drawables_.size())return;
+
+			std::swap(drawables_[ldx], drawables_[rdx]);
+		}
+		// std::unique_ptr<drawable> image_drawable;
+
+		[[nodiscard]] static math::vec2 get_expected_size(const drawable& drawable, const image_display_style& style, const math::vec2 bound) noexcept{
 			if(const auto sz = drawable.get_default_size()){
 				return align::embedTo(style.scaling, *sz, bound);
 			}
@@ -48,11 +75,19 @@ namespace mo_yanxi::ui{
 			return bound;
 		}
 
-		void draw_content(const rect clipSpace, const rect redirect) const override{
-			if(!image_drawable)return;
-			auto sz = get_expected_size(*image_drawable, style, content_size());
-			auto off = align::get_offset_of(style.align, sz, property.content_bound_absolute());
-			image_drawable->draw(*this, rect{tags::from_extent, off, sz}, graphicProp().style_color_scl, style.mix_color);
+		void draw_content(const rect clipSpace) const override{
+			auto drawable = get_region();
+			if(!drawable || !drawable->drawable)return;
+			auto sz = get_expected_size(*drawable->drawable, drawable->style, content_size());
+			auto off = align::get_offset_of(default_style.align, sz, property.content_bound_absolute());
+			drawable->drawable->draw(*this, rect{tags::from_extent, off, sz}, (drawable->style.color_scl * gprop().style_color_scl).mulA(gprop().get_opacity()), drawable->style.color_mix);
+		}
+
+		[[nodiscard]] const styled_drawable* get_region() const noexcept{
+			if(current_frame_index < drawables_.size()){
+				return &drawables_[current_frame_index];
+			}
+			return nullptr;
 		}
 	};
 

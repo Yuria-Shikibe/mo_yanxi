@@ -61,7 +61,7 @@ namespace mo_yanxi::graphic{
 
 		scissor scissor{};
 
-		std::uint32_t cap{};
+		float global_time{};
 
 		math::vec2 viewport_extent{};
 
@@ -229,10 +229,14 @@ namespace mo_yanxi::graphic{
 			vk::cmd::submit_command(context().compute_queue(), blit_command);
 		}
 
-		void push_scissor(const scissor_raw& scissor){
-			if(scissors.back() != scissor){
+		void push_scissor(scissor_raw scissor){
+			const auto back = scissors.back();
+			if(back != scissor){
 				batch.consume_all();
 			}
+
+			scissor.rect = scissor.rect.intersection_with(back.rect);
+
 			scissors.push_back(scissor);
 		}
 
@@ -434,6 +438,10 @@ namespace mo_yanxi::graphic{
 					bloom.get_main_command_buffer(),
 					merge_command.get()
 				});
+		}
+
+		void set_time(float time_in_sec){
+			batch.frag_data.current.global_time = std::fmod(time_in_sec, 1 << 16);
 		}
 
 	private:

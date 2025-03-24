@@ -385,18 +385,26 @@ namespace mo_yanxi::math {
 
 	export
 	template <typename T, std::unsigned_integral E>
-	MATH_ATTR constexpr T pow_integral(const T val, const E Exponent) noexcept {
-		if(Exponent == 0) {
-			return 1;
-		}else if (Exponent == 1) {
-			return val;
-		}else if (Exponent % 2 == 0) {
-			const T v = math::pow_integral<T>(val, Exponent / 2);
-			return v * v;
-		}else {
-			const T v = math::pow_integral<T>(val, (Exponent - 1) / 2);
-			return val * v * v;
+	MATH_ATTR constexpr T pow_integral(T val, const E exp) noexcept{
+		const auto count = sizeof(E) * 8 - std::countl_zero(exp);
+
+		T rst{1};
+
+		for(auto i = count; i; --i){
+			rst *= rst;
+			if(exp >> (i - 1) & static_cast<E>(1u)){
+				rst *= val;
+			}
 		}
+
+		return rst;
+	}
+
+	export
+	template <typename T, std::signed_integral E>
+	MATH_ATTR constexpr T pow_integral(T val, const E exp) noexcept{
+		assert(exp > 0);
+		return math::pow_integral(val, static_cast<std::make_unsigned_t<E>>(exp));
 	}
 
 	export

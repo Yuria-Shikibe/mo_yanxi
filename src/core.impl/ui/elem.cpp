@@ -96,13 +96,13 @@ namespace mo_yanxi{
 	void ui::elem::update_opacity(const float val){
 		if(util::tryModify(property.graphic_data.context_opacity, val)){
 			for(const auto& element : get_children()){
-				element->update_opacity(graphicProp().get_opacity());
+				element->update_opacity(gprop().get_opacity());
 			}
 		}
 	}
 
 	void ui::elem::mark_independent_layout_changed(){
-		layoutState.notify_self_changed();
+		layout_state.notify_self_changed();
 		get_scene()->independentLayout.insert(this);
 	}
 
@@ -190,11 +190,11 @@ namespace mo_yanxi{
 	}
 
 	void ui::elem::notify_layout_changed(spread_direction toDirection){
-		if(toDirection & spread_direction::local) layoutState.notify_self_changed();
+		if(toDirection & spread_direction::local) layout_state.notify_self_changed();
 
 		if(parent){
 			if(toDirection & spread_direction::super || toDirection & spread_direction::from_content){
-				if(parent->layoutState.notify_children_changed(toDirection & spread_direction::from_content)){
+				if(parent->layout_state.notify_children_changed(toDirection & spread_direction::from_content)){
 					parent->notify_layout_changed(toDirection - spread_direction::child);
 				}
 			}
@@ -202,7 +202,7 @@ namespace mo_yanxi{
 
 		if(toDirection & spread_direction::child){
 			for(auto&& element : get_children()){
-				if(element->layoutState.notify_parent_changed()){
+				if(element->layout_state.notify_parent_changed()){
 					element->notify_layout_changed(toDirection - spread_direction::super);
 				}
 			}
@@ -276,7 +276,7 @@ namespace mo_yanxi{
 	// 	if(tooltipProp.useStagnateTime) getScene()->tooltipManager.requestDrop(*this);
 	// }
 
-	void ui::elem::draw_pre(const rect clipSpace, rect redirect) const{
+	void ui::elem::draw_pre(const rect clipSpace) const{
 		if(property.graphic_data.drawer)property.graphic_data.drawer->draw(*this, get_bound(), property.graphic_data.get_opacity());
 	}
 
@@ -303,12 +303,20 @@ namespace mo_yanxi{
 		return !tooltip_prop_.auto_release || tooltip_handle.handle->is_focused_key();
 	}
 
+	void ui::elem::build_tooltip(bool belowScene, bool fade_in){
+		get_scene()->tooltip_manager.append_tooltip(*this, belowScene, fade_in);
+	}
+
+	ui::elem* ui::elem::get_parent_to_elem() const noexcept{
+		return get_parent();
+	}
+
 	void ui::iterateAll_DFSImpl(math::vec2 cursorPos, std::vector<elem*>& selected, elem* current){
 		if(!current->ignore_inbound() && current->contains(cursorPos)){
 			selected.push_back(current);
 		}
 
-		if(current->touch_disabled() || !current->has_children()) return;
+		if(current->touch_blocked() || !current->has_children()) return;
 
 		auto transformed = current->transform_pos(cursorPos);
 

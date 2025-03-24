@@ -28,7 +28,7 @@ namespace mo_yanxi::ui{
 		snap_shot<math::vec2> scroll{};
 
 		elem_ptr item{};
-		layout_policy layout_policy_{layout_policy::horizontal};
+		layout_policy layout_policy_{layout_policy::hori_major};
 		bool bar_caps_size{true};
 
 	public:
@@ -124,13 +124,13 @@ namespace mo_yanxi::ui{
 			item->update(delta_in_ticks);
 		}
 
-		void draw_content(const rect clipSpace, rect redirect) const override{
-			if(item)item->draw(clipSpace, redirect);
+		void draw_content(const rect clipSpace) const override{
+			if(item)item->draw(clipSpace);
 		}
 
-		void draw_pre(rect clipSpace, rect redirect) const override;
+		void draw_pre(rect clipSpace) const override;
 
-		void draw_post(rect clipSpace, rect redirect) const override;
+		void draw_post(rect clipSpace) const override;
 
 		void layout() override{
 			group::layout();
@@ -194,7 +194,7 @@ namespace mo_yanxi::ui{
 		void update_item_layout(){
 			if(item){
 				modifyChildren(*item);
-				setChildrenFillParentSize_Quiet(*item, content_size());
+				setChildrenFillParentSize_Quiet_legacy(*item, content_size());
 
 				auto bound = item->context_size_restriction;
 
@@ -203,7 +203,7 @@ namespace mo_yanxi::ui{
 					if(bar_caps_size){
 						bool need_relayout = false;
 						switch(layout_policy_){
-						case layout_policy::horizontal :{
+						case layout_policy::hori_major :{
 							if(sz->y > property.content_height()){
 								bound.width.value -= scrollBarStroke;
 								bound.width.value = math::clamp_positive(bound.width.value);
@@ -211,7 +211,7 @@ namespace mo_yanxi::ui{
 							}
 							break;
 						}
-						case layout_policy::vertical :{
+						case layout_policy::vert_major :{
 							if(sz->x > property.content_width()){
 								bound.height.value -= scrollBarStroke;
 								bound.height.value = math::clamp_positive(bound.height.value);
@@ -228,7 +228,7 @@ namespace mo_yanxi::ui{
 						}
 					}
 
-					item->resize_quiet(*sz, spread_direction::local | spread_direction::child);
+					item->resize_masked(*sz, spread_direction::local | spread_direction::child);
 				}
 
 				// setChildrenFillParentSize_Quiet(*item, get_viewport_size());
@@ -239,12 +239,12 @@ namespace mo_yanxi::ui{
 		void modifyChildren(elem& element) const{
 			element.context_size_restriction = extent_by_external;
 			switch(layout_policy_){
-			case layout_policy::horizontal :{
+			case layout_policy::hori_major :{
 				element.property.fill_parent = {true, false};
 				element.context_size_restriction.width = {size_category::mastering, property.content_width()};
 				break;
 			}
-			case layout_policy::vertical :{
+			case layout_policy::vert_major :{
 				element.property.fill_parent = {false, true};
 				element.context_size_restriction.height = {size_category::mastering, property.content_height()};
 				break;

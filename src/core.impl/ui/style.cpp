@@ -24,7 +24,7 @@ namespace mo_yanxi{
 			color = general;
 		}
 
-		return color.mulA(element.graphicProp().get_opacity());
+		return color.mulA(element.gprop().get_opacity());
 	}
 
 	void ui::style::round_style::draw(const elem& element, math::frect region, float opacityScl) const{

@@ -13,7 +13,7 @@ import align;
 import mo_yanxi.algo;
 
 
-void mo_yanxi::ui::tooltip_instance::updatePosition(const tooltip_manager& manager){
+void mo_yanxi::ui::tooltip_instance::update_layout(const tooltip_manager& manager){
 	assert(owner != nullptr);
 
 	const auto policy = owner->tooltip_align_policy();
@@ -21,47 +21,66 @@ void mo_yanxi::ui::tooltip_instance::updatePosition(const tooltip_manager& manag
 	//TODO bound element to the scene region?
 	element->context_size_restriction = policy.extent;
 
-	if(auto sz = element->pre_acquire_size(policy.extent)){
-		element->resize(sz.value());
-	}else{
-		element->resize(math::vec2{policy.extent.width, policy.extent.height}.max({60, 60}));
+	math::vec2 sz{};
+	math::vec2 fsz{};
+	if(policy.follow == tooltip_follow::dialog){
+		auto [fx, fy] = element->property.fill_parent;
+		if(fx){
+			fsz.x = manager.scene->region.width();
+			element->context_size_restriction.width = {size_category::mastering, fsz.x};
+		}
+
+		if(fy){
+			fsz.y = manager.scene->region.height();
+			element->context_size_restriction.height = {size_category::mastering, fsz.y};
+		}
 	}
 
-	element->try_layout();
+	if(element->layout_state.check_any_changed()){
+		sz = element->pre_acquire_size(policy.extent).value_or(math::vec2{policy.extent.width, policy.extent.height}.max({60, 60}));
+		if(fsz.x == 0)fsz.x = sz.x;
+		if(fsz.y == 0)fsz.y = sz.y;
+	}
+
+
+
+	element->resize(fsz);
+
+	// auto parent_size = policy.follow ==
+
+	// if(.x)
+	// if(){
+	// 	element->resize(sz.value());
+	// }else{
+	// }
+
+	element->layout();
 
 	const auto elemOffset = align::get_offset_of(policy.align, element->get_size());
 	math::vec2 followOffset{elemOffset};
 
-	std::visit([&] <typename T> (const T& val){
-		if constexpr (std::same_as<T, math::vec2>){
-			followOffset += val;
-		} else if constexpr(std::same_as<T, tooltip_follow>){
-			switch(val){
-				case tooltip_follow::cursor :{
-					followOffset += manager.get_cursor_pos();
-					break;
-				}
+	switch(policy.follow){
+	case tooltip_follow::cursor :{
+		followOffset += manager.get_cursor_pos();
+		break;
+	}
 
-				case tooltip_follow::dialog :{
-					followOffset += align::get_vert(policy.align, manager.scene->region);
-					break;
-				}
+	case tooltip_follow::dialog :{
+		followOffset += align::get_vert(policy.align, manager.scene->region);
+		break;
+	}
 
-				case tooltip_follow::initial_pos :{
-					if(!isPosSet()){
-						followOffset += manager.get_cursor_pos();
-					}else{
-						followOffset = last_pos;
-					}
-
-					break;
-				}
-
-				default: std::unreachable();
-			}
+	case tooltip_follow::initial_pos :{
+		if(!isPosSet()){
+			followOffset += manager.get_cursor_pos();
+		} else{
+			followOffset = last_pos;
 		}
-	}, policy.pos);
 
+		break;
+	}
+	default : break;
+	}
 
 	last_pos = followOffset;
 	element->update_abs_src(followOffset);
@@ -77,7 +96,7 @@ mo_yanxi::ui::tooltip_instance& mo_yanxi::ui::tooltip_manager::append_tooltip(
 	bool fade_in){
 	auto rst = owner.tooltip_setup(*scene);
 	auto& val = actives.emplace_back(std::move(rst), &owner);
-	val.updatePosition(*this);
+	val.update_layout(*this);
 	scene->on_cursor_pos_update();
 
 	if(fade_in){
@@ -95,25 +114,17 @@ void mo_yanxi::ui::tooltip_manager::update(float delta_in_time){
 	for (auto&& active : actives){
 		active.element->update(delta_in_time);
 		active.element->try_layout();
-		active.updatePosition(*this);
+		active.update_layout(*this);
 	}
 
 	if(!scene->isMousePressed()){
 		const auto lastNotInBound = std::ranges::find_if_not(actives, [this](const tooltip_instance& toolTip){
 			if(toolTip.owner->tooltip_force_drop(get_cursor_pos()))return false;
 
-			const auto target_is = [&](tooltip_follow follow){
-				return std::visit([follow] <typename T>(const T& val){
-					if constexpr(std::same_as<T, math::vec2>){
-						return false;
-					} else if constexpr(std::same_as<T, tooltip_follow>){
-						return val == follow;
-					}
-				}, toolTip.owner->tooltip_align_policy().pos);
-			};
+			auto follow = toolTip.owner->tooltip_align_policy().follow;
 
-			const bool selfContains = !target_is(tooltip_follow::cursor) && toolTip.element->contains_self(get_cursor_pos(), MarginSize);
-			const bool ownerContains = !target_is(tooltip_follow::initial_pos) && toolTip.owner->tooltip_owner_contains(get_cursor_pos());
+			const bool selfContains = follow != tooltip_follow::cursor && toolTip.element->contains_self(get_cursor_pos(), MarginSize);
+			const bool ownerContains = follow != tooltip_follow::initial_pos && toolTip.owner->tooltip_owner_contains(get_cursor_pos());
 			return selfContains || ownerContains || toolTip.owner->tooltip_should_maintain(get_cursor_pos());
 		});
 

@@ -29,8 +29,10 @@ namespace mo_yanxi::ui{
 	// };
 
 	export
-	struct tooltip_align{
-		std::variant<math::vec2, tooltip_follow> pos{};
+	struct
+	tooltip_align{
+		tooltip_follow follow{};
+		std::optional<math::vec2> pos{};
 		align::pos align{};
 		stated_extent extent{extent_by_external};
 		// layout_policy layout_policy{};
@@ -108,20 +110,21 @@ namespace mo_yanxi::ui{
 		~func_tooltip_owner() = default;
 
 	private:
-		std::move_only_function<elem_ptr(T&, scene&)> toolTipBuilder{};
+		using builder_type = std::move_only_function<elem_ptr(T&, scene&)>;
+		builder_type toolTipBuilder{};
 
 	public:
 		[[nodiscard]] func_tooltip_owner() = default;
 
-		template<elem_init_func InitFunc>
-			requires std::invocable<InitFunc, T&, typename elem_init_func_trait<InitFunc>::elem_type&>
-		decltype(auto) set_tooltip_builder(InitFunc&& initFunc){
-			return std::exchange(toolTipBuilder, decltype(toolTipBuilder){[func = std::forward<InitFunc>(initFunc)](T& owner, scene& scene){
+		template<elem_init_func InitFunc, std::derived_from<T> S>
+			requires std::invocable<InitFunc, S&, typename elem_init_func_trait<InitFunc>::elem_type&>
+		decltype(auto) set_tooltip_builder(this S& self, InitFunc&& initFunc){
+			return std::exchange(self.toolTipBuilder, builder_type{[func = std::forward<InitFunc>(initFunc)](T& owner, scene& scene){
 				return elem_ptr{
 					&scene,
 					static_cast<func_tooltip_owner&>(owner).tooltip_deduce_parent(scene),
 					[&](typename elem_init_func_trait<InitFunc>::elem_type& e){
-						std::invoke(func, owner, e);
+						std::invoke(func, static_cast<S&>(owner), e);
 				}};
 			}});
 		}
@@ -149,8 +152,8 @@ namespace mo_yanxi::ui{
 	struct tooltip_layout_info{
 		tooltip_follow follow{tooltip_follow::initial_pos};
 
-		align::pos target_align{align::pos::bottom_left};
-		align::pos owner_align{align::pos::top_left};
+		align::pos align_owner{align::pos::bottom_left};
+		align::pos align_tooltip{align::pos::top_left};
 
 		math::vec2 offset{};
 	};
@@ -184,10 +187,10 @@ namespace mo_yanxi::ui{
 			return tooltip_prop_;
 		}
 
-		template<elem_init_func InitFunc>
-		void set_tooltip_state(const tooltip_create_info& toolTipProperty, InitFunc&& initFunc) noexcept{
-			this->tooltip_prop_ = toolTipProperty;
-			this->set_tooltip_builder(std::forward<InitFunc>(initFunc));
+		template<elem_init_func InitFunc, std::derived_from<T> S>
+		void set_tooltip_state(this S& self, const tooltip_create_info& toolTipProperty, InitFunc&& initFunc) noexcept{
+			self.tooltip_prop_ = toolTipProperty;
+			self.set_tooltip_builder(std::forward<InitFunc>(initFunc));
 		}
 
 	};

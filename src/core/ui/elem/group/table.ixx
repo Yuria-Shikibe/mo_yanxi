@@ -8,56 +8,6 @@ export import mo_yanxi.ui.util;
 import std;
 
 namespace mo_yanxi::ui{
-
-	[[nodiscard]] constexpr std::array<float align::spacing::*, 4> get_pad_ptr(layout_policy policy) noexcept{
-		if(policy == layout_policy::vertical){
-			return {
-				&align::spacing::top,
-				&align::spacing::bottom,
-
-				&align::spacing::left,
-				&align::spacing::right,
-			};
-		}else{
-			return {
-				&align::spacing::left,
-				&align::spacing::right,
-
-				&align::spacing::top,
-				&align::spacing::bottom,
-			};
-		}
-	}
-
-	[[nodiscard]] constexpr std::array<stated_size stated_extent::*, 2> get_extent_ptr(layout_policy policy) noexcept{
-		if(policy == layout_policy::vertical){
-			return {
-				&stated_extent::height,
-				&stated_extent::width,
-			};
-		}else{
-			return {
-				&stated_extent::width,
-				&stated_extent::height
-			};
-		}
-	}
-
-	template <typename T = float>
-	[[nodiscard]] constexpr auto get_vec_ptr(layout_policy policy) noexcept{
-		if(policy == layout_policy::vertical){
-			return std::array{
-				&math::vector2<T>::y,
-				&math::vector2<T>::x,
-			};
-		}else{
-			return std::array{
-				&math::vector2<T>::x,
-				&math::vector2<T>::y,
-			};
-		}
-	}
-
 	using table_size_t = unsigned;
 
 	export struct table_cell_adaptor : cell_adaptor<mastering_cell>{
@@ -455,7 +405,7 @@ namespace mo_yanxi::ui{
 			for(auto&& [minor, line] : view){
 				for(auto&& [major, elem] : line | std::views::enumerate){
 					switch(layout_policy){
-					case layout_policy::horizontal :{
+					case layout_policy::hori_major :{
 						if(minor == 0){
 							changed |= util::tryModify(elem.cell.pad.top, pad.top);
 						}
@@ -473,7 +423,7 @@ namespace mo_yanxi::ui{
 						}
 						break;
 					}
-					case layout_policy::vertical :{
+					case layout_policy::vert_major :{
 						if(minor == 0){
 							changed |= util::tryModify(elem.cell.pad.left, pad.left);
 						}
@@ -503,6 +453,20 @@ namespace mo_yanxi::ui{
 		void set_edge_pad(float pad){
 			set_edge_pad({pad, pad, pad, pad});
 		}
+
+	public:
+		std::optional<math::vec2> pre_acquire_size(stated_extent extent) override{
+			const auto grid = util::countRowAndColumn_toVector(cells, &table_cell_adaptor::line_feed);
+			if(grid.empty()) return std::nullopt;
+
+			// elem::resize_quiet(get_size().min(extent.potential_max_size()));
+			table_layout_context context{layout_policy, std::ranges::max(grid), static_cast<table_size_t>(grid.size())};
+
+			auto size = pre_layout(context, clip_boarder_from(extent), true);
+
+			return size;
+		}
+
 
 	protected:
 		math::vec2 pre_layout(table_layout_context& context, stated_extent constrain, bool size_to_constrain){
@@ -534,21 +498,6 @@ namespace mo_yanxi::ui{
 			return size;
 		}
 
-		std::optional<math::vec2> pre_acquire_size(stated_extent extent) override{
-			const auto grid = util::countRowAndColumn_toVector(cells, &table_cell_adaptor::line_feed);
-			if(grid.empty()) return std::nullopt;
-
-			// elem::resize_quiet(get_size().min(extent.potential_max_size()));
-			table_layout_context context{layout_policy, std::ranges::max(grid), static_cast<table_size_t>(grid.size())};
-			if(extent.width.mastering()){extent.width.value = math::clamp_positive(extent.width.value - property.boarder.width());}
-			if(extent.height.mastering()){extent.height.value = math::clamp_positive(extent.height.value - property.boarder.height());}
-
-
-			auto size = pre_layout(context, extent, true);
-
-			return size;
-		}
-
 		void layout_directional(){
 			const auto grid = util::countRowAndColumn_toVector(cells, &table_cell_adaptor::line_feed);
 			if(grid.empty()) return;
@@ -560,7 +509,7 @@ namespace mo_yanxi::ui{
 
 			auto size = pre_layout(context, extent, false);
 			size.min(context_size_restriction.potential_max_size());
-			elem::resize_quiet(size);
+			elem::resize_masked(size);
 
 			size -= property.boarder.get_size();
 			size.max({});
@@ -572,7 +521,7 @@ namespace mo_yanxi::ui{
 
 		 // grid{};
 		align::pos entire_align{align::pos::center};
-		layout_policy layout_policy{layout_policy::horizontal};
+		layout_policy layout_policy{layout_policy::hori_major};
 
 	};
 }

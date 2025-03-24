@@ -54,7 +54,7 @@ export namespace mo_yanxi::ui::action{
 		}
 
 		void begin(elem& elem) override{
-			initialAlpha = elem.graphicProp().get_opacity();
+			initialAlpha = elem.gprop().get_opacity();
 		}
 
 		void end(elem& elem) override{

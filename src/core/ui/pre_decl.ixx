@@ -5,6 +5,8 @@
 export module mo_yanxi.ui.pre_decl;
 
 namespace mo_yanxi::ui{
+	export using event_channel_t = unsigned;
+
 	export struct elem;
 	export struct group;
 	export struct scene;

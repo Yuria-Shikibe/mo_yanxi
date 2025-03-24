@@ -2,7 +2,7 @@ module mo_yanxi.ui.elem.text_input_area;
 
 import mo_yanxi.ui.graphic;
 
-void mo_yanxi::ui::text_input_area::draw_content(const rect clipSpace, const rect redirect) const{
+void mo_yanxi::ui::text_input_area::draw_content(const rect clipSpace) const{
 	using namespace graphic;
 	if(caret_){
 		auto off2 = get_glyph_abs_src();
@@ -10,7 +10,7 @@ void mo_yanxi::ui::text_input_area::draw_content(const rect clipSpace, const rec
 		draw_acquirer param{get_renderer().get_batch(), draw::white_region};
 		if(caret_->shouldBlink()){
 			const color caret_Color =
-				(onFailed() ? colors::RED_DUSK : colors::white).copy().mulA(graphicProp().get_opacity());
+				(onFailed() ? colors::RED_DUSK : colors::white).copy().mulA(gprop().get_opacity());
 
 			const auto& row = glyph_layout[caret_->range.dst.pos.y];
 			const auto& glyph = row[caret_->range.dst.pos.x];
@@ -64,6 +64,6 @@ void mo_yanxi::ui::text_input_area::draw_content(const rect clipSpace, const rec
 
 	drawBase:
 	
-	basic_text_elem::draw_content(clipSpace, redirect);
+	basic_text_elem::draw_content(clipSpace);
 	
 }

@@ -38,7 +38,7 @@ namespace mo_yanxi::ui{
 		math::vec2 last_pos{math::vectors::constant2<float>::SNaN};
 
 	private:
-		void updatePosition(const tooltip_manager& manager);
+		void update_layout(const tooltip_manager& manager);
 
 		[[nodiscard]] bool isPosSet() const noexcept{
 			return !last_pos.is_NaN();

@@ -12,6 +12,7 @@ export import mo_yanxi.graphic.image_atlas;
 export import mo_yanxi.graphic.image_region;
 export import mo_yanxi.graphic.image_nine_region;
 export import mo_yanxi.vk.vertex_info;
+export import align;
 
 import std;
 
@@ -19,39 +20,78 @@ namespace mo_yanxi::ui{
 	//TODO using variant?
 	export
 	struct drawable{
-		vk::vertices::mode_flag_bits draw_flags{};
-
 		[[nodiscard]] drawable() = default;
-
-		[[nodiscard]] explicit drawable(vk::vertices::mode_flag_bits draw_flags)
-			: draw_flags(draw_flags){
-		}
 
 		virtual ~drawable() = default;
 
-		virtual void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) = 0;
+		virtual void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) const = 0;
 
 		[[nodiscard]] virtual std::optional<math::vec2> get_default_size() const{
 			return std::nullopt;
 		}
 	};
 
+
 	export
-	struct image_drawable : public drawable{
+	struct image_display_style{
+		align::scale scaling{align::scale::fit};
+		align::pos align{align::pos::center};
+		graphic::color color_scl{graphic::colors::white};
+		graphic::color color_mix{};
+	};
+
+	export
+	struct styled_drawable{
+		image_display_style style{};
+		std::unique_ptr<drawable> drawable{};
+	};
+
+	struct moded_drawable : public drawable{
+		vk::vertices::mode_flag_bits draw_flags{};
+
+		[[nodiscard]] moded_drawable() = default;
+
+		[[nodiscard]] explicit moded_drawable(vk::vertices::mode_flag_bits draw_flags)
+			: draw_flags(draw_flags){
+		}
+	};
+
+	export
+	struct image_drawable : public moded_drawable{
 		graphic::cached_image_region image{};
 
 		[[nodiscard]] image_drawable() = default;
 
 		[[nodiscard]] image_drawable(vk::vertices::mode_flag_bits flags, graphic::allocated_image_region& image_region)
-			: drawable(flags), image(image_region){
+			: moded_drawable(flags), image(image_region){
 		}
 
-		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) override;
+		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) const override;
 
 		[[nodiscard]] std::optional<math::vec2> get_default_size() const override {
 			return image->get_region().size().as<float>();
 		}
 	};
+	export
+	struct drawable_ref : public drawable{
+		const drawable* ref{};
+
+		[[nodiscard]] drawable_ref() = default;
+
+		[[nodiscard]] explicit(false) drawable_ref(const drawable* ref)
+			: ref(ref){
+		}
+
+		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) const override{
+			if(ref)ref->draw(elem, region, color_scl, color_ovr);
+		}
+
+		[[nodiscard]] std::optional<math::vec2> get_default_size() const override {
+			if(ref)return ref->get_default_size();
+			return std::nullopt;
+		}
+	};
+
 
 	// struct RegionDrawable {
 	// 	virtual ~RegionDrawable() = default;
@@ -108,7 +148,7 @@ namespace mo_yanxi::ui{
 	//
 
 	export
-	struct image_caped_region_drawable : drawable{
+	struct image_caped_region_drawable : moded_drawable{
 		graphic::image_caped_region region{};
 		float scale{1.f};
 
@@ -118,11 +158,11 @@ namespace mo_yanxi::ui{
 			vk::vertices::mode_flag_bits draw_flags,
 			const graphic::image_caped_region& region,
 			float scale = 1.)
-			: drawable(draw_flags),
+			: moded_drawable(draw_flags),
 			  region(region), scale(scale){
 		}
 
-		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) override;
+		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) const override;
 
 		[[nodiscard]] std::optional<math::vec2> get_default_size() const override{
 			return region.get_size() * scale;
@@ -130,7 +170,7 @@ namespace mo_yanxi::ui{
 	};
 
 	export
-	struct image_nine_region_drawable : drawable{
+	struct image_nine_region_drawable : moded_drawable{
 		graphic::image_nine_region region{};
 
 		[[nodiscard]] image_nine_region_drawable() = default;
@@ -138,11 +178,11 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] image_nine_region_drawable(
 			vk::vertices::mode_flag_bits draw_flags,
 			const graphic::image_nine_region& region)
-			: drawable(draw_flags),
+			: moded_drawable(draw_flags),
 			  region(region){
 		}
 
-		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) override;
+		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) const override;
 
 		[[nodiscard]] std::optional<math::vec2> get_default_size() const override{
 			return region.get_size();
@@ -167,4 +207,6 @@ namespace mo_yanxi::ui{
 	// 		return wrapper.getSize();
 	// 	}
 	// };
+
+
 }

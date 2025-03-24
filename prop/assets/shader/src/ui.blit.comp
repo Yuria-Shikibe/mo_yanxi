@@ -24,13 +24,14 @@ void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
 //    vec2 uv = (vec2(pos) + vec2(0.5f, 0.5f)) / vec2(imageSize(outputImageGeneral));
 
-    vec4 lightSrcColor = texelFetch(in_light, pos, 0);
-    vec4 backgroundDstColor = imageLoad(out_light, pos);
-    vec4 generalSrcColor = texelFetch(in_base, pos, 0);
-    vec4 generalDstColor = imageLoad(out_base, pos);
+    vec4 color_base_src = texelFetch(in_base, pos, 0);
+    vec4 color_base_dst = imageLoad(out_base, pos);
+
+    vec4 color_light_src = texelFetch(in_light, pos, 0);
+    vec4 color_light_dst = imageLoad(out_light, pos);
     //TODO
-    imageStore(out_base, pos, generalSrcColor);
-    imageStore(out_light, pos, lightSrcColor);
+    imageStore(out_base, pos, blend(color_base_src, color_base_dst));
+    imageStore(out_light, pos, blend(color_light_src, color_light_dst));
 
 //    imageStore(out_base, pos, blend2(generalSrcColor, applyShadow(generalDstColor, backgroundSrcColor)));
 //    imageStore(out_light, pos, alphaBlend(backgroundSrcColor, backgroundDstColor));

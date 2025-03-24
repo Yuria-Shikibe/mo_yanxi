@@ -41,9 +41,17 @@ namespace mo_yanxi::graphic::msdf{
 		}
 	}
 
+	// export
+	// [[nodiscard]] bitmap load_svg(const char* path, unsigned w, unsigned h, double range = 2.);
+
+	struct svg_info{
+		msdfgen::Shape shape{};
+		math::vec2 size{};
+	};
+
 	export
 	[[nodiscard]] bitmap load_shape(
-		const msdfgen::Shape& shape,
+		const svg_info& shape,
 		unsigned w, unsigned h,
 		double range = sdf_image_range,
 		unsigned boarder = sdf_image_boarder);
@@ -62,16 +70,13 @@ namespace mo_yanxi::graphic::msdf{
 	);
 
 	export
-	[[nodiscard]] bitmap load_svg(const char* path, unsigned w, unsigned h, double range = 2.);
-
-	export
-	[[nodiscard]] msdfgen::Shape svg_to_shape(const char* path);
+	[[nodiscard]] svg_info svg_to_shape(const char* path);
 
 
 	export
 	struct msdf_generator{
 	private:
-		msdfgen::Shape shape{};
+		svg_info shape{};
 	public:
 
 		double range = sdf_image_range;
@@ -79,7 +84,7 @@ namespace mo_yanxi::graphic::msdf{
 
 		[[nodiscard]] msdf_generator() = default;
 
-		[[nodiscard]] msdf_generator(msdfgen::Shape&& shape, double range = sdf_image_range, unsigned boarder = sdf_image_boarder);
+		[[nodiscard]] msdf_generator(svg_info&& shape, double range = sdf_image_range, unsigned boarder = sdf_image_boarder);
 
 		[[nodiscard]] msdf_generator(const char* path, double range = sdf_image_range, unsigned boarder = sdf_image_boarder);
 
@@ -101,7 +106,7 @@ namespace mo_yanxi::graphic::msdf{
 		msdfgen::FontHandle* face{};
 		unsigned font_w{};
 		unsigned font_h{};
-		double range = 0.45;
+		double range = 0.4;
 		unsigned boarder = sdf_image_boarder;
 	};
 
@@ -196,8 +201,8 @@ namespace mo_yanxi::graphic::msdf{
 	constexpr double boarder_range = 4;
 
 	export
-	msdfgen::Shape create_boarder(double radius = 15., double k = .7f, double width = 2.);
+	svg_info create_boarder(double radius = 15., double k = .7f, double width = 2.);
 
 	export
-	msdfgen::Shape create_solid_boarder(double radius = 15., double k = .7f);
+	svg_info create_solid_boarder(double radius = 15., double k = .7f);
 }

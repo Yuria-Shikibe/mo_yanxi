@@ -422,6 +422,7 @@ namespace mo_yanxi{
 
 			/*constexpr*/
 			auto* operator->() const noexcept{
+				assert(current != sentinel);
 				if constexpr(addConst){
 					return reinterpret_cast<const std::pair<const key_type, mapped_type>*>(std::to_address(current));
 				} else{

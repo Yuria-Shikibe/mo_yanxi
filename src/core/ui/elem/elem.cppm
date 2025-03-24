@@ -27,6 +27,7 @@ export import mo_yanxi.core.ctrl.constants;
 
 
 export import mo_yanxi.meta_programming;
+export import mo_yanxi.spreadable_event_handler;
 // export import Core.UI.Drawer;
 // export import Core.UI.Flags;
 // export import Core.UI.Util;
@@ -229,6 +230,7 @@ namespace mo_yanxi::ui{
 
 
 
+
 	export struct elem_prop{
 	protected:
 		//TODO uses string view?
@@ -332,6 +334,8 @@ namespace mo_yanxi::ui{
 		elem_prop property{};
 		cursor_states cursor_state{};
 
+
+		//TODO using variant<type, float> instead?
 		stated_extent context_size_restriction{};
 		/**
 		 * @brief size restriction in a layout context, usually is gain from a cell
@@ -358,7 +362,7 @@ namespace mo_yanxi::ui{
 		bool skip_inbound_capture{};
 
 		//Layout Spec
-		layout_state layoutState{};
+		layout_state layout_state{};
 		interactivity interactivity{interactivity::enabled};
 
 	protected:
@@ -369,7 +373,14 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] elem_datas() = default;
 	};
 
-	export struct elem : elem_datas, stated_tooltip_owner<struct elem>
+	export struct elem :
+
+	elem_datas,
+	stated_tooltip_owner<struct elem>,
+	spreadable_event_handler<struct elem,
+		events::collapser_state_changed,
+		events::check_box_state_changed
+	>
 
 		// StatedToolTipOwner<elem>,
 		// math::QuadTreeAdaptable<elem>
@@ -430,10 +441,10 @@ namespace mo_yanxi::ui{
 			property.set_empty_drawer();
 		}
 
-		bool resize_quiet(const math::vec2 size, spread_direction mask = spread_direction::none){
-			auto last = std::exchange(layoutState.acceptMask_inherent, mask);
+		bool resize_masked(const math::vec2 size, spread_direction mask = spread_direction::none){
+			auto last = std::exchange(layout_state.acceptMask_inherent, mask);
 			auto rst = resize(size);
-			layoutState.acceptMask_inherent = last;
+			layout_state.acceptMask_inherent = last;
 			return rst;
 		}
 
@@ -500,12 +511,41 @@ namespace mo_yanxi::ui{
 			return property;
 		}
 
-		[[nodiscard]] const auto& graphicProp() const noexcept{
+		[[nodiscard]] const auto& gprop() const noexcept{
 			return property.graphic_data;
 		}
 
 		elem_event_manager& events() noexcept{
 			return event_slots;
+		}
+
+		template <typename T>
+		bool fire_event(const T& event, spread_direction spread_direction = spread_direction::lower, bool force_spread = false){
+			if(spread_direction & spread_direction::local){
+				if(spreadable_event_handler::spreadable_event_handler_fire(event) && !force_spread){
+					return true;
+				}
+			}
+
+			if(spread_direction & spread_direction::super && !is_root_element()){
+				auto p = get_parent_to_elem();
+				auto rst = p->fire_event(event, (spread_direction | spread_direction::local) - spread_direction::child, force_spread);
+				if(!force_spread && rst){
+					return true;
+				}
+			}
+
+
+			if(spread_direction & spread_direction::child){
+				for (auto && child : get_children()){
+					auto rst = child->fire_event(event, (spread_direction | spread_direction::local) - spread_direction::super, force_spread);
+					if(!force_spread && rst){
+						return true;
+					}
+				}
+			}
+
+			return false;
 		}
 
 		template <typename T, typename Fn>
@@ -575,11 +615,11 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] constexpr bool interactable() const noexcept{
 			if(!is_visible()) return false;
 			if(disabled) return false;
-			return interactivity == interactivity::enabled;
+			return interactivity == interactivity::enabled || interactivity == interactivity::intercepted;
 		}
 
-		[[nodiscard]] constexpr bool touch_disabled() const noexcept{
-			return interactivity == interactivity::disabled;
+		[[nodiscard]] constexpr bool touch_blocked() const noexcept{
+			return interactivity == interactivity::disabled || interactivity == interactivity::intercepted;
 		}
 
 		[[nodiscard]] bool contains(math::vec2 absPos) const noexcept;
@@ -616,7 +656,7 @@ namespace mo_yanxi::ui{
 		virtual void update(float delta_in_ticks);
 
 		virtual bool try_layout(){
-			if(layoutState.is_changed()){
+			if(layout_state.is_changed()){
 				layout();
 				return true;
 			}
@@ -624,18 +664,25 @@ namespace mo_yanxi::ui{
 		}
 
 		virtual void layout(){
-			layoutState.clear();
+			layout_state.clear();
 		}
 
 		void exhaustedLayout(){
 			std::size_t count{};
-			while(layoutState.is_changed() || layoutState.is_children_changed()){
+			while(layout_state.is_changed() || layout_state.is_children_changed()){
 				layout();
 				count++;
 				if(count > 16){
 					throw std::runtime_error("bad layout");
 				}
 			}
+		}
+
+		[[nodiscard]] constexpr stated_extent clip_boarder_from(stated_extent extent) const noexcept{
+			if(extent.width.mastering()){extent.width.value = math::clamp_positive(extent.width.value - property.boarder.width());}
+			if(extent.height.mastering()){extent.height.value = math::clamp_positive(extent.height.value - property.boarder.height());}
+
+			return extent;
 		}
 
 		virtual std::optional<math::vec2> pre_acquire_size(stated_extent extent){
@@ -663,40 +710,32 @@ namespace mo_yanxi::ui{
 		// }
 
 
-		virtual void try_draw(const rect clipSpace, const rect redirect) const{
+		virtual void try_draw(const rect clipSpace) const{
 			if(!is_visible()) return;
 			// if(IgnoreClipWhenDraw || inboundOf(clipSpace)){
-			draw(clipSpace, redirect);
+			draw(clipSpace);
 			// }
 		}
 
-		void try_draw(const rect clipSpace) const{
-			try_draw(clipSpace, get_bound());
-		}
-
 		void draw(const rect clipSpace) const{
-			draw(clipSpace, get_bound());
-		}
-
-		void draw(const rect clipSpace, const rect redirect) const{
-			draw_pre(clipSpace, redirect);
-			draw_content(clipSpace, redirect);
-			draw_post(clipSpace, redirect);
+			draw_pre(clipSpace);
+			draw_content(clipSpace);
+			draw_post(clipSpace);
 		}
 
 	protected:
-		virtual void draw_pre(const rect clipSpace, const rect redirect) const;
+		virtual void draw_pre(const rect clipSpace) const;
 
-		virtual void draw_content(const rect clipSpace, const rect redirect) const{
+		virtual void draw_content(const rect clipSpace) const{
 
 		}
-		virtual void draw_post(const rect clipSpace, const rect redirect) const{
+		virtual void draw_post(const rect clipSpace) const{
 
 		}
 
 		void tooltip_on_drop() override{
 			stated_tooltip_owner::tooltip_on_drop();
-			cursor_state.time_tooltip = 0;
+			cursor_state.time_tooltip = -10.f;
 		}
 
 	public:
@@ -733,13 +772,14 @@ namespace mo_yanxi::ui{
 			switch(tooltip_prop_.layout_info.follow){
 			case tooltip_follow::owner :{
 				return {
-						.pos = align::get_vert(tooltip_prop_.layout_info.target_align, get_bound()),
-						.align = tooltip_prop_.layout_info.owner_align,
+						.follow = tooltip_follow::owner,
+						.pos = align::get_vert(tooltip_prop_.layout_info.align_owner, get_bound()),
+						.align = tooltip_prop_.layout_info.align_tooltip,
 						// .extent =
 					};
 			}
 
-			default : return {tooltip_prop_.layout_info.follow, tooltip_prop_.layout_info.owner_align};
+			default : return {tooltip_prop_.layout_info.follow, std::nullopt, tooltip_prop_.layout_info.align_tooltip};
 			}
 		}
 
@@ -755,6 +795,11 @@ namespace mo_yanxi::ui{
 				&& tooltip_prop_.auto_build()
 				&& cursor_state.time_tooltip > tooltip_prop_.min_hover_time;
 		}
+
+		void build_tooltip(bool belowScene = false, bool fade_in = true);
+
+	private:
+		[[nodiscard]] elem* get_parent_to_elem() const noexcept;
 	};
 
 	void iterateAll_DFSImpl(math::vec2 cursorPos, std::vector<struct elem*>& selected, struct elem* current);
