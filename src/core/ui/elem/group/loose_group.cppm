@@ -19,13 +19,13 @@ namespace mo_yanxi::ui{
 			interactivity = interactivity::children_only;
 		}
 
-		void clear_children() noexcept override{
+		virtual void clear_children() noexcept{
 			toRemove.clear();
 			children.clear();
 			notify_layout_changed(spread_direction::super | spread_direction::from_content);
 		}
 
-		void post_remove(elem* elem) override{
+		virtual void post_remove(elem* elem){
 			if(const auto itr = find(elem); itr != children.end()){
 				toRemove.push_back(std::move(*itr));
 				children.erase(itr);
@@ -33,15 +33,14 @@ namespace mo_yanxi::ui{
 			notify_layout_changed(spread_direction::all_visible);
 		}
 
-		void instant_remove(elem* elem) override{
+		virtual void instant_remove(elem* elem){
 			if(const auto itr = find(elem); itr != children.end()){
 				children.erase(itr);
 			}
 			notify_layout_changed(spread_direction::all_visible);
 		}
 
-		elem& add_children(elem_ptr&& elem) override{
-			//TODO move this to other place?
+		virtual elem& add_children(elem_ptr&& elem){
 			setChildrenFillParentSize_legacy(*elem, content_size());
 
 			elem->update_abs_src(content_src_pos());
@@ -71,6 +70,12 @@ namespace mo_yanxi::ui{
 	struct loose_group : basic_group{
 		[[nodiscard]] loose_group(scene* scene, group* group)
 			: basic_group(scene, group, "loose_group"){
+		}
+
+		virtual elem& add_children(elem_ptr&& elem){
+			//TODO move this to other place?
+
+			return basic_group::add_children(std::move(elem));
 		}
 	};
 

@@ -88,7 +88,7 @@ namespace mo_yanxi::ui{
 			using mouse_event::mouse_event;
 		};
 
-		struct moved final : PosedEvent{
+		struct cursor_moved final : PosedEvent{
 			using PosedEvent::PosedEvent;
 		};
 

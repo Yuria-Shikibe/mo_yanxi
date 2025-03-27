@@ -5,6 +5,7 @@ module mo_yanxi.ui.scene;
 import mo_yanxi.ui.pre_decl;
 import mo_yanxi.ui.elem;
 import mo_yanxi.ui.group;
+import mo_yanxi.ui.graphic;
 
 import mo_yanxi.concepts;
 import mo_yanxi.algo;
@@ -22,7 +23,7 @@ mo_yanxi::ui::scene::scene(
 	scene_base{name, root, renderer}{
 
 	// keyMapping = &core::input.register_sub_input(name);
-	// tooltipManager.scene = this;
+	tooltip_manager.scene = this;
 
 	if(!root)return;
 	root->skip_inbound_capture = true;
@@ -32,7 +33,8 @@ mo_yanxi::ui::scene::scene(
 
 mo_yanxi::ui::scene::~scene(){
 	// if(keyMapping)Global::input->eraseSubInput(name);
-	delete root.handle;
+	if(root_ownership)delete root.handle;
+	else root->set_scene(nullptr);
 }
 
 std::string_view mo_yanxi::ui::scene::get_clipboard() const noexcept{
@@ -87,15 +89,15 @@ void mo_yanxi::ui::scene::trySwapFocus(elem* newFocus){
 void mo_yanxi::ui::scene::swapFocus(elem* newFocus){
 	if(currentCursorFocus){
 		for(auto& state : mouseKeyStates){
-			state.clear(cursorPos);
+			state.clear(cursor_pos);
 		}
-		currentCursorFocus->events().fire(events::focus_end{cursorPos});
+		currentCursorFocus->events().fire(events::focus_end{cursor_pos});
 	}
 
 	currentCursorFocus = newFocus;
 
 	if(currentCursorFocus){
-		if(currentCursorFocus->interactable())currentCursorFocus->events().fire(events::focus_begin{cursorPos});
+		if(currentCursorFocus->interactable())currentCursorFocus->events().fire(events::focus_begin{cursor_pos});
 	}
 }
 
@@ -110,25 +112,25 @@ mo_yanxi::ui::esc_flag mo_yanxi::ui::scene::on_esc(){
 }
 
 void mo_yanxi::ui::scene::on_mouse_action(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode){
-	if(action == core::ctrl::act::press && currentKeyFocus && !currentKeyFocus->contains(cursorPos)){
+	if(action == core::ctrl::act::press && currentKeyFocus && !currentKeyFocus->contains(cursor_pos)){
 		currentKeyFocus = nullptr;
 	}
 
 	if(currentCursorFocus)
 		currentCursorFocus->events().fire(
-			events::click{cursorPos, core::ctrl::key_pack{key, action, mode}}
+			events::click{cursor_pos, core::ctrl::key_pack{key, action, mode}}
 		);
 
 	if(action == core::ctrl::act::press){
-		mouseKeyStates[key].reset(cursorPos);
+		mouseKeyStates[key].reset(cursor_pos);
 	}
 
 	if(action == core::ctrl::act::release){
-		mouseKeyStates[key].clear(cursorPos);
+		mouseKeyStates[key].clear(cursor_pos);
 	}
 
 	if(currentCursorFocus && currentCursorFocus->maintain_focus_by_mouse()){
-		on_cursor_pos_update(cursorPos);
+		on_cursor_pos_update(cursor_pos);
 	}
 }
 
@@ -151,33 +153,32 @@ void mo_yanxi::ui::scene::on_unicode_input(char32_t val) const{
 	}
 }
 
-void mo_yanxi::ui::scene::on_scroll(const math::vec2 scroll) const{
-	const auto mode = get_input_mode();
+void mo_yanxi::ui::scene::on_scroll(const math::vec2 scroll, core::ctrl::key_code_t mode) const{
 	if(currentScrollFocus){
 		currentScrollFocus->events().fire(events::scroll{scroll, mode});
 	}
 }
 
 void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos){
-	const auto delta = newPos - cursorPos;
-	cursorPos = newPos;
+	const auto delta = newPos - cursor_pos;
+	cursor_pos = newPos;
 
 	std::vector<elem*> inbounds{};
 
 	for (auto && activeTooltip : tooltip_manager.get_active_tooltips() | std::views::reverse){
 		if(tooltip_manager.is_below_scene(activeTooltip.element.get()))continue;
-		inbounds = activeTooltip.element->dfs_find_deepest_element(cursorPos);
+		inbounds = activeTooltip.element->dfs_find_deepest_element(cursor_pos);
 		if(!inbounds.empty())goto upt;
 	}
 
 	if(inbounds.empty()){
-		inbounds = root->dfs_find_deepest_element(cursorPos);
+		inbounds = root->dfs_find_deepest_element(cursor_pos);
 	}
 
 	if(inbounds.empty()){
 		for (auto && activeTooltip : tooltip_manager.get_active_tooltips() | std::views::reverse){
 			if(!tooltip_manager.is_below_scene(activeTooltip.element.get()))continue;
-			inbounds = activeTooltip.element->dfs_find_deepest_element(cursorPos);
+			inbounds = activeTooltip.element->dfs_find_deepest_element(cursor_pos);
 			if(!inbounds.empty())goto upt;
 		}
 	}
@@ -203,8 +204,7 @@ void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos){
 
 void mo_yanxi::ui::scene::resize(const math::frect region){
 	if(util::tryModify(this->region, region)){
-		root->property.relative_src = region.src;
-		root->update_abs_src({});
+		// root->update_abs_src({});
 		root->resize(region.size());
 	}
 }
@@ -250,8 +250,14 @@ void mo_yanxi::ui::scene::layout(){
 	// if(count)std::println(std::cerr, "{}", count);
 }
 
-void mo_yanxi::ui::scene::draw() const{
+void mo_yanxi::ui::scene::root_draw() const{
+	renderer->batch.push_projection(rect{tags::from_extent, math::vec2{}, region.size()});
+	renderer->batch.push_viewport(region);
+
 	draw(region);
+
+	renderer->batch.pop_viewport();
+	renderer->batch.pop_projection();
 }
 
 void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
@@ -279,6 +285,10 @@ void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 			// renderer->blit();
 		}
 	}
+
+	// renderer_ui.batch.batch.consume_all();
+
+
 }
 
 mo_yanxi::ui::scene::scene(scene&& other) noexcept:
@@ -307,12 +317,12 @@ void mo_yanxi::ui::scene::updateInbounds(std::vector<elem*>&& next){
 	auto [i1, i2] = std::ranges::mismatch(lastInbounds, next);
 
 	for(const auto& element : std::ranges::subrange{i1, lastInbounds.end()}){
-		element->events().fire(events::exbound{cursorPos});
+		element->events().fire(events::exbound{cursor_pos});
 	}
 
 	// for(const auto& element : std::ranges::subrange{i2, next.end()}){
 	for(const auto& element : next){
-		element->events().fire(events::inbound{cursorPos});
+		element->events().fire(events::inbound{cursor_pos});
 	}
 
 	lastInbounds = std::move(next);

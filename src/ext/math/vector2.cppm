@@ -966,6 +966,15 @@ export namespace mo_yanxi::math{
 		[[nodiscard]] FORCE_INLINE constexpr T slope() const noexcept{
 			return y / x;
 		}
+		/**
+		 * @brief
+		 * @return y / x
+		 */
+		[[nodiscard]] FORCE_INLINE constexpr vector2& uniform() noexcept{
+			x = x * 2 - 1;
+			y = y * 2 - 1;
+			return *this;
+		}
 
 
 		/**

@@ -57,6 +57,7 @@ namespace mo_yanxi::graphic{
 		}
 
 	public:
+		math::vec2 move_speed_scale{1, 1};
 		float speed_scale{1.};
 		float clip_margin{50};
 
@@ -90,11 +91,11 @@ namespace mo_yanxi::graphic{
 		}
 
 		constexpr void move(const float x, const float y) noexcept {
-			stablePos.add(x * speed_scale, y * speed_scale);
+			stablePos.add(x * speed_scale * move_speed_scale.x, y * speed_scale * move_speed_scale.y);
 		}
 
 		constexpr void move(const math::vec2 vec2) noexcept {
-			stablePos.add(vec2 * speed_scale);
+			stablePos.add(vec2 * speed_scale * move_speed_scale);
 		}
 
 		/**

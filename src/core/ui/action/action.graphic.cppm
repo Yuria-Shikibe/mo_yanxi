@@ -62,12 +62,12 @@ export namespace mo_yanxi::ui::action{
 		}
 	};
 
-	struct RemoveAction : action<elem>{
-		RemoveAction() = default;
-
-		void begin(elem& elem) override{
-			elem.remove_self_from_parent();
-		}
-	};
+	// struct RemoveAction : action<elem>{
+	// 	RemoveAction() = default;
+	//
+	// 	void begin(elem& elem) override{
+	// 		elem.remove_self_from_parent();
+	// 	}
+	// };
 }
 

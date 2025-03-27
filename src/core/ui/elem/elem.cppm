@@ -28,6 +28,7 @@ export import mo_yanxi.core.ctrl.constants;
 
 export import mo_yanxi.meta_programming;
 export import mo_yanxi.spreadable_event_handler;
+export import mo_yanxi.math.quad_tree.interface;
 // export import Core.UI.Drawer;
 // export import Core.UI.Flags;
 // export import Core.UI.Util;
@@ -108,7 +109,7 @@ namespace mo_yanxi::ui{
 		events::focus_begin,
 		events::focus_end,
 		events::scroll,
-		events::moved>;
+		events::cursor_moved>;
 
 	const style_drawer<struct elem>* getDefaultStyleDrawer(){
 		return global_style_drawer ? global_style_drawer : &DefaultStyleDrawer;
@@ -295,6 +296,10 @@ namespace mo_yanxi::ui{
 			return rect{tags::from_extent, absolute_src + content_src_offset(), content_size()};
 		}
 
+		[[nodiscard]] constexpr float get_min_boarder_size() const noexcept{
+			return std::ranges::max({boarder.left, boarder.right, boarder.bottom, boarder.top});
+		}
+
 		[[nodiscard]] constexpr bool
 		content_bound_contains(const rect& clipRegion, const math::vec2 pos) const noexcept{
 			return clipRegion.contains_loose(pos) && content_bound_absolute().contains_loose(pos);
@@ -380,10 +385,10 @@ namespace mo_yanxi::ui{
 	spreadable_event_handler<struct elem,
 		events::collapser_state_changed,
 		events::check_box_state_changed
-	>
+	>,
 
 		// StatedToolTipOwner<elem>,
-		// math::QuadTreeAdaptable<elem>
+		math::quad_tree_adaptable<struct elem>
 	{
 
 		[[nodiscard]] elem(){
@@ -567,7 +572,7 @@ namespace mo_yanxi::ui{
 		 * @param delta cursor transform
 		 */
 		void notify_cursor_moved(const math::vec2 delta) const{
-			event_slots.fire(events::moved{delta});
+			event_slots.fire(events::cursor_moved{delta});
 			// dropToolTipIfMoved();
 		}
 
@@ -586,12 +591,9 @@ namespace mo_yanxi::ui{
 			return property.absolute_src + property.content_src_offset();
 		}
 
-		void remove_self_from_parent();
-		void remove_self_from_parent_instantly();
-
-		// void registerAsyncTask();
-
-		void notify_remove();
+		// void remove_self_from_parent();
+		// void remove_self_from_parent_instantly();
+		// void notify_remove();
 
 		void clear_external_references() noexcept;
 
@@ -798,6 +800,14 @@ namespace mo_yanxi::ui{
 
 		void build_tooltip(bool belowScene = false, bool fade_in = true);
 
+
+		[[nodiscard]] quad_tree_rect_type quad_tree_get_bound() const noexcept{
+			return get_bound();
+		}
+
+		[[nodiscard]] bool quad_tree_contains(typename quad_tree_vector_type::const_pass_t point) const{
+			return contains(point);
+		}
 	private:
 		[[nodiscard]] elem* get_parent_to_elem() const noexcept;
 	};

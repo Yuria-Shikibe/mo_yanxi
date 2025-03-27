@@ -27,6 +27,10 @@ layout(set = 0, binding = 1) uniform UBO{
     float dst;
     float time;
     vec2 extent;
+    float camera_scale;
+    uint cap1;
+    uint cap2;
+    uint cap3;
 }ubo;
 
 layout(set = 1, binding = 0) uniform sampler2D textures[4];
@@ -63,7 +67,7 @@ void main() {
 
     if(bool(mode & draw_mode_sdf)){
         float msdf = msdf(textures[in_indices[0]], in_uv, 1, bool(mode & draw_mode_uniformed));
-        msdf = smoothstep(-0.0375, 0.0375, msdf);
+        msdf = smoothstep(-0.0375 * ubo.camera_scale, 0.0375 * ubo.camera_scale, msdf);
         texColor = vec4(1, 1, 1, msdf);
     }else{
         texColor = texture(textures[in_indices[0]], in_uv);

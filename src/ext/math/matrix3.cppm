@@ -25,9 +25,9 @@ namespace mo_yanxi::math{
 	private:
 		//TODO OPTM SIMD
 		FORCE_INLINE static constexpr void mul(matrix3& rhs, const matrix3& to_apply) {
-			const vec3_t c1 = to_apply.c1 * rhs.c1.x + to_apply.c2 * rhs.c1.y + to_apply.c2 * rhs.c1.z;
-			const vec3_t c2 = to_apply.c1 * rhs.c2.x + to_apply.c2 * rhs.c2.y + to_apply.c2 * rhs.c2.z;
-			const vec3_t c3 = to_apply.c1 * rhs.c3.x + to_apply.c2 * rhs.c3.y + to_apply.c2 * rhs.c3.z;
+			const vec3_t c1 = to_apply.c1 * rhs.c1.x + to_apply.c2 * rhs.c1.y + to_apply.c3 * rhs.c1.z;
+			const vec3_t c2 = to_apply.c1 * rhs.c2.x + to_apply.c2 * rhs.c2.y + to_apply.c3 * rhs.c2.z;
+			const vec3_t c3 = to_apply.c1 * rhs.c3.x + to_apply.c2 * rhs.c3.y + to_apply.c3 * rhs.c3.z;
 
 			rhs.c1 = c1;
 			rhs.c2 = c2;
@@ -82,9 +82,9 @@ namespace mo_yanxi::math{
 			return dcpy.apply(lhs);
 		}
 
-		FORCE_INLINE constexpr matrix3& operator*=(const matrix3& lhs) noexcept {
-			return apply(lhs);
-		}
+		// FORCE_INLINE constexpr matrix3& operator*=(const matrix3& lhs) noexcept {
+		// 	return apply(lhs);
+		// }
 
 		FORCE_INLINE constexpr matrix3& operator~() noexcept {
 			return inv();
@@ -163,6 +163,15 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
+		FORCE_INLINE constexpr matrix3& apply_ortho(const matrix3& transform) noexcept {
+			c1.x *= transform.c1.x;
+			c2.y *= transform.c2.y;
+			c3.x += transform.c3.x;
+			c3.y += transform.c3.y;
+
+			return *this;
+		}
+
 		FORCE_INLINE constexpr matrix3& from_rotation(const floating_point_t degrees) noexcept {
 			return from_rotation_rad(math::deg_to_rad_v<floating_point_t> * degrees);
 		}
@@ -176,8 +185,8 @@ namespace mo_yanxi::math{
 		}
 
 		FORCE_INLINE constexpr matrix3& set_rotation_rad(const floating_point_t radians) noexcept {
-			const auto cos = math::cos(radians);
-			const auto sin = math::sin(radians);
+			auto cos = math::cos(radians);
+			auto sin = math::sin(radians);
 
 			c1 = { cos, sin, 0};
 			c2 = {-sin, cos, 0};
@@ -291,6 +300,19 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
+		FORCE_INLINE constexpr matrix3& inv_scaled_transform() noexcept {
+			c1.x = 1 / c1.x;
+			c1.y = 1 / c1.y;
+			c2.x = 1 / c1.x;
+			c2.y = 1 / c1.y;
+
+			c3.x *= -1;
+			c3.y *= -1;
+
+			return *this;
+		}
+
+
 
 		/**
 		* @brief Only works when this mat is rot * square scale + trans
@@ -311,22 +333,24 @@ namespace mo_yanxi::math{
 
 			const floating_point_t inv_det = 1.0f / static_cast<floating_point_t>(detV);
 
+			
+			
 			vec3_t tc1{
-				c2.y * c3.z - c3.y * c2.z,
-				c3.x * c2.z - c2.x * c3.z,
-				c2.x * c3.y - c3.x * c2.y
+				c2.y * c3.z - c2.z * c3.y,
+				c1.z * c3.y - c1.y * c3.z,
+				c1.y * c2.z - c1.z * c2.y
 			};
 
 			vec3_t tc2{
-				c3.y * c1.z - c3.z * c1.y,
-				c1.x * c3.z - c3.x * c1.z,
-				c3.x * c1.y - c1.x * c3.y
+				c2.z * c3.x - c3.z * c2.x,
+				c1.x * c3.z - c1.z * c3.x,
+				c1.z * c2.x - c1.x * c2.z
 			};
 
 			vec3_t tc3{
-				c1.y * c2.z - c2.y * c1.z,
-				c2.x * c1.z - c1.x * c2.z,
-				c1.x * c2.y - c2.x * c1.y
+				c2.x * c3.y - c2.y * c3.x,
+				c1.y * c3.x - c1.x * c3.y,
+				c1.x * c2.y - c1.y * c2.x
 			};
 
 			c1 = tc1 * inv_det;

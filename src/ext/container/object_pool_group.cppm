@@ -4,7 +4,7 @@ module;
 
 export module ext.object_pool_group;
 
-export import ext.object_pool;
+export import mo_yanxi.object_pool;
 export import mo_yanxi.open_addr_hash_map;
 import std;
 
@@ -51,8 +51,8 @@ namespace mo_yanxi{
 
 	export
 	struct dynamic_object_pool_group{
-		constexpr static std::size_t pool_size = sizeof(object_pool<std::nullptr_t>);
-		constexpr static std::size_t align = alignof(object_pool<std::nullptr_t>);
+		constexpr static std::size_t pool_size = sizeof(single_thread_object_pool<std::nullptr_t>);
+		constexpr static std::size_t align = alignof(single_thread_object_pool<std::nullptr_t>);
 
 		struct pool_wrapper{
 			using deleter = void(pool_wrapper*) noexcept;
@@ -67,14 +67,14 @@ namespace mo_yanxi{
 			template <typename T>
 			[[nodiscard]] constexpr explicit(false) pool_wrapper(std::in_place_type_t<T>) :
 			destructor(+[](pool_wrapper* p) noexcept {
-				auto* ptr = reinterpret_cast<object_pool<T>*>(p->buffer.data());
+				auto* ptr = reinterpret_cast<single_thread_object_pool<T>*>(p->buffer.data());
 				std::destroy_at(ptr);
 			}), move_constructor_func(+[](pool_wrapper& self, pool_wrapper&& other) noexcept{
-				auto* l = reinterpret_cast<object_pool<T>*>(self.buffer.data());
-				auto* r = reinterpret_cast<object_pool<T>*>(other.buffer.data());
+				auto* l = reinterpret_cast<single_thread_object_pool<T>*>(self.buffer.data());
+				auto* r = reinterpret_cast<single_thread_object_pool<T>*>(other.buffer.data());
 				std::construct_at(l, std::move(*r));
 			}){
-				auto* ptr = reinterpret_cast<object_pool<T>*>(buffer.data());
+				auto* ptr = reinterpret_cast<single_thread_object_pool<T>*>(buffer.data());
 				std::construct_at(ptr);
 			}
 
@@ -83,8 +83,8 @@ namespace mo_yanxi{
 			}
 
 			template <typename T>
-			[[nodiscard]] constexpr object_pool<T>& as() noexcept{
-				return reinterpret_cast<object_pool<T>&>(buffer);
+			[[nodiscard]] constexpr single_thread_object_pool<T>& as() noexcept{
+				return reinterpret_cast<single_thread_object_pool<T>&>(buffer);
 			}
 
 			[[nodiscard]] constexpr pool_wrapper() = default;
@@ -136,25 +136,25 @@ namespace mo_yanxi{
 
 	public:
 		template <typename T>
-		object_pool<T>& pool_of(){
+		single_thread_object_pool<T>& pool_of(){
 			return pools.try_emplace(std::type_index{typeid(T)}, std::in_place_type<T>).first->second.template as<T>();
 		}
 
 		template <typename T, typename... Args>
 		auto obtain_raw(/*std::in_place_type_t<T>, */Args&&... args){
-			object_pool<T>& pool = pool_of<T>();
+			single_thread_object_pool<T>& pool = pool_of<T>();
 			return pool.template obtain_raw<Args...>(std::forward<Args>(args)...);
 		}
 
 		template <typename T, typename... Args>
 		auto obtain_unique(/*std::in_place_type_t<T>, */Args&&... args){
-			object_pool<T>& pool = pool_of<T>();
+			single_thread_object_pool<T>& pool = pool_of<T>();
 			return pool.template obtain_unique<Args...>(std::forward<Args>(args)...);
 		}
 
 		template <typename T, typename... Args>
 		auto obtain_shared(/*std::in_place_type_t<T>, */Args&&... args){
-			object_pool<T>& pool = pool_of<T>();
+			single_thread_object_pool<T>& pool = pool_of<T>();
 			return pool.template obtain_shared<Args...>(std::forward<Args>(args)...);
 		}
 	};
@@ -163,29 +163,29 @@ namespace mo_yanxi{
 	template <typename ...Ts>
 	struct static_object_pool_group{
 	private:
-		std::tuple<object_pool<Ts> ...> pools{};
+		std::tuple<single_thread_object_pool<Ts> ...> pools{};
 
 	public:
 		template <typename T>
-		object_pool<T>& pool_of() noexcept{
-			return std::get<object_pool<T>>(pools);
+		single_thread_object_pool<T>& pool_of() noexcept{
+			return std::get<single_thread_object_pool<T>>(pools);
 		}
 
 		template <typename T, typename ...Args>
 		auto obtain_raw(/*std::in_place_type_t<T>, */Args&&... args){
-			object_pool<T>& pool = pool_of<T>();
+			single_thread_object_pool<T>& pool = pool_of<T>();
 			return pool.template obtain_raw<Args...>(std::forward<Args>(args)...);
 		}
 
 		template <typename T, typename ...Args>
 		auto obtain_unique(/*std::in_place_type_t<T>, */Args&&... args){
-			object_pool<T>& pool = pool_of<T>();
+			single_thread_object_pool<T>& pool = pool_of<T>();
 			return pool.template obtain_unique<Args...>(std::forward<Args>(args)...);
 		}
 
 		template <typename T, typename ...Args>
 		auto obtain_shared(/*std::in_place_type_t<T>, */Args&&... args){
-			object_pool<T>& pool = pool_of<T>();
+			single_thread_object_pool<T>& pool = pool_of<T>();
 			return pool.template obtain_shared<Args...>(std::forward<Args>(args)...);
 		}
 	};

@@ -121,7 +121,7 @@ namespace mo_yanxi::ui{
 
 			// prevRatio = getScrollRatio(scroll.base);
 
-			item->update(delta_in_ticks);
+			if(item)item->update(delta_in_ticks);
 		}
 
 		void draw_content(const rect clipSpace) const override{
@@ -192,48 +192,48 @@ namespace mo_yanxi::ui{
 		}
 
 		void update_item_layout(){
-			if(item){
-				modifyChildren(*item);
-				setChildrenFillParentSize_Quiet_legacy(*item, content_size());
+			if(!item)return;
 
-				auto bound = item->context_size_restriction;
+			modifyChildren(*item);
+			setChildrenFillParentSize_Quiet_legacy(*item, content_size());
 
-				if(auto sz = item->pre_acquire_size(bound)){
+			auto bound = item->context_size_restriction;
 
-					if(bar_caps_size){
-						bool need_relayout = false;
-						switch(layout_policy_){
-						case layout_policy::hori_major :{
-							if(sz->y > property.content_height()){
-								bound.width.value -= scrollBarStroke;
-								bound.width.value = math::clamp_positive(bound.width.value);
-								need_relayout = true;
-							}
-							break;
-						}
-						case layout_policy::vert_major :{
-							if(sz->x > property.content_width()){
-								bound.height.value -= scrollBarStroke;
-								bound.height.value = math::clamp_positive(bound.height.value);
-								need_relayout = true;
-							}
-							break;
-						}
-						default: break;
-						}
+			if(auto sz = item->pre_acquire_size(bound)){
 
-						if(need_relayout){
-							auto s = item->pre_acquire_size(bound);
-							if(s) sz = s;
+				if(bar_caps_size){
+					bool need_relayout = false;
+					switch(layout_policy_){
+					case layout_policy::hori_major :{
+						if(sz->y > property.content_height()){
+							bound.width.value -= scrollBarStroke;
+							bound.width.value = math::clamp_positive(bound.width.value);
+							need_relayout = true;
 						}
+						break;
+					}
+					case layout_policy::vert_major :{
+						if(sz->x > property.content_width()){
+							bound.height.value -= scrollBarStroke;
+							bound.height.value = math::clamp_positive(bound.height.value);
+							need_relayout = true;
+						}
+						break;
+					}
+					default: break;
 					}
 
-					item->resize_masked(*sz, spread_direction::local | spread_direction::child);
+					if(need_relayout){
+						auto s = item->pre_acquire_size(bound);
+						if(s) sz = s;
+					}
 				}
 
-				// setChildrenFillParentSize_Quiet(*item, get_viewport_size());
-				item->layout();
+				item->resize_masked(*sz, spread_direction::local | spread_direction::child);
 			}
+
+			// setChildrenFillParentSize_Quiet(*item, get_viewport_size());
+			item->layout();
 		}
 
 		void modifyChildren(elem& element) const{
@@ -255,22 +255,6 @@ namespace mo_yanxi::ui{
 			default: std::unreachable();
 			}
 		}
-
-		void post_remove(elem* element) override{
-			item = {};
-		}
-
-		void instant_remove(elem* element) override{
-			item = {};
-		}
-
-		void clear_children() noexcept override{
-			item = {};
-		}
-		elem& add_children(elem_ptr&& element) override{
-			return *item;
-		}
-
 
 	private:
 		void set_scroll_by_ratio(math::vec2 ratio){

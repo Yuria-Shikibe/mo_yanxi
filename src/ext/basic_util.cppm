@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module ext.basic_util;
+export module mo_yanxi.basic_util;
 
 import std;
 

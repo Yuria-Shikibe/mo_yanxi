@@ -82,9 +82,8 @@ namespace mo_yanxi::graphic{
 
 		command_buffer_modifier create_command(
 			const vk::dynamic_rendering& rendering,
-			vk::batch& batch
+			vk::batch& batch, VkRect2D region
 		) override{
-			auto region = batch.get_context()->get_screen_area();
 			for (auto && [idx, vk_command_buffer] : command_buffers | std::views::enumerate){
 				vk::scoped_recorder scoped_recorder{vk_command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
@@ -258,6 +257,7 @@ namespace mo_yanxi::graphic{
 				.set_uniform_buffer(1, frag_data.ubo.get_address() + decltype(frag_data)::chunk_size * i, decltype(frag_data)::chunk_size, i);
 			}
 
+			region.extent = context.get_extent();
 			create_attachments(context.get_extent());
 
 			init_image_layout(context.get_transient_graphic_command_buffer(), context.get_transient_compute_command_buffer());
@@ -267,6 +267,8 @@ namespace mo_yanxi::graphic{
 		}
 
 		void resize(const VkExtent2D extent){
+			region.extent = extent;
+
 			mid_attachments.resize(extent);
 			draw_attachments.resize(extent);
 			create_attachments(extent);
@@ -318,7 +320,7 @@ namespace mo_yanxi::graphic{
 				VK_IMAGE_LAYOUT_GENERAL
 			);
 
-			const auto h = batch_layer.create_command(dynamic_rendering, batch);
+			const auto h = batch_layer.create_command(dynamic_rendering, batch, region);
 			for(std::size_t i = 0; i < batch.get_chunk_count(); ++i){
 
 				vk::cmd::bind_descriptors(

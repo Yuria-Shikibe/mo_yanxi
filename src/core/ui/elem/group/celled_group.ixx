@@ -187,32 +187,19 @@ namespace mo_yanxi::ui{
 		create_handle<E, cell_type> emplace(this G& self, Args&&... args){
 			auto [result, adaptor] = self.template add<E>(elem_ptr{self.get_scene(), &self, std::in_place_type<E>, std::forward<Args>(args) ...});
 
+			auto addr = self.cells.data();
+
 			co_yield result;
-			static_cast<universal_group&>(self).on_add(adaptor);
+			static_cast<universal_group&>(self).add_adaptor(addr, &result.elem, adaptor);
 		}
-
-		// template <Template::ElementCreator Tmpl>
-		// create_result<typename Template::Traits<Tmpl>::ElementType, CellTy> create(const Tmpl& tmpl){
-		// 	auto rst = this->template add<typename Template::Traits<Tmpl>::ElementType>(Template::Traits<Tmpl>::create(tmpl, this, scene));
-		//
-		// 	Template::Traits<Tmpl>::tryModifyCell(tmpl, rst.cell);
-		// 	return rst;
-		// }
-
-		// template <Template::ElementCreator Tmpl, std::invocable<typename Template::Traits<Tmpl>::ElementType&> Init>
-		// CellTy& create(const Tmpl& tmpl, Init init){
-		// 	auto rst = this->create(tmpl);
-		//
-		// 	std::invoke(init, rst.elem);
-		// 	return rst.cell;
-		// }
 
 		template <invocable_elem_init_func Fn, std::derived_from<universal_group> G>
 		create_handle<typename elem_init_func_trait<Fn>::elem_type, cell_type> function_init(this G& self, Fn init){
 			auto [result, adaptor] = self.template add<typename elem_init_func_trait<Fn>::elem_type>(elem_ptr{self.get_scene(), &self, init});
+			auto addr = self.cells.data();
 
 			co_yield result;
-			static_cast<universal_group&>(self).on_add(adaptor);
+			static_cast<universal_group&>(self).add_adaptor(addr, &result.elem, adaptor);
 		}
 
 		// template <InvocableElemInitFunc Fn>
@@ -227,6 +214,15 @@ namespace mo_yanxi::ui{
 		}
 
 	protected:
+		void add_adaptor(adaptor_type* last_addr, elem* elem, adaptor_type& adaptor){
+			if(last_addr == cells.data()){
+				this->on_add(adaptor);
+			}else{
+				if(auto itr = std::ranges::find_last(cells, elem, &adaptor_type::element); itr.begin() != itr.end()){
+					this->on_add(itr.front());
+				}
+			}
+		}
 		virtual void on_add(adaptor_type& adaptor){
 		}
 

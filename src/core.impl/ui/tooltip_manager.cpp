@@ -87,7 +87,7 @@ void mo_yanxi::ui::tooltip_instance::update_layout(const tooltip_manager& manage
 }
 
 mo_yanxi::math::vec2 mo_yanxi::ui::tooltip_manager::get_cursor_pos() const noexcept{
-	return scene->cursorPos;
+	return scene->cursor_pos;
 }
 
 mo_yanxi::ui::tooltip_instance& mo_yanxi::ui::tooltip_manager::append_tooltip(
@@ -109,6 +109,7 @@ mo_yanxi::ui::tooltip_instance& mo_yanxi::ui::tooltip_manager::append_tooltip(
 }
 
 void mo_yanxi::ui::tooltip_manager::update(float delta_in_time){
+	assert(scene);
 	updateDropped(delta_in_time);
 
 	for (auto&& active : actives){

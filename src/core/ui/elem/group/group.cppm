@@ -4,26 +4,18 @@ module;
 
 export module mo_yanxi.ui.group;
 
+export import mo_yanxi.ui.pre_decl;
 export import mo_yanxi.ui.elem_ptr;
 export import mo_yanxi.ui.elem;
 
 import std;
 
 namespace mo_yanxi::ui{
-	// export struct scene;
 
 	// export struct scene;
 	export
 	struct group : public elem{
 		using elem::elem;
-
-		virtual void post_remove(elem* element) = 0;
-
-		virtual void instant_remove(elem* element) = 0;
-
-		virtual void clear_children() noexcept = 0;
-
-		virtual elem& add_children(elem_ptr&& element) = 0;
 
 		[[nodiscard]] elem* find_children_by_name(const std::string_view name) const{
 			for (const elem_ptr& element : get_children()){

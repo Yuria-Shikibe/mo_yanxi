@@ -43,7 +43,7 @@ namespace mo_yanxi::ui{
 
 		void draw() const{
 			assert(focus != nullptr);
-			focus->draw();
+			focus->root_draw();
 		}
 
 		void update(const float delta_in_ticks) const{

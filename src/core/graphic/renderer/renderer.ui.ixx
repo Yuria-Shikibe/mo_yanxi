@@ -35,11 +35,18 @@ namespace mo_yanxi::graphic{
 
 	};
 
+	constexpr math::mat3 uniform{{2, 0, 0}, {0, 2, 0}, {-1, -1, 1}};
+	constexpr math::mat3 inv_uniform = math::mat3{uniform}.inv();
+
 	 struct scissor_raw{
 		math::frect rect{};
 		float distance{};
 
 	 	void uniform(const math::mat3& mat) noexcept{
+	 		if(rect.area() < 0.05f){
+	 			rect = {-5, -5, 0, 0};
+	 			return;
+	 		}
 	 		auto src = mat * rect.get_src();
 	 		auto dst = mat * rect.get_end();
 	 		rect = {src, dst};
@@ -60,10 +67,14 @@ namespace mo_yanxi::graphic{
 		// std::uint32_t cap2{};
 
 		scissor scissor{};
-
 		float global_time{};
-
 		math::vec2 viewport_extent{};
+
+		float camera_scale{};
+
+		std::uint32_t cap1;
+		std::uint32_t cap2;
+		std::uint32_t cap3;
 
 		constexpr friend bool operator==(const ui_fragment_uniform& lhs, const ui_fragment_uniform& rhs) noexcept = default;
 	};
@@ -97,9 +108,8 @@ namespace mo_yanxi::graphic{
 
 		command_buffer_modifier create_command(
 			const vk::dynamic_rendering& rendering,
-			vk::batch& batch
+			vk::batch& batch, VkRect2D region
 		) override{
-			auto region = batch.get_context()->get_screen_area();
 			for (auto && [idx, vk_command_buffer] : command_buffers | std::views::enumerate){
 				vk::scoped_recorder scoped_recorder{vk_command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
@@ -150,7 +160,12 @@ namespace mo_yanxi::graphic{
 		vk::pipeline blit_pipeline{};
 		vk::command_buffer blit_command{};
 
-		std::vector<math::mat3> transforms{};
+		// math::mat3 current_proj{math::mat3_idt};
+		math::mat3 current_transform{math::mat3_idt};
+
+		std::vector<math::mat3> projections{};
+
+		std::vector<math::frect> viewports{};
 		std::vector<scissor_raw> scissors{};
 
 
@@ -229,12 +244,15 @@ namespace mo_yanxi::graphic{
 			vk::cmd::submit_command(context().compute_queue(), blit_command);
 		}
 
+
 		void push_scissor(scissor_raw scissor){
 			const auto back = scissors.back();
 			if(back != scissor){
 				batch.consume_all();
 			}
 
+			auto proj = get_cur_full_proj();
+			scissor.uniform(proj);
 			scissor.rect = scissor.rect.intersection_with(back.rect);
 
 			scissors.push_back(scissor);
@@ -251,19 +269,102 @@ namespace mo_yanxi::graphic{
 			assert(scissors.size() > 0);
 		}
 
+		void push_projection(const math::frect viewport){
+			batch.consume_all();
+
+			projections.push_back(math::mat3{}.set_orthogonal(viewport.src, viewport.size()));
+		}
+
+		[[nodiscard]] math::mat3 get_cur_proj() const{
+			assert(!projections.empty());
+			return current_transform * projections.back();
+		}
+		[[nodiscard]] const scissor_raw& get_cur_scissor() const{
+			assert(!scissors.empty());
+			return scissors.back();
+		}
+
+		void push_projection(const math::mat3& proj){
+			batch.consume_all();
+
+			projections.push_back(proj);
+		}
+
+		void pop_projection() noexcept{
+			batch.consume_all();
+
+			assert(!projections.empty());
+			projections.pop_back();
+		}
+
+		void push_viewport(const math::frect viewport){
+			batch.consume_all();
+			math::frect last_viewport = get_last_viewport();
+
+			math::mat3 transform;
+			auto scale = viewport.size() / last_viewport.size();
+			transform.from_scaling(scale);
+			transform.set_translation(scale - math::vec2{1, 1} + viewport.src / last_viewport.size() * 2);
+
+			if(viewports.empty()){
+				current_transform = transform;
+			}else{
+				current_transform *= transform;
+			}
+
+			viewports.push_back(viewport);
+		}
+
+		void pop_viewport(){
+			batch.consume_all();
+			assert(!viewports.empty());
+
+			auto viewport = viewports.back();
+			viewports.pop_back();
+
+			math::frect last_viewport = get_last_viewport();
+
+			math::mat3 transform;
+			auto scale = viewport.size() / last_viewport.size();
+			transform.from_scaling(scale);
+			transform.set_translation(scale - math::vec2{1, 1} + viewport.src / last_viewport.size() * 2);
+
+			if(viewports.empty()){
+				current_transform = transform;
+			}else{
+				current_transform *= transform.inv();
+			}
+
+		}
+
+
 	private:
+		[[nodiscard]] math::frect get_last_viewport() const noexcept{
+			math::frect last_viewport;
+			if(!viewports.empty()){
+				last_viewport = viewports.back();
+			}else{
+				last_viewport = math::irect{
+					region.offset.x, region.offset.y,
+					static_cast<int>(region.extent.width),
+					static_cast<int>(region.extent.height)
+				}.as<float>();
+			}
+			return last_viewport;
+		}
 		void on_resize(const VkExtent2D extent){
+			region.extent = extent;
+
 			init_image_layout(context().get_transient_graphic_command_buffer(), context().get_transient_compute_command_buffer());
 			update_layer_commands(main_layer);
 			create_blit_command();
 
 			vert_data.current = {{math::mat3{}.set_orthogonal({}, math::vector2{extent.width, extent.height}.as<float>())}};
 			scissors.assign(1, {
-				.rect = math::frect{
-					math::vector2{extent.width, extent.height}.as<float>()
-				},
+				.rect = math::frect{-1, -1, 2, 2},
 				.distance = 0.f
 			});
+
 		}
 
 		void update_layer_commands(batch_layer& batch_layer){
@@ -271,7 +372,7 @@ namespace mo_yanxi::graphic{
 					{color_base.get_image_view(), color_light.get_image_view(), color_background.get_image_view()}
 				};
 
-			const auto h = batch_layer.create_command(dynamic_rendering, batch);
+			const auto h = batch_layer.create_command(dynamic_rendering, batch, region);
 			for(std::size_t i = 0; i < batch.get_chunk_count(); ++i){
 
 				vk::cmd::bind_descriptors(
@@ -304,16 +405,37 @@ namespace mo_yanxi::graphic{
 				.set_image(4, blit_light.get_image_view(), 0, VK_IMAGE_LAYOUT_GENERAL, nullptr, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
 
 			;
+		}
 
+		[[nodiscard]] math::mat3 get_cur_full_proj() const noexcept{
+			assert(!projections.empty());
+
+			const auto currentProj = projections.back();
+			math::mat3 proj = current_transform * currentProj;
+			return proj;
 		}
 
 		VkCommandBuffer submit(const std::size_t index){
+			assert(!projections.empty());
+			assert(!viewports.empty());
+
+			const auto currentProj = projections.back();
+			math::mat3 proj = current_transform * currentProj;
+			vert_data.current.view = proj;
 			vert_data.update<true>(index);
+
+
 			auto csr = scissors.back();
-			const math::mat3 proj = vert_data.current.view;
-			csr.uniform(proj);
+			// csr.uniform(proj);
 			frag_data.current.scissor = csr;
-			frag_data.current.viewport_extent = ~proj.get_ortho_scale() * 2;
+			frag_data.current.viewport_extent = viewports.back().size();
+
+			math::vec2 def_scale = math::vector2{region.extent.width, region.extent.height}.as<float>();
+			math::vec2 cur_scale = ~currentProj.get_scale() * 2;
+
+			auto multis = std::sqrt(cur_scale.area() / def_scale.area());
+			frag_data.current.camera_scale = multis;
+
 			frag_data.update<true>(index);
 
 			return main_layer.submit(context(), index);

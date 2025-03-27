@@ -105,11 +105,20 @@ namespace mo_yanxi::ui{
 		}
 
 		math::vec2 layout_text(math::vec2 bound){
-			text_expired = false;
+			//TODO loose the relayout requirement
+			if(text_expired){
+				glyph_layout.set_clamp_size(bound);
+				glyph_layout.clear();
+				parser->operator()(glyph_layout);
+				text_expired = false;
+			}else{
+				if(glyph_layout.get_clamp_size() != bound){
+					glyph_layout.set_clamp_size(bound);
+					glyph_layout.clear();
+					parser->operator()(glyph_layout);
+				}
+			}
 
-			glyph_layout.set_clamp_size(bound);
-			glyph_layout.clear();
-			/*if(!glyph_layout)*/parser->operator()(glyph_layout);
 			return glyph_layout.extent();
 		}
 

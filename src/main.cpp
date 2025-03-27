@@ -83,6 +83,7 @@ import mo_yanxi.ui.elem.progress_bar;
 import mo_yanxi.ui.elem.collapser;
 import mo_yanxi.ui.elem.button;
 import mo_yanxi.ui.elem.check_box;
+import mo_yanxi.ui.elem.nested_scene;
 
 import test;
 
@@ -136,12 +137,33 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	auto spane = bed.emplace<ui::scroll_pane>();
 	spane.cell().region_scale = {math::vec2{}, math::vec2{.5, .8}};
 	spane.cell().align = align::pos::top_left;
-
 	spane->set_layout_policy(ui::layout_policy::hori_major);
+
+	auto nscene = bed.emplace<ui::nested_scene>();
+	nscene.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.5, 1}};
+	nscene.cell().align = align::pos::center_right;
+	//
+	nscene->get_group().function_init([](ui::table& t){
+		t.function_init([](ui::text_input_area& text){
+			text.set_text("楼上的下来搞\nadasd\n\nasdasdas\n\n核算abcde啊啊啊.,。，；：");
+			text.set_policy(font::typesetting::layout_policy::auto_feed_line);
+		}).cell().set_external({true, true});
+		t.context_size_restriction = ui::extent_by_external;
+	});
+
+	nscene->get_group().function_init([](ui::table& t){
+		t.function_init([](ui::text_input_area& text){
+			text.set_text("楼上的下来搞\nadasd\n\nasdasdas\n\n核算abcde啊啊啊.,。，；：");
+			text.set_policy(font::typesetting::layout_policy::auto_feed_line);
+		}).cell().set_external({true, true});
+		t.context_size_restriction = ui::extent_by_external;
+		t.property.relative_src = {-100, 500};
+	});
 
 	{
 
-		auto& table = spane->emplace<ui::table>();
+		auto& table = nscene->get_group().emplace<ui::table>();
+		table.property.relative_src = {400, 500};
 
 		table.template_cell.pad.set(4);
 
@@ -162,7 +184,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 				t.set_policy(font::typesetting::layout_policy::auto_feed_line);
 				t.property.fill_parent = {true, true};
 			});
-		}).cell().set_external({false, true});
+		}).cell().set_external({true, true});
 
 		{
 			auto image_hdl = table.end_line().emplace<ui::image_frame>();

@@ -6,6 +6,7 @@ export module mo_yanxi.assets.ctrl;
 
 export import mo_yanxi.core.global;
 export import mo_yanxi.core.global.ui;
+export import mo_yanxi.ui.scene;
 export import mo_yanxi.ui.root;
 
 import std;
@@ -18,30 +19,40 @@ namespace mo_yanxi::assets::ctrl{
 	bool disableMove = false;
 	float cameraMoveSpeed = baseCameraMoveSpeed;
 
+	graphic::camera2& get_camera(){
+		if(core::global::ui::root->focus->has_camera_focus()){
+			return *core::global::ui::root->focus->focused_camera;
+		}else{
+			return core::global::camera;
+		}
+	}
+
 	export
 	void load(){
 		using namespace mo_yanxi;
 		namespace cc = mo_yanxi::core::ctrl;
+
 		core::global::input.main_binds.register_bind(cc::key::A, cc::act::Continuous, [](auto){
-			if(!disableMove) core::global::camera.move({
+
+			 if(!disableMove) get_camera().move({
 					(-cameraMoveSpeed * core::global::timer.global_delta_tick()), 0
 			});
 		});
 
 		core::global::input.main_binds.register_bind(cc::key::D, cc::act::Continuous, [](auto){
-			if(!disableMove) core::global::camera.move({
+			if(!disableMove) get_camera().move({
 					(+cameraMoveSpeed * core::global::timer.global_delta_tick()), 0
 			});
 		});
 
 		core::global::input.main_binds.register_bind(cc::key::S, cc::act::Continuous, [](auto){
-			if(!disableMove) core::global::camera.move({
+			if(!disableMove) get_camera().move({
 					0, -cameraMoveSpeed * core::global::timer.global_delta_tick()
 			});
 		});
 
 		core::global::input.main_binds.register_bind(cc::key::W, cc::act::Continuous, [](auto){
-			if(!disableMove) core::global::camera.move({
+			if(!disableMove) get_camera().move({
 					0, +cameraMoveSpeed * core::global::timer.global_delta_tick()
 			});
 		});

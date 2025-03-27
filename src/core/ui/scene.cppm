@@ -17,6 +17,7 @@ export import mo_yanxi.ui.pre_decl;
 import mo_yanxi.owner;
 import mo_yanxi.handle_wrapper;
 import mo_yanxi.open_addr_hash_map;
+import mo_yanxi.graphic.camera;
 
 import std;
 
@@ -29,7 +30,7 @@ namespace mo_yanxi{
 
 
 namespace mo_yanxi::ui{
-	// struct elem;
+
 
 	struct event_channel_manager{
 		using subscriber_map = fixed_open_hash_map<event_channel_t, std::vector<elem*>, std::numeric_limits<event_channel_t>::max()>;
@@ -95,7 +96,7 @@ namespace mo_yanxi::ui{
 			return {};
 		}
 	};
-	
+
 	export struct scene_base{
 		struct MouseState{
 			math::vec2 src{};
@@ -117,16 +118,14 @@ namespace mo_yanxi::ui{
 
 		math::frect region{};
 
-		math::vec2 cursorPos{};
+		math::vec2 cursor_pos{};
 		std::array<MouseState, core::ctrl::mouse::Count> mouseKeyStates{};
 
 
 
-		dependency<owner<group*>> root{};
+		bool root_ownership{true};
+		dependency<group*> root{};
 
-		// dependency<core::ctrl::key_mapping<>*> keyMapping{};
-		//focus fields
-		// struct elem* currentInputFocused{nullptr};
 		elem* currentScrollFocus{nullptr};
 		elem* currentCursorFocus{nullptr};
 		elem* currentKeyFocus{nullptr};
@@ -136,6 +135,7 @@ namespace mo_yanxi::ui{
 		std::unordered_set<elem*> asyncTaskOwners{};
 
 		graphic::renderer_ui* renderer{};
+		graphic::camera2* focused_camera{};
 
 		tooltip_manager tooltip_manager{};
 
@@ -171,12 +171,16 @@ namespace mo_yanxi::ui{
 
 		~scene();
 
-		// [[nodiscard]] math::frect getBound() const noexcept{
-		// 	return math::frect{pos, size};
-		// }
+		void set_camera_focus(graphic::camera2* camera2) noexcept{
+			focused_camera = camera2;
+		}
+
+		[[nodiscard]] bool has_camera_focus() const noexcept{
+			return focused_camera != nullptr;
+		}
 
 		[[nodiscard]] math::vec2 getCursorDragTransform(const core::ctrl::key_code_t key) const noexcept{
-			return cursorPos - mouseKeyStates[key].src;
+			return cursor_pos - mouseKeyStates[key].src;
 		}
 
 		[[nodiscard]] std::string_view get_clipboard() const noexcept;
@@ -211,11 +215,14 @@ namespace mo_yanxi::ui{
 
 		void on_unicode_input(char32_t val) const;
 
-		void on_scroll(math::vec2 scroll) const;
+		void on_scroll(math::vec2 scroll, core::ctrl::key_code_t mode) const;
+		void on_scroll(math::vec2 scroll) const{
+			on_scroll(scroll, get_input_mode());
+		}
 
 		void on_cursor_pos_update(math::vec2 newPos);
 		void on_cursor_pos_update(){
-			on_cursor_pos_update(cursorPos);
+			on_cursor_pos_update(cursor_pos);
 		}
 
 		void resize(math::frect region);
@@ -233,14 +240,14 @@ namespace mo_yanxi::ui{
 
 		void layout();
 
-		void draw() const;
+		void root_draw() const;
 		void draw(math::frect clipSpace) const;
 
-		[[nodiscard]] bool hasScrollFocus() const noexcept{
+		[[nodiscard]] bool has_scroll_focus() const noexcept{
 			return this->currentScrollFocus != nullptr;
 		}
 
-		[[nodiscard]] bool hasKeyFocus() const noexcept{
+		[[nodiscard]] bool has_key_focus() const noexcept{
 			return this->currentKeyFocus != nullptr;
 		}
 

@@ -167,8 +167,9 @@ namespace mo_yanxi::graphic{
 
 		virtual command_buffer_modifier create_command(
 			const vk::dynamic_rendering& rendering,
-			vk::batch& batch
+			vk::batch& batch,
 			// std::span<const VkDescriptorBufferBindingInfoEXT> descriptors
+			VkRect2D region
 		) = 0;
 
 		[[nodiscard]] virtual bool requires_dump() const noexcept{
@@ -210,6 +211,7 @@ namespace mo_yanxi::graphic{
 	struct batch_proxy{
 	// protected:
 		vk::batch batch{};
+		VkRect2D region{};
 	// public:
 
 		[[nodiscard]] batch_proxy() = default;

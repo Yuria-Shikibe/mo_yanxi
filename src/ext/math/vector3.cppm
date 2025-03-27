@@ -480,7 +480,7 @@ export namespace mo_yanxi::math{
 		}
 
 		FORCE_INLINE constexpr friend vector3 operator*(const_pass_t lhs, T scalar) noexcept{
-			return {lhs.x * scalar, lhs.y, lhs.z * scalar};
+			return {lhs.x * scalar, lhs.y * scalar, lhs.z * scalar};
 		}
 
 		FORCE_INLINE constexpr friend vector3 operator*(T scalar, const_pass_t rhs) noexcept{

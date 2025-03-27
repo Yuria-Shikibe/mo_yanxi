@@ -124,7 +124,7 @@ namespace mo_yanxi::font{
 	export
 	template <std::floating_point T = float>
 	constexpr T normalize_len(const FT_Pos pos) noexcept {
-		return static_cast<T>(pos) / static_cast<T>(64.); // NOLINT(*-narrowing-conversions)
+		return std::ldexp(static_cast<T>(pos), -6); // NOLINT(*-narrowing-conversions)
 	}
 
 	export

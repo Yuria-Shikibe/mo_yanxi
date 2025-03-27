@@ -4,7 +4,7 @@
 
 export module ext.condition_variable_single;
 
-import ext.basic_util;
+import mo_yanxi.basic_util;
 import std;
 
 namespace mo_yanxi{

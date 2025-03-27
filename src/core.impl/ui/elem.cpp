@@ -43,7 +43,7 @@ namespace mo_yanxi{
 			// stagnateTime = focusedTime = 0.f;
 		});
 
-		event_manager.on<events::moved>([](auto, elem& self){
+		event_manager.on<events::cursor_moved>([](auto, elem& self){
 			self.cursor_state.time_stagnate = 0;
 			if(self.get_tooltip_prop().use_stagnate_time){
 				self.cursor_state.time_tooltip = 0.;
@@ -119,26 +119,26 @@ namespace mo_yanxi{
 		return global_input;
 	}
 
-	void ui::elem::remove_self_from_parent(){
-		assert(!is_root_element());
-
-		parent->post_remove(this);
-	}
-
-	void ui::elem::remove_self_from_parent_instantly(){
-		assert(!is_root_element());
-
-		parent->instant_remove(this);
-	}
+	// void ui::elem::remove_self_from_parent(){
+	// 	assert(!is_root_element());
 	//
-	// void ui::elem::registerAsyncTask(){
+	// 	parent->post_remove(this);
 	// }
-
-	void ui::elem::notify_remove(){
-		assert(parent != nullptr);
-		clear_external_references();
-		parent->post_remove(this);
-	}
+	//
+	// void ui::elem::remove_self_from_parent_instantly(){
+	// 	assert(!is_root_element());
+	//
+	// 	parent->instant_remove(this);
+	// }
+	// //
+	// // void ui::elem::registerAsyncTask(){
+	// // }
+	//
+	// void ui::elem::notify_remove(){
+	// 	assert(parent != nullptr);
+	// 	clear_external_references();
+	// 	parent->post_remove(this);
+	// }
 
 	void ui::elem::clear_external_references() noexcept{
 		if(scene_){

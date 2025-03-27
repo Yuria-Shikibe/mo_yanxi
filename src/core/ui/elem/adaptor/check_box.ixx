@@ -54,8 +54,12 @@ namespace mo_yanxi::ui{
 						owner.current_frame_index = idx;
 						owner.tooltip_notify_drop();
 					});
-					img->property.set_empty_drawer();
-					// table.end_line();
+
+					img->checkers.setActivatedProv([&owner, idx]{
+						return owner.get_frame_index() == idx;
+					});
+					// img->property.set_empty_drawer();
+
 				}
 
 				table.set_edge_pad(0);
