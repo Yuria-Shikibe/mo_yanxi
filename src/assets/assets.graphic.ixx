@@ -32,6 +32,8 @@ namespace mo_yanxi::assets::graphic{
 			export vk::shader_module bloom{};
 			export vk::shader_module ssao{};
 			export vk::shader_module world_merge{};
+			export vk::shader_module result_merge{};
+			export vk::shader_module oit_blend{};
 		}
 	}
 

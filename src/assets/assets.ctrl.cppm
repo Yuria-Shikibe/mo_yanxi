@@ -5,9 +5,11 @@
 export module mo_yanxi.assets.ctrl;
 
 export import mo_yanxi.core.global;
+export import mo_yanxi.core.global.graphic;
 export import mo_yanxi.core.global.ui;
 export import mo_yanxi.ui.scene;
 export import mo_yanxi.ui.root;
+export import mo_yanxi.graphic.camera;
 
 import std;
 
@@ -19,11 +21,11 @@ namespace mo_yanxi::assets::ctrl{
 	bool disableMove = false;
 	float cameraMoveSpeed = baseCameraMoveSpeed;
 
-	graphic::camera2& get_camera(){
+	mo_yanxi::graphic::camera2& get_camera(){
 		if(core::global::ui::root->focus->has_camera_focus()){
 			return *core::global::ui::root->focus->focused_camera;
 		}else{
-			return core::global::camera;
+			return core::global::graphic::world.camera;
 		}
 	}
 
@@ -67,7 +69,7 @@ namespace mo_yanxi::assets::ctrl{
 			if(!core::global::ui::root->focusIdle()){
 				core::global::ui::root->input_scroll(x, y);
 			}else{
-				core::global::camera.set_target_scale(core::global::camera.get_target_scale() + y * 0.05f);
+				core::global::graphic::world.camera.set_target_scale(core::global::graphic::world.camera.get_target_scale() + y * 0.05f);
 			}
 
 		 });

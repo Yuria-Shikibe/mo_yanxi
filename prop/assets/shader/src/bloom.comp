@@ -100,7 +100,7 @@ void main() {
         }
 
         vec4 last = imageLoad(target, mipPos);
-        vec4 src = screen(colorSrc * ubo.strength_src, colorDst * ubo.strength_dst);
+        vec4 src = screen(vec4(colorSrc.rgb * ubo.strength_src, colorSrc.a), vec4(colorDst.rgb * ubo.strength_dst, colorDst.a));
         imageStore(target, mipPos, mix(src, last, lastMix));
     }else{
         vec4 last = imageLoad(target, mipPos);

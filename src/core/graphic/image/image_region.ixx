@@ -10,6 +10,8 @@ export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.concepts;
 import std;
 
+//TODO vk buffer cache, secondary commandbuffer...
+
 namespace mo_yanxi::graphic{
 	export
 	struct uniformed_rect_uv{

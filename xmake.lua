@@ -80,11 +80,9 @@ target("mo_yanxi")
     add_packages("freetype")
 
     add_packages("nanosvg")
---     add_packages("boost")
---     add_packages("volk")
 
-    add_includedirs("VulkanMemoryAllocator/include")
-    add_includedirs("rectpack2D/src")
+    add_includedirs("submodules/VulkanMemoryAllocator/include")
+    add_includedirs("submodules/plf_hive")
     add_includedirs("includes")
 
 

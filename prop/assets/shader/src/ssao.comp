@@ -33,6 +33,11 @@ void main() {
 
     const float depth = texture(depthTex, uv).r;
 
+    if(depth == 1){
+        imageStore(outTex, pos, vec4(1));
+        return;
+    }
+
     for (int i = 0; i < ubo.kernalSize; ++i){
         const vec2 smp = uv + ubo.kernal[i].xy * radius * ubo.scale;
 

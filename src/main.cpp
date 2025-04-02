@@ -56,10 +56,10 @@ import mo_yanxi.core.global.graphic;
 import mo_yanxi.graphic.renderer;
 import mo_yanxi.graphic.renderer.world;
 import mo_yanxi.graphic.renderer.ui;
+import mo_yanxi.graphic.renderer.merger;
 import mo_yanxi.graphic.draw;
 import mo_yanxi.graphic.draw.func;
 import mo_yanxi.graphic.draw.multi_region;
-import mo_yanxi.graphic.draw.transparent;
 import mo_yanxi.graphic.image_atlas;
 import mo_yanxi.graphic.image_nine_region;
 
@@ -85,7 +85,11 @@ import mo_yanxi.ui.elem.button;
 import mo_yanxi.ui.elem.check_box;
 import mo_yanxi.ui.elem.nested_scene;
 
+import mo_yanxi.game.graphic.effect;
+import mo_yanxi.game.world.graphic;
+
 import test;
+import hive;
 
 void compile_shaders(){
 	using namespace mo_yanxi;
@@ -130,18 +134,23 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 
 	graphic::image_caped_region region{line_svg, line_svg.get_region(), 12, 12, graphic::msdf::sdf_image_boarder};
 
+	root.property.set_empty_drawer();
+	root.skip_inbound_capture = true;
+
 	ui::elem_ptr e{root.get_scene(), &root, std::in_place_type<ui::manual_table>};
+	e->property.set_empty_drawer();
 	e->property.fill_parent = {true, true};
+	e->skip_inbound_capture = true;
 	auto& bed = static_cast<ui::manual_table&>(root.add_children(std::move(e)));
 
-	auto spane = bed.emplace<ui::scroll_pane>();
-	spane.cell().region_scale = {math::vec2{}, math::vec2{.5, .8}};
-	spane.cell().align = align::pos::top_left;
-	spane->set_layout_policy(ui::layout_policy::hori_major);
+	// auto spane = bed.emplace<ui::scroll_pane>();
+	// spane.cell().region_scale = {math::vec2{}, math::vec2{.5, .8}};
+	// spane.cell().align = align::pos::top_left;
+	// spane->set_layout_policy(ui::layout_policy::hori_major);
 
 	auto nscene = bed.emplace<ui::nested_scene>();
-	nscene.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.5, 1}};
-	nscene.cell().align = align::pos::center_right;
+	nscene.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.3, .5}};
+	nscene.cell().align = align::pos::bottom_left;
 	//
 	nscene->get_group().function_init([](ui::table& t){
 		t.function_init([](ui::text_input_area& text){
@@ -260,6 +269,13 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	}
 }
 
+constexpr mo_yanxi::game::fx::line_splash f{
+	.count = 150,
+	.range = {260, 620},
+	.stroke = {{2, 0}, {4, 0}},
+	.length = {{30, 20}, {30, 100, mo_yanxi::math::interp::slope}}
+};
+
 void main_loop(){
 	using namespace mo_yanxi;
 
@@ -291,99 +307,174 @@ void main_loop(){
 
 	font::typesetting::parser parser{};
 
-	vk::load_ext(context.get_instance());
 
-	graphic::renderer_export exports;
-	graphic::renderer_world renderer_world{context, exports};
-	graphic::renderer_ui renderer_ui{context, exports};
+	core::global::graphic::post_init();
+
+	auto& renderer_world = core::global::graphic::world;
+	auto& renderer_ui = core::global::graphic::ui;
+	auto& merger = core::global::graphic::merger;
+
+	game::world::graphic_context graphic_context{renderer_world};
 
 	core::global::ui::root->add_scene(ui::scene{"main", new ui::loose_group{nullptr, nullptr}, &renderer_ui}, true);
-	core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()}.shrink(8));
+	core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()});
 	init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
 
-	context.register_post_resize("test", [&](window_instance::resize_event event){
-		core::global::ui::root->resize(math::frect{math::vector2{event.size.width, event.size.height}.as<float>()}.shrink(8));
 
-		core::global::camera.resize_screen(event.size.width, event.size.height);
+	auto& wgfx_input = core::global::input.register_sub_input<math::vec2, game::world::graphic_context&>("gfx");
+	wgfx_input.set_context(math::vec2{}, std::ref(graphic_context));
+	{
+		using namespace core::ctrl;
+		using namespace game;
+		wgfx_input.register_bind(mouse::_1, act::press, +[](packed_key_t, math::vec2 pos, world::graphic_context& ctx){
+			const auto wpos = ctx.renderer().camera.get_screen_to_world(pos, {}, true);
 
-		renderer_world.resize(event.size);
-		renderer_ui.resize(event.size);
+			// ctx.create_efx().set_data({
+			// 	.style = fx::shape_rect_ortho{
+			// 		.size = {{}, {100, 100}, math::interp::pow3Out},
+			// 		.offset = {},
+			// 		.stroke = {3, 0}
+			// 	},
+			// 	.trans = {wpos},
+			// 	.depth = 0,
+			// 	.duration = {60},
+			// 	.palette = graphic::colors::white.to_light_color_copy()
+			// });
+			ctx.create_efx().set_data({
+				.style = fx::line_splash{
+					.count = 150,
+					.range = {260, 620},
+					.stroke = {{2, 0}, {4, 0}},
+					.length = {{30, 20}, {30, 100, math::interp::slope}}
+				},
+				.trans = wpos,
+				.depth = 0,
+				.duration = {60},
+				.palette =fx::pal::gradient_colors{{fx::gradient{
+							graphic::colors::white.to_light_color_copy(),
+							graphic::colors::AQUA.to_light_color_copy(),
+							math::interp::margined_linear<.5>
+						},{
+							graphic::colors::white.create_lerp(graphic::colors::ORANGE, .85f).to_light_color_copy(),
+							graphic::colors::dark_gray
+						}}
+					}
+				});
+		});
+	}
+
+
+	{
+		context.register_post_resize("test", [&](window_instance::resize_event event){
+		   core::global::ui::root->resize(
+			   math::frect{math::vector2{event.size.width, event.size.height}.as<float>()});
+
+		   renderer_world.resize(event.size);
+		   renderer_ui.resize(event.size);
+		   merger.resize(event.size);
+
+		   context.set_staging_image(
+			   {
+				   .image = merger.get_result().image,
+				   .extent = context.get_extent(),
+				   .clear = false,
+				   .owner_queue_family = context.compute_family(),
+				   .src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				   .src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+				   .dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				   .dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+				   .src_layout = VK_IMAGE_LAYOUT_GENERAL,
+				   .dst_layout = VK_IMAGE_LAYOUT_GENERAL
+			   }, false);
+	   });
 
 		context.set_staging_image({
-			                          .image = exports.results[renderer_ui.get_name()].image,
-			                          .extent = event.size,
-			                          .clear = false,
-			                          .owner_queue_family = context.compute_family(),
-			                          .src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-			                          .src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-			                          .dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-			                          .dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-			                          .src_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			                          .dst_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-		                          }, false);
-	});
-
-	core::global::camera.resize_screen(context.get_extent().width, context.get_extent().height);
-	context.set_staging_image({
-		.image = exports.results[renderer_ui.get_name()].image,
-		.extent = context.get_extent(),
-		.clear = false,
-		.owner_queue_family = context.compute_family(),
-		.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-		.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-		.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-		.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-		.src_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		.dst_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-	});
+			.image = merger.get_result().image,
+			.extent = context.get_extent(),
+			.clear = false,
+			.owner_queue_family = context.compute_family(),
+			.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+			.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+		});
+	}
 
 	graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.light.png)"}).first;
 	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
 	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
 
+	core::global::timer.reset_time();
 	while(!context.window().should_close()){
 		context.window().poll_events();
 		core::global::timer.fetch_time();
 		core::global::input.update(core::global::timer.global_delta_tick());
-		core::global::camera.update(core::global::timer.global_delta_tick());
-		renderer_world.batch.frag_data.current.enable_depth = true;
-		renderer_world.batch.update_proj({core::global::camera.get_world_to_uniformed_flip_y()});
 
-		renderer_world.ssao.set_scale(core::global::camera.map_scale(0.15f, 2.5f) * 1.5f);
-		renderer_world.bloom.set_scale(core::global::camera.map_scale(0.195f, 2.f));
-		renderer_world.batch.frag_data.current.camera_scale = core::global::camera.get_scale();
-
-
+		graphic_context.update(core::global::timer.global_delta_tick());
 		renderer_ui.set_time(core::global::timer.global_time());
+
+		wgfx_input.set_context(core::global::ui::root->focus->cursor_pos);
+
 		core::global::ui::root->update(core::global::timer.global_delta_tick());
 		core::global::ui::root->layout();
-
 		core::global::ui::root->draw();
 
+		graphic::draw::world_acquirer acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
 
+		{
+			//
+			for(int i = 0; i < 10; ++i){
+				acquirer << base_region;
+				acquirer.proj.depth = 1 - (static_cast<float>(i + 1) / 10.f - 0.04f);
 
-		// renderer_ui.batch.pop_scissor();
+				auto off = math::vector2{i * 500, i * 400}.as<float>();
 
-		// {
-		// 	graphic::draw::world_acquirer acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
-		// 	//
-		// 	for(int i = 0; i < 10; ++i){
-		// 		acquirer.proj.depth = static_cast<float>(i + 1) / 20.f - 0.04f;
-		//
-		// 		auto off = math::vector2{i * 500, i * 400}.as<float>();
-		//
-		// 		graphic::draw::fill::quad(
-		// 			acquirer.get(),
-		// 			off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
-		// 			off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
-		// 			off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
-		// 			off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
-		// 			graphic::colors::white
-		// 		);
-		// 	}
-		// }
-		//
-		//
+				using namespace graphic::colors;
+
+				graphic::draw::fill::quad(
+					acquirer.get(),
+					off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
+					off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
+					off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
+					off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
+					white.copy()
+				);
+
+				acquirer << light_region;
+				acquirer.proj.slightly_decr_depth();
+				graphic::draw::fill::quad(
+					acquirer.get(),
+					off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
+					off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
+					off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
+					off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
+					white.copy().setA((i + 3) / 10.f).to_light_color()
+				);
+			}
+		}
+
+		acquirer.proj.depth = 0.35f;
+
+		graphic::draw::fill::rect_ortho(
+				acquirer.get(),
+				{-1000, -1000, 200, 200},
+				graphic::colors::AQUA.copy().setA(.5)
+			);
+
+		acquirer << graphic::draw::white_region;
+		graphic::draw::fill::rect_ortho(
+				acquirer.get(),
+				{math::vec2{}, 40000},
+				graphic::colors::black
+			);
+		graphic::draw::fill::rect_ortho(
+				acquirer.get(),
+				{math::vec2{}, 30},
+				graphic::colors::AQUA_SKY.to_light_color_copy()
+			);
+
 		// renderer_world.batch.batch.consume_all();
 		//
 		// {
@@ -405,13 +496,17 @@ void main_loop(){
 		// 	}
 		// }
 
+		graphic_context.render_efx();
+
 		renderer_world.batch.batch.consume_all();
-		renderer_world.batch.consume_all_transparent();
+		// renderer_world.batch.consume_all_transparent();
 		renderer_world.post_process();
 
 		renderer_ui.batch.batch.consume_all();
 		renderer_ui.batch.blit();
 		renderer_ui.post_process();
+
+		merger.submit();
 
 
 		context.flush();
@@ -424,6 +519,13 @@ void main_loop(){
 
 int main(){
 	using namespace mo_yanxi;
+
+	hive<int> a;
+	hive<int> b;
+
+
+	std::swap(a, b);
+	std::erase(a, 1);
 
 	init_assets();
 	compile_shaders();

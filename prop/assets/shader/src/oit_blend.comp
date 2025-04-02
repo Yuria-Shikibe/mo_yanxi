@@ -1,0 +1,148 @@
+#pragma shader_stage(compute)
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_EXT_shader_16bit_storage : require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+
+#include "lib/blend.glsl"
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+
+struct oit_node{
+        f16vec4 color_base;
+        f16vec4 color_light;
+        f16vec4 color_normal;
+
+        float depth;
+        uint next;
+};
+
+struct oit_node_local{
+    vec4 color_base;
+    vec4 color_light;
+    vec4 color_normal;
+
+    float depth;
+};
+
+struct at_channel{
+    vec4 color;
+    float alpha;
+};
+
+
+
+layout(set = 0, binding = 0, std430) restrict buffer oit_list_s{
+    oit_node nodes[];
+} oit_list;
+
+layout (set = 0, binding = 1, r32ui) restrict uniform readonly uimage2D oit_head_indices;
+layout (set = 0, binding = 2) uniform sampler2D input_depth;
+
+layout (set = 0, binding = 3, rgba32f) restrict uniform readonly image2D input_color_base;
+layout (set = 0, binding = 4, rgba32f) restrict uniform readonly image2D input_color_light;
+
+layout (set = 0, binding = 5, rgba32f) restrict uniform image2D output_color_base;
+layout (set = 0, binding = 6, rgba32f) restrict uniform image2D output_color_light;
+
+#define MAX_FRAGMENT_COUNT 15
+
+//#define AT
+
+#define AT_VIS_SAMPLES 16
+const float visibility[AT_VIS_SAMPLES + 1] = {
+    1.00, 0.95, 0.90, 0.82, 0.75, 0.68, 0.60, 0.52, 0.45, 0.38, 0.32, 0.25, 0.18, 0.12, 0.07, 0.00, 0.00
+};
+
+const uint INVALID_IDX = ~0u;
+
+//vec4
+
+void main() {
+    const ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+
+    float src_depth = texelFetch(input_depth, pos, 0).r;
+    vec4 src_color_base = imageLoad(input_color_base, pos);
+    vec4 src_color_light = imageLoad(input_color_light, pos);
+    uint node_idx = imageLoad(oit_head_indices, pos).r;
+
+    #ifdef AT
+
+    vec4 channel_base = vec4(0);
+    vec4 channel_light = vec4(0);
+    while (node_idx != INVALID_IDX) {
+        oit_node_local loacl;
+
+        loacl.depth = oit_list.nodes[node_idx].depth;
+        loacl.color_base = oit_list.nodes[node_idx].color_base;
+        loacl.color_light = oit_list.nodes[node_idx].color_light;
+        loacl.color_normal = oit_list.nodes[node_idx].color_normal;
+        uint idx = oit_list.nodes[node_idx].next;
+        oit_list.nodes[node_idx].next = INVALID_IDX;
+        node_idx = idx;
+
+        int bin = int(loacl.depth * AT_VIS_SAMPLES);
+        float vis = visibility[bin] * (1 - step(src_depth, loacl.depth));
+
+        {
+            float alpha = loacl.color_base.a * vis;
+            channel_base.rgb += loacl.color_base.rgb * alpha;
+            channel_base.a += alpha;
+        }
+
+        {
+            float alpha = loacl.color_light.a * vis;
+            channel_light.rgb += loacl.color_light.rgb * alpha;
+            channel_light.a += alpha;
+        }
+
+    }
+
+    src_color_base = blend(channel_base, src_color_base);
+    src_color_light = blend(channel_light, src_color_light);
+
+    #else
+    {
+        oit_node_local fragments[MAX_FRAGMENT_COUNT];
+
+        int count = 0;
+
+        while (node_idx != INVALID_IDX && count != MAX_FRAGMENT_COUNT)
+        {
+            fragments[count].color_base = oit_list.nodes[node_idx].color_base;
+            fragments[count].color_light = oit_list.nodes[node_idx].color_light;
+            fragments[count].color_normal = oit_list.nodes[node_idx].color_normal;
+            fragments[count].depth = oit_list.nodes[node_idx].depth;
+
+            uint idx = oit_list.nodes[node_idx].next;
+            oit_list.nodes[node_idx].next = INVALID_IDX;
+            node_idx = idx;
+            ++count;
+        }
+
+        // 仅对后半部分（深度小于等于 src_depth 的节点）进行排序
+        for (int i = 1; i < count; ++i) {
+            oit_node_local insert = fragments[i];
+            int j = i;
+            while (j > 0 && insert.depth > fragments[j - 1].depth) {
+                fragments[j] = fragments[j - 1];
+                --j;
+            }
+            fragments[j] = insert;
+        }
+
+        for (int i = 0; i < count; ++i) {
+            if(fragments[i].depth >= src_depth)continue;
+            src_color_base = blend(fragments[i].color_base, src_color_base);
+            src_color_light = blend(fragments[i].color_light, src_color_light);
+        }
+    }
+#endif
+
+    vec4 dst_color_base = imageLoad(output_color_base, pos);
+    vec4 dst_color_light = imageLoad(output_color_light, pos);
+
+    imageStore(output_color_base, pos, blend(src_color_base, dst_color_base));
+    imageStore(output_color_light, pos, blend(src_color_light, dst_color_light));
+}

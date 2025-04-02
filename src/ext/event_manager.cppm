@@ -43,18 +43,8 @@ namespace mo_yanxi::events{
 
 	private:
 		T* ptr{};
-	//
-	// public:
-	// 	template <class... Tpes>
-	// 	constexpr auto operator()(Tpes&&... _Args) const
-	// 		noexcept(noexcept(_STD invoke(*ptr, static_cast<Tpes&&>(_Args)...))) //
-	// 		-> decltype(_STD invoke(*ptr, static_cast<Tpes&&>(_Args)...)) {
-	// 			return _STD invoke(*ptr, static_cast<Tpes&&>(_Args)...);
-	// 		}
 	};
 
-	static_assert(std::constructible_from<std::tuple<def_reference_wrapper<int>>, int&>);
-	
 	template <typename Ty>
 	using decay_ref = std::conditional_t<std::is_reference_v<Ty>, def_reference_wrapper<std::remove_reference_t<Ty>>, std::decay_t<Ty>>;
 
@@ -472,7 +462,7 @@ namespace mo_yanxi::events{
 
 
 	template <typename FnWrap>
-	auto getTy(){
+	auto getFnTy(){
 		using args = typename function_traits<FnWrap>::args_type;
 
 		if constexpr (std::tuple_size_v<args> == 1){
@@ -483,7 +473,7 @@ namespace mo_yanxi::events{
 	}
 
 	template <typename FnWrap>
-	using Fnty = decltype(events::getTy<FnWrap>());
+	using Fnty = decltype(events::getFnTy<FnWrap>());
 
 	template <template<typename > typename Cont, typename FnWrap, typename Proj, typename ...Events>
 	using ebase = event_manager_base<

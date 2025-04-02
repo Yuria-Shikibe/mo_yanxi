@@ -108,8 +108,8 @@ namespace mo_yanxi::vk{
 
 		export
 		template <
-			std::ranges::contiguous_range InfoRng = std::initializer_list<const VkDescriptorBufferBindingInfoEXT>,
-			std::ranges::contiguous_range Offset = std::initializer_list<const VkDeviceSize>>
+			std::ranges::contiguous_range InfoRng = std::initializer_list<VkDescriptorBufferBindingInfoEXT>,
+			std::ranges::contiguous_range Offset = std::initializer_list<VkDeviceSize>>
 		void bind_descriptors(
 			VkCommandBuffer commandBuffer,
 			const VkPipelineBindPoint pipelineBindPoint,
@@ -125,6 +125,38 @@ namespace mo_yanxi::vk{
 				commandBuffer,
 				pipelineBindPoint,
 				layout, firstSet, std::ranges::size(offsets), IndicesDesignator, std::ranges::data(offsets));
+		}
+
+		export
+		template <
+			std::ranges::contiguous_range InfoRng = std::initializer_list<VkDescriptorBufferBindingInfoEXT>,
+			std::ranges::contiguous_range Offset = std::initializer_list<VkDeviceSize>>
+		void bind_descriptors(
+			VkCommandBuffer commandBuffer,
+			const InfoRng& infos
+		){
+			cmd::bindDescriptorBuffersEXT(commandBuffer, std::ranges::size(infos), std::ranges::data(infos));
+
+		}
+		export
+		template <
+			std::ranges::contiguous_range Targets = std::initializer_list<std::uint32_t>,
+			std::ranges::contiguous_range Offset = std::initializer_list<VkDeviceSize>
+		>
+		void set_descriptor_offsets(
+			VkCommandBuffer commandBuffer,
+			const VkPipelineBindPoint pipelineBindPoint,
+			const VkPipelineLayout layout,
+			const uint32_t firstSet,
+
+			const Targets& targets,
+			const Offset& offsets
+		){
+			assert(std::ranges::size(offsets) >= std::ranges::size(targets));
+			cmd::setDescriptorBufferOffsetsEXT(
+				commandBuffer,
+				pipelineBindPoint,
+				layout, firstSet, std::ranges::size(targets), std::ranges::data(targets), std::ranges::data(offsets));
 		}
 
 	}

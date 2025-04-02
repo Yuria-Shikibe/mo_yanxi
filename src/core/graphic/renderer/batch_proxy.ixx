@@ -201,6 +201,11 @@ namespace mo_yanxi::graphic{
 			return nullptr;
 		}
 
+		batch_layer(const batch_layer& other) = delete;
+		batch_layer(batch_layer&& other) noexcept = default;
+		batch_layer& operator=(const batch_layer& other) = delete;
+		batch_layer& operator=(batch_layer&& other) noexcept = default;
+
 		// virtual command_buffer_modifier t(){
 		// 	vk::dynamic_rendering dynamic_rendering{};
 		// 	co_yield dynamic_rendering;

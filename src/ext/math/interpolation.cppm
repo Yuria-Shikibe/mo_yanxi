@@ -34,7 +34,7 @@ namespace mo_yanxi::math::interp::spec{
 
 	template <float power>
 	struct Pow{
-		float operator()(const float a) const noexcept{
+		static constexpr float operator()(float a) noexcept{
 			if(a <= 0.5f) return std::powf(a * 2, power) * 0.5f;
 			return std::powf((a - 1.0f) * 2.0f, power) / (std::fmod(power, 2.0f) == 0.0f ? -2.0f : 2.0f) + 1;
 		}
@@ -44,7 +44,7 @@ namespace mo_yanxi::math::interp::spec{
 	template <auto Func, float powBegin = 0.5f, float minVal = 0.02f>
 		requires invocable<decltype(Func), float(float)>
 	struct LinePow{
-		float operator()(const float a) const noexcept{
+		static constexpr float operator()(float a) noexcept{
 			auto t = a < powBegin ? minVal * a / powBegin : (1 - minVal) * Func((a - powBegin) / (1 - powBegin));
 
 			return t;
@@ -54,7 +54,7 @@ namespace mo_yanxi::math::interp::spec{
 
 	template <auto power>
 	struct PowIn{
-		constexpr float operator()(const float a) const noexcept{
+		static constexpr float operator()(float a) noexcept{
 			if constexpr(std::floating_point<decltype(power)>){
 				return std::powf(a, power);
 			} else{
@@ -66,7 +66,7 @@ namespace mo_yanxi::math::interp::spec{
 
 	template <auto power>
 	struct PowOut{
-		float operator()(const float a) const noexcept{
+		static constexpr float operator()(float a) noexcept{
 			if constexpr(std::floating_point<decltype(power)>){
 				return std::powf(a - 1.0f, power) * (std::fmod(power, 2.0f) == 0.0f ? -1.0f : 1.0f) + 1.0f;
 			} else{
@@ -135,7 +135,7 @@ namespace mo_yanxi::math::interp::spec{
 	struct ElasticIn : Elastic<value, power, scale, bounces>{
 		using Elastic<value, power, scale, bounces>::RealBounces;
 
-		float operator()(const float a) const noexcept{
+		static float operator()(float a) noexcept{
 			if(a >= 0.99) return 1;
 			return std::powf(value, power * (a - 1)) * sin(a * RealBounces) * scale;
 		}
@@ -146,7 +146,7 @@ namespace mo_yanxi::math::interp::spec{
 	struct ElasticOut : Elastic<value, power, scale, bounces>{
 		using Elastic<value, power, scale, bounces>::RealBounces;
 
-		float operator()(float a) const noexcept{
+		static float operator()(float a) noexcept{
 			if(a == 0) return 0;
 			a = 1 - a;
 			return 1 - std::powf(value, power * (a - 1)) * sin(a * RealBounces) * scale;
@@ -154,7 +154,7 @@ namespace mo_yanxi::math::interp::spec{
 	};
 
 
-	template <size_t bounces>
+	template <std::size_t bounces>
 	struct BounceOut{
 		using Bounce = std::array<float, bounces>;
 		const Bounce widths{}, heights{};
@@ -269,7 +269,7 @@ namespace mo_yanxi::math::interp::spec{
 	struct Swing{
 		static constexpr float scale = s * 2.0f;
 
-		constexpr float operator()(float a) const noexcept{
+		static constexpr float operator()(float a) noexcept{
 			if(a <= 0.5f){
 				a *= 2;
 				return a * a * ((scale + 1) * a - scale) / 2;
@@ -284,7 +284,7 @@ namespace mo_yanxi::math::interp::spec{
 	struct SwingOut{
 		static constexpr float scale = s;
 
-		constexpr float operator()(float a) const noexcept{
+		static constexpr float operator()(float a) noexcept{
 			a -= 1.0f;
 			return a * a * ((scale + 1) * a + scale) + 1;
 		}
@@ -294,7 +294,7 @@ namespace mo_yanxi::math::interp::spec{
 	struct SwingIn{
 		static constexpr float scale = s;
 
-		constexpr float operator()(const float a) const noexcept{
+		static constexpr float operator()(float a) noexcept{
 			return a * a * ((scale + 1) * a - scale);
 		}
 	};
@@ -311,6 +311,9 @@ namespace mo_yanxi::math::interp{
 
 	export
 	using general_func_move_only = std::move_only_function<float(float) const>;
+
+	export
+	using no_state_interp_func = std::add_pointer_t<float(float) noexcept>;
 
 	export
 	template <std::regular_invocable<float> Fn>
@@ -338,17 +341,42 @@ namespace mo_yanxi::math::interp{
 			return fn(f);
 		}
 
-		template <typename L>
-		consteval friend auto operator|(const interp_func<L>& f1, const interp_func& f2) noexcept{
-			return interp_func{
+		template <typename LFn>
+		constexpr friend auto operator|(const interp_func<LFn>& f1, const interp_func& f2) noexcept{
+			if constexpr (static_interp<LFn> && static_interp<Fn>){
+				return interp_func{[] (float f) constexpr noexcept{
+					return LFn::operator()(Fn::operator()(f));
+				}};
+			}else if constexpr (static_interp<LFn>){
+				return interp_func{[f2] (float f) constexpr noexcept{
+					return LFn::operator()(f2(f));
+				}};
+			}else if constexpr (static_interp<Fn>){
+				return interp_func{[f1] (float f) constexpr noexcept{
+					return f1(Fn::operator()(f));
+				}};
+			}else{
+				return interp_func{
 					[f1, f2](float v) constexpr noexcept{
-						return f2(f1(v));
+						return f1(f2(v));
 					}
 				};
+			}
+		}
+
+		constexpr operator no_state_interp_func() const noexcept requires (static_interp<Fn>){
+			return +[] (float f) static constexpr noexcept{
+				return Fn::operator()(f);
+			};
 		}
 	};
 
 	export{
+		template <float margin_in, float margin_out = 1.f>
+		inline constexpr auto margined_linear = interp_func{[](const float x) static noexcept{
+			return math::fma(x, margin_out - margin_in, margin_in);
+		}};
+
 		inline constexpr interp_func linear = [](const float x) static noexcept{
 			return x;
 		};
@@ -418,22 +446,22 @@ namespace mo_yanxi::math::interp{
 		inline constexpr interp_func pow10In = spec::PowIn<10>{};
 		inline constexpr interp_func pow10Out = spec::PowOut<10>{};
 		inline constexpr interp_func pow5Out = spec::PowOut<5>{};
-		inline constexpr interp_func sine = [](const float a) static noexcept{
+		inline constexpr interp_func sine = [](const float a) static constexpr noexcept{
 			return (1.0f - math::cos(a * math::pi)) * 0.5f;
 		};
-		inline constexpr interp_func sineIn = [](const float a) static noexcept{
+		inline constexpr interp_func sineIn = [](const float a) static constexpr noexcept{
 			return 1.0f - math::cos(a * math::pi * 0.5f);
 		};
-		inline constexpr interp_func sineOut = [](const float a) static noexcept{
+		inline constexpr interp_func sineOut = [](const float a) static constexpr noexcept{
 			return math::sin(a * math::pi * 0.5f);
 		};
 
-		inline const interp_func exp10 = spec::Exp(2, 10);
-		inline const interp_func exp10In = spec::ExpIn(2, 10);
-		inline const interp_func exp10Out = spec::ExpOut(2, 10);
-		inline const interp_func exp5 = spec::Exp(2, 5);
-		inline const interp_func exp5In = spec::ExpIn(2, 5);
-		inline const interp_func exp5Out = spec::ExpOut(2, 5);
+		// inline const interp_func exp10 = spec::Exp(2, 10);
+		// inline const interp_func exp10In = spec::ExpIn(2, 10);
+		// inline const interp_func exp10Out = spec::ExpOut(2, 10);
+		// inline const interp_func exp5 = spec::Exp(2, 5);
+		// inline const interp_func exp5In = spec::ExpIn(2, 5);
+		// inline const interp_func exp5Out = spec::ExpOut(2, 5);
 
 		inline constexpr interp_func circle = [](float a) static noexcept{
 			if(a <= 0.5f){
@@ -458,9 +486,9 @@ namespace mo_yanxi::math::interp{
 		inline constexpr interp_func swing = spec::Swing<1.5f>();
 		inline constexpr interp_func swingIn = spec::SwingIn<2.0f>();
 		inline constexpr interp_func swingOut = spec::SwingOut<2.0f>();
-		inline constexpr interp_func bounce = spec::Bounce<4>();
-		inline constexpr interp_func bounceIn = spec::BounceIn<4>();
-		inline constexpr interp_func bounceOut = spec::BounceOut<4>();
+		// inline constexpr interp_func bounce = spec::Bounce<4>();
+		// inline constexpr interp_func bounceIn = spec::BounceIn<4>();
+		// inline constexpr interp_func bounceOut = spec::BounceOut<4>();
 	}
 
 	template <typename Rng>

@@ -309,7 +309,7 @@ namespace mo_yanxi::math{
 			: base{rect.vert_00(), rect.vert_10(), rect.vert_11(), rect.vert_01()}, bounding_box{rect}{
 		}
 
-		[[nodiscard]] FORCE_INLINE typename base::rect_t get_bound() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE typename base::rect_t get_bound() const noexcept{
 			return bounding_box;
 		}
 
@@ -325,7 +325,7 @@ namespace mo_yanxi::math{
 			bounding_box = base::get_bound();
 		}
 
-		constexpr explicit(false) operator quad() const noexcept{
+		constexpr explicit(false) operator base() const noexcept{
 			return *this;
 		}
 

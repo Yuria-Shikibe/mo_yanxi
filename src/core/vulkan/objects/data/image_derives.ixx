@@ -21,8 +21,6 @@ namespace mo_yanxi::vk{
 		return 4 * src_area * (pow4_m - 1) / pow4_m / 3;
 	}
 
-	constexpr VkDeviceSize a = get_mipmap_pixels(64, 5);
-
 	export
 	struct image_handle{
 		VkImage image;
@@ -60,11 +58,11 @@ namespace mo_yanxi::vk{
 		}
 	};
 
-	export std::uint32_t get_recommended_mip_level(const std::uint32_t w, const std::uint32_t h) noexcept{
-		return static_cast<std::uint32_t>(std::floor(std::log2(std::max(w, h)))) + 1u;
+	export constexpr std::uint32_t get_recommended_mip_level(const std::uint32_t w, const std::uint32_t h) noexcept{
+		return static_cast<std::uint32_t>(std::countr_zero(std::bit_floor(std::max(w, h))) + 1);
 	}
-	export std::uint32_t get_recommended_mip_level(const VkExtent2D extent, std::uint32_t ceil = std::numeric_limits<std::uint32_t>::max()) noexcept{
-		// return 1;
+
+	export constexpr std::uint32_t get_recommended_mip_level(const VkExtent2D extent, const std::uint32_t ceil = std::numeric_limits<std::uint32_t>::max()) noexcept{
 		return std::min(get_recommended_mip_level(extent.width, extent.height), ceil);
 	}
 
@@ -349,7 +347,7 @@ namespace mo_yanxi::vk{
 	};
 
 	export
-	struct texel_image : combined_image{
+	struct storage_image : combined_image{
 		static constexpr VkImageUsageFlags default_usage = 0
 			| VK_IMAGE_USAGE_STORAGE_BIT
 			| VK_IMAGE_USAGE_TRANSFER_SRC_BIT
@@ -363,9 +361,9 @@ namespace mo_yanxi::vk{
 		std::uint32_t mip_level{};
 
 	public:
-		[[nodiscard]] texel_image() = default;
+		[[nodiscard]] storage_image() = default;
 
-		[[nodiscard]] texel_image(
+		[[nodiscard]] storage_image(
 			allocator& allocator,
 			const VkExtent2D extent,
 			const std::uint32_t mip_level = 1,
@@ -392,6 +390,9 @@ namespace mo_yanxi::vk{
 			                 }
 			  ), usage(usage), format{format}, mip_level(mip_level){
 		}
+
+
+
 
 		[[nodiscard]] VkFormat get_format() const{
 			return format;

@@ -1,6 +1,7 @@
 module;
 
 #include <cassert>
+#include "../src/ext/adapted_attributes.hpp"
 
 export module mo_yanxi.core.ctrl.key_binding;
 
@@ -10,6 +11,7 @@ import std;
 // import ext.concepts;
 import mo_yanxi.algo;
 import mo_yanxi.referenced_ptr;
+import mo_yanxi.refable_tuple;
 
 namespace mo_yanxi::core::ctrl{
  	export
@@ -44,11 +46,11 @@ namespace mo_yanxi::core::ctrl{
 			return act::matched(act, this->act) && mode::matched(mode, this->mode);
 		}
 
-		void try_exec(const key_code_t act, const key_code_t mode, ParamTy... args) const{
+		FORCE_INLINE void try_exec(const key_code_t act, const key_code_t mode, ParamTy... args) const{
 			if(matched(act, mode)) this->exec(std::forward<ParamTy>(args)...);
 		}
 
-		void exec(ParamTy... args) const{
+		FORCE_INLINE void exec(ParamTy... args) const{
 			func(this->pack(), std::forward<ParamTy>(args)...);
 		}
 
@@ -56,12 +58,74 @@ namespace mo_yanxi::core::ctrl{
 	};
 
 	export
+	struct key_mapping_interface : public referenced_object<false>{
+	public:
+		using referenced_object::decr_ref;
+		using referenced_object::incr_ref;
+
+		bool activated{true};
+
+		void update(const float delta_in_tick){
+			if(!activated) return;
+
+			update_impl(delta_in_tick);
+		}
+
+
+		//TODO wtf is these shit setter/getters
+		void set_activated(const bool active) noexcept{
+			activated = active;
+		}
+
+		[[nodiscard]] bool is_activated() const noexcept{
+			return activated;
+		}
+
+		void activate() noexcept{
+			activated = true;
+		}
+
+		void deactivate() noexcept{
+			activated = false;
+		}
+
+
+		virtual ~key_mapping_interface() = default;
+
+		[[nodiscard]] virtual bool triggered(key_code_t key, key_code_t act, key_code_t mode) const noexcept = 0;
+		virtual void inform(key_code_t code, key_code_t action, key_code_t mods) = 0;
+
+		[[nodiscard]] bool triggered(const key_code_t key) const noexcept{
+			return triggered(key, act::ignore, mode::ignore);
+		}
+
+		[[nodiscard]] key_code_t get_mode() const noexcept{
+			const auto shift = triggered(key::Left_Shift) || triggered(key::Right_Shift) ? mode::Shift : mode::None;
+			const auto ctrl = triggered(key::Left_Control) || triggered(key::Right_Control) ? mode::Ctrl : mode::None;
+			const auto alt = triggered(key::Left_Alt) || triggered(key::Right_Alt) ? mode::Alt : mode::None;
+			const auto caps = triggered(key::CapsLock) ? mode::CapLock : mode::None;
+			const auto nums = triggered(key::NumLock) ? mode::NumLock : mode::None;
+			const auto super = triggered(key::Left_Super) || triggered(key::Right_Super) ? mode::Super : mode::None;
+
+			return shift | ctrl | alt | caps | nums | super;
+		}
+
+		[[nodiscard]] bool has_mode(const key_code_t mode) const noexcept{
+			return (get_mode() & mode) == mode;
+		}
+
+	protected:
+		virtual void update_impl(float delta_in_tick) = 0;
+	};
+
+	export
 	template <typename ...ParamTy>
-	class key_mapping_sockets{
+	class key_mapping final : public key_mapping_interface{
 	public:
 		using bind_type = key_binding<ParamTy...>;
 		using bind_func_t = typename bind_type::function_ptr;
-		typename bind_type::params_type context{};
+		using context_tuple_t = refable_tuple<ParamTy...>;
+		context_tuple_t context{};
 
 	private:
 		struct DoubleClickTimer{
@@ -161,16 +225,36 @@ namespace mo_yanxi::core::ctrl{
 
 		void exec(const bind_type& bind, const key_code_t act, const key_code_t mode){
 			[&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>){
-				bind.try_exec(act, mode, std::forward<std::tuple_element_t<Idx, typename bind_type::params_type>>(std::get<Idx>(context))...);
+				bind.try_exec(act, mode, std::get<Idx>(context)...);
 			}(std::make_index_sequence<std::tuple_size_v<typename bind_type::params_type>>{});
 		}
 	public:
+		[[nodiscard]] key_mapping() = default;
 
-		void set_context(ParamTy... param_ty){
-			context = {param_ty...};
+		template <typename ...Args>
+			requires requires(context_tuple_t& ctx, Args&& ...args){
+				requires sizeof...(Args) > 1;
+				ctx = mo_yanxi::make_refable_tuple(args...);
+			}
+		void set_context(Args&& ...param_ty){
+			context = mo_yanxi::make_refable_tuple(param_ty...);
 		}
 
-		[[nodiscard]] bool triggered(const key_code_t code, const key_code_t action, const key_code_t mode) const noexcept{
+		template <std::size_t Idx, typename Arg>
+			requires std::assignable_from<std::add_lvalue_reference_t<std::tuple_element_t<Idx, context_tuple_t>>, Arg>
+		void set_context(Arg&& param_ty){
+			std::get<Idx>(context) = std::forward<Arg>(param_ty);
+		}
+
+		template <typename Arg>
+			requires requires{
+				requires std::assignable_from<decltype(std::get<refable_tuple_decay_ref<std::unwrap_ref_decay_t<Arg>>>(context)), Arg>;
+			}
+		void set_context(Arg&& param_ty){
+			std::get<refable_tuple_decay_ref<std::unwrap_ref_decay_t<Arg>>>(context) = std::forward<Arg>(param_ty);
+		}
+
+		[[nodiscard]] bool triggered(const key_code_t code, const key_code_t action, const key_code_t mode) const noexcept override{
 			const signal target = signals[code];
 
 			if(!mode::matched(target, mode)) return false;
@@ -195,26 +279,7 @@ namespace mo_yanxi::core::ctrl{
 			return target & actionTgt;
 		}
 
-		[[nodiscard]] bool triggered(const key_code_t key) const noexcept{
-			return static_cast<bool>(signals[key]);
-		}
-
-		[[nodiscard]] key_code_t get_mode() const noexcept{
-			const auto shift = triggered(key::Left_Shift) || triggered(key::Right_Shift) ? mode::Shift : mode::None;
-			const auto ctrl = triggered(key::Left_Control) || triggered(key::Right_Control) ? mode::Ctrl : mode::None;
-			const auto alt = triggered(key::Left_Alt) || triggered(key::Right_Alt) ? mode::Alt : mode::None;
-			const auto caps = triggered(key::CapsLock) ? mode::CapLock : mode::None;
-			const auto nums = triggered(key::NumLock) ? mode::NumLock : mode::None;
-			const auto super = triggered(key::Left_Super) || triggered(key::Right_Super) ? mode::Super : mode::None;
-
-			return shift | ctrl | alt | caps | nums | super;
-		}
-
-		[[nodiscard]] bool has_mode(const key_code_t mode) const noexcept{
-			return (get_mode() & mode) == mode;
-		}
-
-		void inform(const key_code_t code, const key_code_t action, const key_code_t mods){
+		void inform(const key_code_t code, const key_code_t action, const key_code_t mods) override{
 			const bool doubleClick = insert(code, action, mods);
 
 			for(const auto& bind : binds[code]){
@@ -228,7 +293,8 @@ namespace mo_yanxi::core::ctrl{
 			updateSignal(code, action);
 		}
 
-		void update(const float delta_in_tick){
+	protected:
+		void update_impl(const float delta_in_tick) override{
 			for(const key_code_t key : pressed){
 				for(const auto& bind : binds_continuous[key]){
 					this->exec(bind, act::Continuous, signals[key] & mode::Mask);
@@ -240,6 +306,7 @@ namespace mo_yanxi::core::ctrl{
 				return timer.time <= 0.f;
 			});
 		}
+	public:
 
 		void register_bind(bind_type&& bind){
 			assert(bind.key < AllKeyCount && bind.key >= 0);
@@ -292,38 +359,4 @@ namespace mo_yanxi::core::ctrl{
 			}
 		}
 	};
-
-	export
-	template <typename ...ParamTy>
-	class key_mapping : public key_mapping_sockets<ParamTy...>, public referenced_object<false>{
-		using base = key_mapping_sockets<ParamTy...>;
-		bool activated{true};
-
-	public:
-		void update(const float delta_in_tick){
-			if(!activated) return;
-
-			base::update(delta_in_tick);
-		}
-
-		void set_activated(const bool active) noexcept{
-			activated = active;
-		}
-
-		[[nodiscard]] bool is_activated() const noexcept{
-			return activated;
-		}
-
-		void activate() noexcept{
-			activated = true;
-		}
-
-		void deactivate() noexcept{
-			activated = false;
-		}
-
-		using referenced_object::decr_ref;
-		using referenced_object::incr_ref;
-	};
-
 }

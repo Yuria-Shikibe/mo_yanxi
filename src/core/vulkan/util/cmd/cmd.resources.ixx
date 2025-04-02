@@ -36,20 +36,19 @@ namespace mo_yanxi::vk::cmd{
 	}
 
 	export
-	template <std::ranges::range Rng>
-		requires (std::same_as<std::ranges::range_reference_t<Rng>, VkImageMemoryBarrier2&>)
-	void swap_stage(Rng&& arr){
-		for(VkImageMemoryBarrier2& t : arr){
-			swap_stage(t);
-		}
+	template <>
+	void swap_stage(VkBufferMemoryBarrier2& t){
+		std::swap(t.srcAccessMask, t.dstAccessMask);
+		std::swap(t.srcStageMask, t.dstStageMask);
+		std::swap(t.srcQueueFamilyIndex, t.dstQueueFamilyIndex);
 	}
+
 
 	export
 	template <std::ranges::range Rng>
-		requires (std::same_as<std::ranges::range_reference_t<Rng>, VkBufferMemoryBarrier2&>)
 	void swap_stage(Rng&& arr){
-		for(VkBufferMemoryBarrier2& t : arr){
-			swap_stage<VkBufferMemoryBarrier2>(t);
+		for(auto& t : arr){
+			cmd::swap_stage(t);
 		}
 	}
 
@@ -65,7 +64,7 @@ namespace mo_yanxi::vk::cmd{
 		// VkBlitImageInfo
 		::vkCmdBlitImage(command_buffer, src, srcExpectedLayout, dst, dstExpectedLayout,
 		                 static_cast<std::uint32_t>(std::ranges::size(rng)),
-		                 std::ranges::data(rng),
+		                 std::ranges::cdata(rng),
 		                 filter_type
 		);
 	}
@@ -80,7 +79,7 @@ namespace mo_yanxi::vk::cmd{
 		::vkCmdClearColorImage(command_buffer, image, expectedLayout,
 		                       &clearValue,
 		                       static_cast<std::uint32_t>(std::ranges::size(rng)),
-		                       std::ranges::data(rng)
+		                       std::ranges::cdata(rng)
 		);
 	}
 
@@ -93,7 +92,7 @@ namespace mo_yanxi::vk::cmd{
 	){
 		::vkCmdCopyImage(command_buffer, src, srcExpectedLayout, dst, dstExpectedLayout,
 		                 static_cast<std::uint32_t>(std::ranges::size(rng)),
-		                 std::ranges::data(rng)
+		                 std::ranges::cdata(rng)
 		);
 	}
 
@@ -103,7 +102,7 @@ namespace mo_yanxi::vk::cmd{
 		VkCommandBuffer command_buffer, VkBuffer src, VkImage dst, VkImageLayout expectedLayout, const Rng& rng){
 		::vkCmdCopyBufferToImage(command_buffer, src, dst, expectedLayout,
 		                         static_cast<std::uint32_t>(std::ranges::size(rng)),
-		                         std::ranges::data(rng)
+		                         std::ranges::cdata(rng)
 		);
 	}
 
@@ -113,7 +112,7 @@ namespace mo_yanxi::vk::cmd{
 		VkCommandBuffer command_buffer, VkImage src, VkBuffer dst, VkImageLayout expectedLayout, const Rng& rng){
 		::vkCmdCopyImageToBuffer(command_buffer, src, expectedLayout, dst,
 		                         static_cast<std::uint32_t>(std::ranges::size(rng)),
-		                         std::ranges::data(rng)
+		                         std::ranges::cdata(rng)
 		);
 	}
 
@@ -123,7 +122,7 @@ namespace mo_yanxi::vk::cmd{
 		::vkCmdCopyBuffer(
 			command_buffer, src, dst,
 			static_cast<std::uint32_t>(std::ranges::size(rng)),
-			std::ranges::data(rng));
+			std::ranges::cdata(rng));
 	}
 
 	export
@@ -159,6 +158,12 @@ namespace mo_yanxi::vk::cmd{
 		std::vector<VkMemoryBarrier2> memory_barriers;
 		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
 		std::vector<VkImageMemoryBarrier2> image_memory_barriers;
+
+		void swap_stages(){
+			cmd::swap_stage(memory_barriers);
+			cmd::swap_stage(buffer_memory_barriers);
+			cmd::swap_stage(image_memory_barriers);
+		}
 
 		void clear() noexcept{
 			memory_barriers.clear();
@@ -267,7 +272,7 @@ namespace mo_yanxi::vk::cmd{
 			);
 		}
 
-		void push(
+		auto& push(
 			const VkBuffer buffer,
 			const VkPipelineStageFlags2 srcStageMask,
 			const VkAccessFlags2 srcAccessMask,
@@ -278,7 +283,7 @@ namespace mo_yanxi::vk::cmd{
 			const VkDeviceSize offset = 0,
 			const VkDeviceSize size = VK_WHOLE_SIZE
 		){
-			buffer_memory_barriers.push_back({
+			return buffer_memory_barriers.emplace_back(VkBufferMemoryBarrier2{
 					.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
 					.pNext = nullptr,
 					.srcStageMask = srcStageMask,
@@ -712,20 +717,22 @@ namespace mo_yanxi::vk::cmd{
 		clear_func_color_t<Fn> clearValue,
 		const VkImageSubresourceRange& subrange,
 
-		const VkPipelineStageFlags srcStage,
-		const VkPipelineStageFlags dstStage,
-		const VkAccessFlags srcAccess,
-		const VkAccessFlags dstAccess,
+		const VkPipelineStageFlags2 srcStage,
+		const VkPipelineStageFlags2 dstStage,
+		const VkAccessFlags2 srcAccess,
+		const VkAccessFlags2 dstAccess,
 		const VkImageLayout expectedLayout,
 		const std::uint32_t runningQueue = VK_QUEUE_FAMILY_IGNORED,
 		const std::uint32_t srcQueue = VK_QUEUE_FAMILY_IGNORED,
 		const std::uint32_t dstQueue = VK_QUEUE_FAMILY_IGNORED
 	) noexcept{
-		VkImageMemoryBarrier imageMemoryBarrier{
-				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		VkImageMemoryBarrier2 imageMemoryBarrier{
+				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
 				nullptr,
+				srcStage,
 				srcAccess,
-				VK_ACCESS_TRANSFER_WRITE_BIT,
+				VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+				VK_ACCESS_2_TRANSFER_WRITE_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				srcQueue,
@@ -734,23 +741,26 @@ namespace mo_yanxi::vk::cmd{
 				subrange
 			};
 
-		vkCmdPipelineBarrier(
-			commandBuffer,
-			srcStage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-			0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+		VkDependencyInfo dependency_info{
+			.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+			.imageMemoryBarrierCount = 1,
+			.pImageMemoryBarriers = &imageMemoryBarrier
+		};
+
+		vkCmdPipelineBarrier2(commandBuffer, &dependency_info);
 
 		fn(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearValue, 1, &subrange);
 
-		imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		imageMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+		imageMemoryBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+		imageMemoryBarrier.dstStageMask = dstStage;
 		imageMemoryBarrier.dstAccessMask = dstAccess;
 		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 		imageMemoryBarrier.newLayout = expectedLayout;
 		imageMemoryBarrier.srcQueueFamilyIndex = runningQueue,
-		imageMemoryBarrier.srcQueueFamilyIndex = dstQueue,
+		imageMemoryBarrier.dstQueueFamilyIndex = dstQueue,
 
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage,
-		                     0,
-		                     0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+		vkCmdPipelineBarrier2(commandBuffer, &dependency_info);
 	}
 
 	export
@@ -760,10 +770,10 @@ namespace mo_yanxi::vk::cmd{
 		const VkClearColorValue& clearValue,
 		const VkImageSubresourceRange& subrange,
 
-		const VkPipelineStageFlags srcStage,
-		const VkPipelineStageFlags dstStage,
-		const VkAccessFlags srcAccess,
-		const VkAccessFlags dstAccess,
+		const VkPipelineStageFlags2 srcStage,
+		const VkPipelineStageFlags2 dstStage,
+		const VkAccessFlags2 srcAccess,
+		const VkAccessFlags2 dstAccess,
 		const VkImageLayout expectedLayout,
 		const std::uint32_t runningQueue = VK_QUEUE_FAMILY_IGNORED,
 		const std::uint32_t srcQueue = VK_QUEUE_FAMILY_IGNORED,
@@ -780,8 +790,8 @@ namespace mo_yanxi::vk::cmd{
 		const VkClearDepthStencilValue& clearValue,
 		const VkImageSubresourceRange& subrange,
 
-		const VkPipelineStageFlags srcStage,
-		const VkPipelineStageFlags dstStage,
+		const VkPipelineStageFlags2 srcStage,
+		const VkPipelineStageFlags2 dstStage,
 		const VkAccessFlags srcAccess,
 		const VkAccessFlags dstAccess,
 		const VkImageLayout expectedLayout,
@@ -791,5 +801,38 @@ namespace mo_yanxi::vk::cmd{
 	) noexcept{
 		clear_image(vkCmdClearDepthStencilImage, commandBuffer, image, clearValue, subrange,
 			srcStage, dstStage, srcAccess, dstAccess, expectedLayout, runningQueue, srcQueue, dstQueue);
+	}
+
+	export
+	void update(
+		VkCommandBuffer commandBuffer,
+		VkBuffer buffer,
+		VkDeviceSize offset,
+		VkDeviceSize size,
+		const void* data
+	){
+		vkCmdUpdateBuffer(commandBuffer, buffer, offset, size, data);
+	}
+
+	export
+	template <typename T>
+	void update(
+		VkCommandBuffer commandBuffer,
+		VkBuffer buffer,
+		VkDeviceSize offset,
+		const T& data
+	){
+		::vkCmdUpdateBuffer(commandBuffer, buffer, offset, sizeof(T), &data);
+	}
+
+	export
+	template <std::ranges::contiguous_range T>
+	void update(
+		VkCommandBuffer commandBuffer,
+		VkBuffer buffer,
+		VkDeviceSize offset,
+		const T& range
+	){
+		::vkCmdUpdateBuffer(commandBuffer, buffer, offset, std::ranges::size(range) * sizeof(std::ranges::range_value_t<T>), std::ranges::cdata(range));
 	}
 }

@@ -64,7 +64,7 @@ void main() {
     float occlusion = color_ssao.r;          // SSAO遮蔽因子（0.0-1.0）
     vec4 emissive_raw = color_light_src;  // 原始自发光颜色
     vec4 emissive_bloom = color_light_bloom; // Bloom处理后的自发光
-    vec4 total_emissive = screen(emissive_raw * .35f, emissive_bloom * 1.05f);
+    vec4 total_emissive = screen(vec4(emissive_raw.rgb * .35f, emissive_raw.a), emissive_bloom * 1.05f);
 
 
     float light_factor = smoothstep(0.35f, 1.f, color_light_bloom.a);

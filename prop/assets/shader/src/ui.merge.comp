@@ -36,7 +36,7 @@ void main() {
     vec4 color_light_src = imageLoad(tex_light_src, pos);
     vec4 color_light_bloom = imageLoad(tex_light_bloom, pos);
 
-    vec4 total_emissive = screen(color_light_src * .35f, color_light_bloom * 1.05f);
+    vec4 total_emissive = screen(vec4(color_light_src.rgb * .35f, color_light_src.a), color_light_bloom * 1.05f);
 
     vec4 hdr_result = screen(color_base, total_emissive);
 

@@ -52,6 +52,22 @@ namespace mo_yanxi::vk{
 		}
 	}
 
+	export
+	struct buffer_borrow{
+		VkBuffer buffer;
+		VkDeviceAddress address;
+		VkDeviceSize offset;
+		VkDeviceSize size;
+
+		[[nodiscard]] constexpr buffer_borrow sub_range(VkDeviceSize off, VkDeviceSize size) const noexcept{
+			assert(off + size <= this->size);
+			return buffer_borrow{buffer, address + offset + off, size};
+		}
+		[[nodiscard]] constexpr VkDeviceAddress begin() const noexcept{
+			return address + offset;
+		}
+	};
+
 	export struct buffer : resource_base<VkBuffer>{
 	protected:
 		VkDeviceSize size{};
@@ -97,7 +113,37 @@ namespace mo_yanxi::vk{
 			return vkGetBufferDeviceAddress(get_device(), &bufferDeviceAddressInfo);
 		}
 
+		buffer_borrow borrow(VkDeviceSize off, VkDeviceSize size) const noexcept{
+			assert(off + size < get_size());
+			return buffer_borrow{*this, get_address(), off, size};
+		}
+
+		buffer_borrow borrow() const noexcept{
+			return buffer_borrow{*this, get_address(), 0, get_size()};
+		}
+
 	};
+
+	export struct storage_buffer : buffer{
+
+	private:
+		VkBufferUsageFlags usage{};
+	public:
+		[[nodiscard]] storage_buffer() = default;
+
+		[[nodiscard]] storage_buffer(vk::allocator& allocator, VkDeviceSize size, VkBufferUsageFlags usages)
+			: buffer(allocator, {
+				.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+				.size = size,
+				.usage = usages,
+			}, {.usage = VMA_MEMORY_USAGE_GPU_ONLY}), usage(usages){
+		}
+
+		void resize(VkDeviceSize size){
+			this->operator=(storage_buffer{*get_allocator(), size, usage});
+		}
+	};
+
 
 	export
 	template <std::derived_from<buffer> Bty>
@@ -165,7 +211,7 @@ namespace mo_yanxi::vk{
 		template <std::ranges::contiguous_range T>
 			requires (std::is_trivially_copyable_v<std::ranges::range_value_t<T>> && std::ranges::sized_range<T>)
 		const buffer_mapper& load_range(const T& range, const std::ptrdiff_t dst_byte_offset = 0) const noexcept{
-			std::memcpy(mapped + dst_byte_offset, std::ranges::data(range), std::ranges::size(range) * sizeof(std::ranges::range_value_t<T>));
+			std::memcpy(mapped + dst_byte_offset, std::ranges::cdata (range), std::ranges::size(range) * sizeof(std::ranges::range_value_t<T>));
 			return *this;
 		}
 

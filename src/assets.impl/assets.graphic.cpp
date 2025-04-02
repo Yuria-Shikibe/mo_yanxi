@@ -47,6 +47,8 @@ void mo_yanxi::assets::graphic::load(vk::context& context){
 	shaders::comp::world_merge = {context.get_device(), dir::shader_spv / "world.merge.comp.spv"};
 	shaders::comp::ui_blit = {context.get_device(), dir::shader_spv / "ui.blit.comp.spv"};
 	shaders::comp::ui_merge = {context.get_device(), dir::shader_spv / "ui.merge.comp.spv"};
+	shaders::comp::result_merge = {context.get_device(), dir::shader_spv / "result.merge.comp.spv"};
+	shaders::comp::oit_blend = {context.get_device(), dir::shader_spv / "oit_blend.comp.spv"};
 
 	samplers::texture_sampler = {context.get_device(), vk::preset::default_texture_sampler};
 	samplers::ui_sampler = {context.get_device(), vk::preset::ui_texture_sampler};
@@ -67,6 +69,8 @@ void mo_yanxi::assets::graphic::dispose(){
 	shaders::comp::ssao = {};
 	shaders::comp::ui_blit = {};
 	shaders::comp::ui_merge = {};
+	shaders::comp::result_merge = {};
+	shaders::comp::oit_blend = {};
 
 	samplers::texture_sampler = {};
 	samplers::blit_sampler = {};

@@ -74,9 +74,12 @@ namespace mo_yanxi::vk{
 					graphic = {static_cast<std::uint32_t>(index), queueFamily.queueCount};
 				}
 
-				if(queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT){
-					compute = {static_cast<std::uint32_t>(index), queueFamily.queueCount};
-				}
+				// if(index != 0){
+					if(queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT){
+						compute = {static_cast<std::uint32_t>(index), queueFamily.queueCount};
+					}
+				// }
+
 
 				//Obtain present queue
 				VkBool32 presentSupport = false;

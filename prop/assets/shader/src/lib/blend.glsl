@@ -7,12 +7,13 @@ vec4 alphaBlend(vec4 src, vec4 dst) {
     return result;
 }
 
-vec4 blend(vec4 src, vec4 dst) {
-    vec4 result = vec4(src.rgb * src.a + dst.rgb * (1 - src.a) * dst.a, src.a + (1 - src.a) * dst.a);
-    return result;
+vec4 blend(const in vec4 src, const in vec4 dst) {
+    vec3 rgb = mix(dst.rgb * dst.a, src.rgb, src.a);
+    float a = mix(dst.a, 1.0, src.a);
+    return vec4(rgb, a);
 }
 
 vec4 blend2(vec4 src, vec4 dst) {
-    vec4 result = vec4(src.rgb + dst.rgb * (1 - src.a), src.a + (1 - src.a) * dst.a);
+    vec4 result = vec4(src.rgb + dst.rgb * (1 - src.a), src.a + dst.a * (1 - src.a));
     return result;
 }

@@ -28,7 +28,6 @@ namespace mo_yanxi::graphic{
 		math::mat3 worldToScreen{};
 		math::mat3 screenToWorld{};
 
-		//TODO is a rect necessary??
 		math::vec2 screenSize{};
 
 		math::vec2 stablePos{};
@@ -226,8 +225,9 @@ namespace mo_yanxi::graphic{
 			return (screen_pos / get_screen_size()).sub(0.5f, 0.5f).scl(2, -2);
 		}
 
-		[[nodiscard]] math::vec2 get_screen_to_world(const math::vec2 where, const math::vec2 offset = {}) const{
-			return screenToWorld * uniform(where - offset);
+		[[nodiscard]] math::vec2 get_screen_to_world(const math::vec2 where, const math::vec2 offset = {}, const bool flip_y = false) const{
+			auto offed = where - offset;
+			return screenToWorld * uniform(flip_y ? math::vec2{offed.x, screenSize.y - offed.y} : offed);
 		}
 
 		[[nodiscard]] math::vec2 get_world_to_screen(const math::vec2 inWorld, const bool flip_y = true) const noexcept{

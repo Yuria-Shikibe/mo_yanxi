@@ -16,7 +16,6 @@ export import mo_yanxi.core.ctrl.key_binding;
 export namespace mo_yanxi::core::ctrl{
 
 	class main_input{
-		using key_binding_type = key_mapping<>;
 	public:
 
 		using PosListener = std::function<void(float, float)>;
@@ -27,7 +26,7 @@ export namespace mo_yanxi::core::ctrl{
 		// std::vector<InputListener*> inputKeyListeners{};
 		// std::vector<InputListener*> inputMouseListeners{};
 
-		key_binding_type main_binds{};
+		key_mapping<> main_binds{};
 
 	protected:
 		bool isInbound{false};
@@ -37,19 +36,24 @@ export namespace mo_yanxi::core::ctrl{
 		math::vec2 mouse_velocity_{};
 		math::vec2 scroll_offset_{};
 
-		string_hash_map<key_binding_type> subInputs{};
+		string_hash_map<std::unique_ptr<key_mapping_interface>> subInputs{};
 
 	public:
 
-		key_binding_type& register_sub_input(const std::string_view mappingName){
-			auto& rst = subInputs[mappingName];
-			rst.incr_ref();
-			return rst;
+		//TODO provide type conflict check?
+		template <typename ...CtxArgs>
+		key_mapping<CtxArgs...>& register_sub_input(const std::string_view mappingName){
+			std::pair<decltype(subInputs)::iterator, bool> rst = subInputs.try_emplace(mappingName);
+			if(rst.second){
+				rst.first->second = std::make_unique<key_mapping<CtxArgs...>>();
+			}
+			rst.first->second->incr_ref();
+			return static_cast<key_mapping<CtxArgs...>&>(*rst.first->second);
 		}
 
 		bool erase_sub_input(const std::string_view mappingName){
 			if(const auto itr = subInputs.find(mappingName); itr != subInputs.end()){
-				if(itr->second.decr_ref()){
+				if(itr->second->decr_ref()){
 					subInputs.erase(itr);
 					return true;
 				}
@@ -61,7 +65,7 @@ export namespace mo_yanxi::core::ctrl{
 			main_binds.inform(button, action, mods);
 
 			for(auto& subInput : subInputs | std::views::values){
-				subInput.inform(button, action, mods);
+				subInput->inform(button, action, mods);
 			}
 		}
 
@@ -131,7 +135,7 @@ export namespace mo_yanxi::core::ctrl{
 			}
 
 			for(auto& subInput : subInputs | std::views::values){
-				subInput.update(delta_in_tick);
+				subInput->update(delta_in_tick);
 			}
 		}
 	};

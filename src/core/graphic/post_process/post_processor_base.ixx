@@ -14,6 +14,7 @@ export import mo_yanxi.vk.pipeline;
 export import mo_yanxi.vk.util.cmd.render;
 export import mo_yanxi.vk.util;
 export import mo_yanxi.math.vector2;
+import mo_yanxi.vk.exception;
 import std;
 
 namespace mo_yanxi::graphic{
@@ -47,8 +48,12 @@ namespace mo_yanxi::graphic{
 			return image_size.add(compute_group_unit_size2.copy().sub(1u, 1u)).div(compute_group_unit_size2);
 		}
 
-	protected:
+		static constexpr VkExtent2D size_to_extent_2d(math::u32size2 sz) noexcept{
+			return std::bit_cast<VkExtent2D>(sz);
+		}
 
+	protected:
+		math::usize2 size_{};
 		vk::context* context_{};
 
 		vk::constant_layout constant_layout{};
@@ -81,13 +86,21 @@ namespace mo_yanxi::graphic{
 			pipeline = vk::pipeline{context().get_device(), pipeline_layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, shader_info};
 		}
 
+	protected:
+		static void throwExceptionOnCommandBufferRequirement(){
+			throw vk::unqualified_error{"Command Buffer Required But Null Provided"};
+		}
+
 	public:
 		std::vector<post_process_socket> inputs{};
 		std::vector<post_process_socket> outputs{};
 
 		[[nodiscard]] post_processor() = default;
 
-		[[nodiscard]] explicit post_processor(vk::context& context) : context_(&context), main_command_buffer(context.get_compute_command_pool().obtain()){
+		[[nodiscard]] explicit post_processor(
+			vk::context& context, math::usize2 size) :
+		size_(size), context_(&context), main_command_buffer(context.get_compute_command_pool().obtain())
+		{
 
 		}
 
@@ -99,7 +112,8 @@ namespace mo_yanxi::graphic{
 		}
 
 		virtual void resize(VkCommandBuffer command_buffer, math::usize2 size, bool record_command){
-
+			this->size_ = size;
+			if(record_command)record_commands();
 		}
 
 		virtual void set_input(std::initializer_list<post_process_socket> sockets){
@@ -110,6 +124,10 @@ namespace mo_yanxi::graphic{
 			outputs = sockets;
 		}
 
+		[[nodiscard]] math::usize2 size() const noexcept{
+			return size_;
+		}
+
 		[[nodiscard]] VkCommandBuffer get_main_command_buffer() const noexcept{
 			return main_command_buffer;
 		}
@@ -118,5 +136,10 @@ namespace mo_yanxi::graphic{
 			assert(context_ != nullptr);
 			return *context_;
 		}
+
+		post_processor(const post_processor& other) = delete;
+		post_processor(post_processor&& other) noexcept = default;
+		post_processor& operator=(const post_processor& other) = delete;
+		post_processor& operator=(post_processor&& other) noexcept = default;
 	};
 }

@@ -618,47 +618,56 @@ namespace mo_yanxi::math{
 
 
 		FORCE_INLINE constexpr rect_ortho& expand_x(T x) noexcept{
-			src.x -= x;
-
 			if constexpr(std::unsigned_integral<T>){
+				src.x -= x;
 				size_.x += x * TWO;
 			} else{
-				float addW = x * TWO;
-
-				if(-addW >= size_.x){
+				auto doubleX = x * TWO;
+				if(-doubleX > size_.x){
+					src.x += size_.x / TWO;
 					size_.x = 0;
-				} else{
-					size_.x += addW;
+				}else{
+					src.x -= x;
+					size_.x += doubleX;
 				}
+
 			}
 
 			return *this;
 		}
 
 		FORCE_INLINE constexpr rect_ortho& expand_y(T y) noexcept{
-			src.y -= y;
-
 			if constexpr(std::unsigned_integral<T>){
+				src.y -= y;
 				size_.y += y * TWO;
 			} else{
-				float addH = y * TWO;
-
-				if(-addH >= size_.y){
+				auto doubleY = y * TWO;
+				if(-doubleY > size_.y){
+					src.y += size_.y / TWO;
 					size_.y = 0;
-				} else{
-					size_.y += addH;
+				}else{
+					src.y -= y;
+					size_.y += doubleY;
 				}
+
 			}
 
 			return *this;
 		}
-		
+
 		FORCE_INLINE constexpr rect_ortho& expand(const T x, const T y) noexcept{
 			(void)this->expand_x(x);
 			(void)this->expand_y(y);
 
 			return *this;
 		}
+		FORCE_INLINE constexpr rect_ortho& expand(const T v) noexcept{
+			(void)this->expand_x(v);
+			(void)this->expand_y(v);
+
+			return *this;
+		}
+
 		FORCE_INLINE constexpr rect_ortho& expand(const vector2<T> vec) noexcept{
 			(void)this->expand_x(vec.x);
 			(void)this->expand_y(vec.y);
@@ -666,18 +675,28 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		FORCE_INLINE constexpr rect_ortho& shrink_x(T marginX) noexcept{
-			marginX = math::min(marginX, size_.x / TWO);
-			src.x += marginX;
-			size_.x -= marginX * TWO;
+		FORCE_INLINE constexpr rect_ortho& shrink_x(T x) noexcept{
+			auto doubleX = x * TWO;
+			if(doubleX > size_.x){
+				src.x += size_.x / TWO;
+				size_.x = 0;
+			}else{
+				src.x += x;
+				size_.x -= doubleX;
+			}
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr rect_ortho& shrink_y(T marginY) noexcept{
-			marginY = math::min(marginY, size_.y / TWO);
-			src.y += marginY;
-			size_.y -= marginY * TWO;
+		FORCE_INLINE constexpr rect_ortho& shrink_y(T y) noexcept{
+			auto doubleY = y * TWO;
+			if(doubleY > size_.y){
+				src.y += size_.y / TWO;
+				size_.y = 0;
+			}else{
+				src.y += y;
+				size_.y -= doubleY;
+			}
 
 			return *this;
 		}
@@ -710,7 +729,7 @@ namespace mo_yanxi::math{
 			// ADAPTED_ASSUME(minEndX >= maxSrcX);
 			// ADAPTED_ASSUME(minEndY >= maxSrcY);
 
-			return rect_ortho{
+			return rect_ortho{tags::unchecked,
 					maxSrcX, maxSrcY, math::clamp_positive(minEndX - maxSrcX), math::clamp_positive(minEndY - maxSrcY)
 				};
 		}
@@ -766,6 +785,15 @@ namespace mo_yanxi::math{
 	export using frect = rect_ortho<float>;
 	export using irect = rect_ortho<int>;
 	export using urect = rect_ortho<unsigned int>;
+
+	//TODO provide trivial rect with no class invariant
+	export
+	template <typename T>
+	using raw_rect = rect_ortho<T>;
+
+	export using raw_frect = raw_rect<float>;
+	export using raw_irect = raw_rect<int>;
+	export using raw_urect = raw_rect<unsigned int>;
 
 	export
 	template <std::floating_point T>

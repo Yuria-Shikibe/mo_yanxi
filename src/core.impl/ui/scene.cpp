@@ -309,7 +309,7 @@ mo_yanxi::ui::scene& mo_yanxi::ui::scene::operator=(scene&& other) noexcept{
 	return *this;
 }
 
-double mo_yanxi::ui::scene::getGlobalTime() const noexcept{
+double mo_yanxi::ui::scene::get_global_time() const noexcept{
 	return core::global::timer.global_time();
 }
 

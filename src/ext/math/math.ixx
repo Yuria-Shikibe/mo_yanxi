@@ -117,6 +117,19 @@ namespace mo_yanxi::math {
 		return cos(radians / scl) * mag;
 	}
 
+	export struct cos_sin_result{
+		float cos;
+		float sin;
+	};
+
+	export MATH_ATTR constexpr cos_sin_result cos_sin(const float radians) noexcept{
+		return {cos(radians), sin(radians)};
+	}
+
+	export MATH_ATTR constexpr cos_sin_result cos_sin_deg(const float degree)noexcept{
+		return {cos_deg(degree), sin_deg(degree)};
+	}
+
 	namespace angles{
 
 		/** Wraps the given angle to the range [-pi, pi]
@@ -457,7 +470,7 @@ namespace mo_yanxi::math {
 	MATH_ATTR T clamp_range(const T v, const T absMax) noexcept{
 		MATH_ASSERT(absMax >= 0);
 
-		if(std::abs(v) > absMax){
+		if(math::abs(v) > absMax){
 			return std::copysign(absMax, v);
 		}
 
@@ -542,7 +555,7 @@ namespace mo_yanxi::math {
 			}
 		}
 		
-		return fromValue + (toValue - fromValue) * progress;
+		return fromValue * (1 - progress) + toValue * progress;
 	}
 
 	export
@@ -626,7 +639,12 @@ namespace mo_yanxi::math {
 	export
 	template <typename T = int>
 	MATH_ATTR constexpr T ceil(const float value) noexcept {
-		return BIG_ENOUGH_INT - static_cast<T>(BIG_ENOUGH_FLOOR - value);
+		if (std::is_constant_evaluated()){
+			return BIG_ENOUGH_INT - static_cast<T>(BIG_ENOUGH_FLOOR - value);
+		}else{
+			return static_cast<T>(std::ceil(value));
+		}
+
 	}
 
 	/**
@@ -789,11 +807,11 @@ namespace mo_yanxi::math {
 	 */
 	export
 	template <mo_yanxi::number T>
-	MATH_ATTR T constexpr dst_safe(const T a, const T b) noexcept {
+	MATH_ATTR T constexpr dst_safe(const T src, const T dst) noexcept {
 		if constexpr(!std::is_unsigned_v<T>) {
-			return a - b;
+			return dst - src;
 		} else {
-			return a > b ? a - b : b - a;
+			return src > dst ? src - dst : dst - src;
 		}
 	}
 
@@ -994,6 +1012,10 @@ namespace mo_yanxi::math {
 			return math::clamp(val, from, to);
 		}
 
+		MATH_ATTR constexpr T operator[](std::floating_point auto fp) const noexcept{
+			return math::lerp(from, to, fp);
+		}
+
 		FORCE_INLINE constexpr section& operator*=(const T val) noexcept{
 			from *= val;
 			to *= val;
@@ -1008,6 +1030,26 @@ namespace mo_yanxi::math {
 
 	export
 	using range = section<float>;
+
+
+	export
+	template <typename T>
+	struct based_section{
+		T base;
+		T append;
+
+		MATH_ATTR constexpr T length() const noexcept{
+			return math::abs(append);
+		}
+
+		MATH_ATTR constexpr T operator[](std::floating_point auto fp) const noexcept{
+			return math::fma(fp, append, base);
+		}
+
+		operator section<T>(){
+			return section<T>{base, base + append};
+		}
+	};
 
 	export
 	template <std::floating_point T>

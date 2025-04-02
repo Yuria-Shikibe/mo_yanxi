@@ -16,6 +16,13 @@ namespace mo_yanxi::graphic{
 	struct renderer_export{
 
 		string_open_addr_hash_map<vk::image_handle> results{};
+
+		[[nodiscard]] vk::image_handle find(std::string_view name) const noexcept{
+			if(auto rst = results.try_find(name)){
+				return *rst;
+			}
+			return {};
+		}
 	};
 
 	export
@@ -61,5 +68,10 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] std::string_view get_name() const noexcept{
 			return name;
 		}
+
+		renderer(const renderer& other) = delete;
+		renderer(renderer&& other) noexcept = default;
+		renderer& operator=(const renderer& other) = delete;
+		renderer& operator=(renderer&& other) noexcept = default;
 	};
 }

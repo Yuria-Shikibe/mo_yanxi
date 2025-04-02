@@ -11,6 +11,8 @@ import mo_yanxi.handle_wrapper;
 import mo_yanxi.vk.vma;
 import mo_yanxi.vk.ext;
 
+
+//TODO more compact dbo using descriptorBufferOffsetAlignment
 namespace mo_yanxi::vk{
 	export struct descriptor_mapper;
 
@@ -25,6 +27,7 @@ namespace mo_yanxi::vk{
 		std::size_t combinedImageSamplerDescriptorSize{};
 		std::size_t storageImageDescriptorSize{};
 		std::size_t inputAttachmentDescriptorSize{};
+		std::size_t storageBufferDescriptorSize{};
 
 	public:
 		[[nodiscard]] descriptor_buffer() = default;
@@ -64,10 +67,12 @@ namespace mo_yanxi::vk{
 
 				getPhysicalDeviceProperties2KHR(physical_device, &device_properties);
 
+				auto offset_align = descriptor_buffer_properties.descriptorBufferOffsetAlignment;
 				uniformBufferDescriptorSize = descriptor_buffer_properties.uniformBufferDescriptorSize;
 				combinedImageSamplerDescriptorSize = descriptor_buffer_properties.combinedImageSamplerDescriptorSize;
 				storageImageDescriptorSize = descriptor_buffer_properties.storageImageDescriptorSize;
 				inputAttachmentDescriptorSize = descriptor_buffer_properties.inputAttachmentDescriptorSize;
+				storageBufferDescriptorSize = descriptor_buffer_properties.storageBufferDescriptorSize;
 			}
 
 
@@ -88,6 +93,10 @@ namespace mo_yanxi::vk{
 
 		[[nodiscard]] std::size_t get_storage_image_descriptor_size() const noexcept{
 			return storageImageDescriptorSize;
+		}
+
+		[[nodiscard]] std::size_t get_storage_buffer_descriptor_size() const noexcept{
+			return storageBufferDescriptorSize;
 		}
 
 		[[nodiscard]] std::size_t get_input_attachment_descriptor_size() const noexcept{
@@ -222,6 +231,39 @@ namespace mo_yanxi::vk{
 	struct descriptor_mapper : buffer_mapper<descriptor_buffer>{
 		// using buffer_mapper::buffer_mapper;
 
+		const descriptor_mapper& set_storage_buffer(
+			const std::uint32_t binding,
+			const VkDeviceAddress address,
+			const VkDeviceSize size,
+			const std::uint32_t chunkIndex = 0,
+			const VkFormat format = VK_FORMAT_UNDEFINED
+		) const{
+			const VkDescriptorAddressInfoEXT addr_info{
+				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT,
+				.pNext = nullptr,
+				.address = address,
+				.range = size,
+				.format = format
+			};
+			const VkDescriptorGetInfoEXT info{
+				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT,
+				.pNext = nullptr,
+				.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				.data = VkDescriptorDataEXT{
+					.pStorageBuffer = &addr_info,
+				}
+			};
+
+			vk::getDescriptorEXT(
+				buffer_obj->get_device(),
+				&info,
+				buffer_obj->get_storage_buffer_descriptor_size(),
+				mapped + buffer_obj->offsets[binding] + buffer_obj->get_chunk_offset(chunkIndex)
+			);
+
+			return *this;
+		}
+
 		const descriptor_mapper& set_uniform_buffer(
 			const std::uint32_t binding,
 			const buffer& ubo,
@@ -230,6 +272,8 @@ namespace mo_yanxi::vk{
 		) const{
 			return this->set_uniform_buffer(binding, ubo.get_address() + ubo_offset, ubo.get_size(), chunkIndex);
 		}
+
+
 
 		const descriptor_mapper& set_uniform_buffer(
 			const std::uint32_t binding,
@@ -284,7 +328,7 @@ namespace mo_yanxi::vk{
 		const descriptor_mapper& set_storage_image(
 					const std::uint32_t binding,
 					VkImageView imageView,
-					const VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+					const VkImageLayout imageLayout = VK_IMAGE_LAYOUT_GENERAL,
 					const std::uint32_t chunkIndex = 0,
 					const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) const{
 

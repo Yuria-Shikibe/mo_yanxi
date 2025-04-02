@@ -11,7 +11,7 @@ void mo_yanxi::ui::nested_scene::draw_pre(const rect clipSpace) const{
 	get_renderer().batch.push_viewport(scene_.region);
 
 	float edge = 4 / camera_.get_scale();
-	get_renderer().batch.push_scissor({camera_.get_viewport().shrink(edge), 4});
+	get_renderer().batch.push_scissor({camera_.get_viewport()/*.shrink(edge), 4*/});
 
 }
 

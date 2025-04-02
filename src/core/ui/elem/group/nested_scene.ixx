@@ -363,8 +363,10 @@ namespace mo_yanxi::ui{
 		void draw_post(rect clipSpace) const override;
 
 		void update(float delta_in_ticks) override{
+			// scene_.resize(property.content_bound_absolute().move_x(math::absin(get_scene()->get_global_time(), 10, property.content_width())));
+
 			elem::update(delta_in_ticks);
-			camera_.update(delta_in_ticks);
+			camera_.update(delta_in_ticks, false);
 
 			scene_.update(delta_in_ticks);
 			scene_.layout();
@@ -380,7 +382,7 @@ namespace mo_yanxi::ui{
 		bool resize(const math::vec2 size) override{
 			if(elem::resize(size)){
 				scene_.resize(property.content_bound_absolute());
-				auto [x, y] = property.content_size();
+				auto [x, y] = scene_.region.size();
 				camera_.resize_screen(x, y);
 				return true;
 			}

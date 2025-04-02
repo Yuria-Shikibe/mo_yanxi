@@ -265,7 +265,7 @@ namespace mo_yanxi::ui{
 			if(currentKeyFocus == target)currentKeyFocus = nullptr;
 		}
 
-		double getGlobalTime() const noexcept;
+		double get_global_time() const noexcept;
 
 	private:
 		void updateInbounds(std::vector<elem*>&& next);

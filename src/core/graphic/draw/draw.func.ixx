@@ -14,6 +14,12 @@ namespace mo_yanxi::graphic::draw{
 	using vec = math::vec2;
 	using col = color;
 
+	constexpr float CircleVertPrecision{12};
+
+	FORCE_INLINE constexpr int getCircleVertices(const float radius) noexcept{
+		return math::clamp(static_cast<int>(radius * math::pi / CircleVertPrecision), 12, 512);
+	}
+
 	template <typename Proj, typename Vtx>
 	void try_proj(Proj& proj, Vtx& vtx){
 		if constexpr (std::invocable<Proj, Vtx&>){
@@ -99,9 +105,216 @@ namespace mo_yanxi::graphic::draw{
 				color_ovr, color_ovr, color_ovr, color_ovr
 			);
 		}
+
+		export
+		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+		FORCE_INLINE void rect(
+			const batch_draw_param<Vtx, UV, Proj>& param,
+			const math::trans2 center,
+			const math::frect rect_offset_in_local,
+			col color_scl = colors::white,
+			col color_ovr = {}
+			) noexcept {
+
+			const auto size = rect_offset_in_local.size() * .5f;
+
+			auto [cos, sin] = center.rot_cos_sin();
+			const auto off = center.vec + rect_offset_in_local.src.copy().rotate(cos, sin);
+			const float w1 =  cos * size.x;
+			const float h1 =  sin * size.x;
+
+			const float w2 = -sin * size.y;
+			const float h2 = cos  * size.y;
+			fill::fill(
+				param,
+				off + vec{-w1 - w2, -h1 - h2},
+				off + vec{+w1 - w2, +h1 - h2},
+				off + vec{+w1 + w2, +h1 + h2},
+				off + vec{-w1 + w2, -h1 + h2},
+				color_scl, color_scl, color_scl, color_scl,
+				color_ovr, color_ovr, color_ovr, color_ovr
+			);
+		}
+
+		export
+		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+		FORCE_INLINE void rect(
+			const batch_draw_param<Vtx, UV, Proj>& param,
+			const math::trans2 center,
+			const vec size,
+			col color_scl = colors::white,
+			col color_ovr = {}
+			) noexcept {
+
+			const auto sz = size * .5f;
+
+			auto [cos, sin] = center.rot_cos_sin();
+
+			const float w1 =  cos * sz.x;
+			const float h1 =  sin * sz.x;
+
+			const float w2 = -sin * sz.y;
+			const float h2 = cos  * sz.y;
+			fill::fill(
+				param,
+				center.vec + vec{-w1 - w2, -h1 - h2},
+				center.vec + vec{+w1 - w2, +h1 - h2},
+				center.vec + vec{+w1 + w2, +h1 + h2},
+				center.vec + vec{-w1 + w2, -h1 + h2},
+				color_scl, color_scl, color_scl, color_scl,
+				color_ovr, color_ovr, color_ovr, color_ovr
+			);
+		}
+
+		export
+		template <
+			typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj>
+		void poly(
+			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+			math::trans2 trans,
+			const int sides,
+			const float radius,
+			const col center_color = colors::white,
+			const col edge_color = colors::white){
+			const float space = math::circle_deg_full / static_cast<float>(sides);
+
+			static constexpr std::size_t MaxReserve = 64;
+
+			if(sides <= MaxReserve){
+				acquirer_guard _{auto_param, MaxReserve};
+				for(int i = 0; i < sides; i++){
+					const float a = space * static_cast<float>(i) + trans.rot;
+					float cos1 = math::cos_deg(a);
+					float sin1 = math::sin_deg(a);
+					float cos2 = math::cos_deg(a + space);
+					float sin2 = math::sin_deg(a + space);
+					fill::fill(
+						auto_param[i],
+						trans.vec,
+						trans.vec,
+						vec{trans.vec.x + radius * cos2, trans.vec.y + radius * sin2},
+						vec{trans.vec.x + radius * cos1, trans.vec.y + radius * sin1},
+						center_color, center_color, edge_color, edge_color
+					);
+				}
+			}else{
+				for(int i = 0; i < sides; i++){
+					const float a = space * static_cast<float>(i) + trans.rot;
+					float cos1 = math::cos_deg(a);
+					float sin1 = math::sin_deg(a);
+					float cos2 = math::cos_deg(a + space);
+					float sin2 = math::sin_deg(a + space);
+					fill::fill(
+						auto_param.get_reserved(math::min<std::size_t>(sides - i, MaxReserve)),
+						trans.vec,
+						trans.vec,
+						vec{trans.vec.x + radius * cos2, trans.vec.y + radius * sin2},
+						vec{trans.vec.x + radius * cos1, trans.vec.y + radius * sin1},
+						center_color, center_color, edge_color, edge_color
+					);
+				}
+			}
+		}
+
+		export
+		template <typename M>
+		FORCE_INLINE void circle(
+			M& auto_param,
+			vec pos,
+			const float radius,
+			const col color = colors::white
+			){
+			fill::poly(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, color);
+		}
 	}
 
 	namespace line{
+		export 
+		template <bool cap = true, typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+		FORCE_INLINE void line(
+			const batch_draw_param<Vtx, UV, Proj>& param,
+			const vec src, const vec dst,
+			const float stroke = 2.f,
+			const col color_scl_src = colors::white,
+			const col color_scl_dst = colors::white,
+			const col color_ovr_src = {},
+			const col color_ovr_dst = {}
+			){
+			const float h_stroke = stroke / 2.0f;
+			vec diff = dst - src;
+
+			const float len = diff.length();
+			diff *= h_stroke / len;
+
+			if constexpr (cap){
+				fill::fill(
+					param,
+					src + vec{-diff.x - diff.y, -diff.y + diff.x},
+					src + vec{-diff.x + diff.y, -diff.y - diff.x},
+					dst + vec{+diff.x + diff.y, +diff.y - diff.x},
+					dst + vec{+diff.x - diff.y, +diff.y + diff.x},
+					color_scl_src, color_scl_src, color_scl_dst, color_scl_dst,
+					color_ovr_src, color_ovr_src, color_ovr_dst, color_ovr_dst
+				);
+			}else{
+				fill::fill(
+					param,
+					src + vec{-diff.y, +diff.x},
+					src + vec{+diff.y, -diff.x},
+					dst + vec{+diff.y, -diff.x},
+					dst + vec{-diff.y, +diff.x},
+					color_scl_src, color_scl_src, color_scl_dst, color_scl_dst,
+					color_ovr_src, color_ovr_src, color_ovr_dst, color_ovr_dst
+				);
+			}
+		}
+
+		export
+		template <bool cap = true, typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj>
+		FORCE_INLINE void line_angle_center(
+			const batch_draw_param<Vtx, UV, Proj>& param,
+			const math::trans2 trans,
+			const float length,
+			const float stroke = 2.f,
+			const col color_scl_src = colors::white,
+			const col color_scl_dst = colors::white,
+			const col color_ovr_src = {},
+			const col color_ovr_dst = {}){
+			vec vec{};
+
+			vec.set_polar(trans.rot, length * 0.5f);
+
+			line::line<cap>(param, trans.vec - vec, trans.vec + vec, stroke,
+			                color_scl_src,
+			                color_scl_dst,
+			                color_ovr_src,
+			                color_ovr_dst
+			);
+		}
+
+		export
+		template <bool cap = true, typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj>
+		FORCE_INLINE void line_angle(
+			const batch_draw_param<Vtx, UV, Proj>& param,
+			const math::trans2 trans,
+			const float length,
+			const float stroke = 2.f,
+			const col color_scl_src = colors::white,
+			const col color_scl_dst = colors::white,
+			const col color_ovr_src = {},
+			const col color_ovr_dst = {}){
+			vec vec{};
+
+			vec.set_polar(trans.rot, length * 0.5f);
+
+			line::line<cap>(param, trans.vec, trans.vec + vec, stroke,
+							color_scl_src,
+							color_scl_dst,
+							color_ovr_src,
+							color_ovr_dst
+			);
+		}
+		
 		export
 		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
 		FORCE_INLINE void line_ortho(
@@ -139,19 +352,381 @@ namespace mo_yanxi::graphic::draw{
 			line::line_ortho(auto_param[2], rect.vert_11(), rect.vert_10(), stroke, color, color);
 			line::line_ortho(auto_param[3], rect.vert_10(), rect.vert_00(), stroke, color, color);
 		}
-		//
-		// export
-		// template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
-		// FORCE_INLINE void rect_ortho2(
-		// 	auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
-		// 	const math::frect rect,
-		// 	const float stroke = 2.f,
-		// 	const color color = colors::white){
-		// 	acquirer_guard _{auto_param, 4};
-		// 	line::line_ortho(auto_param[0], rect.vert_00(), rect.vert_01(), stroke, color, color);
-		// 	line::line_ortho(auto_param[1], rect.vert_01(), rect.vert_11(), stroke, color, color);
-		// 	line::line_ortho(auto_param[2], rect.vert_11(), rect.vert_10(), stroke, color, color);
-		// 	line::line_ortho(auto_param[3], rect.vert_10(), rect.vert_00(), stroke, color, color);
-		// }
+
+		export
+		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+		FORCE_INLINE void square(
+			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+				math::trans2 trans,
+				const float radius,
+				const float stroke = 2.f,
+
+				const col color_scl = colors::white,
+				const col color_ovr = {}
+			){
+			trans.rot += 45.000f;
+			const float dst = stroke / math::sqrt2;
+
+			vec vec2_0{}, vec2_1{}, vec2_2{}, vec2_3{}, vec2_4{};
+
+			vec2_0.set_polar(trans.rot, 1);
+
+			vec2_1.set(vec2_0);
+			vec2_2.set(vec2_0);
+
+			vec2_1.scl(radius - dst);
+			vec2_2.scl(radius + dst);
+			
+			acquirer_guard _{auto_param, 4};
+			for(int i = 0; i < 4; ++i){
+				vec2_0.rotate_rt_clockwise();
+
+				vec2_3.set(vec2_0).scl(radius - dst);
+				vec2_4.set(vec2_0).scl(radius + dst);
+
+				fill::fill(
+					auto_param[i], vec2_1 + trans.vec, vec2_2 + trans.vec, vec2_4 + trans.vec, vec2_3 + trans.vec,
+					color_scl, color_scl, color_scl, color_scl,
+					color_ovr, color_ovr, color_ovr, color_ovr
+				);
+
+				vec2_1 = vec2_3;
+				vec2_2 = vec2_4;
+			}
+		}
+
+		export
+		template <
+			std::ranges::random_access_range Rng,
+			typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+				requires (std::ranges::sized_range<Rng> && std::convertible_to<col, std::ranges::range_value_t<Rng>>)
+		void poly_partial(
+			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+				math::trans2 trans,
+				const int sides,
+				const float radius,
+				const float ratio,
+				const Rng& colorGroup,
+				const float stroke = 2.f
+			){
+#if DEBUG_CHECK
+				if(std::ranges::empty(colorGroup)){
+					throw std::invalid_argument("Color group is Empty.");
+				}
+#endif
+				const auto fSides = static_cast<float>(sides);
+
+				const float space = math::circle_deg_full / fSides;
+				float h_step = stroke / 2.0f / math::cos_deg(space / 2.0f);
+				const float r1 = radius - h_step;
+				const float r2 = radius + h_step;
+
+				float currentRatio;
+
+				float currentAng = trans.rot;
+				auto [cos1, sin1] = math::cos_sin_deg(currentAng);
+				float sin2, cos2;
+
+				int progress = 0;
+				col lerpColor1 = colorGroup[0];
+				col lerpColor2 = colorGroup[std::ranges::size(colorGroup) - 1];
+
+				const auto sz = math::ceil(fSides * ratio);
+				if(sz == 0)return;
+
+				for(; progress < fSides * ratio - 1.0f; ++progress){
+					const float fp = static_cast<float>(progress);
+					// NOLINT(*-flp30-c)
+					// NOLINT(cert-flp30-c)
+					currentAng = trans.rot + (fp + 1.0f) * space;
+
+					cos2 = math::cos_deg(currentAng);
+					sin2 = math::sin_deg(currentAng);
+
+					currentRatio = fp / fSides;
+
+					lerpColor2.lerp(currentRatio, colorGroup);
+
+					fill::fill(
+						auto_param.get_reserved(),
+						vec{cos1 * r1 + trans.vec.x, sin1 * r1 + trans.vec.y},
+						vec{cos1 * r2 + trans.vec.x, sin1 * r2 + trans.vec.y},
+						vec{cos2 * r2 + trans.vec.x, sin2 * r2 + trans.vec.y},
+						vec{cos2 * r1 + trans.vec.x, sin2 * r1 + trans.vec.y},
+						lerpColor1, lerpColor1, lerpColor2, lerpColor2
+					);
+
+					lerpColor1.set(lerpColor2);
+
+					sin1 = sin2;
+					cos1 = cos2;
+				}
+
+				const float fp = static_cast<float>(progress);
+				currentRatio = ratio;
+				const float remainRatio = currentRatio * fSides - fp;
+
+				currentAng = trans.rot + (fp + 1.0f) * space;
+
+				cos2 = math::lerp(cos1, math::cos_deg(currentAng), remainRatio);
+				sin2 = math::lerp(sin1, math::sin_deg(currentAng), remainRatio);
+
+				lerpColor2.lerp(fp / fSides, colorGroup);
+				lerpColor2.lerp(lerpColor1, 1.0f - remainRatio);
+
+				fill::fill(
+					auto_param.get(),
+					vec{cos1 * r1 + trans.vec.x, sin1 * r1 + trans.vec.y},
+					vec{cos1 * r2 + trans.vec.x, sin1 * r2 + trans.vec.y},
+					vec{cos2 * r2 + trans.vec.x, sin2 * r2 + trans.vec.y},
+					vec{cos2 * r1 + trans.vec.x, sin2 * r1 + trans.vec.y},
+					lerpColor1, lerpColor1, lerpColor2, lerpColor2
+				);
+			}
+
+		export
+		template <
+			typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+		void poly_partial(
+			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+				math::trans2 trans,
+				const int sides,
+				const float radius,
+				const float ratio,
+				const col color = colors::white,
+				const float stroke = 2.f
+			){
+				const auto fSides = static_cast<float>(sides);
+
+				const float space = math::circle_deg_full / fSides;
+				float h_step = stroke / 2.0f / math::cos_deg(space / 2.0f);
+				const float r1 = radius - h_step;
+				const float r2 = radius + h_step;
+
+				float currentRatio;
+
+				float currentAng = trans.rot;
+				auto [cos1, sin1] = math::cos_sin_deg(currentAng);
+				float sin2, cos2;
+
+				int progress = 0;
+
+				const auto sz = math::ceil(fSides * ratio);
+				if(sz == 0)return;
+
+				for(; progress < fSides * ratio - 1.0f; ++progress){
+					const float fp = static_cast<float>(progress);
+					// NOLINT(*-flp30-c)
+					// NOLINT(cert-flp30-c)
+					currentAng = trans.rot + (fp + 1.0f) * space;
+
+					cos2 = math::cos_deg(currentAng);
+					sin2 = math::sin_deg(currentAng);
+
+					currentRatio = fp / fSides;
+
+					fill::fill(
+						auto_param.get_reserved(),
+						vec{cos1 * r1 + trans.vec.x, sin1 * r1 + trans.vec.y},
+						vec{cos1 * r2 + trans.vec.x, sin1 * r2 + trans.vec.y},
+						vec{cos2 * r2 + trans.vec.x, sin2 * r2 + trans.vec.y},
+						vec{cos2 * r1 + trans.vec.x, sin2 * r1 + trans.vec.y},
+						color, color, color, color
+					);
+
+					sin1 = sin2;
+					cos1 = cos2;
+				}
+
+				const float fp = static_cast<float>(progress);
+				currentRatio = ratio;
+				const float remainRatio = currentRatio * fSides - fp;
+
+				currentAng = trans.rot + (fp + 1.0f) * space;
+
+				cos2 = math::lerp(cos1, math::cos_deg(currentAng), remainRatio);
+				sin2 = math::lerp(sin1, math::sin_deg(currentAng), remainRatio);
+
+				fill::fill(
+					auto_param.get(),
+					vec{cos1 * r1 + trans.vec.x, sin1 * r1 + trans.vec.y},
+					vec{cos1 * r2 + trans.vec.x, sin1 * r2 + trans.vec.y},
+					vec{cos2 * r2 + trans.vec.x, sin2 * r2 + trans.vec.y},
+					vec{cos2 * r1 + trans.vec.x, sin2 * r1 + trans.vec.y},
+					color, color, color, color
+				);
+			}
+
+		export
+		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj>
+		void poly(
+			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+			math::trans2 trans,
+			const int sides,
+			const float radius,
+			const col color = colors::white,
+			const float stroke = 2.f){
+			const float space = math::circle_deg_full / static_cast<float>(sides);
+			float h_step = stroke / 2.0f / math::cos_deg(space / 2.0f);
+			const float r1 = radius - h_step;
+			const float r2 = radius + h_step;
+
+			static constexpr std::size_t MaxReserve = 64;
+
+			if(sides <= MaxReserve){
+				acquirer_guard _{auto_param, MaxReserve};
+				for(int i = 0; i < sides; i++){
+					const float a = space * static_cast<float>(i) + trans.rot;
+					float cos1 = math::cos_deg(a);
+					float sin1 = math::sin_deg(a);
+					float cos2 = math::cos_deg(a + space);
+					float sin2 = math::sin_deg(a + space);
+					fill::fill(
+						auto_param[i],
+						vec{trans.vec.x + r1 * cos1, trans.vec.y + r1 * sin1},
+						vec{trans.vec.x + r1 * cos2, trans.vec.y + r1 * sin2},
+						vec{trans.vec.x + r2 * cos2, trans.vec.y + r2 * sin2},
+						vec{trans.vec.x + r2 * cos1, trans.vec.y + r2 * sin1},
+						color, color, color, color
+					);
+				}
+			}else{
+				for(int i = 0; i < sides; i++){
+					const float a = space * static_cast<float>(i) + trans.rot;
+					float cos1 = math::cos_deg(a);
+					float sin1 = math::sin_deg(a);
+					float cos2 = math::cos_deg(a + space);
+					float sin2 = math::sin_deg(a + space);
+					fill::fill(
+						auto_param.get_reserved(math::min<std::size_t>(sides - i, MaxReserve)),
+						vec{trans.vec.x + r1 * cos1, trans.vec.y + r1 * sin1},
+						vec{trans.vec.x + r1 * cos2, trans.vec.y + r1 * sin2},
+						vec{trans.vec.x + r2 * cos2, trans.vec.y + r2 * sin2},
+						vec{trans.vec.x + r2 * cos1, trans.vec.y + r2 * sin1},
+						color, color, color, color
+					);
+				}
+			}
+		}
+
+		export
+		template <typename M>
+		FORCE_INLINE void circle(
+			M& auto_param,
+			vec pos,
+			const float radius,
+			const col color = colors::white,
+			const float stroke = 2.f
+		){
+			line::poly(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, color, stroke);
+		}
+
+		export
+		template <typename M>
+		FORCE_INLINE void circle_partial(
+			M& auto_param,
+			math::trans2 trans,
+			const float radius,
+			const float ratio = 1.f,
+			const col color = colors::white,
+			const float stroke = 2.f
+		){
+			line::poly_partial(auto_param, trans, getCircleVertices(radius), radius, ratio, color, stroke);
+		}
+	}
+
+	namespace fancy{
+		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj>
+		void poly_outlined(
+			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+			const math::trans2 trans,
+			int sides,
+			const float radius,
+			const col edge_inner_color = colors::white,
+			const col edge_outer_color = colors::white,
+			const col inner_edge_color = colors::white,
+			const col inner_center_color = colors::white,
+			const float outline_stroke = 2.f
+		){
+			static constexpr std::size_t MaxReserve = 64;
+
+			const float space = math::circle_deg_full / static_cast<float>(sides);
+			float h_step = outline_stroke / math::cos_deg(space / 2.0f);
+			const float r1 = radius;
+			const float r2 = radius + h_step;
+
+			if(sides <= MaxReserve / 2){
+				acquirer_guard _{auto_param, MaxReserve};
+				for(int i = 0; i < sides; i++){
+					const float a = space * static_cast<float>(i) + trans.rot;
+					float cos1 = math::cos_deg(a);
+					float sin1 = math::sin_deg(a);
+					float cos2 = math::cos_deg(a + space);
+					float sin2 = math::sin_deg(a + space);
+
+					vec edge1 = vec{trans.vec.x + r1 * cos1, trans.vec.y + r1 * sin1};
+					vec edge2 = vec{trans.vec.x + r1 * cos2, trans.vec.y + r1 * sin2};
+					fill::fill(
+						auto_param[i * 2],
+						edge1,
+						edge2,
+						vec{trans.vec.x + r2 * cos2, trans.vec.y + r2 * sin2},
+						vec{trans.vec.x + r2 * cos1, trans.vec.y + r2 * sin1},
+						edge_inner_color, edge_inner_color, edge_outer_color, edge_outer_color
+					);
+					fill::fill(
+						auto_param[i * 2 + 1],
+						edge1,
+						edge2,
+						trans.vec,
+						trans.vec,
+						inner_edge_color, inner_edge_color, inner_center_color, inner_center_color
+					);
+				}
+			}else{
+				for(int i = 0; i < sides; i++){
+					const float a = space * static_cast<float>(i) + trans.rot;
+					float cos1 = math::cos_deg(a);
+					float sin1 = math::sin_deg(a);
+					float cos2 = math::cos_deg(a + space);
+					float sin2 = math::sin_deg(a + space);
+					vec edge1 = vec{trans.vec.x + r1 * cos1, trans.vec.y + r1 * sin1};
+					vec edge2 = vec{trans.vec.x + r1 * cos2, trans.vec.y + r1 * sin2};
+					fill::fill(
+						auto_param.get_reserved(math::min<std::size_t>((sides - i) * 2, MaxReserve)),
+						edge1,
+						edge2,
+						vec{trans.vec.x + r2 * cos2, trans.vec.y + r2 * sin2},
+						vec{trans.vec.x + r2 * cos1, trans.vec.y + r2 * sin1},
+						edge_inner_color, edge_inner_color, edge_outer_color, edge_outer_color
+					);
+					fill::fill(
+						auto_param.get_reserved(math::min<std::size_t>((sides - i) * 2 - 1, MaxReserve)),
+						edge1,
+						edge2,
+						trans.vec,
+						trans.vec,
+						inner_edge_color, inner_edge_color, inner_center_color, inner_center_color
+					);
+				}
+			}
+		}
+
+		template <typename M>
+		FORCE_INLINE void poly_outlined(
+			M& auto_param,
+			const vec pos,
+			const float radius,
+			const col edge_inner_color = colors::white,
+			const col edge_outer_color = colors::white,
+			const col inner_edge_color = colors::white,
+			const col inner_center_color = colors::white,
+			const float outline_stroke = 2.f
+		){
+			fancy::poly_outlined(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, edge_inner_color,
+			           edge_outer_color,
+			           inner_edge_color,
+			           inner_center_color, outline_stroke);
+		}
 	}
 }

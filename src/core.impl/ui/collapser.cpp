@@ -10,7 +10,7 @@ void mo_yanxi::ui::collapser::draw_content(const rect clipSpace) const{
 	const auto space = property.content_bound_absolute().intersection_with(clipSpace);
 	head_->draw(space);
 
-	if(is_expanding())get_renderer().batch.push_scissor({get_collapsed_region().shrink(8, 8), 16});
+	if(is_expanding())get_renderer().batch.push_scissor({get_collapsed_region()});
 
 	if(expand_progress > 0){
 		content_->draw(space);

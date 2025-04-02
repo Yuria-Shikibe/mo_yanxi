@@ -41,16 +41,18 @@ namespace mo_yanxi::graphic{
 	 struct scissor_raw{
 		math::frect rect{};
 		float distance{};
+		// math::frect shrunk_rect{};
 
-	 	void uniform(const math::mat3& mat) noexcept{
+		void uniform(const math::mat3& mat) noexcept{
 	 		if(rect.area() < 0.05f){
 	 			rect = {-5, -5, 0, 0};
 	 			return;
 	 		}
-	 		auto src = mat * rect.get_src();
-	 		auto dst = mat * rect.get_end();
-	 		rect = {src, dst};
-	 	}
+
+		    auto src = mat * rect.get_src();
+		    auto dst = mat * rect.get_end();
+		    rect = {src, dst};
+		}
 
 		constexpr friend bool operator==(const scissor_raw& lhs, const scissor_raw& rhs) noexcept = default;
 
@@ -141,8 +143,8 @@ namespace mo_yanxi::graphic{
 		vk::color_attachment color_light{};
 		vk::color_attachment color_background{};
 		
-		vk::texel_image blit_base{};
-		vk::texel_image blit_light{};
+		vk::storage_image blit_base{};
+		vk::storage_image blit_light{};
 		
 	private:
 		vk::descriptor_layout descriptor_layout_proj{};
@@ -246,7 +248,7 @@ namespace mo_yanxi::graphic{
 
 
 		void push_scissor(scissor_raw scissor){
-			const auto back = scissors.back();
+			auto back = scissors.back();
 			if(back != scissor){
 				batch.consume_all();
 			}
@@ -362,7 +364,7 @@ namespace mo_yanxi::graphic{
 			vert_data.current = {{math::mat3{}.set_orthogonal({}, math::vector2{extent.width, extent.height}.as<float>())}};
 			scissors.assign(1, {
 				.rect = math::frect{-1, -1, 2, 2},
-				.distance = 0.f
+				.distance = 0.f,
 			});
 
 		}
@@ -482,7 +484,7 @@ namespace mo_yanxi::graphic{
 	struct renderer_ui : renderer{
 	public:
 		ui_batch_proxy batch{};
-		vk::texel_image merge_result{};
+		vk::storage_image merge_result{};
 
 		bloom_post_processor bloom{};
 
@@ -494,11 +496,11 @@ namespace mo_yanxi::graphic{
 			renderer(context, export_target, "renderer.ui"),
 			batch(context),
 			merge_result{
-			context.get_allocator(), context.get_extent()
+			context.get_allocator(), context.get_extent(), 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT
 			},
 
 			bloom{
-				context,
+				context, std::bit_cast<math::usize2>(context.get_extent()),
 				assets::graphic::shaders::comp::bloom,
 				assets::graphic::samplers::blit_sampler,
 				6, 0.35f
@@ -586,10 +588,10 @@ namespace mo_yanxi::graphic{
 
 		void set_merger_state(){
 			vk::descriptor_mapper{merge_descriptor_buffer}
-				.set_image(0, merge_result.get_image_view(), 0, VK_IMAGE_LAYOUT_GENERAL, nullptr, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-				.set_image(1, batch.blit_base.get_image_view(), 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, nullptr, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-				.set_image(2, batch.blit_light.get_image_view(), 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, nullptr, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-				.set_image(3, bloom.get_output().view, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, nullptr, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+				.set_storage_image(0, merge_result.get_image_view())
+				.set_storage_image(1, batch.blit_base.get_image_view())
+				.set_storage_image(2, batch.blit_light.get_image_view())
+				.set_storage_image(3, bloom.get_output().view);
 		}
 
 		void create_merge_commands(){
@@ -599,30 +601,6 @@ namespace mo_yanxi::graphic{
 
 			vk::cmd::dependency_gen dependency{};
 
-			for (const auto & attachment : attachments){
-				dependency.push(
-					attachment->get_image(),
-					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-					VK_ACCESS_2_SHADER_READ_BIT,
-					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-					VK_ACCESS_2_SHADER_READ_BIT,
-					VK_IMAGE_LAYOUT_GENERAL,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					vk::image::default_image_subrange
-				);
-			}
-
-			dependency.push(
-				merge_result.get_image(),
-				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				VK_ACCESS_2_SHADER_READ_BIT,
-				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				VK_IMAGE_LAYOUT_GENERAL,
-				vk::image::default_image_subrange
-			);
-
 			dependency.apply(scoped_recorder);
 
 			merge_pipeline.bind(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE);
@@ -631,16 +609,6 @@ namespace mo_yanxi::graphic{
 			auto group = post_processor::get_work_group_size(std::bit_cast<math::u32size2>(merge_result.get_image().get_extent2()));
 			vkCmdDispatch(scoped_recorder, group.x, group.y, 1);
 
-			dependency.push(
-				merge_result.get_image(),
-				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				VK_ACCESS_2_SHADER_READ_BIT,
-				VK_IMAGE_LAYOUT_GENERAL,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				vk::image::default_image_subrange
-			);
 
 			dependency.apply(scoped_recorder);
 
@@ -649,22 +617,17 @@ namespace mo_yanxi::graphic{
 					scoped_recorder, attachment->get_image(), {},
 
 					vk::image::default_image_subrange,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_ACCESS_SHADER_READ_BIT,
-					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+					VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
+					VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
 					VK_IMAGE_LAYOUT_GENERAL
 				);
 			}
 		}
 
 		void init_layout(VkCommandBuffer compute_command_buffer) const{
-			merge_result.get_image().init_layout(
-				compute_command_buffer,
-				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				VK_ACCESS_2_SHADER_READ_BIT,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-			);
+			merge_result.init_layout_general(compute_command_buffer);
 		}
 	};
 }

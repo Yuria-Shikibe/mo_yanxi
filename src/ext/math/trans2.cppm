@@ -5,6 +5,7 @@ module;
 export module mo_yanxi.math.trans2;
 
 export import mo_yanxi.math.vector2;
+export import mo_yanxi.math;
 export import mo_yanxi.math.angle;
 
 import mo_yanxi.concepts;
@@ -126,6 +127,10 @@ export namespace mo_yanxi::math{
 		}
 
 		friend bool operator==(const transform2& lhs, const transform2& rhs) noexcept = default;
+
+		[[nodiscard]] constexpr math::cos_sin_result rot_cos_sin() const noexcept{
+			return math::cos_sin_deg(rot);
+		}
 	};
 
 	using trans2 = transform2<float>;

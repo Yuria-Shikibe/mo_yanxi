@@ -33,12 +33,12 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] post_process_resolver() = default;
 
 		[[nodiscard]] explicit post_process_resolver(
-			vk::context& context,
+			vk::context& context, math::usize2 size,
 			const vk::shader_module& bloom_shader,
 			VkSampler sampler,
 			const std::size_t nX = 1
 			)
-			: post_processor(context), sample_counts(1 << nX), sampler(sampler), uniform_buffer{context.get_allocator(), sizeof(resolver_info)}{
+			: post_processor(context, size), sample_counts(1 << nX), sampler(sampler), uniform_buffer{context.get_allocator(), sizeof(resolver_info)}{
 
 			descriptor_layout = vk::descriptor_layout(context.get_device(), [](vk::descriptor_layout_builder& builder){
 				builder.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);

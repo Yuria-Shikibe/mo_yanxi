@@ -79,6 +79,14 @@ namespace mo_yanxi::graphic::draw{
 	struct world_vertex_proj : basic_batch_param_proj{
 		float depth;
 
+		void slightly_incr_depth(){
+			depth = std::nextafter(depth, std::numeric_limits<float>::max());
+		}
+
+		void slightly_decr_depth(){
+			depth = std::nextafter(depth, std::numeric_limits<float>::lowest());
+		}
+
 		FORCE_INLINE constexpr void operator()(vk::vertices::vertex_world& vertex) const noexcept {
 			vertex.depth = depth;
 		}
@@ -218,6 +226,18 @@ namespace mo_yanxi::graphic::draw{
 
 		batch_draw_param<Vtx, UV, Proj> get() noexcept{
 			return *this;
+		}
+
+		batch_draw_param<Vtx, UV, Proj> get_reserved(std::size_t reserve = 8) noexcept{
+			if(current == sentinel){
+				acquire(1);
+			}
+
+			auto rst = this->operator*();
+
+			++current;
+
+			return rst;
 		}
 
 		explicit(false) operator batch_draw_param<Vtx, UV, Proj> () noexcept{

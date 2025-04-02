@@ -15,6 +15,7 @@ import std;
 namespace mo_yanxi::graphic{
 	export
 	struct bloom_post_processor final : post_processor{
+	protected:
 		constexpr std::uint32_t reverse_after(std::uint32_t value, std::uint32_t ceil) noexcept{
 			if(value < ceil)return value;
 			return (ceil * 2 - value - 1);
@@ -44,12 +45,12 @@ namespace mo_yanxi::graphic{
 
 		VkSampler sampler_{};
 		std::uint32_t max_mipmap_levels{};
-		float bloom_scale{};
+		float bloom_scale{1.};
 		float strength_src{1.};
 		float strength_dst{1.};
 
-		vk::texel_image mipmap_tree{};
-		vk::texel_image output_image{};
+		vk::storage_image mipmap_tree{};
+		vk::storage_image output_image{};
 
 		std::vector<vk::image_view> down_mipmap_image_views{};
 		std::vector<vk::image_view> up_mipmap_image_views{};
@@ -61,12 +62,11 @@ namespace mo_yanxi::graphic{
 
 			scoped_recorder scoped_recorder{main_command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
-
 			const auto& input = inputs[0];
-			const auto extent = std::bit_cast<math::u32size2>(output_image.get_image().get_extent2());
 			const bool from_graphic = input.queue_family_index == context_->graphic_family();
 
 			pipeline.bind(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE);
+			cmd::bind_descriptors(scoped_recorder, {descriptor_buffer});
 
 			cmd::memory_barrier(
 				scoped_recorder,
@@ -74,12 +74,10 @@ namespace mo_yanxi::graphic{
 			    from_graphic ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT : VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 			    from_graphic ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_SHADER_WRITE_BIT,
 			    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-			    VK_ACCESS_2_SHADER_READ_BIT,
+			    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
 			    input.layout,
 			    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			    image::default_image_subrange,
-			    input.queue_family_index,
-			    context().compute_family()
+			    image::default_image_subrange
 			);
 
 
@@ -87,7 +85,7 @@ namespace mo_yanxi::graphic{
 			for(std::uint32_t i = 0; i < get_real_mip_level() * 2; ++i){
 				auto current_mipmap_index = reverse_after(i, get_real_mip_level());
 				auto div = 1 << (current_mipmap_index + 1 - (i >= get_real_mip_level()));
-				math::u32size2 current_ext{extent / div};
+				math::u32size2 current_ext{size() / div};
 
 				if(i > 0){
 					if(i <= get_real_mip_level()){
@@ -130,17 +128,15 @@ namespace mo_yanxi::graphic{
 						scoped_recorder,
 						output_image.get_image(),
 						VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-						VK_ACCESS_2_SHADER_READ_BIT,
+						VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
 						VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-						VK_ACCESS_2_SHADER_WRITE_BIT,
-						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+						VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+						VK_IMAGE_LAYOUT_GENERAL,
 						VK_IMAGE_LAYOUT_GENERAL
 					);
 				}
 
-				cmd::bind_descriptors(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, {descriptor_buffer}, {descriptor_buffer.get_chunk_offset(i)});
-
-				// ext::cmdBindThenSetDescriptorBuffers(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, arr);
+				cmd::set_descriptor_offsets(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, {0}, {descriptor_buffer.get_chunk_offset(i)});
 
 				auto groups = get_work_group_size(current_ext);
 				vkCmdDispatch(scoped_recorder, groups.x, groups.y, 1);
@@ -152,9 +148,9 @@ namespace mo_yanxi::graphic{
 				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 				VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
 				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				VK_ACCESS_2_SHADER_READ_BIT,
+				VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
 				VK_IMAGE_LAYOUT_GENERAL,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+				VK_IMAGE_LAYOUT_GENERAL
 			);
 
 			cmd::memory_barrier(
@@ -166,14 +162,12 @@ namespace mo_yanxi::graphic{
 				from_graphic ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_SHADER_WRITE_BIT,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				input.layout,
-				image::default_image_subrange,
-				context().compute_family(),
-				input.queue_family_index
+				image::default_image_subrange
 			);
 		}
 
 		[[nodiscard]] std::uint32_t get_real_mip_level() const noexcept{
-			return std::min(max_mipmap_levels, vk::get_recommended_mip_level(context().get_extent()));
+			return math::min(max_mipmap_levels, vk::get_recommended_mip_level(size_.x, size_.y));
 		}
 
 	public:
@@ -199,24 +193,24 @@ namespace mo_yanxi::graphic{
 		}
 
 		[[nodiscard]] explicit bloom_post_processor(
-			vk::context& context,
+			vk::context& context, math::usize2 size,
 			const vk::shader_module& bloom_shader,
 			VkSampler sampler,
 			const std::uint32_t max_mip_levels = 5,
 			float scale = 1.5f
 		) :
-			post_processor(context),
+			post_processor(context, size),
 			sampler_(sampler),
 			max_mipmap_levels(max_mip_levels),
 			bloom_scale{scale},
 			mipmap_tree{
 				context.get_allocator(),
-				{context.get_extent().width / 2, context.get_extent().height / 2},
+				{size.x / 2, size.y / 2},
 				get_real_mip_level()
 			},
 			output_image(
 				context.get_allocator(),
-				context.get_extent(),
+				size_to_extent_2d(size),
 				get_real_mip_level()
 			){
 			descriptor_layout = vk::descriptor_layout(context.get_device(), [](vk::descriptor_layout_builder& builder){
@@ -235,11 +229,15 @@ namespace mo_yanxi::graphic{
 		}
 
 		void resize(VkCommandBuffer command_buffer, const math::usize2 size, bool record_command) override{
+			if(!command_buffer){
+				throwExceptionOnCommandBufferRequirement();
+			}
+
 			mipmap_tree.resize({size.x / 2, size.y / 2});
 			output_image.resize({size.x, size.y});
 
 			init_image_state(command_buffer);
-			if(record_command)record_commands();
+			post_processor::resize(command_buffer, size, record_command);
 		}
 
 		void set_scale(const float scale) const{

@@ -88,39 +88,22 @@ namespace mo_yanxi::graphic{
 			scoped_recorder scoped_recorder{main_command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 			const auto& input = inputs[0];
 
-			if(input.layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL){
-				cmd::memory_barrier(
-					scoped_recorder,
-					input.image,
-					VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-					VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-					VK_ACCESS_2_SHADER_READ_BIT,
-					input.layout,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					image::depth_image_subrange,
-					input.queue_family_index,
-					context().compute_family()
-				);
-			} else{
-				cmd::memory_barrier(
-					scoped_recorder,
-					input.image,
-					VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-					VK_ACCESS_2_TRANSFER_WRITE_BIT,
-					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-					VK_ACCESS_2_SHADER_READ_BIT,
-					input.layout,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					image::depth_image_subrange,
-					input.queue_family_index,
-					context().compute_family()
-				);
-			}
+			cmd::dependency_gen dependency_gen{};
 
+			dependency_gen.push(
+				input.image,
+				VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+				VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				VK_ACCESS_2_SHADER_READ_BIT,
+				input.layout,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				image::depth_image_subrange,
+				input.queue_family_index,
+				context().compute_family()
+			);
 
-			cmd::memory_barrier(
-				scoped_recorder,
+			dependency_gen.push(
 				ssao_result,
 			    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 			    VK_ACCESS_2_SHADER_READ_BIT,
@@ -131,23 +114,16 @@ namespace mo_yanxi::graphic{
 			    image::default_image_subrange
 			);
 
+			dependency_gen.apply(scoped_recorder, true);
+
 			pipeline.bind(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE);
 			descriptor_buffer.bind_to(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0);
 
-			auto groups = get_work_group_size(std::bit_cast<math::u32size2>(context().get_extent()));
+			auto groups = get_work_group_size(size());
 			vkCmdDispatch(scoped_recorder, groups.x, groups.y, 1);
 
-			cmd::memory_barrier(
-				scoped_recorder,
-				ssao_result,
-				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				VK_ACCESS_2_SHADER_WRITE_BIT,
-				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				VK_ACCESS_2_SHADER_READ_BIT,
-				VK_IMAGE_LAYOUT_GENERAL,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				image::default_image_subrange
-			);
+			dependency_gen.swap_stages();
+			dependency_gen.apply(scoped_recorder, true);
 		}
 
 
@@ -171,16 +147,16 @@ namespace mo_yanxi::graphic{
 		}
 
 		[[nodiscard]] explicit ssao_post_processor(
-			vk::context& context,
+			vk::context& context, math::usize2 size,
 			const vk::shader_module& bloom_shader,
 			VkSampler sampler
 		) :
-			post_processor(context),
+			post_processor(context, size),
 			sampler_(sampler),
 			uniform_buffer(context.get_allocator(), sizeof(ssao_kernal_block))
 			{
 
-			vk::buffer_mapper{uniform_buffer}.load(ssao_kernal_block{std::bit_cast<math::u32size2>(context.get_extent()).as<math::isize2>()});
+			vk::buffer_mapper{uniform_buffer}.load(ssao_kernal_block{this->size().as<math::isize2>()});
 			descriptor_layout = vk::descriptor_layout(context.get_device(), [](vk::descriptor_layout_builder& builder){
 				builder.push_seq(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT);
 				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
@@ -206,13 +182,6 @@ namespace mo_yanxi::graphic{
 			vk::buffer_mapper{uniform_buffer}.load(scale, std::bit_cast<std::uint32_t>(&ssao_kernal_block::scale));
 		}
 
-		// void set_scale(const float scale) const{
-		// 	vk::buffer_mapper ubo_mapper{uniform_buffer};
-		// 	for(std::uint32_t i = 0; i < get_real_mip_level() * 2; ++i){
-		// 		(void)ubo_mapper.load(scale, sizeof(bloom_uniform_block) * i + std::bit_cast<std::uint32_t>(&bloom_uniform_block::scale));
-		// 	}
-		// }
-
 	private:
 		void init_image_state(VkCommandBuffer command_buffer){
 			static constexpr VkFormat Fmt = VK_FORMAT_R16_UNORM;
@@ -222,7 +191,7 @@ namespace mo_yanxi::graphic{
 					.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 					.imageType = VK_IMAGE_TYPE_2D,
 					.format = Fmt,
-					.extent = context().get_extent3(),
+					.extent = {size_.x, size_.y, 1},
 					.mipLevels = 1,
 					.arrayLayers = 1,
 					.samples = VK_SAMPLE_COUNT_1_BIT,

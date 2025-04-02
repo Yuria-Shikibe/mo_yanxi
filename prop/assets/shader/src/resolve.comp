@@ -28,4 +28,5 @@ void main() {
 
     vec4 last = imageLoad(output_image[idx], pos);
     imageStore(output_image[idx], pos, blend(avg_color, last));
+//    imageStore(output_image[idx], pos, vec4(1));
 }

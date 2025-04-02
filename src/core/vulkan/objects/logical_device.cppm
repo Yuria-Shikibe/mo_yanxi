@@ -37,7 +37,15 @@ namespace mo_yanxi::vk{
 
 			features.bufferDeviceAddress = true;
 			features.timelineSemaphore = true;
+			features.shaderFloat16 = true;
 			if(enable_validation_layers)features.bufferDeviceAddressCaptureReplay = true;
+
+			return features;
+		}()};
+		constexpr VkPhysicalDeviceVulkan11Features PhysicalDeviceVulkan11Features{[]{
+			VkPhysicalDeviceVulkan11Features features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES};
+
+			features.storageBuffer16BitAccess = true;
 
 			return features;
 		}()};
@@ -48,6 +56,7 @@ namespace mo_yanxi::vk{
 			features.samplerAnisotropy = true;
 			features.independentBlend = true;
 			features.sampleRateShading = true;
+			features.fragmentStoresAndAtomics = true;
 
 			return features;
 		}()};
@@ -140,6 +149,7 @@ namespace mo_yanxi::vk{
 		ExtChain(Args&& ...) -> ExtChain<std::decay_t<Args> ...>;
 
 		const ExtChain extChain{
+			PhysicalDeviceVulkan11Features,
 			PhysicalDeviceVulkan12Features,
 			PhysicalDeviceVulkan13Features,
 			// RequiredDescriptorIndexingFeatures,
