@@ -5,3 +5,6 @@
 [submodule "submodules/plf_hive"]
 	path = submodules/plf_hive
 	url = https://github.com/mattreecebentley/plf_hive.git
+[submodule "submodules/small_vector"]
+	path = submodules/small_vector
+	url = https://github.com/gharveymn/small_vector.git

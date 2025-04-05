@@ -178,41 +178,85 @@ namespace mo_yanxi::graphic::draw{
 			const col edge_color = colors::white){
 			const float space = math::circle_deg_full / static_cast<float>(sides);
 
-			static constexpr std::size_t MaxReserve = 64;
+			static constexpr std::size_t MaxReserve = 128;
 
-			if(sides <= MaxReserve){
-				acquirer_guard _{auto_param, MaxReserve};
-				for(int i = 0; i < sides; i++){
-					const float a = space * static_cast<float>(i) + trans.rot;
-					float cos1 = math::cos_deg(a);
-					float sin1 = math::sin_deg(a);
-					float cos2 = math::cos_deg(a + space);
-					float sin2 = math::sin_deg(a + space);
+			if(static_cast<std::size_t>(sides / 2 + (sides & 1) + 1) <= MaxReserve){
+				acquirer_guard _{auto_param, static_cast<std::size_t>(sides / 2 + (sides & 1))};
+				int i = 0;
+				for(; i < sides - 1; i+= 2){
+					const float abase = space * static_cast<float>(i) + trans.rot;
+
+					float cos1 = math::cos_deg(abase);
+					float sin1 = math::sin_deg(abase);
+					float cos2 = math::cos_deg(abase + space);
+					float sin2 = math::sin_deg(abase + space);
+					float cos3 = math::cos_deg(abase + space * 2);
+					float sin3 = math::sin_deg(abase + space * 2);
+
 					fill::fill(
-						auto_param[i],
+						auto_param[i / 2],
 						trans.vec,
-						trans.vec,
-						vec{trans.vec.x + radius * cos2, trans.vec.y + radius * sin2},
 						vec{trans.vec.x + radius * cos1, trans.vec.y + radius * sin1},
-						center_color, center_color, edge_color, edge_color
+						vec{trans.vec.x + radius * cos2, trans.vec.y + radius * sin2},
+						vec{trans.vec.x + radius * cos3, trans.vec.y + radius * sin3},
+						center_color, edge_color, edge_color, edge_color
 					);
 				}
+
+				if(i == sides)return;
+				const float abase = space * static_cast<float>(i) + trans.rot;
+
+				float cos1 = math::cos_deg(abase);
+				float sin1 = math::sin_deg(abase);
+				float cos2 = math::cos_deg(abase + space);
+				float sin2 = math::sin_deg(abase + space);
+
+				fill::fill(
+					auto_param[i / 2],
+					trans.vec,
+					trans.vec,
+					vec{trans.vec.x + radius * cos1, trans.vec.y + radius * sin1},
+					vec{trans.vec.x + radius * cos2, trans.vec.y + radius * sin2},
+					center_color, center_color, edge_color, edge_color
+				);
 			}else{
-				for(int i = 0; i < sides; i++){
-					const float a = space * static_cast<float>(i) + trans.rot;
-					float cos1 = math::cos_deg(a);
-					float sin1 = math::sin_deg(a);
-					float cos2 = math::cos_deg(a + space);
-					float sin2 = math::sin_deg(a + space);
+				int i = 0;
+				for(; i < sides - 1; i+= 2){
+					const float abase = space * static_cast<float>(i) + trans.rot;
+
+					float cos1 = math::cos_deg(abase);
+					float sin1 = math::sin_deg(abase);
+					float cos2 = math::cos_deg(abase + space);
+					float sin2 = math::sin_deg(abase + space);
+					float cos3 = math::cos_deg(abase + space * 2);
+					float sin3 = math::sin_deg(abase + space * 2);
+
 					fill::fill(
-						auto_param.get_reserved(math::min<std::size_t>(sides - i, MaxReserve)),
+						auto_param.get_reserved(math::min<std::size_t>((sides - i) / 2 + (sides & 1), MaxReserve)),
 						trans.vec,
-						trans.vec,
-						vec{trans.vec.x + radius * cos2, trans.vec.y + radius * sin2},
 						vec{trans.vec.x + radius * cos1, trans.vec.y + radius * sin1},
-						center_color, center_color, edge_color, edge_color
+						vec{trans.vec.x + radius * cos2, trans.vec.y + radius * sin2},
+						vec{trans.vec.x + radius * cos3, trans.vec.y + radius * sin3},
+						center_color, edge_color, edge_color, edge_color
 					);
 				}
+
+				if(i == sides)return;
+				const float abase = space * static_cast<float>(i) + trans.rot;
+
+				float cos1 = math::cos_deg(abase);
+				float sin1 = math::sin_deg(abase);
+				float cos2 = math::cos_deg(abase + space);
+				float sin2 = math::sin_deg(abase + space);
+
+				fill::fill(
+					auto_param.get(),
+					trans.vec,
+					trans.vec,
+					vec{trans.vec.x + radius * cos1, trans.vec.y + radius * sin1},
+					vec{trans.vec.x + radius * cos2, trans.vec.y + radius * sin2},
+					center_color, center_color, edge_color, edge_color
+				);
 			}
 		}
 
@@ -564,7 +608,8 @@ namespace mo_yanxi::graphic::draw{
 			math::trans2 trans,
 			const int sides,
 			const float radius,
-			const col color = colors::white,
+			const col color_inner = colors::white,
+			const col color_outer = colors::white,
 			const float stroke = 2.f){
 			const float space = math::circle_deg_full / static_cast<float>(sides);
 			float h_step = stroke / 2.0f / math::cos_deg(space / 2.0f);
@@ -587,7 +632,7 @@ namespace mo_yanxi::graphic::draw{
 						vec{trans.vec.x + r1 * cos2, trans.vec.y + r1 * sin2},
 						vec{trans.vec.x + r2 * cos2, trans.vec.y + r2 * sin2},
 						vec{trans.vec.x + r2 * cos1, trans.vec.y + r2 * sin1},
-						color, color, color, color
+						color_inner, color_inner, color_outer, color_outer
 					);
 				}
 			}else{
@@ -603,7 +648,7 @@ namespace mo_yanxi::graphic::draw{
 						vec{trans.vec.x + r1 * cos2, trans.vec.y + r1 * sin2},
 						vec{trans.vec.x + r2 * cos2, trans.vec.y + r2 * sin2},
 						vec{trans.vec.x + r2 * cos1, trans.vec.y + r2 * sin1},
-						color, color, color, color
+						color_inner, color_inner, color_outer, color_outer
 					);
 				}
 			}
@@ -615,10 +660,11 @@ namespace mo_yanxi::graphic::draw{
 			M& auto_param,
 			vec pos,
 			const float radius,
-			const col color = colors::white,
+			const col color_inner = colors::white,
+			const col color_outer = colors::white,
 			const float stroke = 2.f
 		){
-			line::poly(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, color, stroke);
+			line::poly(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, color_inner, color_outer, stroke);
 		}
 
 		export
@@ -636,6 +682,7 @@ namespace mo_yanxi::graphic::draw{
 	}
 
 	namespace fancy{
+		export
 		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj>
 		void poly_outlined(
 			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
@@ -644,8 +691,8 @@ namespace mo_yanxi::graphic::draw{
 			const float radius,
 			const col edge_inner_color = colors::white,
 			const col edge_outer_color = colors::white,
-			const col inner_edge_color = colors::white,
 			const col inner_center_color = colors::white,
+			const col inner_edge_color = colors::white,
 			const float outline_stroke = 2.f
 		){
 			static constexpr std::size_t MaxReserve = 64;
@@ -655,78 +702,28 @@ namespace mo_yanxi::graphic::draw{
 			const float r1 = radius;
 			const float r2 = radius + h_step;
 
-			if(sides <= MaxReserve / 2){
-				acquirer_guard _{auto_param, MaxReserve};
-				for(int i = 0; i < sides; i++){
-					const float a = space * static_cast<float>(i) + trans.rot;
-					float cos1 = math::cos_deg(a);
-					float sin1 = math::sin_deg(a);
-					float cos2 = math::cos_deg(a + space);
-					float sin2 = math::sin_deg(a + space);
+			line::poly(auto_param, trans, sides, radius + outline_stroke / 2.f, edge_inner_color, edge_outer_color, outline_stroke);
+			fill::poly(auto_param, trans, sides, radius, inner_center_color, inner_edge_color);
 
-					vec edge1 = vec{trans.vec.x + r1 * cos1, trans.vec.y + r1 * sin1};
-					vec edge2 = vec{trans.vec.x + r1 * cos2, trans.vec.y + r1 * sin2};
-					fill::fill(
-						auto_param[i * 2],
-						edge1,
-						edge2,
-						vec{trans.vec.x + r2 * cos2, trans.vec.y + r2 * sin2},
-						vec{trans.vec.x + r2 * cos1, trans.vec.y + r2 * sin1},
-						edge_inner_color, edge_inner_color, edge_outer_color, edge_outer_color
-					);
-					fill::fill(
-						auto_param[i * 2 + 1],
-						edge1,
-						edge2,
-						trans.vec,
-						trans.vec,
-						inner_edge_color, inner_edge_color, inner_center_color, inner_center_color
-					);
-				}
-			}else{
-				for(int i = 0; i < sides; i++){
-					const float a = space * static_cast<float>(i) + trans.rot;
-					float cos1 = math::cos_deg(a);
-					float sin1 = math::sin_deg(a);
-					float cos2 = math::cos_deg(a + space);
-					float sin2 = math::sin_deg(a + space);
-					vec edge1 = vec{trans.vec.x + r1 * cos1, trans.vec.y + r1 * sin1};
-					vec edge2 = vec{trans.vec.x + r1 * cos2, trans.vec.y + r1 * sin2};
-					fill::fill(
-						auto_param.get_reserved(math::min<std::size_t>((sides - i) * 2, MaxReserve)),
-						edge1,
-						edge2,
-						vec{trans.vec.x + r2 * cos2, trans.vec.y + r2 * sin2},
-						vec{trans.vec.x + r2 * cos1, trans.vec.y + r2 * sin1},
-						edge_inner_color, edge_inner_color, edge_outer_color, edge_outer_color
-					);
-					fill::fill(
-						auto_param.get_reserved(math::min<std::size_t>((sides - i) * 2 - 1, MaxReserve)),
-						edge1,
-						edge2,
-						trans.vec,
-						trans.vec,
-						inner_edge_color, inner_edge_color, inner_center_color, inner_center_color
-					);
-				}
-			}
 		}
 
+		export
 		template <typename M>
-		FORCE_INLINE void poly_outlined(
+		FORCE_INLINE void circle_outlined(
 			M& auto_param,
 			const vec pos,
 			const float radius,
 			const col edge_inner_color = colors::white,
 			const col edge_outer_color = colors::white,
-			const col inner_edge_color = colors::white,
 			const col inner_center_color = colors::white,
+			const col inner_edge_color = colors::white,
 			const float outline_stroke = 2.f
 		){
 			fancy::poly_outlined(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, edge_inner_color,
 			           edge_outer_color,
+			           inner_center_color,
 			           inner_edge_color,
-			           inner_center_color, outline_stroke);
+			            outline_stroke);
 		}
 	}
 }

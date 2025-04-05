@@ -1,5 +1,6 @@
 #include <vulkan/vulkan.h>
 #include <cassert>
+#include <gch/small_vector.hpp>
 
 // #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -87,6 +88,7 @@ import mo_yanxi.ui.elem.nested_scene;
 
 import mo_yanxi.game.graphic.effect;
 import mo_yanxi.game.world.graphic;
+import mo_yanxi.game.ecs.component_manager;
 
 import test;
 import hive;
@@ -149,7 +151,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	// spane->set_layout_policy(ui::layout_policy::hori_major);
 
 	auto nscene = bed.emplace<ui::nested_scene>();
-	nscene.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.3, .5}};
+	nscene.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.3f, .5f}};
 	nscene.cell().align = align::pos::bottom_left;
 	//
 	nscene->get_group().function_init([](ui::table& t){
@@ -342,24 +344,47 @@ void main_loop(){
 			// });
 			ctx.create_efx().set_data({
 				.style = fx::line_splash{
-					.count = 150,
-					.range = {260, 620},
-					.stroke = {{2, 0}, {4, 0}},
-					.length = {{30, 20}, {30, 100, math::interp::slope}}
+					.count = 50,
+					.distribute_angle = 15,
+					.range = {260, 820},
+					.stroke = {{2, 0}, {6, 0}},
+					.length = {{30, 20}, {30, 480}},
+
+					.palette = {
+						{
+							graphic::colors::white.create_lerp(graphic::colors::ORANGE, .65f).to_light().set_a(.5),
+							graphic::colors::clear,
+							math::interp::linear_map<0., .55f>
+						}, {
+							graphic::colors::AQUA.to_light().set_a(1.5f),
+							graphic::colors::clear,
+							math::interp::pow3In | math::interp::reverse
+						}
+					}
+				},
+				.trans = {wpos, 45},
+				.depth = 0,
+				.duration = {30}
+				});
+
+			ctx.create_efx().set_data({
+				.style = fx::poly_outlined_out{
+					.radius = {30, 550, math::interp::pow3Out},
+					.stroke = {4},
+					.palette = {
+						{graphic::colors::AQUA.to_light()},
+						{graphic::colors::AQUA.to_light()},
+						{graphic::colors::clear},
+						{
+							graphic::colors::AQUA.create_lerp(graphic::colors::white, .5f).to_light().set_a(.5f),
+							graphic::colors::clear,
+						}
+					}
 				},
 				.trans = wpos,
 				.depth = 0,
-				.duration = {60},
-				.palette =fx::pal::gradient_colors{{fx::gradient{
-							graphic::colors::white.to_light_color_copy(),
-							graphic::colors::AQUA.to_light_color_copy(),
-							math::interp::margined_linear<.5>
-						},{
-							graphic::colors::white.create_lerp(graphic::colors::ORANGE, .85f).to_light_color_copy(),
-							graphic::colors::dark_gray
-						}}
-					}
-				});
+				.duration = {40}
+			});
 		});
 	}
 
@@ -450,7 +475,7 @@ void main_loop(){
 					off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
 					off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
 					off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
-					white.copy().setA((i + 3) / 10.f).to_light_color()
+					(white.copy() * 2).set_a((i + 3) / 10.f)
 				);
 			}
 		}
@@ -460,7 +485,7 @@ void main_loop(){
 		graphic::draw::fill::rect_ortho(
 				acquirer.get(),
 				{-1000, -1000, 200, 200},
-				graphic::colors::AQUA.copy().setA(.5)
+				graphic::colors::AQUA.copy().set_a(.5)
 			);
 
 		acquirer << graphic::draw::white_region;
@@ -469,10 +494,12 @@ void main_loop(){
 				{math::vec2{}, 40000},
 				graphic::colors::black
 			);
+
+		acquirer.proj.slightly_decr_depth();
 		graphic::draw::fill::rect_ortho(
 				acquirer.get(),
 				{math::vec2{}, 30},
-				graphic::colors::AQUA_SKY.to_light_color_copy()
+				graphic::colors::AQUA_SKY.to_light()
 			);
 
 		// renderer_world.batch.batch.consume_all();
@@ -519,26 +546,81 @@ void main_loop(){
 
 int main(){
 	using namespace mo_yanxi;
+	using namespace mo_yanxi::game;
 
-	hive<int> a;
-	hive<int> b;
+	ecs::component_manager component_manager{};
+
+	component_manager.create_entity<math::trans2, math::vec2>();
+	component_manager.create_entity<math::trans2, math::vec2>();
+	component_manager.create_entity<math::trans2, math::vec2>();
+	component_manager.create_entity<math::trans2, math::vec2>();
+	component_manager.create_entity<math::trans2, math::vec2>();
+	component_manager.create_entity<math::trans2, math::vec2, int>();
+	component_manager.create_entity<math::trans2, math::vec2, int>();
+	component_manager.create_entity<math::trans2, math::vec2, int>();
+	component_manager.create_entity<math::trans2, math::vec2, int>();
+	component_manager.create_entity<math::trans2, math::vec2, int>();
+	component_manager.create_entity<math::vec2>();
+	component_manager.create_entity<math::vec2>();
+	auto ent = component_manager.create_entity<math::vec2>();
+	auto en2t = component_manager.create_entity<math::vec2>();
+	component_manager.create_entity<int>();
+	component_manager.create_entity<int>();
+	component_manager.create_entity<int>();
+
+	if(auto data = component_manager.get_entity_partial_chunk<math::vec2>(ent)){
+		data->val().set_polar(45.f, math::sqrt2);
+	}
+
+	component_manager.sliced_each([](ecs::component<math::vec2>& comp){
+		std::print("{} ", comp.val());
+	});
+
+	std::println();
 
 
-	std::swap(a, b);
-	std::erase(a, 1);
+	component_manager.erase_entity(en2t);
+	component_manager.do_destroy();
 
-	init_assets();
-	compile_shaders();
+	component_manager.sliced_each([](ecs::component<math::vec2>& vec, ecs::component<int>& ival){
+		std::print("{} ", vec.val());
+		std::print("{} ", ival.val());
+	});
 
-	core::glfw::init();
-	core::global::graphic::init();
-	core::global::ui::init();
-	assets::graphic::load(core::global::graphic::context);
+	std::println();
 
-	main_loop();
+	component_manager.sliced_each([](ecs::component<math::vec2>& vec, ecs::component<double>& ival){
+		std::print("{} ", vec.val());
+		std::print("{} ", ival.val());
+	});
+	// auto spans = component_manager.get_slice_of<std::tuple<math::trans2, math::vec2>>();
+	// for (auto&& [trans, vec] : std::views::zip(spans | std::views::elements<0> | std::views::join, spans | std::views::elements<1> | std::views::join)){
+	// 	trans.id();
+	// }
+	//
+	//
+	// std::println("{}", component_manager.get_slice_of<math::vec2>() | std::views::join | std::views::transform(ecs::unwrap_component{}));
+	// std::println("{}", component_manager.get_slice_of<int>() | std::views::join | std::views::transform(ecs::unwrap_component{}));
 
-	assets::graphic::dispose();
-	core::global::ui::dispose();
-	core::global::graphic::dispose();
-	core::glfw::terminate();
+	// hive<int> a;
+	// hive<int> b;
+	//
+	//
+	// std::swap(a, b);
+	// std::erase(a, 1);
+	//
+	// init_assets();
+	// compile_shaders();
+	//
+	// core::glfw::init();
+	// core::global::graphic::init();
+	// core::global::ui::init();
+	// assets::graphic::load(core::global::graphic::context);
+	//
+	// main_loop();
+	//
+	// assets::graphic::dispose();
+	// core::global::ui::dispose();
+	// core::global::graphic::dispose();
+	// core::glfw::terminate();
 }

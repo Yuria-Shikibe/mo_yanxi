@@ -36,7 +36,7 @@ namespace mo_yanxi::game{
 
 		auto acquire = get_acquirer(e, ctx);
 
-		draw::line::rect_ortho(acquire, region, w, e.palette[0, prog]);
+		draw::line::rect_ortho(acquire, region, w, color[prog]);
 	}
 
 	math::frect fx::shape_rect_ortho::get_clip_region(const effect& e, const float min_clip_radius) const noexcept{
@@ -50,8 +50,8 @@ namespace mo_yanxi::game{
 		auto acquirer = get_acquirer(e, ctx);
 
 		const auto prog = e.duration.get();
-		const auto color_edge = e.palette[1, prog];
-		const auto color_inner = e.palette[0, prog];
+		const auto color_inner = palette.in[prog];
+		const auto color_edge = palette.out[prog];
 		const auto stroke_base = stroke.base[prog];
 		const auto stroke_append = stroke.append[prog];
 
@@ -83,12 +83,37 @@ namespace mo_yanxi::game{
 		auto acquirer = get_acquirer(e, ctx);
 
 		const auto prog = e.duration.get();
-		const auto color = e.palette[prog];
+		const auto color_i = palette.in[prog];
+		const auto color_o = palette.out[prog];
 
 		if(is_circle()){
-			draw::line::circle(acquirer, e.trans.vec, radius[prog], color, stroke[prog]);
+			draw::line::circle(acquirer, e.trans.vec, radius[prog], color_i, color_o, stroke[prog]);
 		}else{
-			draw::line::poly(acquirer, e.trans, sides, radius[prog], color, stroke[prog]);
+			draw::line::poly(acquirer, e.trans, sides, radius[prog], color_i, color_o, stroke[prog]);
+		}
+	}
+
+	void fx::poly_outlined_out::operator()(const effect& e, const effect_draw_context& ctx) const noexcept{
+		auto acquirer = get_acquirer(e, ctx);
+
+		const auto prog = e.duration.get();
+
+		if(is_circle()){
+			draw::fancy::circle_outlined(
+				acquirer, e.trans.vec, radius[prog],
+				palette.edge_in[prog],
+				palette.edge_out[prog],
+				palette.center_in[prog],
+				palette.center_out[prog],
+				stroke[prog]);
+		} else{
+			draw::fancy::poly_outlined(
+				acquirer, e.trans, sides, radius[prog],
+				palette.edge_in[prog],
+				palette.edge_out[prog],
+				palette.center_in[prog],
+				palette.center_out[prog],
+				stroke[prog]);
 		}
 	}
 }

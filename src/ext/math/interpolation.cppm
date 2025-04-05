@@ -341,28 +341,6 @@ namespace mo_yanxi::math::interp{
 			return fn(f);
 		}
 
-		template <typename LFn>
-		constexpr friend auto operator|(const interp_func<LFn>& f1, const interp_func& f2) noexcept{
-			if constexpr (static_interp<LFn> && static_interp<Fn>){
-				return interp_func{[] (float f) constexpr noexcept{
-					return LFn::operator()(Fn::operator()(f));
-				}};
-			}else if constexpr (static_interp<LFn>){
-				return interp_func{[f2] (float f) constexpr noexcept{
-					return LFn::operator()(f2(f));
-				}};
-			}else if constexpr (static_interp<Fn>){
-				return interp_func{[f1] (float f) constexpr noexcept{
-					return f1(Fn::operator()(f));
-				}};
-			}else{
-				return interp_func{
-					[f1, f2](float v) constexpr noexcept{
-						return f1(f2(v));
-					}
-				};
-			}
-		}
 
 		constexpr operator no_state_interp_func() const noexcept requires (static_interp<Fn>){
 			return +[] (float f) static constexpr noexcept{
@@ -371,10 +349,46 @@ namespace mo_yanxi::math::interp{
 		}
 	};
 
+	export
+	template <typename LFn, typename RFn>
+	constexpr auto operator|(const interp_func<LFn>& f1, const interp_func<RFn>& f2) noexcept{
+		if constexpr(static_interp<LFn> && static_interp<RFn>){
+			return interp_func{
+					[](float f) static constexpr noexcept{
+						return LFn::operator()(RFn::operator()(f));
+					}
+				};
+		} else if constexpr(static_interp<LFn>){
+			return interp_func{
+					[f2](float f) constexpr noexcept{
+						return LFn::operator()(f2(f));
+					}
+				};
+		} else if constexpr(static_interp<RFn>){
+			return interp_func{
+					[f1](float f) constexpr noexcept{
+						return f1(RFn::operator()(f));
+					}
+				};
+		} else{
+			return interp_func{
+					[f1, f2](float v) constexpr noexcept{
+						return f1(f2(v));
+					}
+				};
+		}
+	}
+
+
 	export{
 		template <float margin_in, float margin_out = 1.f>
-		inline constexpr auto margined_linear = interp_func{[](const float x) static noexcept{
+		inline constexpr auto linear_margined = interp_func{[](const float x) static noexcept{
 			return math::fma(x, margin_out - margin_in, margin_in);
+		}};
+
+		template <float margin_in, float margin_out = 1.f>
+		inline constexpr auto linear_map = interp_func{[](const float x) static noexcept{
+			return curve(x, margin_in, margin_out);
 		}};
 
 		inline constexpr interp_func linear = [](const float x) static noexcept{

@@ -16,3 +16,15 @@
 * 直接生成而不是通过blit获取mipmap
 ---
 * 文本元素的布局
+
+---
+
+# 绘制
+* 绘制实心多边形的顶点优化
+* 使用sdf圆贴图来替代整单色圆绘制，使得顶点减少为常数级并且自带抗锯齿\
+
+---
+
+# ECS
+* 对各slice的defer action的stage, dependency, read, write的标记
+* 对各slice的task graph

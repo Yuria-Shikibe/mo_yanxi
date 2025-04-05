@@ -269,7 +269,7 @@ export module mo_yanxi.small_vector;
 
 import std;
 
-namespace gch{
+export namespace gch{
 #ifdef GCH_LIB_CONCEPTS
 
 	namespace concepts{
@@ -5606,8 +5606,3 @@ namespace gch{
 
 #endif
 } // namespace gch
-
-namespace mo_yanxi{
-	export using gch::default_buffer_size;
-	export using gch::small_vector;
-}

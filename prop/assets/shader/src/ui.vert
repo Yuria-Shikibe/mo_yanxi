@@ -41,8 +41,9 @@ void main() {
     out_uv = in_uv;
     out_indices = in_indices;
 
-    out_color_base = mod(in_color_scl, 10.f);
-    out_color_light = in_color_scl / LightColorRange;
+    vec4 base_c = mod(in_color_scl, 10.f);
+    out_color_base = base_c;
+    out_color_light = (in_color_scl - base_c) / LightColorRange;
 
     out_color_ovr = in_color_ovr;
 

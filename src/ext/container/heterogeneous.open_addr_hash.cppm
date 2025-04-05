@@ -10,6 +10,60 @@ export import mo_yanxi.open_addr_hash_map;
 import std;
 
 namespace mo_yanxi{
+
+	struct type_index_equal_to__not_null{
+		using is_transparent = void;
+		bool operator()(std::nullptr_t, const std::type_index b) const noexcept {
+			return b == typeid(std::nullptr_t);
+		}
+
+		bool operator()(const std::type_index b, std::nullptr_t) const noexcept {
+			return b == typeid(std::nullptr_t);
+		}
+
+		bool operator()(const std::type_index b, const std::type_index a) const noexcept {
+			return a == b;
+		}
+
+		constexpr bool operator()(std::nullptr_t, std::nullptr_t) const noexcept {
+			return true;
+		}
+	};
+
+	struct type_index_hasher{
+		using is_transparent = void;
+		static constexpr std::hash<std::type_index> hasher{};
+
+		std::size_t operator()(const std::type_index val) const noexcept {
+			return hasher(val);
+		}
+
+		std::size_t operator()(std::nullptr_t) const noexcept {
+			return hasher(typeid(std::nullptr_t));
+		}
+	};
+
+	struct Proj{
+		std::type_index operator ()(std::nullptr_t) const noexcept{
+			return typeid(std::nullptr_t);
+		}
+	};
+
+	export
+	template <typename T>
+	using type_fixed_hash_map = fixed_open_hash_map<
+			std::type_index,
+			T,
+			nullptr,
+			type_index_hasher, type_index_equal_to__not_null, Proj>;
+
+	export
+	template <typename T>
+	using type_unordered_map = std::unordered_map<
+			std::type_index,
+			T,
+			type_index_hasher, type_index_equal_to__not_null>;
+
 	struct Prov{
 		std::string operator ()(std::nullptr_t) const noexcept{
 			return std::string();

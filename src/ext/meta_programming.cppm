@@ -4,6 +4,25 @@ import std;
 
 namespace mo_yanxi{
 	export
+	template <typename T>
+	struct unwrap;
+
+	template <template <typename...> typename W, typename ...T>
+	struct unwrap<W<T...>> : std::type_identity<std::tuple<T...>>{};
+
+	export
+	template <typename T>
+	using unwrap_t = typename unwrap<T>::type;
+
+	export
+	template <std::size_t Idx, typename T>
+	using unwrap_element_t = std::tuple_element_t<Idx, typename unwrap<T>::type>;
+
+	export
+	template <typename T>
+	using unwrap_first_element_t = std::tuple_element_t<0, typename unwrap<T>::type>;
+
+	export
 	template <typename...>
 	struct static_assert_trigger : std::false_type{};
 
@@ -36,6 +55,8 @@ namespace mo_yanxi{
 	struct function_traits<Ret(Args...)>{
 		using return_type = Ret;
 		using args_type = std::tuple<Args...>;
+		using mem_func_args_type = std::tuple<Args...>;
+
 		static constexpr std::size_t args_count = std::tuple_size_v<args_type>;
 		static constexpr bool is_single = args_count == 1;
 
@@ -218,6 +239,52 @@ namespace mo_yanxi{
 	export
 	template <typename T>
 	using tuple_to_variant_t = decltype(createVariantFromTuple_Impl<T>());
+
+
+	template <typename T, typename Tuple, size_t Index = 0>
+	consteval std::size_t find_first_index_in_tuple() {
+		// 如果索引超出范围，返回无效值(可以用std::optional或特殊值处理)
+		static_assert(Index < std::tuple_size_v<Tuple>,
+					 "Type not found in tuple");
+
+		// 检查当前索引类型是否匹配
+		if constexpr (std::is_same_v<T, std::tuple_element_t<Index, Tuple>>) {
+			return Index;
+		} else {
+			// 递归检查下一个元素
+			return find_first_index_in_tuple<T, Tuple, Index + 1>();
+		}
+	}
+
+	export
+	template <typename T, typename Tuple>
+	constexpr std::size_t tuple_index_v = find_first_index_in_tuple<T, Tuple>();
+	//Tuple Offset Of
+
+	template <std::size_t I, typename Tuple>
+	consteval std::size_t element_offset() noexcept {
+		using element_t = std::tuple_element_t<I, Tuple>;
+		static_assert(!std::is_reference_v<element_t>);
+		union {
+			char a[sizeof(Tuple)];
+			Tuple t{};
+		};
+		auto* p = std::addressof(std::get<I>(t));
+		t.~Tuple();
+		std::size_t off = 0;
+		for (std::size_t i = 0;; ++i) {
+			if (static_cast<void*>(a + i) == p) return i;
+		}
+	}
+
+	export
+	template <std::size_t Index, typename Tuple>
+	inline constexpr std::size_t tuple_offset_at_v = element_offset<Index, Tuple>();
+
+	export
+	template <typename T, typename Tuple>
+	inline constexpr std::size_t tuple_offset_of_v = element_offset<tuple_index_v<T, Tuple>, Tuple>();
+
 }
 
 

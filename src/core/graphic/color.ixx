@@ -23,6 +23,7 @@ namespace mo_yanxi::graphic{
 	export
 	struct color : math::vector4<float>{
 	public:
+		static constexpr float max_luma_scale = 3.f;
 		static constexpr float light_color_range = 2550.f;
 
 		static constexpr auto max_val = std::numeric_limits<std::uint8_t>::max();
@@ -65,21 +66,32 @@ namespace mo_yanxi::graphic{
 	public:
 		//TODO is this really good??
 		FORCE_INLINE constexpr color& append_light_color(const color& color) noexcept{
-			r += static_cast<float>(math::floor(light_color_range * color.r, 10));
-			g += static_cast<float>(math::floor(light_color_range * color.g, 10));
-			b += static_cast<float>(math::floor(light_color_range * color.b, 10));
-			a += static_cast<float>(math::floor(light_color_range * color.a, 10));
+			r += static_cast<float>(math::floor((light_color_range - 10) * color.r, 10) + 10);
+			g += static_cast<float>(math::floor((light_color_range - 10) * color.g, 10) + 10);
+			b += static_cast<float>(math::floor((light_color_range - 10) * color.b, 10) + 10);
+			a += static_cast<float>(math::floor((light_color_range - 10) * color.a, 10) + 10);
 
 			return *this;
 		}
 
 		FORCE_INLINE constexpr color& to_light_color() noexcept{
-			r = static_cast<float>(math::floor(light_color_range * r, 10));
-			g = static_cast<float>(math::floor(light_color_range * g, 10));
-			b = static_cast<float>(math::floor(light_color_range * b, 10));
-			a = static_cast<float>(math::floor(light_color_range * a, 10));
+			r = static_cast<float>(math::floor((light_color_range - 10) * r, 10) + 10);
+			g = static_cast<float>(math::floor((light_color_range - 10) * g, 10) + 10);
+			b = static_cast<float>(math::floor((light_color_range - 10) * b, 10) + 10);
+			a = static_cast<float>(math::floor((light_color_range - 10) * a, 10) + 10);
 
 			return *this;
+		}
+
+		constexpr color& set_light(float lumaScl = max_luma_scale) noexcept{
+			r *= lumaScl;
+			g *= lumaScl;
+			b *= lumaScl;
+			return *this;
+		}
+
+		[[nodiscard]] constexpr color to_light(float lumaScl = max_luma_scale) const noexcept{
+			return copy().set_light(lumaScl);
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr color to_light_color_copy() const noexcept{
@@ -325,7 +337,7 @@ namespace mo_yanxi::graphic{
 			return *this;
 		}
 
-		FORCE_INLINE constexpr color& setA(const float ta) noexcept{
+		FORCE_INLINE constexpr color& set_a(const float ta) noexcept{
 			this->a = ta;
 			return *this;
 		}
@@ -354,6 +366,18 @@ namespace mo_yanxi::graphic{
 		}
 
 		using vector4::lerp;
+
+		constexpr FORCE_INLINE auto& light_reserved_lerp(const color& target, const float t) noexcept{
+			color base_self = *this % 10.f;
+			color base_target = target % 10.f;
+
+			color light_self = (*this - base_self) / light_color_range;
+			color light_target = (target - base_target) / light_color_range;
+
+			base_self.lerp(base_target, t);
+			light_self.lerp(light_target, t);
+			return set(base_self).append_light_color(light_self);
+		}
 
 		// template <bool doClamp = true>
 		// FORCE_INLINE constexpr color& lerp(const color& target, const float t) noexcept{
@@ -603,7 +627,7 @@ namespace mo_yanxi::graphic{
 				b = q;
 			}
 
-			targetColor.setA(targetColor.a);
+			targetColor.set_a(targetColor.a);
 			return targetColor;
 		}
 
@@ -659,6 +683,7 @@ namespace mo_yanxi::graphic{
 		constexpr color dark_gray{color::from_rgba8888(0x3f3f3fff)};
 		constexpr color black{0, 0, 0, 1};
 		constexpr color clear{0, 0, 0, 0};
+		// constexpr color clear_light{10, 10, 10, 10};
 
 		constexpr color BLUE{0, 0, 1, 1};
 		constexpr color NAVY{0, 0, 0.5f, 1};

@@ -503,7 +503,7 @@ namespace mo_yanxi::graphic{
 				VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
 				assets::graphic::shaders::comp::world_merge.get_create_info()),
 			merge_command(context.get_compute_command_pool().obtain()){
-			bloom.set_strength(1.087f, 0.925f);
+			bloom.set_strength(1.1f, 0.95f);
 			init_layout(context.get_transient_compute_command_buffer());
 
 

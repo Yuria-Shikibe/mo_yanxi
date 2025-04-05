@@ -83,6 +83,7 @@ target("mo_yanxi")
 
     add_includedirs("submodules/VulkanMemoryAllocator/include")
     add_includedirs("submodules/plf_hive")
+    add_includedirs("submodules/small_vector/source/include")
     add_includedirs("includes")
 
 

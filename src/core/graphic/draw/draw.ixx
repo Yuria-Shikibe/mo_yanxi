@@ -80,11 +80,11 @@ namespace mo_yanxi::graphic::draw{
 		float depth;
 
 		void slightly_incr_depth(){
-			depth = std::nextafter(depth, std::numeric_limits<float>::max());
+			depth += std::numeric_limits<float>::epsilon();//std::nextafter(depth, std::numeric_limits<float>::max());
 		}
 
 		void slightly_decr_depth(){
-			depth = std::nextafter(depth, std::numeric_limits<float>::lowest());
+			depth -= std::numeric_limits<float>::epsilon();//std::nextafter(depth, std::numeric_limits<float>::lowest());
 		}
 
 		FORCE_INLINE constexpr void operator()(vk::vertices::vertex_world& vertex) const noexcept {

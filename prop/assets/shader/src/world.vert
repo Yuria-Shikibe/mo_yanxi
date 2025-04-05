@@ -28,12 +28,57 @@ layout(set = 0, binding = 0) uniform UBO {
     mat3 view;
 } transform;
 
+float nor_luma(float luminance, float maxLuminance) {
+    // 1. 归一化到 [0, 1] 范围
+    float normalized = clamp(luminance / maxLuminance, 0.0, 1.0);
+
+    // 2. 可选 Gamma 校正（sRGB 标准 ≈ 2.2）
+    const float gamma = 2.2;
+    normalized = pow(normalized, 1.0 / gamma); // 逆 Gamma 校正
+
+    return normalized;
+}
+float nor_luma(
+    float luminance
+) {
+//    // 1. 截断到 [minLuminance, maxLuminance] 范围
+//    float clamped = clamp(luminance, minLuminance, maxLuminance);
+//
+//    // 2. 线性映射到 [0, 1]
+    float normalized = luminance;// (clamped - minLuminance) / (maxLuminance - minLuminance);
+
+    // 3. 可选 Gamma 校正（sRGB 标准 ≈ 2.2）
+    const float gamma = 2.2;
+    normalized = pow(normalized, 1.0 / gamma); // 逆 Gamma 校正
+
+    return normalized;
+}
+
+const float sqrt3 = 1.7320508075688772935274463415059;
+float luma(vec3 color) {
+
+//    return length(color) / sqrt3;
+//    const vec3 luminanceCoeff = vec3(0.2126, 0.7152, 0.0722); // BT.709 系数
+    const vec3 luminanceCoeff = vec3(1. / 3., 1. / 3., 1. / 3.); // BT.709 系数
+    return dot(color, luminanceCoeff); // 自动处理超量值
+}
+
 void main() {
 
+    const float minLuma = 1;
+    const float maxLuma = 2;
     gl_Position = vec4((transform.view * vec3(in_pos.xy, 1.0)).xy , in_pos.z / zScale, 1.0);
 
-    out_color_base = mod(in_color_scl, 10.f);
-    out_color_light = in_color_scl / LightColorRange;
+    float base_luma = luma(in_color_scl.rgb);
+    float clamped = clamp(base_luma, minLuma, maxLuma);
+    float normalized = (clamped - minLuma) / (maxLuma - minLuma);
+
+    float light = normalized;
+
+    vec3 src_color = in_color_scl.rgb / mix(1, base_luma, normalized);
+    out_color_base = vec4(src_color, min(in_color_scl.a, 1.f) * (1 - light));
+    out_color_light = vec4(src_color, light * in_color_scl.a);
+
     out_color_override = in_color_override;
 
     out_indices = in_indices;
