@@ -150,6 +150,37 @@ namespace mo_yanxi{
 		}
 	}
 
+	template <std::size_t count, typename Tuple>
+	consteval auto remove_tuple_first_elem(){
+		if constexpr (std::tuple_size_v<Tuple> <= count){
+			return std::tuple<>{};
+		}
+
+		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+			return std::tuple<std::tuple_element_t<Idx + count, Tuple> ...>{};
+		}(std::make_index_sequence<std::tuple_size_v<Tuple> - count>{});
+	}
+
+	template <std::size_t count, typename Tuple>
+	consteval auto remove_tuple_last_elem(){
+		if constexpr (std::tuple_size_v<Tuple> <= count){
+			return std::tuple<>{};
+		}
+
+		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+			return std::tuple<std::tuple_element_t<Idx, Tuple> ...>{};
+		}(std::make_index_sequence<std::tuple_size_v<Tuple> - count>{});
+	}
+
+	export
+	template <typename Tuple>
+	using tuple_drop_first_elem_t = decltype(remove_tuple_first_elem<1, Tuple>());
+
+	export
+	template <typename Tuple>
+	using tuple_drop_last_elem_t = decltype(remove_tuple_last_elem<1, Tuple>());
+
+
 	template <typename TargetTuple, typename... Args, std::size_t... I>
 	constexpr decltype(auto) makeTuple_withDef_impl(std::tuple<Args...>&& args, TargetTuple&& defaults,
 													std::index_sequence<I...>){

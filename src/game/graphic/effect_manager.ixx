@@ -96,6 +96,9 @@ namespace mo_yanxi::game::fx{
 				}
 			}
 
+			if(count){
+				active_pool.shrink_to_fit();
+			}
 
 			return count;
 		}

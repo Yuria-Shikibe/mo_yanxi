@@ -35,6 +35,7 @@ EXPORT_FLAG constexpr BITMASK& operator&=(BITMASK& lhs, BITMASK rhs) noexcept { 
         return lhs = lhs & rhs;                                                               \
     }\
 BITMASK_OPS_BASE(EXPORT_FLAG, BITMASK)
+
 #define BITMASK_OPS_BOOL(EXPORT_FLAG, BITMASK)                                                     \
     EXPORT_FLAG [[nodiscard]] constexpr auto operator&(BITMASK lhs, BITMASK rhs) noexcept {\
         return static_cast<bool>(std::to_underlying(lhs) & std::to_underlying(rhs));       \

@@ -89,6 +89,7 @@ import mo_yanxi.ui.elem.nested_scene;
 import mo_yanxi.game.graphic.effect;
 import mo_yanxi.game.world.graphic;
 import mo_yanxi.game.ecs.component_manager;
+import mo_yanxi.game.ecs.task_graph;
 
 import test;
 import hive;
@@ -548,7 +549,81 @@ int main(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
 
-	ecs::component_manager component_manager{};
+	concurrent::no_fail_task_graph task_graph{};
+	enum task_id{
+		_0,
+		_1,
+		_2,
+		_3,
+		_4,
+		_5,
+		_6,
+		_7,
+	};
+
+	task_graph.add_task(_0, {}, []{
+		std::println(std::cerr, "Done Task: {}", std::to_underlying(_0));
+	});
+
+	using namespace std::literals;
+
+	task_graph.add_task(_1, {_0}, [](concurrent::task_context& ctx){
+		std::println(std::cerr, "Task[{}] Block", ctx.task().id());
+		ctx.acquire();
+		std::this_thread::sleep_for(1s);
+		ctx.release();
+		std::println(std::cerr, "Done Task: {}", std::to_underlying(_1));
+	});
+
+	task_graph.add_task(_2, {_1, _3}, []{
+		std::this_thread::sleep_for(150ms);
+
+		std::println(std::cerr, "Done Task: {}", std::to_underlying(_2));
+	});
+
+	task_graph.add_task(_3, {}, []{
+		std::println(std::cerr, "Done Task: {}", std::to_underlying(_3));
+	});
+
+	task_graph.add_task(_4, {_2, _7}, []{
+		std::this_thread::sleep_for(150ms);
+
+		std::println(std::cerr, "Done Task: {}", std::to_underlying(_4));
+	});
+
+	task_graph.add_task(_5, {_4}, []{
+		std::this_thread::sleep_for(150ms);
+		std::println(std::cerr, "Done Task: {}", std::to_underlying(_5));
+	});
+
+	task_graph.add_task(_6, {_4}, []{
+		// context.wait();
+		std::this_thread::sleep_for(150ms);
+
+		std::println(std::cerr, "Done Task: {}", std::to_underlying(_6));
+	});
+
+	task_graph.add_task(_7, {}, []{
+		std::println(std::cerr, "Task[{}] Block", std::to_underlying(_7));
+
+		// context.wait();
+		std::this_thread::sleep_for(2s);
+
+		std::println(std::cerr, "Done Task: {}", std::to_underlying(_7));
+	});
+
+	const auto group = task_graph.to_sorted_group();
+
+	std::vector<std::jthread> threads{};
+	auto instances = group.create_instance(2);
+
+	for (const auto& instance : instances.launch()){
+		threads.emplace_back(std::cref(instance));
+	}
+
+	instances.wait();
+
+	/*ecs::component_manager component_manager{};
 
 	component_manager.create_entity<math::trans2, math::vec2>();
 	component_manager.create_entity<math::trans2, math::vec2>();
@@ -580,7 +655,7 @@ int main(){
 
 
 	component_manager.erase_entity(en2t);
-	component_manager.do_destroy();
+	component_manager.do_deferred_destroy();
 
 	component_manager.sliced_each([](ecs::component<math::vec2>& vec, ecs::component<int>& ival){
 		std::print("{} ", vec.val());
@@ -592,7 +667,7 @@ int main(){
 	component_manager.sliced_each([](ecs::component<math::vec2>& vec, ecs::component<double>& ival){
 		std::print("{} ", vec.val());
 		std::print("{} ", ival.val());
-	});
+	});*/
 	// auto spans = component_manager.get_slice_of<std::tuple<math::trans2, math::vec2>>();
 	// for (auto&& [trans, vec] : std::views::zip(spans | std::views::elements<0> | std::views::join, spans | std::views::elements<1> | std::views::join)){
 	// 	trans.id();

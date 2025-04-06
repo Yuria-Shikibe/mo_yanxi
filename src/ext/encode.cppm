@@ -95,43 +95,11 @@ namespace mo_yanxi::encode{
 	 */
 	template <std::integral Ret = unsigned>
 	[[nodiscard]] constexpr Ret getUnicodeLength(const char code) noexcept{
-		//TODO check if this code is really a unicode character
-		static constexpr char Mask = 0b0000'0001;
-
-		if(code >> 7 & Mask){ //0b'1...
-			if(code >> 6 & Mask){ //0b'11...
-				if(code >> 5 & Mask){ //0b'111...
-					if(code >> 4 & Mask){ //0b'1111...
-						if(code >> 3 & Mask){ //0b'11111... ,
-							if(code >> 2 & Mask){ //0b'111111... ,
-								if(code >> 1 & Mask){ //0b'1111111... ,
-									if(code >> 0 & Mask){
-										return 8;
-									}
-
-									return 7;
-								}
-
-								return 6; //0b'11111... ,
-							}
-
-							return 5; //0b'11111... ,
-						}
-						//0b'11110... ,4
-						return 4;
-					}
-					//0b'1110... ,3
-					return 3;
-				}
-				//0b'110... ,2
-				return 2;
-			}
-			//0b'10... ,Not Head
-			return 0;
+		switch(auto rst = std::countl_one(std::bit_cast<std::uint8_t>(code))){
+			case 0 : return 1;
+			case 1 : return 0;
+			default : return rst;
 		}
-
-		//0b'0... ,ASCII
-		return 1;
 	}
 
 	export

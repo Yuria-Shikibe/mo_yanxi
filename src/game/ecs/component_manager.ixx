@@ -58,6 +58,13 @@ namespace mo_yanxi::game::ecs{
 		[[nodiscard]] constexpr entity_data_chunk_index chunk_index() const noexcept{
 			return chunk_index_;
 		}
+
+		/**
+		 * @brief Only valid when an entity has its data, i.e. an entity has been truly added.
+		 */
+		explicit operator bool() const noexcept{
+			return chunk_index_ != invalid_chunk_idx;
+		}
 	};
 
 	export
@@ -291,25 +298,41 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-
-	using void_hive = archetype<std::tuple<void*>>;
-
 	export
 	struct component_manager{
 		template <typename T>
 		using small_vector_of = gch::small_vector<T>;
-		// using archetype_wrapper_type = fixed_size_type_wrapper<alignof(void_hive), sizeof(void_hive)>;
 		using archetype_map_type = type_fixed_hash_map<std::unique_ptr<archetype_base>>;
 
 	private:
-		std::vector<entity*> to_destroy{};
+		fixed_open_hash_map<entity*, int> to_destroy{};
 
 		plf::hive<entity> entities{};
-		archetype_map_type archetypes;
+		archetype_map_type archetypes{};
 
-		type_fixed_hash_map<std::vector<archetype_slice>> type_to_archetype;
+		type_fixed_hash_map<std::vector<archetype_slice>> type_to_archetype{};
 
+		std::vector<std::move_only_function<void(component_manager&) const>> deferred_entity_add_request{};
 	public:
+		template <typename Tuple>
+			requires (is_tuple_v<Tuple>)
+		entity create_entity_deferred(){
+			using ArcheT = archetype<Tuple>;
+			std::type_index idx = typeid(Tuple);
+			auto& ent = *entities.emplace(idx);
+
+			deferred_entity_add_request.push_back([ent](component_manager& manager){
+				std::unique_ptr<archetype_base> ptr = std::make_unique<ArcheT>();
+				const auto itr = manager.archetypes.try_emplace(ent.type(), std::move(ptr));
+				if(itr.second){
+					manager.add_new_archetype_map<Tuple>(static_cast<ArcheT&>(*itr.first->second));
+				}
+				itr.first->second->insert(ent);
+			});
+
+			return ent;
+		}
+
 		template <typename Tuple>
 			requires (is_tuple_v<Tuple>)
 		entity create_entity(){
@@ -332,12 +355,25 @@ namespace mo_yanxi::game::ecs{
 			return create_entity<std::tuple<Ts ...>>();
 		}
 
-		void erase_entity(const entity& entity){
-			to_destroy.push_back(entity.id());
+		bool erase_entity(const entity& entity){
+			return to_destroy.try_emplace(entity.id()).second;
 		}
 
-		void do_destroy(){
-			for (auto destroy : to_destroy){
+		void do_deferred(){
+			do_deferred_destroy();
+			do_deferred_add();
+		}
+
+		void do_deferred_add(){
+			for (const auto & entity_add_request : deferred_entity_add_request){
+				entity_add_request(*this);
+			}
+			deferred_entity_add_request.clear();
+		}
+
+		void do_deferred_destroy(){
+			//TODO destroy expiration notify/check
+			for (auto&& destroy : to_destroy | std::views::keys){
 				if(auto map = archetypes.find(destroy->type()); map != archetypes.end()){
 					map->second->erase(*destroy);
 				}
@@ -369,23 +405,48 @@ namespace mo_yanxi::game::ecs{
 
 		template <typename Fn>
 		FORCE_INLINE void sliced_each(Fn fn){
-			using params = wrap_tuple_t<std::decay_t, remove_mfptr_this_args<Fn>>;
-			using span_tuple = wrap_tuple_t<strided_span, params>;
-			this->slice_and_then<wrap_tuple_t<unwrap_first_element_t, params>>([f = std::move(fn)](span_tuple p){
-				auto count = std::ranges::size(std::get<0>(p));
+			using raw_params = remove_mfptr_this_args<Fn>;
 
-				wrap_tuple_t<strided_span_iterator, params> iterators{};
+			if constexpr (std::same_as<std::tuple_element_t<0, raw_params>, component_manager&>){
+				using params = wrap_tuple_t<std::decay_t, tuple_drop_first_elem_t<raw_params>>;
+				using span_tuple = wrap_tuple_t<strided_span, params>;
 
-				[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
-					((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
-				}(std::make_index_sequence<std::tuple_size_v<params>>{});
+				this->slice_and_then<wrap_tuple_t<unwrap_first_element_t, params>>([this, f = std::move(fn)](span_tuple p){
+					auto count = std::ranges::size(std::get<0>(p));
 
-				for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
+					wrap_tuple_t<strided_span_iterator, params> iterators{};
+
 					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
-						std::invoke(f, *(std::get<Idx>(iterators)++) ...);
+						((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
 					}(std::make_index_sequence<std::tuple_size_v<params>>{});
-				}
-			});
+
+					for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
+						[&, this] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+							std::invoke(f, *this, *(std::get<Idx>(iterators)++) ...);
+						}(std::make_index_sequence<std::tuple_size_v<params>>{});
+					}
+				});
+			}else{
+				using params = wrap_tuple_t<std::decay_t, raw_params>;
+				using span_tuple = wrap_tuple_t<strided_span, params>;
+
+				this->slice_and_then<wrap_tuple_t<unwrap_first_element_t, params>>([f = std::move(fn)](span_tuple p){
+					auto count = std::ranges::size(std::get<0>(p));
+
+					wrap_tuple_t<strided_span_iterator, params> iterators{};
+
+					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+						((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
+					}(std::make_index_sequence<std::tuple_size_v<params>>{});
+
+					for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
+						[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+							std::invoke(f, *(std::get<Idx>(iterators)++) ...);
+						}(std::make_index_sequence<std::tuple_size_v<params>>{});
+					}
+				});
+			}
+
 		}
 
 		template <typename ...T>
@@ -561,6 +622,15 @@ namespace mo_yanxi::game::ecs{
 					}
 				}), ...);
 			}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+		}
+
+
+		template <typename Tuple = std::tuple<>>
+		std::unique_ptr<archetype_base> create_new_archetype_map(){
+			using ArcheT = archetype<Tuple>;
+			std::unique_ptr<archetype_base> ptr = std::make_unique<ArcheT>();
+			this->add_new_archetype_map(static_cast<ArcheT&>(*ptr));
+			return ptr;
 		}
 
 		//TODO delete empty archetype map

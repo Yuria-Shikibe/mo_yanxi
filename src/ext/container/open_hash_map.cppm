@@ -231,6 +231,17 @@ namespace mo_yanxi{
 	// using KeyEqual = std::equal_to<Key>;
 	// using Allocator = std::allocator<std::pair<Key, Val>>;
 
+	struct pointer_transparent_hasher{
+		template <typename T>
+			requires (std::is_pointer_v<T>)
+		static constexpr std::size_t operator()(T ptr) noexcept{
+			static constexpr std::hash<const void*> hash{};
+			return hash(ptr);
+		}
+
+		using is_transparent = void;
+	};
+
 	export
 	template <
 		typename Key, typename Val, typename EmptyKey, auto emptyKey,
@@ -853,6 +864,16 @@ namespace mo_yanxi{
 		typename Allocator = std::allocator<std::pair<Key, Val>>>
 	using fixed_open_hash_map = fixed_open_addr_hash_map<
 		Key, Val, std::conditional_t<std::same_as<decltype(emptyKey), std::in_place_t>, Key, decltype(emptyKey)>, emptyKey, Hash, KeyEqual, Convertor, Allocator>;
+
+	export
+	template <
+		typename Key, typename Val,
+		typename Hash = pointer_transparent_hasher,
+		typename KeyEqual = std::equal_to<void>,
+		typename Allocator = std::allocator<std::pair<Key, Val>>>
+	// requires std::is_pointer_v<Key>
+	using pointer_hash_map = fixed_open_addr_hash_map<
+		Key, Val, std::nullptr_t, nullptr, Hash, KeyEqual, std::identity, Allocator>;
 
 
 	// using M = fixed_open_addr_hash_map<int, float, int, 0>;
