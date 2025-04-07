@@ -62,21 +62,22 @@ namespace mo_yanxi::concurrent{
 		template <std::ranges::forward_range Rng>
 		void add_dependencies(Rng&& rng){
 			if constexpr (std::ranges::sized_range<Rng>){
-				parents.reserve(std::ranges::size(rng));
+				parents.reserve(parents.size() + std::ranges::size(rng));
 			}
 
 			for(task* task : rng){
 				task->add_depend_by(this);
-				parents.insert(task);
 			}
+
+			parents.insert_range(std::forward<Rng>(rng));
 		}
 
-		void add_dependencies(task& task){
+		void add_dependency(task& task){
 			task.add_depend_by(this);
 			parents.insert(&task);
 		}
 
-		void erase_dependencies(task& task){
+		void erase_dependency(task& task){
 			task.children.erase(this);
 			parents.erase(&task);
 		}
@@ -368,6 +369,17 @@ namespace mo_yanxi::concurrent{
 		std::unordered_map<task_id, task> tasks{};
 	public:
 
+		task* try_find(task_id tid) noexcept{
+			if(auto it = tasks.find(tid); it != tasks.end()){
+				return &it->second;
+			}
+			return nullptr;
+		}
+
+		task& at(task_id tid) noexcept{
+			return tasks.at(tid);
+		}
+
 		template <std::ranges::forward_range Rng = std::initializer_list<task_id>>
 		void set_dependency(task_id id, Rng&& rng){
 			tasks[id].add_dependencies(std::forward<Rng>(rng));
@@ -385,16 +397,16 @@ namespace mo_yanxi::concurrent{
 			}, true);
 		}
 
-		template <std::ranges::forward_range Rng = std::initializer_list<task_id>>
+		template <std::invocable<task_context&> Fn, std::ranges::forward_range Rng = std::initializer_list<task_id>>
 			requires (std::convertible_to<std::ranges::range_value_t<Rng>, task_id>)
-		bool add_task(task_id id, Rng&& dependencies, task::function_wrap_type&& t, bool autoCtrl = false){
-			auto [itr, suc] = tasks.try_emplace(id, std::move(t));
+		bool add_task(task_id id, Rng&& dependencies, Fn&& fn, const bool autoCtrl = false){
+			auto [itr, suc] = tasks.try_emplace(id, task::function_wrap_type{std::forward<Fn>(fn)});
 			itr->second.id_ = id;
 			itr->second.autoCtrl_ = autoCtrl;
 
 			if(!suc){
 				if(itr->second.runnable)return false;
-				itr->second.runnable = std::move(t);
+				itr->second.runnable = std::move(fn);
 			}
 
 			itr->second.add_dependencies(dependencies | std::views::transform([&](task_id did) -> task* {
@@ -409,16 +421,53 @@ namespace mo_yanxi::concurrent{
 		}
 
 		[[nodiscard]] task_group to_sorted_group() const {
-			auto groups = gen_impl();
-			task_group rst;
-			rst.sequences.reserve(std::ranges::fold_left(groups | std::views::values | std::views::transform([](const task_group& task_group){
-				return task_group.sequences.size();
-			}), static_cast<std::size_t>(0), std::plus<>{}));
+			task_group groups{};
 
-			for (auto&& group : groups | std::views::values){
-				rst.merge(std::move(group));
+			pointer_hash_map<const task*, std::size_t> in_degree{};
+			std::vector<const task*> global_zero_in_degree_queue{};
+
+			for (auto&& [id, tsk] : tasks) {
+				const auto current = &tsk;
+				const auto in_deg = current->parents.size();
+
+				if (in_deg == 0) {
+					global_zero_in_degree_queue.push_back(current);
+				}else{
+					in_degree.try_emplace(current, in_deg);
+				}
 			}
-			return rst;
+
+			std::deque<const task*> local_zero_degree;
+			for (auto head : global_zero_in_degree_queue){
+				task_group::task_sequence seq{};
+				local_zero_degree.clear();
+				local_zero_degree.push_back(head);
+
+				while(!local_zero_degree.empty()){
+					auto cur = local_zero_degree.front();
+					local_zero_degree.pop_front();
+
+					for (auto child : cur->children){
+						if (--in_degree[child] == 0) {
+							local_zero_degree.push_back(child);
+						}else{
+							seq.branches[cur].push_back(child);
+						}
+					}
+
+					seq.seq.push_back(cur);
+				}
+
+				groups.sequences.push_back(std::move(seq));
+			}
+
+			for (const auto& [node, degree] : in_degree) {
+				if (degree != 0) {
+					throw std::runtime_error("Cycle detected in task graph");
+				}
+			}
+
+			return groups;
 		}
 
 	private:

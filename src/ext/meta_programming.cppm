@@ -4,11 +4,50 @@ import std;
 
 namespace mo_yanxi{
 	export
+	template <typename T, T a, T b>
+	constexpr inline T max_const = a > b ? a : b;
+
+	export
+	template <typename T, T a, T b>
+	constexpr inline T min_const = a < b ? a : b;
+
+	export
+	template <typename From, typename To>
+	struct copy_qualifier : std::type_identity<To>{};
+
+#define ArrangeGen(qfl, qfr) template <typename From, typename To> struct copy_qualifier<qfl From qfr, To> : std::type_identity<qfl To qfr>{};
+
+	ArrangeGen(const);
+	ArrangeGen(const volatile);
+
+	ArrangeGen(, &);
+	ArrangeGen(, &&);
+
+	ArrangeGen(const, &);
+	ArrangeGen(const, &&);
+
+	ArrangeGen(const volatile, &);
+	ArrangeGen(const volatile, &&);
+
+	export
+	template <typename From, typename To>
+	using copy_qualifier_t = typename copy_qualifier<From, To>::type;
+
+	export
 	template <typename T>
 	struct unwrap;
 
 	template <template <typename...> typename W, typename ...T>
 	struct unwrap<W<T...>> : std::type_identity<std::tuple<T...>>{};
+
+	template <template <typename...> typename W, typename ...T>
+	struct unwrap<const W<T...>> : std::type_identity<std::tuple<T...>>{};
+
+	template <template <typename...> typename W, typename ...T>
+	struct unwrap<volatile W<T...>> : std::type_identity<std::tuple<T...>>{};
+
+	template <template <typename...> typename W, typename ...T>
+	struct unwrap<const volatile W<T...>> : std::type_identity<std::tuple<T...>>{};
 
 	export
 	template <typename T>
@@ -21,6 +60,57 @@ namespace mo_yanxi{
 	export
 	template <typename T>
 	using unwrap_first_element_t = std::tuple_element_t<0, typename unwrap<T>::type>;
+
+	template <template <typename > typename W, typename T>
+	consteval auto apply_to() noexcept{
+		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+			return std::tuple<W<std::tuple_element_t<Idx, T>> ...>{};
+		}(std::make_index_sequence<std::tuple_size_v<T>>{});
+	}
+
+	template <std::size_t i, template <typename > typename UnaryPred, typename Tuple>
+	constexpr void modify(std::size_t& index){
+		if (index != std::tuple_size_v<Tuple>) return;
+		if constexpr (UnaryPred<std::tuple_element_t<i, Tuple>>::value) {
+			index = i;
+		}
+	}
+
+	export
+	template <template <typename > typename UnaryPred, typename Tuple>
+	constexpr inline std::size_t tuple_find_first_v = []() constexpr -> std::size_t {
+		std::size_t index = std::tuple_size_v<Tuple>;
+		[&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
+			(modify<Idx, UnaryPred, Tuple>(index), ...);
+		}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+
+		return index;
+	}();
+
+
+	export
+	template <template <typename > typename UnaryPred, typename Tuple>
+	struct tuple_find_first : std::integral_constant<std::size_t, tuple_find_first_v<UnaryPred, Tuple>>{};
+
+	export
+	template <template <typename > typename UnaryTrait, typename T>
+	using unary_apply_to_tuple_t = decltype(apply_to<UnaryTrait, T>());
+
+	constexpr std::size_t a = tuple_find_first_v<std::is_floating_point, std::tuple<int, float>>;
+
+	export
+	template <template <typename, typename> typename W, typename LHS, typename RHS>
+	using binary_apply_to_tuple_t = typename decltype([]{
+		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+			return std::type_identity<std::tuple<W<std::tuple_element_t<Idx, LHS>, std::tuple_element_t<Idx, RHS>> ...>> {};
+		}(std::make_index_sequence<
+			min_const<std::size_t, std::tuple_size_v<LHS>, std::tuple_size_v<RHS>>
+		>{});
+	}())::type;
+
+	// using A = binary_apply_to_tuple_t<copy_qualifier_t, std::tuple<int&, const double>, std::tuple<float, volatile short>>;
+
+
 
 	export
 	template <typename...>
@@ -153,32 +243,49 @@ namespace mo_yanxi{
 	template <std::size_t count, typename Tuple>
 	consteval auto remove_tuple_first_elem(){
 		if constexpr (std::tuple_size_v<Tuple> <= count){
-			return std::tuple<>{};
+			return std::type_identity<std::tuple<>>{};
 		}
 
 		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-			return std::tuple<std::tuple_element_t<Idx + count, Tuple> ...>{};
+			return std::type_identity<std::tuple<std::tuple_element_t<Idx + count, Tuple> ...>>{};
 		}(std::make_index_sequence<std::tuple_size_v<Tuple> - count>{});
 	}
 
 	template <std::size_t count, typename Tuple>
 	consteval auto remove_tuple_last_elem(){
 		if constexpr (std::tuple_size_v<Tuple> <= count){
-			return std::tuple<>{};
+			return std::type_identity<std::tuple<>>{};
 		}
 
 		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-			return std::tuple<std::tuple_element_t<Idx, Tuple> ...>{};
+			return std::type_identity<std::tuple<std::tuple_element_t<Idx, Tuple> ...>>{};
 		}(std::make_index_sequence<std::tuple_size_v<Tuple> - count>{});
 	}
 
+
 	export
-	template <typename Tuple>
-	using tuple_drop_first_elem_t = decltype(remove_tuple_first_elem<1, Tuple>());
+	template <std::size_t Count, typename Tuple>
+	struct tuple_drop_front_n_elem : decltype(remove_tuple_first_elem<Count, Tuple>()){};
+
+	export
+	template <std::size_t Count, typename Tuple>
+	struct tuple_drop_back_n_elem : decltype(remove_tuple_last_elem<Count, Tuple>()){};
+
+	export
+	template <std::size_t Count, typename Tuple>
+	using tuple_drop_front_n_elem_t = typename tuple_drop_front_n_elem<Count, Tuple>::type;
 
 	export
 	template <typename Tuple>
-	using tuple_drop_last_elem_t = decltype(remove_tuple_last_elem<1, Tuple>());
+	using tuple_drop_first_elem_t = typename decltype(remove_tuple_first_elem<1, Tuple>())::type;
+
+	export
+	template <typename ...Tuples>
+	using tuple_cat_t = decltype(std::tuple_cat(std::declval<Tuples&&>()...));
+
+	export
+	template <typename Tuple>
+	using tuple_drop_last_elem_t = typename decltype(remove_tuple_last_elem<1, Tuple>())::type;
 
 
 	template <typename TargetTuple, typename... Args, std::size_t... I>
@@ -199,11 +306,6 @@ namespace mo_yanxi{
 		}
 	};
 
-	template <typename T, T a, T b>
-	constexpr T max_const = a > b ? a : b;
-
-	template <typename T, T a, T b>
-	constexpr T min_const = a < b ? a : b;
 
 	template <typename TargetTuple, typename FromTuple, std::size_t... I>
 	constexpr bool tupleConvertableTo(std::index_sequence<I...>){
@@ -411,6 +513,7 @@ export namespace mo_yanxi{
 	};
 
 
+	/*
 	template <bool Test, class T>
 	struct ConstConditional{
 		using type = T;
@@ -430,7 +533,7 @@ export namespace mo_yanxi{
 
 
 	template <typename T>
-	constexpr bool isConstRef = std::is_const_v<std::remove_reference_t<T>>;
+	constexpr bool isConstRef = std::is_const_v<std::remove_reference_t<T>>;*/
 
 	template <typename T>
 	struct is_const_lvalue_reference{

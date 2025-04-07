@@ -96,6 +96,12 @@ namespace mo_yanxi {
 		mo_yanxi::derived_from_specialization_impl<Template>(obj);
 	};
 
+	export
+	template <class T, template <class...> class Template>
+	struct is_spec_of : std::bool_constant<spec_of<T, Template>>{};
+
+
+
 
     template <typename T>
     concept complete_type = requires{

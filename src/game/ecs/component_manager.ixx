@@ -15,13 +15,17 @@ export import mo_yanxi.meta_programming;
 import std;
 
 namespace mo_yanxi::game::ecs{
+	export struct component_manager;
 	export using entity_id = struct entity*;
 	export using entity_data_chunk_index = std::vector<int>::size_type;
 	export auto invalid_chunk_idx = std::numeric_limits<entity_data_chunk_index>::max();
+	export
+	template <typename T>
+		requires (std::is_default_constructible_v<T>)
+	struct component;
 
 	export
 	template <typename TupleT>
-		requires (std::tuple_size_v<TupleT> > 0)
 	struct archetype;
 
 	export
@@ -29,7 +33,7 @@ namespace mo_yanxi::game::ecs{
 
 	private:
 		template <typename TupleT>
-			requires (std::tuple_size_v<TupleT> > 0)
+
 		friend struct archetype;
 
 		entity_id id_{};
@@ -56,24 +60,31 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		[[nodiscard]] constexpr entity_data_chunk_index chunk_index() const noexcept{
-			return chunk_index_;
+			if(is_original())return chunk_index_;
+
+			if(id()) return id()->chunk_index();
+
+			return chunk_index_ != invalid_chunk_idx;
 		}
 
 		/**
 		 * @brief Only valid when an entity has its data, i.e. an entity has been truly added.
 		 */
 		explicit operator bool() const noexcept{
-			return chunk_index_ != invalid_chunk_idx;
+			return chunk_index() != invalid_chunk_idx;
 		}
+
+
+		template <typename T>
+		component<T>* get(const component_manager& manager) const;
 	};
 
-	export
 	template <typename T>
 		requires (std::is_default_constructible_v<T>)
 	struct component{
 	private:
 		template <typename TupleT>
-			requires (std::tuple_size_v<TupleT> > 0)
+
 		friend struct archetype;
 
 		entity_id eid_{};
@@ -155,37 +166,27 @@ namespace mo_yanxi::game::ecs{
 		}(std::make_index_sequence<std::tuple_size_v<T>>{});
 	}
 
-	template <template <typename > typename W, typename T>
-	consteval auto apply_to() noexcept{
-		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-			return std::tuple<W<std::tuple_element_t<Idx, T>> ...>{};
-		}(std::make_index_sequence<std::tuple_size_v<T>>{});
-	}
 
 	template <typename T>
-	using tuple_to_comp_t = decltype(apply_to_comp<T>());
-
-	template <template <typename > typename W, typename T>
-	using tuple_to_comp_container_t = decltype(apply_to_comp_of<W, T>());
-
-	template <typename T>
-	using tuple_to_slice_t = decltype(apply_to_slice<T>());
-
-	template <template <typename > typename W, typename T>
-	using wrap_tuple_t = decltype(apply_to<W, T>());
+	using tuple_to_comp_t = unary_apply_to_tuple_t<component, T>;
 
 
 	struct archetype_base{
 		virtual ~archetype_base() = default;
 
-		virtual std::size_t insert(entity& entity) = 0;
+		virtual std::size_t insert(const entity& entity) = 0;
 
-		virtual void erase(entity& entity) = 0;
+		virtual void erase(const entity& entity) = 0;
 	};
 
+	export
+	struct chunk_data_identity{
+		std::type_index type_index;
+		std::ptrdiff_t offset;
+
+	};
 
 	template <typename TupleT = std::tuple<int>>
-		requires (std::tuple_size_v<TupleT> > 0)
 	struct archetype : archetype_base{
 		using raw_tuple = TupleT;
 		using components = tuple_to_comp_t<raw_tuple>;
@@ -193,42 +194,39 @@ namespace mo_yanxi::game::ecs{
 		std::vector<components> chunks{};
 	public:
 
-		std::size_t insert(entity& entity) override{
+		std::size_t insert(const entity& entity) override{
 			auto idx = chunks.size();
 
-			if(entity.chunk_index_ != invalid_chunk_idx){
+			if(entity.chunk_index() != invalid_chunk_idx){
 				throw std::runtime_error{"Duplicated Insert"};
 			}
 
-			auto fake_get = [&] <std::size_t idx> (std::integral_constant<std::size_t, idx>) -> entity_id{
-				return entity.id();
-			};
-
 			[&] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-				chunks.emplace_back(fake_get(std::integral_constant<std::size_t, Idx>{}) ...);
+				chunks.emplace_back((Idx, entity.id()) ...);
 			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>{});
 
-			entity.chunk_index_ = idx;
+			entity.id()->chunk_index_ = idx;
 			return idx;
 		}
 
-		void erase(entity& entity) override{
+		void erase(const entity& entity) override{
 			auto chunk_size = chunks.size();
-			if(entity.chunk_index_ >= chunk_size){
+			auto idx = entity.chunk_index();
+
+			if(idx >= chunk_size){
 				throw std::runtime_error{"Invalid Erase"};
 			}
 
-			if(entity.chunk_index_ == chunk_size - 1){
+			if(idx == chunk_size - 1){
 				chunks.pop_back();
 			}else{
-				chunks[entity.chunk_index_] = std::move(chunks.back());
+				chunks[idx] = std::move(chunks.back());
 				chunks.pop_back();
 
-				std::get<0>(chunks[entity.chunk_index_]).id()->chunk_index_ = entity.chunk_index_;
+				std::get<0>(chunks[idx]).id()->chunk_index_ = idx;
 			}
-
-			entity.chunk_index_ = invalid_chunk_idx;
 		}
+
 
 		[[nodiscard]] auto& at(entity_data_chunk_index idx) const noexcept{
 			return chunks.at(idx);
@@ -265,7 +263,7 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-
+	export
 	struct archetype_slice{
 		using acquirer_type = std::add_pointer_t<strided_span<std::byte>(void*) noexcept>;
 	private:
@@ -280,6 +278,10 @@ namespace mo_yanxi::game::ecs{
 
 		[[nodiscard]] constexpr void* identity() const noexcept{
 			return idt;
+		}
+
+		[[nodiscard]] constexpr acquirer_type get_slice_generator() const noexcept{
+			return getter;
 		}
 
 		// using T = int;
@@ -298,39 +300,48 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	export
 	struct component_manager{
 		template <typename T>
 		using small_vector_of = gch::small_vector<T>;
 		using archetype_map_type = type_fixed_hash_map<std::unique_ptr<archetype_base>>;
 
 	private:
-		fixed_open_hash_map<entity*, int> to_destroy{};
+		pointer_hash_map<entity*, int> to_destroy{};
 
 		plf::hive<entity> entities{};
 		archetype_map_type archetypes{};
 
 		type_fixed_hash_map<std::vector<archetype_slice>> type_to_archetype{};
 
-		std::vector<std::move_only_function<void(component_manager&) const>> deferred_entity_add_request{};
+		std::vector<entity> deferred_entity_add_request{};
 	public:
+		/**
+		 * @brief deferred add entity, whose archtype must have been created
+		 * @return entity handle
+		 */
 		template <typename Tuple>
 			requires (is_tuple_v<Tuple>)
 		entity create_entity_deferred(){
-			using ArcheT = archetype<Tuple>;
 			std::type_index idx = typeid(Tuple);
 			auto& ent = *entities.emplace(idx);
 
-			deferred_entity_add_request.push_back([ent](component_manager& manager){
-				std::unique_ptr<archetype_base> ptr = std::make_unique<ArcheT>();
-				const auto itr = manager.archetypes.try_emplace(ent.type(), std::move(ptr));
-				if(itr.second){
-					manager.add_new_archetype_map<Tuple>(static_cast<ArcheT&>(*itr.first->second));
-				}
-				itr.first->second->insert(ent);
-			});
+			deferred_entity_add_request.push_back(ent);
 
 			return ent;
+		}
+
+
+		template <typename Tuple>
+			requires (is_tuple_v<Tuple>)
+		auto add_archetype(){
+			std::type_index idx = typeid(Tuple);
+
+			return archetypes.try_emplace(idx, create_new_archetype_map<Tuple>());
+		}
+		template <typename ...Tuple>
+			requires (sizeof...(Tuple) > 1)
+		void add_archetype(){
+			(add_archetype<Tuple>(), ...);
 		}
 
 		template <typename Tuple>
@@ -365,8 +376,8 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		void do_deferred_add(){
-			for (const auto & entity_add_request : deferred_entity_add_request){
-				entity_add_request(*this);
+			for (const auto& entity_add_request : deferred_entity_add_request){
+				archetypes.at(entity_add_request.type())->insert(entity_add_request);
 			}
 			deferred_entity_add_request.clear();
 		}
@@ -389,7 +400,7 @@ namespace mo_yanxi::game::ecs{
 		auto get_slice_of(){
 			static_assert(std::tuple_size_v<Tuple> > 0);
 
-			using chunk_spans = wrap_tuple_t<strided_span, wrap_tuple_t<component, Tuple>>;
+			using chunk_spans = unary_apply_to_tuple_t<strided_span, unary_apply_to_tuple_t<component, Tuple>>;
 			using searched_spans = small_vector_of<chunk_spans>;
 
 			searched_spans result{};
@@ -408,13 +419,13 @@ namespace mo_yanxi::game::ecs{
 			using raw_params = remove_mfptr_this_args<Fn>;
 
 			if constexpr (std::same_as<std::tuple_element_t<0, raw_params>, component_manager&>){
-				using params = wrap_tuple_t<std::decay_t, tuple_drop_first_elem_t<raw_params>>;
-				using span_tuple = wrap_tuple_t<strided_span, params>;
+				using params = unary_apply_to_tuple_t<std::decay_t, tuple_drop_first_elem_t<raw_params>>;
+				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				this->slice_and_then<wrap_tuple_t<unwrap_first_element_t, params>>([this, f = std::move(fn)](span_tuple p){
+				this->slice_and_then<unary_apply_to_tuple_t<unwrap_first_element_t, params>>([this, f = std::move(fn)](const span_tuple& p){
 					auto count = std::ranges::size(std::get<0>(p));
 
-					wrap_tuple_t<strided_span_iterator, params> iterators{};
+					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
 
 					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
 						((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
@@ -427,13 +438,13 @@ namespace mo_yanxi::game::ecs{
 					}
 				});
 			}else{
-				using params = wrap_tuple_t<std::decay_t, raw_params>;
-				using span_tuple = wrap_tuple_t<strided_span, params>;
+				using params = unary_apply_to_tuple_t<std::decay_t, raw_params>;
+				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				this->slice_and_then<wrap_tuple_t<unwrap_first_element_t, params>>([f = std::move(fn)](span_tuple p){
+				this->slice_and_then<unary_apply_to_tuple_t<unwrap_first_element_t, params>>([f = std::move(fn)](const span_tuple& p){
 					auto count = std::ranges::size(std::get<0>(p));
 
-					wrap_tuple_t<strided_span_iterator, params> iterators{};
+					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
 
 					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
 						((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
@@ -470,7 +481,7 @@ namespace mo_yanxi::game::ecs{
 
 		template <typename T>
 		component<T>* get_entity_partial_chunk(const entity& entity) const noexcept{
-			std::type_index idx = typeid(T);
+			const std::type_index idx = typeid(T);
 			if(auto slices_itr = type_to_archetype.find(idx); slices_itr != type_to_archetype.end()){
 				auto* archetype = archetypes.at(entity.type()).get();
 
@@ -521,6 +532,7 @@ namespace mo_yanxi::game::ecs{
 			}
 		};
 
+	public:
 		template <
 			typename Tuple = std::tuple<>,
 			typename Fn,
@@ -529,7 +541,7 @@ namespace mo_yanxi::game::ecs{
 		void slice_and_then(Fn fn, ReserveFn reserve_fn = {}){
 			// using Tuple = std::tuple<int>;
 			static_assert(std::tuple_size_v<Tuple> > 0);
-			using chunk_spans = wrap_tuple_t<strided_span, wrap_tuple_t<component, Tuple>>;
+			using chunk_spans = unary_apply_to_tuple_t<strided_span, unary_apply_to_tuple_t<component, Tuple>>;
 
 			std::array<std::span<const archetype_slice>, std::tuple_size_v<Tuple>> spans{};
 
@@ -554,9 +566,6 @@ namespace mo_yanxi::game::ecs{
 
 				if(none)return;
 			}
-
-
-
 
 			std::array<subrange, std::tuple_size_v<Tuple>> ranges{};
 
@@ -587,7 +596,9 @@ namespace mo_yanxi::game::ecs{
 
 				if(last_itr_min == cur_itr_min){
 					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
-						if constexpr (std::invocable<Fn, chunk_spans>){
+						if constexpr (std::invocable<Fn, std::array<archetype_slice, std::tuple_size_v<Tuple>>>){
+							std::invoke(fn, std::array<archetype_slice, std::tuple_size_v<Tuple>>{static_cast<subrange&>(ranges[Idx]).front() ...});
+						}else if constexpr (std::invocable<Fn, chunk_spans>){
 							std::invoke(fn, std::make_tuple(static_cast<subrange&>(ranges[Idx]).front().slice<std::tuple_element_t<Idx, Tuple>>() ...));
 						}else{
 							std::invoke(fn, static_cast<subrange&>(ranges[Idx]).front().slice<std::tuple_element_t<Idx, Tuple>>() ...);
@@ -606,6 +617,7 @@ namespace mo_yanxi::game::ecs{
 			}
 		}
 
+	private:
 		template <typename Tuple = std::tuple<>>
 		void add_new_archetype_map(archetype<Tuple>& type){
 			auto insert = [this](std::type_index idx, archetype_slice&& elem){
@@ -625,14 +637,60 @@ namespace mo_yanxi::game::ecs{
 		}
 
 
-		template <typename Tuple = std::tuple<>>
+		template <typename Tuple>
 		std::unique_ptr<archetype_base> create_new_archetype_map(){
 			using ArcheT = archetype<Tuple>;
 			std::unique_ptr<archetype_base> ptr = std::make_unique<ArcheT>();
-			this->add_new_archetype_map(static_cast<ArcheT&>(*ptr));
+			this->add_new_archetype_map<Tuple>(static_cast<ArcheT&>(*ptr));
 			return ptr;
 		}
 
 		//TODO delete empty archetype map
 	};
+
+	export
+	template <typename T>
+	struct readonly_decay : std::type_identity<std::add_const_t<std::decay_t<T>>>{};
+
+	export
+	template <typename T>
+	struct readonly_decay<const T&> : readonly_decay<T>{};
+
+	export
+	template <typename T>
+	struct readonly_decay<const volatile T&> : readonly_decay<T>{};
+
+	template <typename T>
+	struct readonly_decay<T&> : std::type_identity<std::decay_t<T>>{};
+
+	template <typename T>
+	struct readonly_decay<volatile T&> : std::type_identity<std::decay_t<T>>{};
+
+	export
+	template <typename T>
+	using readonly_const_decay_t = typename readonly_decay<T>::type;
+
+	template <typename T>
+	struct is_component : std::false_type{};
+
+	template <typename T>
+	struct is_component<component<T>> : std::true_type{};
+
+	export
+	template <typename T>
+	constexpr bool is_component_v = is_component<T>::value;
+
+	export
+	template <typename Tuple>
+	using get_used_components = tuple_drop_front_n_elem_t<tuple_find_first_v<is_component, unary_apply_to_tuple_t<std::decay_t, Tuple>>, Tuple>;
+
+}
+
+module : private;
+
+namespace mo_yanxi::game::ecs{
+	template <typename T>
+	component<T>* entity::get(const component_manager& manager) const{
+		return manager.get_entity_partial_chunk<T>(*this);
+	}
 }

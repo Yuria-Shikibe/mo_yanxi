@@ -90,6 +90,8 @@ import mo_yanxi.game.graphic.effect;
 import mo_yanxi.game.world.graphic;
 import mo_yanxi.game.ecs.component_manager;
 import mo_yanxi.game.ecs.task_graph;
+import mo_yanxi.game.ecs.dependency_generator;
+import mo_yanxi.game.ecs.component_operation_task_graph;
 
 import test;
 import hive;
@@ -549,7 +551,89 @@ int main(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
 
-	concurrent::no_fail_task_graph task_graph{};
+	ecs::component_manager cpmg{};
+	ecs::component_operation_task_graph task_graph{cpmg};
+
+	using entity_tuple_1 = std::tuple<math::trans2, math::vec2>;
+	using entity_tuple_2 = std::tuple<math::trans2, math::vec2, int>;
+	using entity_tuple_3 = std::tuple<math::vec2>;
+	using entity_tuple_4 = std::tuple<int>;
+
+	cpmg.add_archetype<
+		entity_tuple_1,
+		entity_tuple_2,
+		entity_tuple_3,
+		entity_tuple_4
+	>();
+
+
+	cpmg.create_entity<entity_tuple_1>();
+	cpmg.create_entity<entity_tuple_1>();
+	cpmg.create_entity<entity_tuple_1>();
+	cpmg.create_entity<entity_tuple_1>();
+	cpmg.create_entity<entity_tuple_1>();
+	cpmg.create_entity<entity_tuple_2>();
+	cpmg.create_entity<entity_tuple_2>();
+	cpmg.create_entity<entity_tuple_2>();
+	cpmg.create_entity<entity_tuple_2>();
+	cpmg.create_entity<entity_tuple_2>();
+	cpmg.create_entity<entity_tuple_3>();
+	cpmg.create_entity<entity_tuple_3>();
+	auto ent = cpmg.create_entity<entity_tuple_3>();
+	auto en2t = cpmg.create_entity<entity_tuple_3>();
+	cpmg.create_entity<entity_tuple_4>();
+	cpmg.create_entity<entity_tuple_4>();
+	cpmg.create_entity<entity_tuple_4>();
+
+	if(auto data = cpmg.get_entity_partial_chunk<math::vec2>(ent)){
+		data->val().set_polar(45.f, math::sqrt2);
+	}
+
+	std::println();
+
+	// cpmg.sliced_each([](ecs::component<math::vec2>& comp){
+	// 	comp->add(1, 2);
+	// 	std::print("{} ", comp.val());
+	// });
+
+	enum task_id{
+		t1, t2, t3,
+
+		max
+	};
+
+	task_graph.reserve_event_id(task_id::max);
+
+	auto m0 = task_graph.run({}, {}, [](ecs::component<math::vec2>& comp){
+		comp->add(1, 2);
+	});
+
+	task_graph.run(t1, {m0}, [](ecs::component<math::vec2>& comp){
+		comp->add(1, 2);
+	});
+
+	task_graph.run(t2, {t1}, [](ecs::component<math::vec2>& comp){
+		comp->mul(1, 2);
+	});
+
+	task_graph.run(t3, {t2}, [](const ecs::component<math::vec2>& comp){
+		std::print("{} ", comp.val());
+	});
+
+	auto beg = std::chrono::high_resolution_clock::now();
+
+	task_graph.generate_dependencies();
+	auto group = task_graph.get_sorted_task_group();
+	auto instance = group.create_instance();
+
+	auto end = std::chrono::high_resolution_clock::now();
+	//
+	std::println("{}us", std::chrono::duration_cast<std::chrono::microseconds>(end - beg).count());
+	for (auto && launch : instance.launch()){
+		launch();
+	}
+	int a = 1;
+	/*concurrent::no_fail_task_graph task_graph{};
 	enum task_id{
 		_0,
 		_1,
@@ -621,7 +705,7 @@ int main(){
 		threads.emplace_back(std::cref(instance));
 	}
 
-	instances.wait();
+	instances.wait();*/
 
 	/*ecs::component_manager component_manager{};
 
