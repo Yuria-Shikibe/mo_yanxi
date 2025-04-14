@@ -231,7 +231,6 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		/*constexpr*/
 		FORCE_INLINE constexpr rect_ortho& shrink_by(typename vec_t::const_pass_t directionAndSize) noexcept{
 			const T minX = math::min(math::abs(directionAndSize.x), size_.x);
 			size_.x -= minX;

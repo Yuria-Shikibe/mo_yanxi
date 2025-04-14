@@ -8,6 +8,26 @@ import std;
 
 namespace mo_yanxi{
 	export
+	template <typename T, std::predicate<T&> Pred>
+	constexpr void modifiable_erase_if(std::vector<T>& vec, Pred pred) noexcept(
+		std::is_nothrow_invocable_v<Pred, T&> && std::is_nothrow_move_assignable_v<T>
+		) {
+		auto write_pos = vec.begin();
+		auto read_pos = vec.begin();
+		const auto end = vec.end();
+		while(read_pos != end){
+			if (!std::invoke(pred, *read_pos)) {
+				if (write_pos != read_pos) {
+					*write_pos = std::ranges::iter_move(read_pos);
+				}
+				++write_pos;
+			}
+			++read_pos;
+		}
+		vec.erase(write_pos, end);
+	}
+
+	export
 	template <class Rep, typename Period>
 	[[nodiscard]] auto to_absolute_time(const std::chrono::duration<Rep, Period>& rel_time) noexcept {
 		constexpr auto zero                 = std::chrono::duration<Rep, Period>::zero();
@@ -27,7 +47,7 @@ namespace mo_yanxi{
 	export
 	template <typename T>
 	constexpr auto pass_fn(T& fn) noexcept{
-		if constexpr (sizeof(T) > sizeof(void*)){
+		if constexpr (sizeof(T) > sizeof(void*) * 2){
 			return std::ref(fn);
 		}else{
 			return fn;

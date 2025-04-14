@@ -23,7 +23,7 @@ namespace mo_yanxi::core::ctrl{
 		export constexpr key_code_t press = GLFW_PRESS;
 		export constexpr key_code_t release = GLFW_RELEASE;
 		export constexpr key_code_t repeat = GLFW_REPEAT;
-		export constexpr key_code_t Continuous = 3;
+		export constexpr key_code_t continuous = 3;
 		export constexpr key_code_t DoubleClick = 4;
 
 		export constexpr unsigned Bits = 8;
@@ -38,7 +38,7 @@ namespace mo_yanxi::core::ctrl{
 		}
 
 		export [[nodiscard]] constexpr bool is_continuous(const key_code_t mode) noexcept{
-			return mode == Continuous;
+			return mode == continuous;
 		}
 	}
 
@@ -455,7 +455,7 @@ namespace mo_yanxi::core::ctrl{
 			names[act::release]     = "release";
 			names[act::repeat]      = "repeat";
 			names[act::DoubleClick] = "double";
-			names[act::Continuous]  = "continuous";
+			names[act::continuous]  = "continuous";
 
 			return names;
 		}()

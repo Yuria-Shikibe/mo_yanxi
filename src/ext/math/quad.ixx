@@ -12,6 +12,11 @@ export import mo_yanxi.math;
 import std;
 
 namespace mo_yanxi::math{
+	template <typename T = unsigned>
+	constexpr inline T vertex_mask{0b11};
+	template <typename D, typename Base>
+	concept any_derived_from = std::is_base_of_v<Base, D>;
+
 	template <typename T>
 	struct overlay_axis_keys{
 		static constexpr std::size_t count = 0;
@@ -41,24 +46,24 @@ namespace mo_yanxi::math{
 
 		static_assert(LK::count + RK::count >= Idx, "Idx Out Of Bound");
 
+		auto a = Idx;
+
 		if constexpr (Idx < LK::count){
 			return LK::template get<Idx>(l);
 		}else{
 			return RK::template get<Idx - LK::count>(r);
 		}
 	}
-
+	//
 	template <typename L, typename R>
 	FORCE_INLINE constexpr vec2 get_axis(std::size_t Idx, const L& l, const R& r) noexcept {
 		using LK = overlay_axis_keys<L>;
 		using RK = overlay_axis_keys<R>;
 
-		static_assert(LK::count + RK::count >= Idx, "Idx Out Of Bound");
-
 		if (Idx < LK::count){
-			return LK::template get<Idx>(l);
+			return l.edge_normal_at(Idx);
 		}else{
-			return RK::template get<Idx - LK::count>(r);
+			return r.edge_normal_at(Idx - LK::count);
 		}
 	}
 
@@ -86,7 +91,7 @@ namespace mo_yanxi::math{
 
 		template <std::integral Idx>
 		FORCE_INLINE constexpr vec_t& operator[](const Idx idx) noexcept{
-			switch (idx & static_cast<Idx>(4)){
+			switch (idx & vertex_mask<Idx>){
 				case 0: return v0;
 				case 1: return v1;
 				case 2: return v2;
@@ -97,7 +102,7 @@ namespace mo_yanxi::math{
 
 		template <std::integral Idx>
 		FORCE_INLINE constexpr vec_t operator[](const Idx idx) const noexcept{
-			switch (idx & static_cast<Idx>(4)){
+			switch (idx & vertex_mask<Idx>){
 				case 0: return v0;
 				case 1: return v1;
 				case 2: return v2;
@@ -125,12 +130,12 @@ namespace mo_yanxi::math{
 			return (v0 + v1 + v2 + v3) / static_cast<value_type>(4);
 		}
 
-		template <std::derived_from<quad> S, std::derived_from<quad> O>
+		template <any_derived_from<quad> S, any_derived_from<quad> O>
 		[[nodiscard]] FORCE_INLINE constexpr bool overlap_rough(this const S& self, const O& o) noexcept{
 			return self.get_bound().overlap_inclusive(o.get_bound());
 		}
 
-		template <std::derived_from<quad> S>
+		template <any_derived_from<quad> S>
 		[[nodiscard]] FORCE_INLINE constexpr bool overlap_rough(this const S& self, const rect_t& other) noexcept{
 			return self.get_bound().overlap_inclusive(other);
 		}
@@ -145,18 +150,17 @@ namespace mo_yanxi::math{
 		}
 
 		/**
-		 * @warning Not Normalized
 		 * @return normal on edge[idx, idx + 1], pointing to outside
 		 */
-		template <std::derived_from<quad> S, std::integral Idx>
+		template <any_derived_from<quad> S, std::integral Idx>
 		[[nodiscard]] FORCE_INLINE constexpr vec_t edge_normal_at(this const S& self, const Idx edgeIndex) noexcept{
 			const auto begin = self[edgeIndex];
 			const auto end   = self[edgeIndex + 1];
 
-			return (end - begin).rotate_rt_clockwise();
+			return static_cast<vec_t&>((end - begin).rotate_rt_clockwise()).normalize();
 		}
 
-		template <std::derived_from<quad> S, std::derived_from<quad> O>
+		template <any_derived_from<quad> S, any_derived_from<quad> O>
 		[[nodiscard]] FORCE_INLINE constexpr value_type axis_proj_dst(this const S& sbj, const O& obj, const vec_t axis) noexcept{
 			const auto [min1, max1] = math::minmax(sbj[0].dot(axis), sbj[1].dot(axis), sbj[2].dot(axis), sbj[3].dot(axis));
 			const auto [min2, max2] = math::minmax(obj[0].dot(axis), obj[1].dot(axis), obj[2].dot(axis), obj[3].dot(axis));
@@ -166,7 +170,7 @@ namespace mo_yanxi::math{
 			return overlap_max - overlap_min;
 		}
 
-		template <std::derived_from<quad> S, std::derived_from<quad> O>
+		template <any_derived_from<quad> S, typename O>
 		[[nodiscard]] FORCE_INLINE constexpr bool axis_proj_overlaps(this const S& sbj, const O& obj, const vec_t axis) noexcept{
 			const auto [min1, max1] = math::minmax(sbj[0].dot(axis), sbj[1].dot(axis), sbj[2].dot(axis), sbj[3].dot(axis));
 			const auto [min2, max2] = math::minmax(obj[0].dot(axis), obj[1].dot(axis), obj[2].dot(axis), obj[3].dot(axis));
@@ -174,8 +178,8 @@ namespace mo_yanxi::math{
 			return max1 >= min2 && max2 >= min1;
 		}
 
-		template <std::derived_from<quad> S, typename O, typename ...Args>
-			requires (std::convertible_to<Args, vec_t> && ...)
+		template <any_derived_from<quad> S, typename O, typename ...Args>
+			requires (std::convertible_to<Args, vec_t> && ...) && (sizeof...(Args) > 0)
 		[[nodiscard]] FORCE_INLINE bool overlap_exact(this const S& sbj, const O& obj,const Args&... args) noexcept{
 			static_assert(sizeof...(Args) > 0 && sizeof...(Args) <= 8);
 
@@ -183,7 +187,7 @@ namespace mo_yanxi::math{
 				(sbj.axis_proj_overlaps(obj, args) && ...);
 		}
 
-		template <std::derived_from<quad> S, typename O>
+		template <any_derived_from<quad> S, typename O>
 			requires requires{
 				requires overlay_axis_keys<S>::count > 0;
 				requires overlay_axis_keys<O>::count > 0;
@@ -197,12 +201,12 @@ namespace mo_yanxi::math{
 			}(std::make_index_sequence<SbjKeys::count + ObjKeys::count>{});
 		}
 
-		template <std::derived_from<quad> S, typename O>
+		template <any_derived_from<quad> S, any_derived_from<quad> O>
 			requires requires{
 				requires overlay_axis_keys<S>::count > 0;
 				requires overlay_axis_keys<O>::count > 0;
 			}
-		[[nodiscard]] FORCE_INLINE vec_t overlap_distance(this const S& sbj, const O& obj) noexcept{
+		[[nodiscard]] FORCE_INLINE vec_t depart_vector_to(this const S& sbj, const O& obj) noexcept{
 			using SbjKeys = overlay_axis_keys<S>;
 			using ObjKeys = overlay_axis_keys<O>;
 
@@ -221,7 +225,7 @@ namespace mo_yanxi::math{
 			}(std::make_index_sequence<SbjKeys::count + ObjKeys::count>{});
 
 			if(index == std::numeric_limits<std::size_t>::max()){
-				return vectors::constant2<value_type>::SNaN;
+				return vectors::constant2<value_type>::zero_vec2;
 			}else{
 				auto approach = math::get_axis(index, sbj, obj).set_length(value);
 
@@ -237,8 +241,48 @@ namespace mo_yanxi::math{
 
 					return approach;
 				}
-
 			}
+		}
+
+		template <any_derived_from<quad> S, any_derived_from<quad> O>
+			requires requires{
+				requires overlay_axis_keys<S>::count > 0;
+				requires overlay_axis_keys<O>::count > 0;
+			}
+		[[nodiscard]] FORCE_INLINE vec_t depart_vector_to_on(this const S& sbj, const O& obj, math::vec2 line_to_align) noexcept{
+			line_to_align.normalize();
+
+			auto proj = sbj.axis_proj_dst(obj, line_to_align);
+			auto vec = line_to_align * proj;
+
+			auto approach = obj.avg() - sbj.avg();
+			if(vec.dot(approach) >= 0){
+				return -vec;
+			}else{
+				return vec;
+			}
+		}
+
+		template <any_derived_from<quad> S, any_derived_from<quad> O>
+			requires requires{
+				requires overlay_axis_keys<S>::count > 0;
+				requires overlay_axis_keys<O>::count > 0;
+			}
+		[[nodiscard]] FORCE_INLINE vec_t depart_vector_to_on_vel(this const S& sbj, const O& obj, vec_t v) noexcept{
+			v.normalize();
+
+			const auto [min_sbj, max_sbj] = math::minmax(sbj[0].dot(v), sbj[1].dot(v), sbj[2].dot(v), sbj[3].dot(v));
+			const auto [min_obj, max_obj] = math::minmax(obj[0].dot(v), obj[1].dot(v), obj[2].dot(v), obj[3].dot(v));
+
+			if(max_obj > min_sbj && min_obj < max_sbj){
+				return v * (min_obj - max_sbj);
+			}
+
+			if(max_sbj > min_obj && min_sbj < max_obj){
+				return v * (max_obj - min_sbj);
+			}
+
+			return {};
 		}
 
 		[[nodiscard]] constexpr bool contains(const vec_t point) const noexcept{
@@ -290,6 +334,7 @@ namespace mo_yanxi::math{
 	}
 
 
+	export
 	//TODO redesign the invariants of the class?
 	template <typename T>
 	struct quad_bounded : protected quad<T>{
@@ -299,14 +344,25 @@ namespace mo_yanxi::math{
 		typename base::rect_t bounding_box{};
 
 	public:
-		[[nodiscard]] quad_bounded() = default;
+		[[nodiscard]] constexpr quad_bounded() = default;
 
-		[[nodiscard]] explicit(false) quad_bounded(const base& base)
+
+		[[nodiscard]] constexpr explicit(false) quad_bounded(const base& base)
 			: base{base}, bounding_box{base::get_bound()}{
 		}
 
-		[[nodiscard]] explicit(false) quad_bounded(typename base::rect_t& rect)
+		[[nodiscard]] constexpr explicit(false) quad_bounded(typename base::rect_t& rect)
 			: base{rect.vert_00(), rect.vert_10(), rect.vert_11(), rect.vert_01()}, bounding_box{rect}{
+		}
+
+		[[nodiscard]] constexpr explicit(false) quad_bounded(
+			typename base::vec_t::const_pass_t v0,
+			typename base::vec_t::const_pass_t v1,
+			typename base::vec_t::const_pass_t v2,
+			typename base::vec_t::const_pass_t v3
+
+		)
+			: base{v0, v1, v2, v3}, bounding_box{base::get_bound()}{
 		}
 
 		[[nodiscard]] constexpr FORCE_INLINE typename base::rect_t get_bound() const noexcept{
@@ -325,11 +381,31 @@ namespace mo_yanxi::math{
 			bounding_box = base::get_bound();
 		}
 
+		/**
+		 * @warning Breaks Invariant! For Fast Only
+		 */
+		constexpr void expand_unchecked(const T length) noexcept{
+			base::expand(length);
+		}
+
 		constexpr explicit(false) operator base() const noexcept{
+			return base{*this};
+		}
+
+		const base& view_as_quad() const noexcept{
 			return *this;
 		}
 
-		using base::operator[];
+		template <std::integral Idx>
+		FORCE_INLINE constexpr typename base::vec_t operator[](const Idx idx) const noexcept{
+			switch (idx & vertex_mask<Idx>){
+			case 0: return this->v0;
+			case 1: return this->v1;
+			case 2: return this->v2;
+			case 3: return this->v3;
+			default: std::unreachable();
+			}
+		}
 
 		using base::avg;
 		using base::axis_proj_dst;
@@ -340,8 +416,12 @@ namespace mo_yanxi::math{
 		using base::move;
 		using base::overlap_rough;
 		using base::overlap_exact;
+		using base::depart_vector_to;
+		using base::depart_vector_to_on;
+		using base::depart_vector_to_on_vel;
 	};
 
+	export
 	template <typename T>
 	struct rect_box_identity{
 		/**
@@ -356,6 +436,7 @@ namespace mo_yanxi::math{
 
 	};
 
+	export
 	template <typename T>
 	struct rect_box : quad_bounded<T>{
 		using base = quad_bounded<T>;
@@ -374,13 +455,16 @@ namespace mo_yanxi::math{
 		 */
 		typename base::vec_t normalV{};
 
-		constexpr void updateNormal() noexcept{
-			normalU = (this->v0 - this->v3)/*.normalize()*/;
-			normalV = (this->v1 - this->v2)/*.normalize()*/;
+		/*constexpr*/ void updateNormal() noexcept{
+			//TODO constexpr normal in c++26
+			normalU = (this->v0 - this->v3).normalize();
+			normalV = (this->v1 - this->v0).normalize();
 		}
 
 	public:
 		[[nodiscard]] rect_box() = default;
+
+
 
 		[[nodiscard]] explicit rect_box(const base& base)
 			: base(base), normalU(this->v0 - this->v3), normalV(this->v1 - this->v2){
@@ -391,36 +475,20 @@ namespace mo_yanxi::math{
 
 		// [[nodiscard]] RectBoxBrief() = default;
 		//
-		// [[nodiscard]] constexpr RectBoxBrief(const Vec2 v0, const Vec2 v1, const Vec2 v2, const Vec2 v3) noexcept
-		// 	: QuadBox{v0, v1, v2, v3}{
-		// 	updateNormal();
-		// }
-		//
-		// [[nodiscard]] explicit(false) constexpr RectBoxBrief(const OrthoRectFloat rect) noexcept
-		// 	: QuadBox{rect}{
-		// 	updateNormal();
-		// 	}
+		[[nodiscard]] constexpr explicit rect_box(
+			const typename base::vec_t::const_pass_t v0,
+			const typename base::vec_t::const_pass_t v1,
+			const typename base::vec_t::const_pass_t v2,
+			const typename base::vec_t::const_pass_t v3) noexcept
+			: base{v0, v1, v2, v3}, normalU(this->v0 - this->v3), normalV(this->v1 - this->v2){
+			//TODO invariant check?
+		}
 
-		// [[nodiscard]] constexpr Vec2 getNormalU() const noexcept{
-		// 	return normalU;
-		// }
-		//
-		// [[nodiscard]] constexpr Vec2 getNormalV() const noexcept{
-		// 	return normalV;
-		// }
-
-		// [[nodiscard]] constexpr float projLen2(const Vec2 axis) const noexcept{
-		// 	const Vec2 diagonal = v2 - v0;
-		// 	const float dot = diagonal.dot(axis);
-		// 	return dot * dot / axis.length2();
-		// }
-		//
-		// [[nodiscard]] float projLen(const Vec2 axis) const noexcept {
-		// 	return std::sqrt(projLen2(axis));
-		// }
-
-		typename base::vec_t edge_normal_at(const std::integral auto idx) const noexcept{
-			switch(idx & 4) {
+		/**
+		 * @brief normal at vtx[idx] - vtx[idx + 1]
+		 */
+		FORCE_INLINE typename base::vec_t edge_normal_at(const std::integral auto idx) const noexcept{
+			switch(idx & vertex_mask<decltype(idx)>) {
 				case 0 : return -normalU;
 				case 1 : return normalV;
 				case 2 : return normalU;
@@ -428,6 +496,8 @@ namespace mo_yanxi::math{
 				default: std::unreachable();
 			}
 		}
+
+
 	};
 
 
@@ -441,8 +511,9 @@ namespace mo_yanxi::math{
 		}
 	};
 
+	export
 	struct rect_box_posed : rect_box<float>, rect_box_identity<float>{
-		using idt_t = rect_box_identity<float>;
+		using rect_idt_t = rect_box_identity<float>;
 		using base = rect_box<float>;
 		using trans_t = trans2;
 		/**
@@ -453,17 +524,18 @@ namespace mo_yanxi::math{
 
 		[[nodiscard]] constexpr rect_box_posed() = default;
 
-		[[nodiscard]] explicit rect_box_posed(const idt_t& idt, const trans_t transform = {})
+		[[nodiscard]] explicit(false) rect_box_posed(const rect_idt_t& idt, const trans_t transform = {})
 			: rect_box_identity{idt}{
 			update(transform);
+			updateNormal();
 		}
 
-		[[nodiscard]] explicit rect_box_posed(const typename base::vec_t size, const trans_t transform = {})
+		[[nodiscard]] explicit(false) rect_box_posed(const typename base::vec_t size, const trans_t transform = {})
 			: rect_box_posed{{size, size / -2.f}, transform}{
 		}
 
 		constexpr rect_box_posed& copy_identity_from(const rect_box_posed& other) noexcept{
-			this->idt_t::operator=(other);
+			this->rect_idt_t::operator=(other);
 			transform = other.transform;
 
 			return *this;
@@ -481,8 +553,7 @@ namespace mo_yanxi::math{
 			return size.length2() * (scale + lengthRadiusRatio) * mass;
 		}
 
-
-		constexpr void update(const trans_t transform) noexcept{
+		/*constexpr*/ void update(const trans_t transform) noexcept{
 			typename base::value_type rot = transform.rot;
 			//
 			float cos = math::cos_deg(rot);
@@ -497,6 +568,9 @@ namespace mo_yanxi::math{
 				normalU = v3;
 				normalV = v1;
 
+				normalU.normalize();
+				normalV.normalize();
+
 				this->transform.rot = transform.rot;
 			}
 
@@ -506,8 +580,28 @@ namespace mo_yanxi::math{
 			v3 += v0;
 
 
-			bounding_box = get_bound();
+			bounding_box = quad<float>::get_bound();
+		}
+
+		void rotate(const trans_t::angle_t delta_deg) noexcept{
+			update({transform.vec, transform.rot + delta_deg});
+		}
+
+
+		constexpr explicit(false) operator const quad<typename base::value_type>&() const noexcept{
+			return *this;
 		}
 	};
 
+
+	export
+	template <>
+	struct overlay_axis_keys<rect_box_posed>{
+		static constexpr std::size_t count = 2;
+
+		template <std::size_t Idx>
+		FORCE_INLINE static constexpr auto get(const rect_box_posed& quad) noexcept{
+			return quad.edge_normal_at(Idx);
+		}
+	};
 }

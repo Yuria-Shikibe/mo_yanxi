@@ -10,7 +10,7 @@ import mo_yanxi.concepts;
 
 export namespace mo_yanxi::math{
 	template <typename Impl, number N = float>
-	struct quad_tree_adaptable{
+	struct quad_tree_adaptor{
 		using quad_tree_impl_type = Impl;
 		using quad_tree_coord_type = N;
 		using quad_tree_rect_type = rect_ortho<N>;

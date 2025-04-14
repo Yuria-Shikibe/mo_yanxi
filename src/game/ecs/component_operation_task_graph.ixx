@@ -8,6 +8,8 @@ export module mo_yanxi.game.ecs.component_operation_task_graph;
 export import mo_yanxi.game.ecs.component_manager;
 export import mo_yanxi.game.ecs.dependency_generator;
 export import mo_yanxi.game.ecs.task_graph;
+
+import mo_yanxi.concepts;
 import std;
 
 
@@ -51,16 +53,10 @@ namespace mo_yanxi::game::ecs{
 			concurrent::task_context& ctx,
 			ecs::component_manager& comp_manager,
 			Fn&& fn){
-			using fn_params = remove_mfptr_this_args<std::decay_t<Fn>>;
+
+			using fn_params = mo_yanxi::remove_mfptr_this_args<std::decay_t<Fn>>;
 			constexpr bool has_task_context = std::same_as<concurrent::task_context, std::remove_cvref_t<std::tuple_element_t<0, fn_params>>>;
 
-			/*
-			constexpr bool has_manager_context = requires{
-				requires std::tuple_size_v<fn_params> > std::tuple_size_v<raw_params> &&
-					std::same_as<ecs::component_manager,
-					std::decay_t<std::tuple_element_t<std::tuple_size_v<fn_params> - std::tuple_size_v<raw_params> - 1, fn_params>
-				>>;
-			};*/
 
 			if constexpr(has_task_context){
 				comp_manager.sliced_each(std::bind_front(fn, ctx));

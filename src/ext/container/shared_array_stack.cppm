@@ -2,7 +2,7 @@ module;
 
 #include "../adapted_attributes.hpp"
 
-export module ext.shared_stack;
+export module mo_yanxi.shared_stack;
 
 import std;
 
@@ -60,7 +60,7 @@ namespace mo_yanxi{
 		{}
 
 		[[nodiscard]] T* push_uninitialized() noexcept{
-			const auto index = top.fetch_add(1, std::memory_order_relaxed);
+			const auto index = top.fetch_add(1, std::memory_order_release);
 			assert(index <= this->cap);
 			return this->data + index;
 		}
@@ -86,8 +86,8 @@ namespace mo_yanxi{
 		}
 
 
-		[[nodiscard]] std::size_t size() const noexcept{
-			return top.load(std::memory_order_relaxed);
+		[[nodiscard]] std::size_t size(std::memory_order memory_order = std::memory_order_relaxed) const noexcept{
+			return top.load(memory_order);
 		}
 
 		[[nodiscard]] T* begin() noexcept{
@@ -103,7 +103,7 @@ namespace mo_yanxi{
 		}
 
 		[[nodiscard]] const T* end() const noexcept{
-			return this->data + size();
+			return this->data + size(std::memory_order_acquire);
 		}
 
 		[[nodiscard]] const T* cbegin() const noexcept{
@@ -111,7 +111,7 @@ namespace mo_yanxi{
 		}
 
 		[[nodiscard]] const T* cend() const noexcept{
-			return this->data + size();
+			return this->data + size(std::memory_order_acquire);
 		}
 		
 		[[nodiscard]] std::size_t capacity() const noexcept{
@@ -132,7 +132,7 @@ namespace mo_yanxi{
 
 		void clear_and_reserve(const std::size_t newSize){
 			destroy();
-			top.store(0, std::memory_order_relaxed);
+			top.store(0, std::memory_order_release);
 			if(this->cap >= newSize)return;
 
 			this->free();

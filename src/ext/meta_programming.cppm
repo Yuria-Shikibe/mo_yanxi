@@ -61,12 +61,6 @@ namespace mo_yanxi{
 	template <typename T>
 	using unwrap_first_element_t = std::tuple_element_t<0, typename unwrap<T>::type>;
 
-	template <template <typename > typename W, typename T>
-	consteval auto apply_to() noexcept{
-		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-			return std::tuple<W<std::tuple_element_t<Idx, T>> ...>{};
-		}(std::make_index_sequence<std::tuple_size_v<T>>{});
-	}
 
 	template <std::size_t i, template <typename > typename UnaryPred, typename Tuple>
 	constexpr void modify(std::size_t& index){
@@ -92,9 +86,17 @@ namespace mo_yanxi{
 	template <template <typename > typename UnaryPred, typename Tuple>
 	struct tuple_find_first : std::integral_constant<std::size_t, tuple_find_first_v<UnaryPred, Tuple>>{};
 
+
+	template <template <typename > typename W, typename T>
+	consteval auto apply_to() noexcept{
+		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+			return std::type_identity<std::tuple<W<std::tuple_element_t<Idx, T>> ...>>{};
+		}(std::make_index_sequence<std::tuple_size_v<T>>{});
+	}
+
 	export
 	template <template <typename > typename UnaryTrait, typename T>
-	using unary_apply_to_tuple_t = decltype(apply_to<UnaryTrait, T>());
+	using unary_apply_to_tuple_t = typename decltype(apply_to<UnaryTrait, T>())::type;
 
 	constexpr std::size_t a = tuple_find_first_v<std::is_floating_point, std::tuple<int, float>>;
 
@@ -376,12 +378,9 @@ namespace mo_yanxi{
 
 	template <typename T, typename Tuple, size_t Index = 0>
 	consteval std::size_t find_first_index_in_tuple() {
-		// 如果索引超出范围，返回无效值(可以用std::optional或特殊值处理)
-		static_assert(Index < std::tuple_size_v<Tuple>,
-					 "Type not found in tuple");
-
-		// 检查当前索引类型是否匹配
-		if constexpr (std::is_same_v<T, std::tuple_element_t<Index, Tuple>>) {
+		if constexpr (Index >= std::tuple_size_v<Tuple>){
+			return Index;
+		}else if constexpr (std::is_same_v<T, std::tuple_element_t<Index, Tuple>>) {
 			return Index;
 		} else {
 			// 递归检查下一个元素
@@ -394,17 +393,20 @@ namespace mo_yanxi{
 	constexpr std::size_t tuple_index_v = find_first_index_in_tuple<T, Tuple>();
 	//Tuple Offset Of
 
+	template <typename T>
+	struct alignas(T) type_replacement{
+		std::byte _[sizeof(T)];
+	};
+
 	template <std::size_t I, typename Tuple>
 	consteval std::size_t element_offset() noexcept {
-		using element_t = std::tuple_element_t<I, Tuple>;
-		static_assert(!std::is_reference_v<element_t>);
+		using Tpl = unary_apply_to_tuple_t<type_replacement, Tuple>;
 		union {
-			char a[sizeof(Tuple)];
-			Tuple t{};
+			char a[sizeof(Tpl)];
+			Tpl t{};
 		};
 		auto* p = std::addressof(std::get<I>(t));
-		t.~Tuple();
-		std::size_t off = 0;
+		t.~Tpl();
 		for (std::size_t i = 0;; ++i) {
 			if (static_cast<void*>(a + i) == p) return i;
 		}

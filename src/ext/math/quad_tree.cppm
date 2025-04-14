@@ -10,6 +10,9 @@ import std;
 import mo_yanxi.basic_util;
 import mo_yanxi.concepts;
 import mo_yanxi.object_pool;
+import mo_yanxi.math.vector2;
+import mo_yanxi.math.rect_ortho;
+import mo_yanxi.math;
 
 // namespace mo_yanxi::math{
 // 	constexpr std::size_t get_region_count(const std::size_t layers) noexcept{
@@ -88,7 +91,7 @@ namespace mo_yanxi::math{
 		}
 
 		static bool is_intersected_between(const ItemTy& subject, const ItemTy& object) noexcept requires requires{
-			requires derived<ItemTy, quad_tree_adaptable<ItemTy, T>>;
+			requires derived<ItemTy, quad_tree_adaptor<ItemTy, T>>;
 		}{
 			//TODO equalTy support?
 			if(&subject == &object) return false;
@@ -252,7 +255,7 @@ namespace mo_yanxi::math{
 
 			this->items.reserve(this->branch_size - this->items.size());
 			for (quad_tree_node& node : children->nodes){
-				this->items.append_range(node.items);
+				this->items.append_range(node.items | std::views::as_rvalue);
 				node.reserved_clear();
 			}
 		}

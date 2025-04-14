@@ -50,14 +50,14 @@ namespace mo_yanxi {
 	export template <typename T, typename functype>
 	concept invocable = function_traits<functype>::template is_invocable<T>;
 
-	export template <typename T, typename functype>
-	concept InvokableVoid = function_traits<functype>::template invocable_as_v<T>();
+	// export template <typename T, typename functype>
+	// concept InvokableVoid = function_traits<functype>::template invocable_as_v<T>();
 
-	export template <typename T, typename functype>
-	concept InvokeNullable = std::same_as<std::nullptr_t, T> || invocable<T, functype>;
+	// export template <typename T, typename functype>
+	// concept InvokeNullable = std::same_as<std::nullptr_t, T> || invocable<T, functype>;
 
-	export template <typename T, typename functype>
-	concept InvokableFunc = std::is_convertible_v<T, std::function<functype>>;
+	// export template <typename T, typename functype>
+	// concept InvokableFunc = std::is_convertible_v<T, std::function<functype>>;
 
 	export template <typename T>
 	concept enum_type = std::is_enum_v<T>;
@@ -76,14 +76,14 @@ namespace mo_yanxi {
 		requires std::same_as<ItemType, std::nullptr_t> || std::same_as<std::ranges::range_value_t<T>, ItemType>;
 	};
 
-	export template <typename Callable>
-	concept InvokeNoexcept = noexcept(Callable()) || noexcept(std::declval<Callable>()());
+	// export template <typename Callable>
+	// concept InvokeNoexcept = noexcept(Callable()) || noexcept(std::declval<Callable>()());
 
-	export template <typename T, typename NumberType = float>
-	concept pos = requires(T t){
-		std::is_base_of_v<decltype(t.getX()), NumberType>;
-		std::is_base_of_v<decltype(t.getY()), NumberType>;
-	};
+	// export template <typename T, typename NumberType = float>
+	// concept pos = requires(T t){
+	// 	std::is_base_of_v<decltype(t.getX()), NumberType>;
+	// 	std::is_base_of_v<decltype(t.getY()), NumberType>;
+	// };
 
 
 	template <template <class...> class Template, class... Args>

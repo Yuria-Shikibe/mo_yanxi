@@ -263,7 +263,7 @@ namespace mo_yanxi::core::ctrl{
 			switch(action){
 				case act::press : actionTgt = press;
 					break;
-				case act::Continuous : actionTgt = Continuous;
+				case act::continuous : actionTgt = Continuous;
 					break;
 				case act::release : actionTgt = Release;
 					break;
@@ -297,7 +297,7 @@ namespace mo_yanxi::core::ctrl{
 		void update_impl(const float delta_in_tick) override{
 			for(const key_code_t key : pressed){
 				for(const auto& bind : binds_continuous[key]){
-					this->exec(bind, act::Continuous, signals[key] & mode::Mask);
+					this->exec(bind, act::continuous, signals[key] & mode::Mask);
 				}
 			}
 

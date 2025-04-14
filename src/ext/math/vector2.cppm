@@ -951,7 +951,7 @@ export namespace mo_yanxi::math{
 			if constexpr (std::is_integral_v<T>){
 				return *this == other;
 			}else{
-				return this->within(other, static_cast<T>(math::FLOATING_ROUNDING_ERROR));
+				return this->within(other, std::numeric_limits<T>::epsilon());
 			}
 		}
 

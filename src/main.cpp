@@ -1,11 +1,11 @@
 #include <vulkan/vulkan.h>
 #include <cassert>
-#include <gch/small_vector.hpp>
 
 // #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 #include <freetype/freetype.h>
-#include <msdfgen/ext/import-font.h>
+
+#include <gch/small_vector.hpp>
 
 import std;
 
@@ -15,6 +15,7 @@ import mo_yanxi.math;
 import mo_yanxi.math.angle;
 import mo_yanxi.math.vector2;
 import mo_yanxi.math.vector4;
+import mo_yanxi.math.quad;
 
 import mo_yanxi.vk.instance;
 import mo_yanxi.vk.sync;
@@ -88,10 +89,18 @@ import mo_yanxi.ui.elem.nested_scene;
 
 import mo_yanxi.game.graphic.effect;
 import mo_yanxi.game.world.graphic;
+
 import mo_yanxi.game.ecs.component_manager;
 import mo_yanxi.game.ecs.task_graph;
 import mo_yanxi.game.ecs.dependency_generator;
+
 import mo_yanxi.game.ecs.component_operation_task_graph;
+import mo_yanxi.game.ecs.component.manifold;
+import mo_yanxi.game.ecs.component.hitbox;
+import mo_yanxi.game.ecs.component.physical_property;
+import mo_yanxi.game.ecs.system.collision;
+import mo_yanxi.game.ecs.system.motion_system;
+
 
 import test;
 import hive;
@@ -325,26 +334,22 @@ void main_loop(){
 	core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()});
 	init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
 
+	game::ecs::component_manager component_manager{};
 
-	auto& wgfx_input = core::global::input.register_sub_input<math::vec2, game::world::graphic_context&>("gfx");
-	wgfx_input.set_context(math::vec2{}, std::ref(graphic_context));
+	auto& wgfx_input =
+		core::global::input.register_sub_input<
+			math::vec2,
+			game::world::graphic_context&,
+			game::ecs::component_manager&
+				>("gfx");
+	wgfx_input.set_context(math::vec2{}, std::ref(graphic_context), std::ref(component_manager));
+
 	{
 		using namespace core::ctrl;
 		using namespace game;
-		wgfx_input.register_bind(mouse::_1, act::press, +[](packed_key_t, math::vec2 pos, world::graphic_context& ctx){
+		wgfx_input.register_bind(mouse::_1, act::press, +[](packed_key_t, math::vec2 pos, world::graphic_context& ctx, game::ecs::component_manager&){
 			const auto wpos = ctx.renderer().camera.get_screen_to_world(pos, {}, true);
 
-			// ctx.create_efx().set_data({
-			// 	.style = fx::shape_rect_ortho{
-			// 		.size = {{}, {100, 100}, math::interp::pow3Out},
-			// 		.offset = {},
-			// 		.stroke = {3, 0}
-			// 	},
-			// 	.trans = {wpos},
-			// 	.depth = 0,
-			// 	.duration = {60},
-			// 	.palette = graphic::colors::white.to_light_color_copy()
-			// });
 			ctx.create_efx().set_data({
 				.style = fx::line_splash{
 					.count = 50,
@@ -356,11 +361,11 @@ void main_loop(){
 					.palette = {
 						{
 							graphic::colors::white.create_lerp(graphic::colors::ORANGE, .65f).to_light().set_a(.5),
-							graphic::colors::clear,
+							graphic::colors::white.to_light().set_a(0),
 							math::interp::linear_map<0., .55f>
 						}, {
-							graphic::colors::AQUA.to_light().set_a(1.5f),
-							graphic::colors::clear,
+							graphic::colors::AQUA.to_light().set_a(0.95f),
+							graphic::colors::white.to_light().set_a(0),
 							math::interp::pow3In | math::interp::reverse
 						}
 					}
@@ -370,24 +375,24 @@ void main_loop(){
 				.duration = {30}
 				});
 
-			ctx.create_efx().set_data({
-				.style = fx::poly_outlined_out{
-					.radius = {30, 550, math::interp::pow3Out},
-					.stroke = {4},
-					.palette = {
-						{graphic::colors::AQUA.to_light()},
-						{graphic::colors::AQUA.to_light()},
-						{graphic::colors::clear},
-						{
-							graphic::colors::AQUA.create_lerp(graphic::colors::white, .5f).to_light().set_a(.5f),
-							graphic::colors::clear,
-						}
-					}
-				},
-				.trans = wpos,
-				.depth = 0,
-				.duration = {40}
-			});
+		// 	ctx.create_efx().set_data({
+		// 		.style = fx::poly_outlined_out{
+		// 			.radius = {30, 550, math::interp::pow3Out},
+		// 			.stroke = {4},
+		// 			.palette = {
+		// 				{graphic::colors::AQUA.to_light()},
+		// 				{graphic::colors::AQUA.to_light()},
+		// 				{graphic::colors::clear},
+		// 				{
+		// 					graphic::colors::AQUA.create_lerp(graphic::colors::white, .5f).to_light().set_a(.5f),
+		// 					graphic::colors::clear,
+		// 				}
+		// 			}
+		// 		},
+		// 		.trans = wpos,
+		// 		.depth = 0,
+		// 		.duration = {40}
+		// 	});
 		});
 	}
 
@@ -434,97 +439,194 @@ void main_loop(){
 	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
 	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
 
+
+	game::ecs::collision_system collision_system{};
+	game::ecs::motion_system motion_system{};
+
+	using entity_desc = std::tuple<game::ecs::mech_motion, game::ecs::manifold, game::ecs::physical_rigid>;
+	component_manager.add_archetype<entity_desc>();
+	{
+		math::rand rand{};
+		for(int i = 0; i < 1000; ++i){
+			using namespace game::ecs;
+
+			manifold mf{};
+			math::trans2 trs = {{rand(10000.f), rand(10000.f)}, rand(180.f)};
+			mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{rand(0, 300.f), rand(0, 300.f)}}}, trs};
+			component_manager.create_entity_deferred<entity_desc>(mech_motion{.trans = trs}, std::move(mf));
+		}
+	}
+
+	wgfx_input.register_bind(core::ctrl::key::F, core::ctrl::act::press, +[](core::ctrl::packed_key_t, math::vec2 pos, game::world::graphic_context& ctx, game::ecs::component_manager& component_manager){
+		using namespace game::ecs;
+
+		math::rand rand{};
+
+		auto dir =
+			(pos.scl(1, -1).add_y(ctx.renderer().camera.get_screen_size().y) - ctx.renderer().camera.get_screen_center())
+			.set_length(rand(80, 800));
+		manifold mf{};
+		math::trans2 trs = {ctx.renderer().camera.get_stable_center(), dir.angle()};
+		mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{200, 40}}}, trs};
+		component_manager.create_entity_deferred<entity_desc>(mech_motion{.trans = trs, .vel = dir}, std::move(mf));
+	});
+
 	core::global::timer.reset_time();
 	while(!context.window().should_close()){
 		context.window().poll_events();
 		core::global::timer.fetch_time();
 		core::global::input.update(core::global::timer.global_delta_tick());
 
+		component_manager.update_delta = core::global::timer.global_delta_tick();
 		graphic_context.update(core::global::timer.global_delta_tick());
 		renderer_ui.set_time(core::global::timer.global_time());
 
 		wgfx_input.set_context(core::global::ui::root->focus->cursor_pos);
+
 
 		core::global::ui::root->update(core::global::timer.global_delta_tick());
 		core::global::ui::root->layout();
 		core::global::ui::root->draw();
 
 		graphic::draw::world_acquirer acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
-
 		{
-			//
-			for(int i = 0; i < 10; ++i){
-				acquirer << base_region;
-				acquirer.proj.depth = 1 - (static_cast<float>(i + 1) / 10.f - 0.04f);
 
-				auto off = math::vector2{i * 500, i * 400}.as<float>();
 
-				using namespace graphic::colors;
+			math::rect_box_posed rect1{math::vec2{200, 300}, {0, 30}};
+			math::rect_box_posed rect2{math::vec2{200, 300}};
 
-				graphic::draw::fill::quad(
+			{
+				//
+				for(int i = 0; i < 10; ++i){
+					acquirer << base_region;
+					acquirer.proj.depth = 1 - (static_cast<float>(i + 1) / 10.f - 0.04f);
+
+					auto off = math::vector2{i * 500, i * 400}.as<float>();
+
+					using namespace graphic::colors;
+
+					graphic::draw::fill::quad(
+						acquirer.get(),
+						off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
+						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
+						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
+						off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
+						white.copy()
+					);
+
+					acquirer << light_region;
+					acquirer.proj.slightly_decr_depth();
+					graphic::draw::fill::quad(
+						acquirer.get(),
+						off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
+						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
+						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
+						off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
+						(white.copy() * 2).set_a((i + 3) / 10.f)
+					);
+				}
+			}
+
+			rect2.update({
+				renderer_world.camera.get_screen_to_world(core::global::ui::root->focus->cursor_pos, {}, true),
+				45});
+
+			acquirer.proj.depth = 0.35f;
+
+			graphic::draw::fill::rect_ortho(
 					acquirer.get(),
-					off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
-					off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
-					off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
-					off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
-					white.copy()
+					{-1000, -1000, 200, 200},
+					graphic::colors::AQUA.copy().set_a(.5)
 				);
 
-				acquirer << light_region;
-				acquirer.proj.slightly_decr_depth();
-				graphic::draw::fill::quad(
+			acquirer << graphic::draw::white_region;
+			graphic::draw::fill::rect_ortho(
 					acquirer.get(),
-					off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
-					off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
-					off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
-					off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
-					(white.copy() * 2).set_a((i + 3) / 10.f)
+					{math::vec2{}, 40000},
+					graphic::colors::black
+				);
+
+			bool is_intersected = rect1.overlap_exact(rect2);
+
+			graphic::draw::fill::quad(
+					acquirer.get(),
+					rect1.view_as_quad(),
+					is_intersected ? graphic::colors::PALE_GREEN : graphic::colors::white
+				);
+
+			graphic::draw::fill::quad(
+					acquirer.get(),
+					rect2.view_as_quad(),
+					is_intersected ? graphic::colors::PALE_GREEN : graphic::colors::white
+				);
+
+			for(int i = 0; i < 4; ++i){
+				auto v0 = rect2[i];
+				auto v1 = rect2[i + 1];
+				auto n = rect2.edge_normal_at(i);
+
+				graphic::draw::line::line(
+					acquirer.get(),
+					(v0 + v1) / 2,
+					(v0 + v1) / 2 + n * 16,
+					3,
+					graphic::colors::PURPLE,
+					graphic::colors::PURPLE
 				);
 			}
+
+			if(is_intersected){
+				auto vec_depart_vector = rect2.depart_vector_to_on_vel(rect1, math::vec2::from_polar(0., 1));
+				auto min_depart_vector = rect2.depart_vector_to(rect1);
+				auto p = rect2.avg();
+
+				graphic::draw::line::line(
+					acquirer.get(),
+					p,
+					p + vec_depart_vector,
+					3,
+					graphic::colors::AQUA,
+					graphic::colors::AQUA
+				);
+				graphic::draw::line::line(
+					acquirer.get(),
+					p,
+					p + min_depart_vector,
+					3,
+					graphic::colors::CRIMSON,
+					graphic::colors::CRIMSON
+				);
+			}
+
+			acquirer.proj.slightly_decr_depth();
+			graphic::draw::fill::rect_ortho(
+					acquirer.get(),
+					{math::vec2{}, 30},
+					graphic::colors::AQUA_SKY.to_light()
+				);
 		}
 
-		acquirer.proj.depth = 0.35f;
+		component_manager.do_deferred();
+		component_manager.sliced_each([&](
+			game::ecs::component<game::ecs::manifold>& manifold,
+			game::ecs::component<game::ecs::mech_motion>& motion
+			){
 
-		graphic::draw::fill::rect_ortho(
-				acquirer.get(),
-				{-1000, -1000, 200, 200},
-				graphic::colors::AQUA.copy().set_a(.5)
-			);
+			manifold->hitbox.update_hitbox_with_ccd(motion->trans);
 
-		acquirer << graphic::draw::white_region;
-		graphic::draw::fill::rect_ortho(
-				acquirer.get(),
-				{math::vec2{}, 40000},
-				graphic::colors::black
-			);
+			if(!renderer_world.camera.get_viewport().overlap_exclusive(manifold->hitbox.max_wrap_bound()))return;
 
-		acquirer.proj.slightly_decr_depth();
-		graphic::draw::fill::rect_ortho(
-				acquirer.get(),
-				{math::vec2{}, 30},
-				graphic::colors::AQUA_SKY.to_light()
-			);
+			using namespace graphic;
+			for (const auto & comp : manifold->hitbox.get_comps()){
+				draw::line::quad(acquirer, comp.box, 2, colors::white.to_light());
+				draw::line::rect_ortho(acquirer, comp.box.get_bound(), 1, colors::CRIMSON);
+			}
+			draw::line::quad(acquirer, manifold->hitbox.ccd_wrap_box(), 1, colors::PALE_GREEN);
+		});
 
-		// renderer_world.batch.batch.consume_all();
-		//
-		// {
-		// 	graphic::draw::world_acquirer<> acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(light_region)};
-		// 	//
-		// 	for(int i = 0; i < 10; ++i){
-		// 		acquirer.proj.depth = static_cast<float>(i + 1) / 20.f - 0.04f;
-		//
-		// 		auto off = math::vector2{i * 500, i * 400}.as<float>();
-		//
-		// 		graphic::draw::fill::quad(
-		// 			acquirer.get(),
-		// 			off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
-		// 			off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
-		// 			off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
-		// 			off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
-		// 			graphic::colors::white.copy().to_light_color()
-		// 		);
-		// 	}
-		// }
+		collision_system.insert_all(component_manager);
+		collision_system.run(component_manager);
+		motion_system.run(component_manager);
 
 		graphic_context.render_efx();
 
@@ -547,7 +649,33 @@ void main_loop(){
 
 }
 
+void foo();
+
 int main(){
+	using namespace mo_yanxi;
+	using namespace mo_yanxi::game;
+
+
+
+	// foo();
+
+	init_assets();
+	compile_shaders();
+
+	core::glfw::init();
+	core::global::graphic::init();
+	core::global::ui::init();
+	assets::graphic::load(core::global::graphic::context);
+
+	main_loop();
+
+	assets::graphic::dispose();
+	core::global::ui::dispose();
+	core::global::graphic::dispose();
+	core::glfw::terminate();
+}
+
+void foo(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
 
@@ -567,219 +695,73 @@ int main(){
 	>();
 
 
-	cpmg.create_entity<entity_tuple_1>();
-	cpmg.create_entity<entity_tuple_1>();
-	cpmg.create_entity<entity_tuple_1>();
-	cpmg.create_entity<entity_tuple_1>();
-	cpmg.create_entity<entity_tuple_1>();
-	cpmg.create_entity<entity_tuple_2>();
-	cpmg.create_entity<entity_tuple_2>();
-	cpmg.create_entity<entity_tuple_2>();
-	cpmg.create_entity<entity_tuple_2>();
-	cpmg.create_entity<entity_tuple_2>();
-	cpmg.create_entity<entity_tuple_3>();
-	cpmg.create_entity<entity_tuple_3>();
-	auto ent = cpmg.create_entity<entity_tuple_3>();
-	auto en2t = cpmg.create_entity<entity_tuple_3>();
-	cpmg.create_entity<entity_tuple_4>();
-	cpmg.create_entity<entity_tuple_4>();
-	cpmg.create_entity<entity_tuple_4>();
+	cpmg.create_entity_deferred<entity_tuple_1>(math::vec2{2, 2});
 
-	if(auto data = cpmg.get_entity_partial_chunk<math::vec2>(ent)){
-		data->val().set_polar(45.f, math::sqrt2);
-	}
+	cpmg.do_deferred();
 
-	std::println();
-
-	// cpmg.sliced_each([](ecs::component<math::vec2>& comp){
+	cpmg.sliced_each([](const ecs::component<math::vec2>& vecs){
+		std::print("{} ", vecs.val());
+	});
+	// cpmg.create_entity<entity_tuple_1>();
+	// cpmg.create_entity<entity_tuple_1>();
+	// cpmg.create_entity<entity_tuple_1>();
+	// cpmg.create_entity<entity_tuple_1>();
+	// cpmg.create_entity<entity_tuple_2>();
+	// cpmg.create_entity<entity_tuple_2>();
+	// cpmg.create_entity<entity_tuple_2>();
+	// cpmg.create_entity<entity_tuple_2>();
+	// cpmg.create_entity<entity_tuple_2>();
+	// cpmg.create_entity<entity_tuple_3>();
+	// cpmg.create_entity<entity_tuple_3>();
+	// auto ent = cpmg.create_entity<entity_tuple_2>();
+	// auto en2t = cpmg.create_entity<entity_tuple_2>();
+	// cpmg.create_entity<entity_tuple_4>();
+	// cpmg.create_entity<entity_tuple_4>();
+	// cpmg.create_entity<entity_tuple_4>();
+	//
+	// if(auto data = cpmg.get_entity_partial_chunk<math::vec2>(ent)){
+	// 	data->val().set_polar(45.f, math::sqrt2);
+	// }
+	//
+	// std::println();
+	//
+	// enum task_id{
+	// 	t1, t2, t3,
+	//
+	// 	max
+	// };
+	//
+	// task_graph.reserve_event_id(task_id::max);
+	//
+	// auto m0 = task_graph.run({}, {}, [](ecs::component<math::vec2>& comp){
 	// 	comp->add(1, 2);
+	// });
+	//
+	// task_graph.run(t1, {m0}, [](ecs::component<math::vec2>& comp){
+	// 	comp->add(1, 2);
+	// });
+	//
+	// task_graph.run(t2, {t1}, [](ecs::component<math::vec2>& comp){
+	// 	comp->mul(1, 2);
+	// });
+	//
+	// task_graph.run(t3, {t2}, [](const ecs::component<math::vec2>& comp){
 	// 	std::print("{} ", comp.val());
 	// });
 
-	enum task_id{
-		t1, t2, t3,
-
-		max
-	};
-
-	task_graph.reserve_event_id(task_id::max);
-
-	auto m0 = task_graph.run({}, {}, [](ecs::component<math::vec2>& comp){
-		comp->add(1, 2);
-	});
-
-	task_graph.run(t1, {m0}, [](ecs::component<math::vec2>& comp){
-		comp->add(1, 2);
-	});
-
-	task_graph.run(t2, {t1}, [](ecs::component<math::vec2>& comp){
-		comp->mul(1, 2);
-	});
-
-	task_graph.run(t3, {t2}, [](const ecs::component<math::vec2>& comp){
-		std::print("{} ", comp.val());
-	});
-
-	auto beg = std::chrono::high_resolution_clock::now();
-
-	task_graph.generate_dependencies();
-	auto group = task_graph.get_sorted_task_group();
-	auto instance = group.create_instance();
-
-	auto end = std::chrono::high_resolution_clock::now();
+	// auto beg = std::chrono::high_resolution_clock::now();
 	//
-	std::println("{}us", std::chrono::duration_cast<std::chrono::microseconds>(end - beg).count());
-	for (auto && launch : instance.launch()){
-		launch();
-	}
-	int a = 1;
-	/*concurrent::no_fail_task_graph task_graph{};
-	enum task_id{
-		_0,
-		_1,
-		_2,
-		_3,
-		_4,
-		_5,
-		_6,
-		_7,
-	};
-
-	task_graph.add_task(_0, {}, []{
-		std::println(std::cerr, "Done Task: {}", std::to_underlying(_0));
-	});
-
-	using namespace std::literals;
-
-	task_graph.add_task(_1, {_0}, [](concurrent::task_context& ctx){
-		std::println(std::cerr, "Task[{}] Block", ctx.task().id());
-		ctx.acquire();
-		std::this_thread::sleep_for(1s);
-		ctx.release();
-		std::println(std::cerr, "Done Task: {}", std::to_underlying(_1));
-	});
-
-	task_graph.add_task(_2, {_1, _3}, []{
-		std::this_thread::sleep_for(150ms);
-
-		std::println(std::cerr, "Done Task: {}", std::to_underlying(_2));
-	});
-
-	task_graph.add_task(_3, {}, []{
-		std::println(std::cerr, "Done Task: {}", std::to_underlying(_3));
-	});
-
-	task_graph.add_task(_4, {_2, _7}, []{
-		std::this_thread::sleep_for(150ms);
-
-		std::println(std::cerr, "Done Task: {}", std::to_underlying(_4));
-	});
-
-	task_graph.add_task(_5, {_4}, []{
-		std::this_thread::sleep_for(150ms);
-		std::println(std::cerr, "Done Task: {}", std::to_underlying(_5));
-	});
-
-	task_graph.add_task(_6, {_4}, []{
-		// context.wait();
-		std::this_thread::sleep_for(150ms);
-
-		std::println(std::cerr, "Done Task: {}", std::to_underlying(_6));
-	});
-
-	task_graph.add_task(_7, {}, []{
-		std::println(std::cerr, "Task[{}] Block", std::to_underlying(_7));
-
-		// context.wait();
-		std::this_thread::sleep_for(2s);
-
-		std::println(std::cerr, "Done Task: {}", std::to_underlying(_7));
-	});
-
-	const auto group = task_graph.to_sorted_group();
-
-	std::vector<std::jthread> threads{};
-	auto instances = group.create_instance(2);
-
-	for (const auto& instance : instances.launch()){
-		threads.emplace_back(std::cref(instance));
-	}
-
-	instances.wait();*/
-
-	/*ecs::component_manager component_manager{};
-
-	component_manager.create_entity<math::trans2, math::vec2>();
-	component_manager.create_entity<math::trans2, math::vec2>();
-	component_manager.create_entity<math::trans2, math::vec2>();
-	component_manager.create_entity<math::trans2, math::vec2>();
-	component_manager.create_entity<math::trans2, math::vec2>();
-	component_manager.create_entity<math::trans2, math::vec2, int>();
-	component_manager.create_entity<math::trans2, math::vec2, int>();
-	component_manager.create_entity<math::trans2, math::vec2, int>();
-	component_manager.create_entity<math::trans2, math::vec2, int>();
-	component_manager.create_entity<math::trans2, math::vec2, int>();
-	component_manager.create_entity<math::vec2>();
-	component_manager.create_entity<math::vec2>();
-	auto ent = component_manager.create_entity<math::vec2>();
-	auto en2t = component_manager.create_entity<math::vec2>();
-	component_manager.create_entity<int>();
-	component_manager.create_entity<int>();
-	component_manager.create_entity<int>();
-
-	if(auto data = component_manager.get_entity_partial_chunk<math::vec2>(ent)){
-		data->val().set_polar(45.f, math::sqrt2);
-	}
-
-	component_manager.sliced_each([](ecs::component<math::vec2>& comp){
-		std::print("{} ", comp.val());
-	});
-
-	std::println();
-
-
-	component_manager.erase_entity(en2t);
-	component_manager.do_deferred_destroy();
-
-	component_manager.sliced_each([](ecs::component<math::vec2>& vec, ecs::component<int>& ival){
-		std::print("{} ", vec.val());
-		std::print("{} ", ival.val());
-	});
-
-	std::println();
-
-	component_manager.sliced_each([](ecs::component<math::vec2>& vec, ecs::component<double>& ival){
-		std::print("{} ", vec.val());
-		std::print("{} ", ival.val());
-	});*/
-	// auto spans = component_manager.get_slice_of<std::tuple<math::trans2, math::vec2>>();
-	// for (auto&& [trans, vec] : std::views::zip(spans | std::views::elements<0> | std::views::join, spans | std::views::elements<1> | std::views::join)){
-	// 	trans.id();
+	// for(int i = 0; i < 10'000'000; ++i){
+	// 	auto& a = ent->unchecked_get<entity_tuple_2, math::vec2>();
+	// 	// auto* a = cpmg.get_entity_partial_chunk<math::vec2>(ent);
+	//
+	// 	a->add(1, 2);
 	// }
+	// // task_graph.generate_dependencies();
+	// // auto group = task_graph.get_sorted_task_group();
+	// // auto instance = group.create_instance();
 	//
-	//
-	// std::println("{}", component_manager.get_slice_of<math::vec2>() | std::views::join | std::views::transform(ecs::unwrap_component{}));
-	// std::println("{}", component_manager.get_slice_of<int>() | std::views::join | std::views::transform(ecs::unwrap_component{}));
-
-	// hive<int> a;
-	// hive<int> b;
-	//
-	//
-	// std::swap(a, b);
-	// std::erase(a, 1);
-	//
-	// init_assets();
-	// compile_shaders();
-	//
-	// core::glfw::init();
-	// core::global::graphic::init();
-	// core::global::ui::init();
-	// assets::graphic::load(core::global::graphic::context);
-	//
-	// main_loop();
-	//
-	// assets::graphic::dispose();
-	// core::global::ui::dispose();
-	// core::global::graphic::dispose();
-	// core::glfw::terminate();
+	// auto end = std::chrono::high_resolution_clock::now();
+	// //
+	// std::println("Task Generate Cost: {}us", std::chrono::duration_cast<std::chrono::microseconds>(end - beg).count());
 }

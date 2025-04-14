@@ -67,8 +67,8 @@ void main() {
     vec4 total_emissive = screen(vec4(emissive_raw.rgb * .35f, emissive_raw.a), emissive_bloom * 1.05f);
 
 
-    float light_factor = smoothstep(0.35f, 1.f, color_light_bloom.a);
-    occlusion = min(occlusion + light_factor * .15f, 1.f);
+    float light_factor = smoothstep(0.0f, 0.25f, color_light_bloom.a + color_light_src.a);
+    occlusion = min(occlusion + light_factor * .5f, 1.f);
     occlusion = mix(1., occlusion, smoothstep(0.35f, 1.f, color_base.a));
     // 应用SSAO到基础颜色（可根据需求调整遮蔽强度）
     vec3 shaded_base = color_base.rgb * mix(1., occlusion, color_base.a);

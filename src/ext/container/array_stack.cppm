@@ -3,7 +3,7 @@ export module mo_yanxi.array_stack;
 import std;
 
 export namespace mo_yanxi{
-	//OPTM replace with inplace array
+	//OPTM replace with inplace vector
 
 	/**
 	 * @brief stack in fixed size, provide bound check ONLY in debug mode

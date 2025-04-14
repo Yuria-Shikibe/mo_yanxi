@@ -72,7 +72,7 @@ namespace mo_yanxi::core{
 
 		constexpr void resume() noexcept {paused = false;}
 
-		constexpr void setPause(const bool v) noexcept {paused = v;}
+		constexpr void set_pause(const bool v) noexcept {paused = v;}
 
 		void fetch_time(){
 #if DEBUG_CHECK

@@ -398,6 +398,20 @@ namespace mo_yanxi::graphic::draw{
 		}
 
 		export
+		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj, typename QuadT>
+		FORCE_INLINE void quad(
+			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+			const QuadT& quad,
+			const float stroke = 2.f,
+			const color color = colors::white){
+			acquirer_guard _{auto_param, 4};
+			line::line(auto_param[0], quad[0], quad[1], stroke, color, color);
+			line::line(auto_param[1], quad[1], quad[2], stroke, color, color);
+			line::line(auto_param[2], quad[2], quad[3], stroke, color, color);
+			line::line(auto_param[3], quad[3], quad[0], stroke, color, color);
+		}
+
+		export
 		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
 		FORCE_INLINE void square(
 			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,

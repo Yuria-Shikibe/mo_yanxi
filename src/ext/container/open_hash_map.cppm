@@ -300,7 +300,7 @@ namespace mo_yanxi{
 
 		struct kv_storage{
 			key_type key{};
-			mapped_buffer value;
+			ADAPTED_NO_UNIQUE_ADDRESS mapped_buffer value;
 
 			[[nodiscard]] constexpr explicit(false) kv_storage(const key_type key)
 				: key(key){
@@ -435,9 +435,9 @@ namespace mo_yanxi{
 			auto* operator->() const noexcept{
 				assert(current != sentinel);
 				if constexpr(addConst){
-					return reinterpret_cast<const std::pair<const key_type, mapped_type>*>(std::to_address(current));
+					return std::launder(reinterpret_cast<const std::pair<const key_type, mapped_type>*>(std::to_address(current)));
 				} else{
-					return reinterpret_cast<std::pair<const key_type, mapped_type>*>(std::to_address(current));
+					return std::launder(reinterpret_cast<std::pair<const key_type, mapped_type>*>(std::to_address(current)));
 				}
 			}
 

@@ -12,20 +12,27 @@ import std;
 namespace mo_yanxi{
 
 	struct type_index_equal_to__not_null{
+		// const static inline std::type_index null_idx{typeid(std::nullptr_t)};
+
 		using is_transparent = void;
-		bool operator()(std::nullptr_t, const std::type_index b) const noexcept {
+		using is_direct = void;
+		static FORCE_INLINE bool operator()(std::nullptr_t, const std::type_index b) noexcept {
 			return b == typeid(std::nullptr_t);
 		}
 
-		bool operator()(const std::type_index b, std::nullptr_t) const noexcept {
+		static FORCE_INLINE bool operator()(const std::type_index b, std::nullptr_t) noexcept {
 			return b == typeid(std::nullptr_t);
 		}
 
-		bool operator()(const std::type_index b, const std::type_index a) const noexcept {
+		static FORCE_INLINE bool operator()(const std::type_index a, const std::type_index b) noexcept {
 			return a == b;
 		}
 
-		constexpr bool operator()(std::nullptr_t, std::nullptr_t) const noexcept {
+		static FORCE_INLINE constexpr bool operator()(std::nullptr_t, std::nullptr_t) noexcept {
+			return true;
+		}
+
+		static FORCE_INLINE constexpr bool operator()(std::nullptr_t) noexcept {
 			return true;
 		}
 	};
@@ -34,18 +41,19 @@ namespace mo_yanxi{
 		using is_transparent = void;
 		static constexpr std::hash<std::type_index> hasher{};
 
-		std::size_t operator()(const std::type_index val) const noexcept {
+		static FORCE_INLINE std::size_t operator()(const std::type_index val) noexcept {
 			return hasher(val);
 		}
 
-		std::size_t operator()(std::nullptr_t) const noexcept {
+		static FORCE_INLINE std::size_t operator()(std::nullptr_t) noexcept {
 			return hasher(typeid(std::nullptr_t));
 		}
 	};
 
 	struct Proj{
-		std::type_index operator ()(std::nullptr_t) const noexcept{
-			return typeid(std::nullptr_t);
+		FORCE_INLINE static const std::type_index& operator ()(std::nullptr_t) noexcept{
+			const static std::type_index idx{typeid(std::nullptr_t)};
+			return idx;
 		}
 	};
 
@@ -65,7 +73,7 @@ namespace mo_yanxi{
 			type_index_hasher, type_index_equal_to__not_null>;
 
 	struct Prov{
-		std::string operator ()(std::nullptr_t) const noexcept{
+		static FORCE_INLINE std::string operator ()(std::nullptr_t) noexcept{
 			return std::string();
 		}
 	};

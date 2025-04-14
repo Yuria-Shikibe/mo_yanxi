@@ -388,7 +388,7 @@ namespace mo_yanxi::ui{
 	>,
 
 		// StatedToolTipOwner<elem>,
-		math::quad_tree_adaptable<struct elem>
+		math::quad_tree_adaptor<struct elem>
 	{
 
 		[[nodiscard]] elem(){

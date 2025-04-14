@@ -1,267 +1,27 @@
 module;
 
 #include <plf_hive.h>
+#include <cassert>
 #include <gch/small_vector.hpp>
+
 #include "../src/ext/adapted_attributes.hpp"
 
 export module mo_yanxi.game.ecs.component_manager;
+
+export import mo_yanxi.game.ecs.entity;
 export import mo_yanxi.heterogeneous.open_addr_hash;
-export import mo_yanxi.fixed_size_type_storage;
 export import mo_yanxi.strided_span;
-export import mo_yanxi.concepts;
-export import mo_yanxi.meta_programming;
-// export import mo_yanxi.small_vector;
+
+import mo_yanxi.concepts;
+import mo_yanxi.meta_programming;
+import mo_yanxi.basic_util;
 
 import std;
 
+
+
 namespace mo_yanxi::game::ecs{
 	export struct component_manager;
-	export using entity_id = struct entity*;
-	export using entity_data_chunk_index = std::vector<int>::size_type;
-	export auto invalid_chunk_idx = std::numeric_limits<entity_data_chunk_index>::max();
-	export
-	template <typename T>
-		requires (std::is_default_constructible_v<T>)
-	struct component;
-
-	export
-	template <typename TupleT>
-	struct archetype;
-
-	export
-	struct entity{
-
-	private:
-		template <typename TupleT>
-
-		friend struct archetype;
-
-		entity_id id_{};
-		entity_data_chunk_index chunk_index_{invalid_chunk_idx};
-		std::type_index type_{typeid(std::nullptr_t)};
-
-	public:
-		[[nodiscard]] entity() = default;
-
-		[[nodiscard]] constexpr explicit(false) entity(std::type_index type)
-			noexcept : id_(this), type_(type){
-		}
-
-		[[nodiscard]] constexpr entity_id id() const noexcept{
-			return id_;
-		}
-
-		[[nodiscard]] constexpr bool is_original() const noexcept{
-			return id_ == this;
-		}
-
-		[[nodiscard]] constexpr std::type_index type() const noexcept{
-			return type_;
-		}
-
-		[[nodiscard]] constexpr entity_data_chunk_index chunk_index() const noexcept{
-			if(is_original())return chunk_index_;
-
-			if(id()) return id()->chunk_index();
-
-			return chunk_index_ != invalid_chunk_idx;
-		}
-
-		/**
-		 * @brief Only valid when an entity has its data, i.e. an entity has been truly added.
-		 */
-		explicit operator bool() const noexcept{
-			return chunk_index() != invalid_chunk_idx;
-		}
-
-
-		template <typename T>
-		component<T>* get(const component_manager& manager) const;
-	};
-
-	template <typename T>
-		requires (std::is_default_constructible_v<T>)
-	struct component{
-	private:
-		template <typename TupleT>
-
-		friend struct archetype;
-
-		entity_id eid_{};
-		T value{};
-	public:
-
-		[[nodiscard]] component() = default;
-
-		[[nodiscard]] explicit component(entity_id eid) noexcept
-			: eid_(eid){
-		}
-
-		[[nodiscard]] constexpr entity_id id() const noexcept{
-			return eid_;
-		}
-
-		constexpr T* operator->() noexcept{
-			return std::addressof(value);
-		}
-
-		constexpr const T* operator->() const noexcept{
-			return std::addressof(value);
-		}
-
-		constexpr T& operator*() noexcept{
-			return value;
-		}
-
-		constexpr const T& operator*() const noexcept{
-			return value;
-		}
-
-		constexpr const T& val() const noexcept{
-			return value;
-		}
-
-		constexpr T& val() noexcept{
-			return value;
-		}
-
-		constexpr explicit(false) operator T&() noexcept{
-			return value;
-		}
-
-		constexpr explicit(false) operator const T&() const noexcept{
-			return value;
-		}
-	};
-
-	export
-	struct unwrap_component{
-		template <typename T>
-			requires requires(T&& t){
-				*t;
-			}
-		constexpr static auto&& operator()(T&& comp) noexcept{
-			return std::forward_like<T>(*comp);
-		}
-	};
-
-	template <typename T>
-	consteval auto apply_to_comp() noexcept{
-		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-			return std::tuple<component<std::tuple_element_t<Idx, T>> ...>{};
-		}(std::make_index_sequence<std::tuple_size_v<T>>{});
-	}
-
-	template <typename T>
-	consteval auto apply_to_slice() noexcept{
-		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-			return std::tuple<strided_span<std::tuple_element_t<Idx, T>> ...>{};
-		}(std::make_index_sequence<std::tuple_size_v<T>>{});
-	}
-
-	template <template <typename > typename W, typename T>
-	consteval auto apply_to_comp_of() noexcept{
-		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-			return std::tuple<W<component<std::tuple_element_t<Idx, T>>> ...>{};
-		}(std::make_index_sequence<std::tuple_size_v<T>>{});
-	}
-
-
-	template <typename T>
-	using tuple_to_comp_t = unary_apply_to_tuple_t<component, T>;
-
-
-	struct archetype_base{
-		virtual ~archetype_base() = default;
-
-		virtual std::size_t insert(const entity& entity) = 0;
-
-		virtual void erase(const entity& entity) = 0;
-	};
-
-	export
-	struct chunk_data_identity{
-		std::type_index type_index;
-		std::ptrdiff_t offset;
-
-	};
-
-	template <typename TupleT = std::tuple<int>>
-	struct archetype : archetype_base{
-		using raw_tuple = TupleT;
-		using components = tuple_to_comp_t<raw_tuple>;
-	private:
-		std::vector<components> chunks{};
-	public:
-
-		std::size_t insert(const entity& entity) override{
-			auto idx = chunks.size();
-
-			if(entity.chunk_index() != invalid_chunk_idx){
-				throw std::runtime_error{"Duplicated Insert"};
-			}
-
-			[&] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-				chunks.emplace_back((Idx, entity.id()) ...);
-			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>{});
-
-			entity.id()->chunk_index_ = idx;
-			return idx;
-		}
-
-		void erase(const entity& entity) override{
-			auto chunk_size = chunks.size();
-			auto idx = entity.chunk_index();
-
-			if(idx >= chunk_size){
-				throw std::runtime_error{"Invalid Erase"};
-			}
-
-			if(idx == chunk_size - 1){
-				chunks.pop_back();
-			}else{
-				chunks[idx] = std::move(chunks.back());
-				chunks.pop_back();
-
-				std::get<0>(chunks[idx]).id()->chunk_index_ = idx;
-			}
-		}
-
-
-		[[nodiscard]] auto& at(entity_data_chunk_index idx) const noexcept{
-			return chunks.at(idx);
-		}
-
-		[[nodiscard]] auto& at(entity_data_chunk_index idx) noexcept{
-			return chunks.at(idx);
-		}
-
-		[[nodiscard]] auto& operator[](entity_data_chunk_index idx) const noexcept{
-			return chunks[idx];
-		}
-
-		[[nodiscard]] auto& operator[](entity_data_chunk_index idx) noexcept{
-			return chunks[idx];
-		}
-
-		template <typename T>
-		[[nodiscard]] strided_span<component<T>> slice() noexcept{
-			return strided_span<component<T>>{
-				reinterpret_cast<component<T>*>(reinterpret_cast<std::byte*>(chunks.data()) +
-					tuple_offset_of_v<component<T>, components>),
-				chunks.size(), sizeof(components)
-			};
-		}
-
-		template <typename T>
-		[[nodiscard]] strided_span<const component<T>> slice() const noexcept{
-			return strided_span<const component<T>>{
-				reinterpret_cast<const component<T>*>(reinterpret_cast<const std::byte*>(chunks.data()) +
-					tuple_offset_of_v<component<T>, components>),
-				chunks.size(), sizeof(components)
-			};
-		}
-	};
 
 	export
 	struct archetype_slice{
@@ -303,33 +63,42 @@ namespace mo_yanxi::game::ecs{
 	struct component_manager{
 		template <typename T>
 		using small_vector_of = gch::small_vector<T>;
-		using archetype_map_type = type_fixed_hash_map<std::unique_ptr<archetype_base>>;
+		using archetype_map_type = std::unordered_map<std::type_index, std::unique_ptr<archetype_base>>;
 
 	private:
-		pointer_hash_map<entity*, int> to_destroy{};
+		std::mutex to_destroy_mutex{};
 
+		pointer_hash_map<entity_id, int> to_destroy{};
+		std::vector<entity_id> expired{};
+
+		std::mutex entity_mutex{};
 		plf::hive<entity> entities{};
 		archetype_map_type archetypes{};
 
 		type_fixed_hash_map<std::vector<archetype_slice>> type_to_archetype{};
 
-		std::vector<entity> deferred_entity_add_request{};
+		// std::vector<entity_id> deferred_entity_add_request{};
 	public:
+		float update_delta;
 		/**
 		 * @brief deferred add entity, whose archtype must have been created
 		 * @return entity handle
 		 */
-		template <typename Tuple>
-			requires (is_tuple_v<Tuple>)
-		entity create_entity_deferred(){
+		template <typename Tuple, typename... Args>
+			requires (is_tuple_v<Tuple> && (contained_in<std::decay_t<Args>, Tuple> && ...))
+		entity_ref create_entity_deferred(Args&& ...args){
+			//TODO add lock?
 			std::type_index idx = typeid(Tuple);
-			auto& ent = *entities.emplace(idx);
+			entity* ent;
+			{
+				std::lock_guard _{entity_mutex};
+				ent = std::to_address(entities.emplace(idx));
+			}
 
-			deferred_entity_add_request.push_back(ent);
+			static_cast<archetype<Tuple>&>(*archetypes.at(idx)).push_staging(ent->id(), std::forward<Args>(args) ...);
 
 			return ent;
 		}
-
 
 		template <typename Tuple>
 			requires (is_tuple_v<Tuple>)
@@ -338,6 +107,7 @@ namespace mo_yanxi::game::ecs{
 
 			return archetypes.try_emplace(idx, create_new_archetype_map<Tuple>());
 		}
+
 		template <typename ...Tuple>
 			requires (sizeof...(Tuple) > 1)
 		void add_archetype(){
@@ -346,7 +116,7 @@ namespace mo_yanxi::game::ecs{
 
 		template <typename Tuple>
 			requires (is_tuple_v<Tuple>)
-		entity create_entity(){
+		entity_ref create_entity(){
 			using ArcheT = archetype<Tuple>;
 			std::type_index idx = typeid(Tuple);
 			auto& ent = *entities.emplace(idx);
@@ -355,18 +125,19 @@ namespace mo_yanxi::game::ecs{
 			if(itr.second){
 				this->add_new_archetype_map<Tuple>(static_cast<ArcheT&>(*itr.first->second));
 			}
-			itr.first->second->insert(ent);
+			itr.first->second->insert(ent.id());
 
 			return ent;
 		}
 
 		template <typename ...Ts>
 			requires (!is_tuple_v<Ts> && ...)
-		entity create_entity(){
+		entity_ref create_entity(){
 			return create_entity<std::tuple<Ts ...>>();
 		}
 
-		bool erase_entity(const entity& entity){
+		bool mark_expired(entity& entity){
+			std::lock_guard _{entity_mutex};
 			return to_destroy.try_emplace(entity.id()).second;
 		}
 
@@ -376,23 +147,43 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		void do_deferred_add(){
-			for (const auto& entity_add_request : deferred_entity_add_request){
-				archetypes.at(entity_add_request.type())->insert(entity_add_request);
+			for (const auto & [type, archetype] : archetypes){
+				archetype->dump_staging();
 			}
-			deferred_entity_add_request.clear();
 		}
 
 		void do_deferred_destroy(){
-			//TODO destroy expiration notify/check
-			for (auto&& destroy : to_destroy | std::views::keys){
-				if(auto map = archetypes.find(destroy->type()); map != archetypes.end()){
-					map->second->erase(*destroy);
+			modifiable_erase_if(expired, [this](entity_id e){
+				if(e->get_ref_count() == 0){
+					//TODO should this always true?
+					const auto itr = entities.get_iterator(e);
+					if(itr != entities.end())entities.erase(itr);
+					return true;
 				}
 
-				auto itr = entities.get_iterator(destroy);
-				if(itr != entities.end())entities.erase(itr);
+				return false;
+			});
+
+			//TODO destroy expiration notify/check
+			for (auto&& e : to_destroy | std::views::keys){
+				e->get_archetype()->erase(e);
+
+				if(e->get_ref_count() > 0){
+					expired.push_back(e);
+				}else{
+					auto itr = entities.get_iterator(e);
+					if(itr != entities.end())entities.erase(itr);
+				}
 			}
 			to_destroy.clear();
+		}
+
+		void deferred_destroy_no_reference_entities(){
+			for (auto& entity : entities){
+				if(entity.get_ref_count() == 0){
+					to_destroy.try_emplace(entity.id());
+				}
+			}
 		}
 
 		template <typename Tuple>
@@ -469,28 +260,30 @@ namespace mo_yanxi::game::ecs{
 
 
 		template <typename Tuple = std::tuple<int>>
-		tuple_to_comp_t<Tuple>* get_entity_chunk(const entity& entity) const noexcept{
+		unary_apply_to_tuple_t<component, Tuple>* get_entity_full_chunk(const entity& entity) const noexcept{
+			if(entity.is_expired())return nullptr;
 			std::type_index idx = typeid(Tuple);
 			if(idx != entity.type())return nullptr;
-			//TODO shuold this a must event? so at() directly?
-			archetype<Tuple>& aty = static_cast<archetype<Tuple>&>(archetypes.at(idx).operator*());
+			//TODO should this a must event? so at() directly?
+			archetype<Tuple>& aty = static_cast<archetype<Tuple>&>(entity.get_archetype());
 			return &aty[entity.chunk_index()];
 
 			return nullptr;
 		}
 
 		template <typename T>
-		component<T>* get_entity_partial_chunk(const entity& entity) const noexcept{
+		component<T>* get_entity_partial_chunk(const entity_id entity) const noexcept{
+			assert(entity);
+			if(entity->is_expired())return nullptr;
+
 			const std::type_index idx = typeid(T);
 			if(auto slices_itr = type_to_archetype.find(idx); slices_itr != type_to_archetype.end()){
-				auto* archetype = archetypes.at(entity.type()).get();
+				auto* archetype = entity->get_archetype();
 
 				if(
-					const auto itr = std::ranges::lower_bound(slices_itr->second, archetype, {}, &archetype_slice::identity);
+					const auto itr = std::ranges::find(slices_itr->second, archetype, &archetype_slice::identity);
 					itr != slices_itr->second.end()){
-					if(archetype == itr->identity()){
-						return &itr->slice<T>()[entity.chunk_index()];
-					}
+					return &itr->slice<T>()[entity->chunk_index()];
 				}
 			}
 
@@ -645,7 +438,7 @@ namespace mo_yanxi::game::ecs{
 			return ptr;
 		}
 
-		//TODO delete empty archetype map
+		//TODO delete empty archetype map?
 	};
 
 	export
@@ -686,11 +479,7 @@ namespace mo_yanxi::game::ecs{
 
 }
 
-module : private;
 
 namespace mo_yanxi::game::ecs{
-	template <typename T>
-	component<T>* entity::get(const component_manager& manager) const{
-		return manager.get_entity_partial_chunk<T>(*this);
-	}
+
 }

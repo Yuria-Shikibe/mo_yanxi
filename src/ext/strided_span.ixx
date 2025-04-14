@@ -368,7 +368,7 @@ namespace mo_yanxi{
 			assert(ptr_);
 			assert(off < extent_.value);
 
-			if(stride_.value){
+			if(!stride_.value){
 				return ptr_[off];
 			}else{
 				const auto dst = reinterpret_cast<pointer>(const_cast<std::byte*>(reinterpret_cast<const std::byte*>(ptr_)) + off * stride_.value);

@@ -34,26 +34,30 @@ namespace mo_yanxi::assets::ctrl{
 		using namespace mo_yanxi;
 		namespace cc = mo_yanxi::core::ctrl;
 
-		core::global::input.main_binds.register_bind(cc::key::A, cc::act::Continuous, [](auto){
+		core::global::input.main_binds.register_bind(cc::key::P, cc::act::press, [](auto){
+			core::global::timer.set_pause(!core::global::timer.is_paused());
+		});
+
+		core::global::input.main_binds.register_bind(cc::key::A, cc::act::continuous, [](auto){
 
 			 if(!disableMove) get_camera().move({
 					(-cameraMoveSpeed * core::global::timer.global_delta_tick()), 0
 			});
 		});
 
-		core::global::input.main_binds.register_bind(cc::key::D, cc::act::Continuous, [](auto){
+		core::global::input.main_binds.register_bind(cc::key::D, cc::act::continuous, [](auto){
 			if(!disableMove) get_camera().move({
 					(+cameraMoveSpeed * core::global::timer.global_delta_tick()), 0
 			});
 		});
 
-		core::global::input.main_binds.register_bind(cc::key::S, cc::act::Continuous, [](auto){
+		core::global::input.main_binds.register_bind(cc::key::S, cc::act::continuous, [](auto){
 			if(!disableMove) get_camera().move({
 					0, -cameraMoveSpeed * core::global::timer.global_delta_tick()
 			});
 		});
 
-		core::global::input.main_binds.register_bind(cc::key::W, cc::act::Continuous, [](auto){
+		core::global::input.main_binds.register_bind(cc::key::W, cc::act::continuous, [](auto){
 			if(!disableMove) get_camera().move({
 					0, +cameraMoveSpeed * core::global::timer.global_delta_tick()
 			});
