@@ -396,6 +396,42 @@ namespace mo_yanxi::vk::cmd{
 	export
 	void memory_barrier(
 		const VkCommandBuffer command_buffer,
+		const VkBuffer buffer,
+		const VkPipelineStageFlags2 srcStageMask,
+		const VkAccessFlags2 srcAccessMask,
+		const VkPipelineStageFlags2 dstStageMask,
+		const VkAccessFlags2 dstAccessMask,
+		const std::uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		const std::uint32_t dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		const VkDeviceSize offset = 0,
+		const VkDeviceSize size = VK_WHOLE_SIZE
+	){
+		VkBufferMemoryBarrier2 barrier2{
+			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+			.pNext = nullptr,
+			.srcStageMask = srcStageMask,
+			.srcAccessMask = srcAccessMask,
+			.dstStageMask = dstStageMask,
+			.dstAccessMask = dstAccessMask,
+			.srcQueueFamilyIndex = srcQueueFamilyIndex,
+			.dstQueueFamilyIndex = dstQueueFamilyIndex,
+			.buffer = buffer,
+			.offset = offset,
+			.size = size
+		};
+
+		VkDependencyInfo dependency{
+			.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+			.bufferMemoryBarrierCount = 1,
+			.pBufferMemoryBarriers = &barrier2,
+		};
+
+		vkCmdPipelineBarrier2(command_buffer, &dependency);
+	}
+
+	export
+	void memory_barrier(
+		const VkCommandBuffer command_buffer,
 		const VkImage image,
 		const VkPipelineStageFlags2 srcStageMask,
 		const VkAccessFlags2 srcAccessMask,
@@ -432,42 +468,6 @@ namespace mo_yanxi::vk::cmd{
 				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
 				.imageMemoryBarrierCount = 1,
 				.pImageMemoryBarriers = &barrier2,
-			};
-
-		vkCmdPipelineBarrier2(command_buffer, &dependency);
-	}
-
-	export
-	void memory_barrier(
-		const VkCommandBuffer command_buffer,
-		const VkBuffer buffer,
-		const VkPipelineStageFlags2 srcStageMask,
-		const VkAccessFlags2 srcAccessMask,
-		const VkPipelineStageFlags2 dstStageMask,
-		const VkAccessFlags2 dstAccessMask,
-		const std::uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		const std::uint32_t dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		const VkDeviceSize offset = 0,
-		const VkDeviceSize size = VK_WHOLE_SIZE
-	){
-		VkBufferMemoryBarrier2 barrier2{
-				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
-				.pNext = nullptr,
-				.srcStageMask = srcStageMask,
-				.srcAccessMask = srcAccessMask,
-				.dstStageMask = dstStageMask,
-				.dstAccessMask = dstAccessMask,
-				.srcQueueFamilyIndex = srcQueueFamilyIndex,
-				.dstQueueFamilyIndex = dstQueueFamilyIndex,
-				.buffer = buffer,
-				.offset = offset,
-				.size = size
-			};
-
-		VkDependencyInfo dependency{
-				.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-				.bufferMemoryBarrierCount = 1,
-				.pBufferMemoryBarriers = &barrier2,
 			};
 
 		vkCmdPipelineBarrier2(command_buffer, &dependency);

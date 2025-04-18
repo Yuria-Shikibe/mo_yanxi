@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.elem;
+export module mo_yanxi.ui.basic:elem;
 
 export import mo_yanxi.math;
 export import mo_yanxi.math.vector2;
@@ -13,38 +13,26 @@ export import align;
 
 export import mo_yanxi.graphic.color;
 
+import :pre_decl;
+import :elem_ptr;
+import :tooltip_interface;
+
 export import mo_yanxi.ui.flags;
-export import mo_yanxi.ui.pre_decl;
 export import mo_yanxi.ui.comp.drawer;
 export import mo_yanxi.ui.event_types;
 export import mo_yanxi.ui.clamped_size;
 export import mo_yanxi.ui.util;
-export import mo_yanxi.ui.elem_ptr;
 export import mo_yanxi.ui.layout.policies;
 export import mo_yanxi.ui.action;
-export import mo_yanxi.ui.tooltip_interface;
 export import mo_yanxi.core.ctrl.constants;
 
+//TODO isolate this in future
+export import mo_yanxi.graphic.renderer.ui;
 
-export import mo_yanxi.meta_programming;
-export import mo_yanxi.spreadable_event_handler;
-export import mo_yanxi.math.quad_tree.interface;
-// export import Core.UI.Drawer;
-// export import Core.UI.Flags;
-// export import Core.UI.Util;
-// export import Core.UI.CellBase;
-// export import Core.UI.Action;
-// export import Core.UI.Util;
 
-// export import Core.Ctrl.Constants;
-//
-// import Core.UI.StatedLength;
-//
-// import Graphic.Color;
-//
-// import Core.UI.ToolTipInterface;
-// import math.QuadTree.Interface;
-//
+import mo_yanxi.spreadable_event_handler;
+import mo_yanxi.math.quad_tree.interface;
+
 
 import mo_yanxi.meta_programming;
 import mo_yanxi.handle_wrapper;
@@ -53,19 +41,8 @@ import mo_yanxi.func_initialzer;
 
 import std;
 
-namespace mo_yanxi{
-	namespace graphic{
-		export struct renderer_ui;
-		// struct renderer_ui;
-	}
-}
-
 
 namespace mo_yanxi::ui{
-	// /*export*/ struct elem;
-	// export struct group;
-	// export struct scene;
-
 
 	export constexpr inline bool IgnoreClipWhenDraw = false;
 
@@ -822,5 +799,3 @@ namespace mo_yanxi::ui{
 	// 	}
 	// }
 }
-
-module : private;

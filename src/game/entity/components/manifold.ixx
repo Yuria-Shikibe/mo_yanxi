@@ -18,13 +18,10 @@ namespace mo_yanxi::game::ecs{
 	struct manifold{
 
 		struct collision_object{
+			entity_id id;
 			component<manifold>* manifold;
 			component<mech_motion>* motion;
 			component<physical_rigid>* rigid;
-
-			[[nodiscard]] constexpr entity_id id() const noexcept{
-				return manifold->id();
-			}
 
 			constexpr friend bool operator==(const collision_object& lhs, const collision_object& rhs) noexcept = default;
 		};
@@ -34,7 +31,7 @@ namespace mo_yanxi::game::ecs{
 			collision_data data;
 
 			[[nodiscard]] entity_id get_other_id() const noexcept{
-				return other.id();
+				return other.id;
 			}
 		};
 
@@ -50,7 +47,7 @@ namespace mo_yanxi::game::ecs{
 			intersection intersection{};
 
 			[[nodiscard]] entity_id get_other_id() const noexcept{
-				return other.id();
+				return other.id;
 			}
 		};
 
@@ -61,7 +58,7 @@ namespace mo_yanxi::game::ecs{
 		hitbox hitbox{};
 		bool no_backtrace_correction{false};
 
-		math::trans2 collision_trans_sum{};
+		math::trans2 collision_vel_trans_sum{};
 		math::vec2 collision_correction_vec{};
 		bool is_under_correction{false};
 		gch::small_vector<entity_ref, 2> last_collided{};
@@ -80,7 +77,7 @@ namespace mo_yanxi::game::ecs{
 			auto backtraceIndex = hitbox.get_intersect_move_index();
 
 			erase_if(possible_collision, [backtraceIndex](const collision_possible& c){
-				return c.data.sbj_transition > backtraceIndex || c.data.obj_transition > c.other.manifold->val().hitbox.get_intersect_move_index();
+				return c.data.sbj_transition > backtraceIndex || c.data.obj_transition > c.other.manifold->hitbox.get_intersect_move_index();
 			});
 
 			return collided();
@@ -89,7 +86,7 @@ namespace mo_yanxi::game::ecs{
 
 
 		bool test_intersection_with(collision_object object){
-			return hitbox.collide_with_exact(object.manifold->val().hitbox, [this, &object](const unsigned index, const unsigned indexObj) {
+			return hitbox.collide_with_exact(object.manifold->hitbox, [this, &object](const unsigned index, const unsigned indexObj) {
 				return &possible_collision.emplace_back(object, collision_data{index, indexObj}).data;
 			}, false);
 		}

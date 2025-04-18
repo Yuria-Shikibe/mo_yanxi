@@ -1,11 +1,9 @@
 module;
 
-module mo_yanxi.ui.scene;
+//TODO this should be the impl file of :scene
+//Anyway the highlight breakdown when using module mo_yanxi.ui.basic:scene;
+module mo_yanxi.ui.basic;
 
-import mo_yanxi.ui.pre_decl;
-import mo_yanxi.ui.elem;
-import mo_yanxi.ui.group;
-import mo_yanxi.ui.graphic;
 
 import mo_yanxi.concepts;
 import mo_yanxi.algo;
@@ -13,7 +11,39 @@ import mo_yanxi.algo;
 import mo_yanxi.core.global;
 import mo_yanxi.core.global.graphic;
 
+import mo_yanxi.graphic.renderer.ui;
+
 import mo_yanxi.core.platform;
+import mo_yanxi.owner;
+
+std::string_view mo_yanxi::ui::scene::get_clipboard() const noexcept{
+	return core::plat::get_clipboard(core::global::graphic::context.window().get_handle());
+}
+
+void mo_yanxi::ui::scene::set_clipboard(const char* sv) const noexcept{
+	core::plat::set_clipborad(core::global::graphic::context.window().get_handle(), sv);
+}
+
+mo_yanxi::core::ctrl::key_code_t mo_yanxi::ui::scene::get_input_mode() const noexcept{
+	return core::global::input.main_binds.get_mode();
+}
+
+void mo_yanxi::ui::scene::root_draw() const{
+	renderer->batch.push_projection(rect{tags::from_extent, math::vec2{}, region.size()});
+	renderer->batch.push_viewport(region);
+
+	draw(region);
+
+	renderer->batch.pop_viewport();
+	renderer->batch.pop_projection();
+}
+
+double mo_yanxi::ui::scene::get_global_time() const noexcept{
+	return core::global::timer.global_time();
+}
+
+
+
 
 
 mo_yanxi::ui::scene::scene(
@@ -37,14 +67,6 @@ mo_yanxi::ui::scene::~scene(){
 	else root->set_scene(nullptr);
 }
 
-std::string_view mo_yanxi::ui::scene::get_clipboard() const noexcept{
-	return core::plat::get_clipboard(core::global::graphic::context.window().get_handle());
-}
-
-void mo_yanxi::ui::scene::set_clipboard(const char* sv) const noexcept{
-	core::plat::set_clipborad(core::global::graphic::context.window().get_handle(), sv);
-}
-
 // void mo_yanxi::ui::scene::setIMEPos(Geom::Point2 pos) const{
 // 	pos += this->pos.as<int>();
 // 	Core::Spec::setInputMethodEditor(Core::Global::window->getNative(), pos.x, size.y - pos.y);
@@ -58,9 +80,10 @@ void mo_yanxi::ui::scene::notifyLayoutUpdate(elem* element){
 	independentLayout.insert(element);
 }
 
-mo_yanxi::core::ctrl::key_code_t mo_yanxi::ui::scene::get_input_mode() const noexcept{
-	return core::global::input.main_binds.get_mode();
-}
+
+
+
+
 
 void mo_yanxi::ui::scene::dropAllFocus(const elem* target){
 	dropEventFocus(target);
@@ -250,16 +273,6 @@ void mo_yanxi::ui::scene::layout(){
 	// if(count)std::println(std::cerr, "{}", count);
 }
 
-void mo_yanxi::ui::scene::root_draw() const{
-	renderer->batch.push_projection(rect{tags::from_extent, math::vec2{}, region.size()});
-	renderer->batch.push_viewport(region);
-
-	draw(region);
-
-	renderer->batch.pop_viewport();
-	renderer->batch.pop_projection();
-}
-
 void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 	// const auto bound = ();
 
@@ -309,10 +322,6 @@ mo_yanxi::ui::scene& mo_yanxi::ui::scene::operator=(scene&& other) noexcept{
 	return *this;
 }
 
-double mo_yanxi::ui::scene::get_global_time() const noexcept{
-	return core::global::timer.global_time();
-}
-
 void mo_yanxi::ui::scene::updateInbounds(std::vector<elem*>&& next){
 	auto [i1, i2] = std::ranges::mismatch(lastInbounds, next);
 
@@ -329,3 +338,4 @@ void mo_yanxi::ui::scene::updateInbounds(std::vector<elem*>&& next){
 
 	trySwapFocus(lastInbounds.empty() ? nullptr : lastInbounds.back());
 }
+

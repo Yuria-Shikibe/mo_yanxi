@@ -5,7 +5,7 @@
 export module mo_yanxi.ui.elem.progress_bar;
 
 
-export import mo_yanxi.ui.elem;
+export import mo_yanxi.ui.basic;
 import mo_yanxi.core.ctrl.key_pack;
 
 import mo_yanxi.snap_shot;

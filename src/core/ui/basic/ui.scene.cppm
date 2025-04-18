@@ -1,37 +1,31 @@
+module;
+
+export module mo_yanxi.ui.basic:scene;
+
+import :pre_decl;
+import :pre_decl;
+import :elem;
+import :group;
+import :tooltip_manager;
 //
-// Created by Matrix on 2024/10/1.
-//
-
-export module mo_yanxi.ui.scene;
-
-export import mo_yanxi.ui.tooltip_manager;
-
 import mo_yanxi.math.vector2;
 import mo_yanxi.math.rect_ortho;
 
 export import mo_yanxi.core.ctrl.constants;
 export import mo_yanxi.core.ctrl.key_binding;
 export import mo_yanxi.ui.flags;
-export import mo_yanxi.ui.pre_decl;
 
 import mo_yanxi.owner;
 import mo_yanxi.handle_wrapper;
 import mo_yanxi.open_addr_hash_map;
 import mo_yanxi.graphic.camera;
 
+//TODO isolate this in future
+import mo_yanxi.graphic.renderer.ui;
+
 import std;
 
-namespace mo_yanxi{
-	namespace graphic{
-		export struct renderer_ui;
-	}
-
-}
-
-
 namespace mo_yanxi::ui{
-
-
 	struct event_channel_manager{
 		using subscriber_map = fixed_open_hash_map<event_channel_t, std::vector<elem*>, std::numeric_limits<event_channel_t>::max()>;
 	private:
@@ -159,10 +153,7 @@ namespace mo_yanxi::ui{
 		scene_base& operator=(scene_base&& other) noexcept = default;
 	};
 
-
 	export struct scene : scene_base{
-		// ToolTipManager tooltipManager{};
-
 		[[nodiscard]] explicit scene(
 			std::string_view name,
 			owner<group*> root,
@@ -265,13 +256,11 @@ namespace mo_yanxi::ui{
 			if(currentKeyFocus == target)currentKeyFocus = nullptr;
 		}
 
-		double get_global_time() const noexcept;
+		[[nodiscard]] double get_global_time() const noexcept;
 
 	private:
 		void updateInbounds(std::vector<elem*>&& next);
 
 		// void moveOwnerShip();
 	};
-
-
 }

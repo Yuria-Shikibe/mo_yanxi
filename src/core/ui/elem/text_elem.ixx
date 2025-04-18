@@ -4,7 +4,7 @@
 
 export module mo_yanxi.ui.elem.text_elem;
 
-export import mo_yanxi.ui.elem;
+export import mo_yanxi.ui.basic;
 export import mo_yanxi.font;
 export import mo_yanxi.font.typesetting;
 import std;

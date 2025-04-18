@@ -4,7 +4,7 @@
 
 export module mo_yanxi.ui.image_drawable;
 
-export import mo_yanxi.ui.pre_decl;
+export import mo_yanxi.ui.basic;
 export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.graphic.color;

@@ -2,24 +2,16 @@ module;
 
 #include <cassert>
 
-module mo_yanxi.ui.elem;
+module mo_yanxi.ui.basic;
 
-import mo_yanxi.ui.pre_decl;
-import mo_yanxi.ui.scene;
-import mo_yanxi.ui.group;
 import mo_yanxi.ui.util;
 import mo_yanxi.ui.graphic;
 import mo_yanxi.graphic.renderer.ui;
 import mo_yanxi.graphic.draw;
-// import Graphic.Renderer.UI;
 
-//
-// float mo_yanxi::ui::EmptyElementDrawer::contentOpacity(const struct elem& element) const{
-// 	if(element.disabled){
-// 		return .55f;
-// 	}
-//
-// 	return 1.f;
+import :pre_decl;
+import :scene;
+import :group;
 // }
 
 namespace mo_yanxi{

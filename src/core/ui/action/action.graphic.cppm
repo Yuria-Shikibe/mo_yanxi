@@ -1,6 +1,6 @@
 export module mo_yanxi.ui.action.graphic;
 
-import mo_yanxi.ui.elem;
+import mo_yanxi.ui.basic;
 export import mo_yanxi.ui.action;
 import mo_yanxi.graphic.color;
 

@@ -1,8 +1,6 @@
 export module mo_yanxi.ui.loose_group;
 
-export import mo_yanxi.ui.elem_ptr;
-export import mo_yanxi.ui.group;
-// export import Core.UI.Template.Traits;
+export import mo_yanxi.ui.basic;
 
 import std;
 

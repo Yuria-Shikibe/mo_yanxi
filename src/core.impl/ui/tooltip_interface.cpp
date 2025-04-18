@@ -1,7 +1,5 @@
-module mo_yanxi.ui.tooltip_interface;
+module mo_yanxi.ui.basic;
 
-import mo_yanxi.ui.elem;
-import mo_yanxi.ui.scene;
 
 void mo_yanxi::ui::tooltip_owner::tooltip_notify_drop(){
 	if(tooltip_handle)tooltip_handle->get_scene()->tooltip_manager.requestDrop(this);

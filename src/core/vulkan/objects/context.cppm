@@ -275,6 +275,8 @@ namespace mo_yanxi::vk{
 				if(last_swap_chain)vkDestroySwapchainKHR(device, last_swap_chain, nullptr);
 			}
 			if(instance)vkDestroySurfaceKHR(instance, surface, nullptr);
+
+			swap_chain_frames.clear();
 		}
 
 		[[nodiscard]] const window_instance& window() const noexcept{

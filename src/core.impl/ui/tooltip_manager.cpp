@@ -2,11 +2,8 @@ module;
 
 #include <cassert>
 
-module mo_yanxi.ui.tooltip_manager;
+module mo_yanxi.ui.basic;
 
-import mo_yanxi.ui.group;
-import mo_yanxi.ui.scene;
-import mo_yanxi.ui.elem;
 import mo_yanxi.ui.action;
 import mo_yanxi.ui.action.graphic;
 import align;

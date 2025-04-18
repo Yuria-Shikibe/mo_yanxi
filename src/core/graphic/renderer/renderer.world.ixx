@@ -453,7 +453,6 @@ namespace mo_yanxi::graphic{
 		}
 	};
 
-	export
 	struct renderer_world : renderer{
 	public:
 		camera2 camera{};

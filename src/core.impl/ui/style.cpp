@@ -1,8 +1,7 @@
 module mo_yanxi.ui.style;
 
-import mo_yanxi.ui.elem;
+import mo_yanxi.ui.basic;
 
-import mo_yanxi.ui.scene;
 import mo_yanxi.ui.graphic;
 import mo_yanxi.graphic.draw.func;
 import mo_yanxi.graphic.draw.multi_region;

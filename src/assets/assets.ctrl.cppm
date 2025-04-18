@@ -7,7 +7,7 @@ export module mo_yanxi.assets.ctrl;
 export import mo_yanxi.core.global;
 export import mo_yanxi.core.global.graphic;
 export import mo_yanxi.core.global.ui;
-export import mo_yanxi.ui.scene;
+export import mo_yanxi.ui.basic;
 export import mo_yanxi.ui.root;
 export import mo_yanxi.graphic.camera;
 

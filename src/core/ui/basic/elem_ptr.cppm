@@ -2,17 +2,17 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.elem_ptr;
+export module mo_yanxi.ui.basic:elem_ptr;
+
+import :pre_decl;
 
 import std;
-import mo_yanxi.ui.pre_decl;
 import mo_yanxi.owner;
 import mo_yanxi.meta_programming;
 import mo_yanxi.func_initialzer;
 
 
 namespace mo_yanxi::ui{
-	// export struct elem;
 
 	export
 	template <typename Fn>

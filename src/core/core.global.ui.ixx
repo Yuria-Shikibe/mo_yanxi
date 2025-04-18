@@ -4,7 +4,7 @@
 
 export module mo_yanxi.core.global.ui;
 
-export import mo_yanxi.ui.pre_decl;
+export import mo_yanxi.ui.root;
 
 namespace mo_yanxi::core::global::ui{
 	export inline mo_yanxi::ui::root* root{};

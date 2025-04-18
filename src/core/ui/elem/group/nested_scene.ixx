@@ -4,9 +4,8 @@ module;
 
 export module mo_yanxi.ui.elem.nested_scene;
 
-export import mo_yanxi.ui.elem;
+export import mo_yanxi.ui.basic;
 export import mo_yanxi.ui.loose_group;
-export import mo_yanxi.ui.scene;
 export import mo_yanxi.graphic.camera;
 export import mo_yanxi.math.quad_tree;
 

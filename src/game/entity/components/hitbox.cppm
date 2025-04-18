@@ -148,7 +148,7 @@ namespace mo_yanxi::game{
 			return components.size();
 		}
 
-		void unchecked_set_trans(math::trans2 trs) noexcept{
+		void set_trans_unchecked(math::trans2 trs) noexcept{
 			trans = trs;
 		};
 	};
@@ -164,7 +164,7 @@ namespace mo_yanxi::game{
 		constexpr ccd_hitbox() = default;
 
 		using hitbox_identity::operator[];
-		using hitbox_identity::unchecked_set_trans;
+		using hitbox_identity::set_trans_unchecked;
 		using hitbox_identity::size;
 
 		[[nodiscard]] explicit(false) ccd_hitbox(const hitbox_identity& identity)
@@ -485,12 +485,12 @@ namespace mo_yanxi::game{
 		}
 
 
-	private:
-
 
 		[[nodiscard]] bool is_clamped() const noexcept{
 			return get_intersect_move_index() != size_CCD;
 		}
+
+	private:
 
 		/**
 		 * \brief This ignores the rotation of the subject entity!

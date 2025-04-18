@@ -13,12 +13,11 @@ export import mo_yanxi.math.timed;
 export import mo_yanxi.math.interpolation;
 export import mo_yanxi.graphic.color;
 export import mo_yanxi.graphic.image_region;
+
+//TODO isolate this in future
+export import mo_yanxi.graphic.renderer.world;
+
 import std;
-
-namespace mo_yanxi::graphic{
-	export struct renderer_world;
-}
-
 
 namespace mo_yanxi::game::fx{
 

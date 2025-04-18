@@ -2,13 +2,11 @@ module;
 
 #include <cassert>
 
-module mo_yanxi.ui.elem_ptr;
+module mo_yanxi.ui.basic;
 
-import mo_yanxi.ui.pre_decl;
-import mo_yanxi.ui.elem;
-import mo_yanxi.ui.group;
-import mo_yanxi.ui.scene;
-
+import :pre_decl;
+import :elem;
+import :group;
 
 mo_yanxi::ui::elem_ptr::~elem_ptr(){
 	delete element;

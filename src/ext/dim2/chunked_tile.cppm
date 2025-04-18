@@ -3,7 +3,7 @@ module;
 #include "../adapted_attributes.hpp"
 #include <cassert>
 
-export module ext.dim2.grid;
+export module mo_yanxi.dim2.grid;
 
 export import mo_yanxi.basic_util;
 export import ext.dim2.plane_concept;

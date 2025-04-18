@@ -81,6 +81,17 @@ namespace mo_yanxi{
 		return index;
 	}();
 
+	export
+	template <typename Tuple>
+	using reverse_tuple_t = typename decltype([]{
+		if constexpr (std::tuple_size_v<Tuple> == 0){
+			return std::type_identity<std::tuple<>>{};
+		}else{
+			return []<std::size_t... Idx>(std::index_sequence<Idx...>) {
+				return std::type_identity<std::tuple<std::tuple_element_t<std::tuple_size_v<Tuple> - 1 - Idx, Tuple> ...>>{};
+			}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+		}
+	}())::type;
 
 	export
 	template <template <typename > typename UnaryPred, typename Tuple>
@@ -265,6 +276,18 @@ namespace mo_yanxi{
 	}
 
 
+	template <std::size_t count, typename Tuple>
+	consteval auto take_tuple_first_elem(){
+		if constexpr (std::tuple_size_v<Tuple> <= count){
+			return std::type_identity<Tuple>{};
+		}else{
+			return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+				return std::type_identity<std::tuple<std::tuple_element_t<Idx, Tuple> ...>>{};
+			}(std::make_index_sequence<count>{});
+		}
+	}
+
+
 	export
 	template <std::size_t Count, typename Tuple>
 	struct tuple_drop_front_n_elem : decltype(remove_tuple_first_elem<Count, Tuple>()){};
@@ -276,6 +299,14 @@ namespace mo_yanxi{
 	export
 	template <std::size_t Count, typename Tuple>
 	using tuple_drop_front_n_elem_t = typename tuple_drop_front_n_elem<Count, Tuple>::type;
+
+	export
+	template <std::size_t Count, typename Tuple>
+	using tuple_drop_back_n_elem_t = typename tuple_drop_back_n_elem<Count, Tuple>::type;
+
+	export
+	template <std::size_t Count, typename Tuple>
+	using tuple_take_n_elem_t = typename decltype(take_tuple_first_elem<Count, Tuple>())::type;
 
 	export
 	template <typename Tuple>

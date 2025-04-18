@@ -4,8 +4,7 @@ module;
 
 export module mo_yanxi.ui.root;
 
-export import mo_yanxi.ui.pre_decl;
-export import mo_yanxi.ui.scene;
+import mo_yanxi.ui.basic;
 
 import mo_yanxi.math.vector2;
 import mo_yanxi.math.rect_ortho;

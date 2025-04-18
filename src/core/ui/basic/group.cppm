@@ -2,11 +2,11 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.group;
+export module mo_yanxi.ui.basic:group;
 
-export import mo_yanxi.ui.pre_decl;
-export import mo_yanxi.ui.elem_ptr;
-export import mo_yanxi.ui.elem;
+import :pre_decl;
+import :elem_ptr;
+import :elem;
 
 import std;
 

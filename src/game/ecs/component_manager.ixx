@@ -63,6 +63,7 @@ namespace mo_yanxi::game::ecs{
 	struct component_manager{
 		template <typename T>
 		using small_vector_of = gch::small_vector<T>;
+		// using archetype_map_type = type_fixed_hash_map<std::unique_ptr<archetype_base>>;
 		using archetype_map_type = std::unordered_map<std::type_index, std::unique_ptr<archetype_base>>;
 
 	private:
@@ -100,16 +101,24 @@ namespace mo_yanxi::game::ecs{
 			return ent;
 		}
 
-		template <typename Tuple>
+		template <typename Tuple, std::derived_from<archetype<Tuple>> Archetype = archetype<Tuple>>
 			requires (is_tuple_v<Tuple>)
-		auto add_archetype(){
+		auto& add_archetype(){
 			std::type_index idx = typeid(Tuple);
 
-			return archetypes.try_emplace(idx, create_new_archetype_map<Tuple>());
+			return static_cast<Archetype&>(*archetypes.try_emplace(idx, create_new_archetype_map<Tuple, Archetype>()).first->second);
+		}
+
+		template <typename Archetype>
+			requires requires{
+				typename Archetype::raw_tuple;
+			}
+		auto& add_archetype(){
+			return add_archetype<typename Archetype::raw_tuple, Archetype>();
 		}
 
 		template <typename ...Tuple>
-			requires (sizeof...(Tuple) > 1)
+			requires (sizeof...(Tuple) > 1 && (is_tuple_v<Tuple> && ...))
 		void add_archetype(){
 			(add_archetype<Tuple>(), ...);
 		}
@@ -209,7 +218,7 @@ namespace mo_yanxi::game::ecs{
 		FORCE_INLINE void sliced_each(Fn fn){
 			using raw_params = remove_mfptr_this_args<Fn>;
 
-			if constexpr (std::same_as<std::tuple_element_t<0, raw_params>, component_manager&>){
+			if constexpr (std::same_as<std::remove_cvref_t<std::tuple_element_t<0, raw_params>>, component_manager>){
 				using params = unary_apply_to_tuple_t<std::decay_t, tuple_drop_first_elem_t<raw_params>>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
@@ -419,22 +428,23 @@ namespace mo_yanxi::game::ecs{
 				vector.insert(it, std::move(elem));
 			};
 
+			using appended = tuple_cat_t<std::tuple<chunk_meta>, Tuple>;
+
 			[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
-				(insert(typeid(std::tuple_element_t<Idx, Tuple>), archetype_slice{
+				(insert(typeid(std::tuple_element_t<Idx, appended>), archetype_slice{
 					&type,
 					+[](void* arg) noexcept -> strided_span<std::byte>{
-						return strided_span<std::byte>{static_cast<archetype<Tuple>*>(arg)->template slice<std::tuple_element_t<Idx, Tuple>>()};
+						return strided_span<std::byte>{static_cast<archetype<Tuple>*>(arg)->template slice<std::tuple_element_t<Idx, appended>>()};
 					}
 				}), ...);
-			}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+			}(std::make_index_sequence<std::tuple_size_v<appended>>{});
 		}
 
 
-		template <typename Tuple>
+		template <typename Tuple, std::derived_from<archetype<Tuple>> Archetype = archetype<Tuple>>
 		std::unique_ptr<archetype_base> create_new_archetype_map(){
-			using ArcheT = archetype<Tuple>;
-			std::unique_ptr<archetype_base> ptr = std::make_unique<ArcheT>();
-			this->add_new_archetype_map<Tuple>(static_cast<ArcheT&>(*ptr));
+			std::unique_ptr<archetype_base> ptr = std::make_unique<Archetype>();
+			this->add_new_archetype_map<Tuple>(static_cast<Archetype&>(*ptr));
 			return ptr;
 		}
 

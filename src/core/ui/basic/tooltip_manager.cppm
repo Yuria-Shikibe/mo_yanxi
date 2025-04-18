@@ -2,15 +2,15 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.tooltip_manager;
+export module mo_yanxi.ui.basic:tooltip_manager;
 
-export import mo_yanxi.ui.tooltip_interface;
 export import mo_yanxi.ui.flags;
+
+import :tooltip_interface;
 import std;
 
 namespace mo_yanxi::ui{
 	export class tooltip_manager;
-	// struct Scene;
 
 	struct ToolTipDrawInfo{
 		elem* element{};

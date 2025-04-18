@@ -111,6 +111,8 @@ target("mo_yanxi")
 
         -- 如果需要 shaderc 等额外库，可以添加：
         add_links("shaderc_shared")
+
+        add_defines("VK_USE_64_BIT_PTR_DEFINES=1")
     end
 
 --

@@ -3,13 +3,10 @@ module;
 #include <vulkan/vulkan.h>
 
 export module mo_yanxi.assets.graphic;
+import mo_yanxi.vk.context;
 
 export import mo_yanxi.vk.sampler;
 export import mo_yanxi.vk.shader;
-
-namespace mo_yanxi::vk{
-	export class context;
-}
 
 namespace mo_yanxi::assets::graphic{
 

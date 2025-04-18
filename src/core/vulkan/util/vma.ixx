@@ -1,6 +1,7 @@
 module;
 
 #include <cassert>
+
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 
@@ -11,11 +12,11 @@ import mo_yanxi.handle_wrapper;
 
 // NOLINTBEGIN(*-misplaced-const)
 namespace mo_yanxi::vk{
-	export{
-		using ::VmaAllocatorCreateInfo;
-		using ::VmaAllocationCreateInfo;
-		using ::VmaAllocator;
-	}
+	// export{
+	// 	using ::VmaAllocatorCreateInfo;
+	// 	using ::VmaAllocationCreateInfo;
+	// 	using ::VmaAllocator;
+	// }
 
 	export
 	template <typename T>

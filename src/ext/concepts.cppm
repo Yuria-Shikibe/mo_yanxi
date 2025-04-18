@@ -98,6 +98,10 @@ namespace mo_yanxi {
 
 	export
 	template <class T, template <class...> class Template>
+	concept decayed_spec_of = spec_of<std::decay_t<T>, Template>;
+
+	export
+	template <class T, template <class...> class Template>
 	struct is_spec_of : std::bool_constant<spec_of<T, Template>>{};
 
 

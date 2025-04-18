@@ -189,13 +189,13 @@ export namespace mo_yanxi::math {
 
 		template <typename T1, typename T2>
 			requires (std::is_arithmetic_v<T1> && std::is_arithmetic_v<T2>)
-		auto operator()(const T1 min, const T2 max) noexcept -> std::common_type_t<T1, T2>{
+		constexpr auto operator()(const T1 min, const T2 max) noexcept -> std::common_type_t<T1, T2>{
 			return this->random(min, max);
 		}
 
 		template <typename T>
 			requires (std::is_arithmetic_v<T>)
-		T operator()(const T range) noexcept{
+		constexpr T operator()(const T range) noexcept{
 			return this->range(range);
 		}
 

@@ -8,15 +8,12 @@ export module mo_yanxi.math.intersection;
 
 export import mo_yanxi.math;
 export import mo_yanxi.math.vector2;
-export import mo_yanxi.math.quad;
 
 import std;
 
 namespace mo_yanxi::math{
 	using fp_t = float;
 
-	template <typename T>
-	concept quad_like = std::is_base_of_v<quad<fp_t>, T>;
 	export
 	/** Returns a point on the segment nearest to the specified point. */
 	[[nodiscard]] FORCE_INLINE constexpr vec2 nearest_segment_point(const vec2 where, const vec2 start, const vec2 end) noexcept{
@@ -54,53 +51,6 @@ namespace mo_yanxi::math{
 		}
 	};
 
-	export
-	rect_box<fp_t> wrap_striped_box(const vector2<fp_t> move, const rect_box<fp_t>& box) noexcept{
-		if(move.equals({}, std::numeric_limits<fp_t>::epsilon() * 64)) {
-			return box;
-		}
-
-		const auto ang = move.angle();
-		auto [cos, sin] = cos_sin_deg(-ang);
-		fp_t minX = std::numeric_limits<fp_t>::max();
-		fp_t minY = std::numeric_limits<fp_t>::max();
-		fp_t maxX = std::numeric_limits<fp_t>::lowest();
-		fp_t maxY = std::numeric_limits<fp_t>::lowest();
-
-		rect_box<fp_t> rst = box;
-
-		for(std::size_t i = 0; i < 4; ++i){
-			auto [x, y] = rst[i].rotate(cos, sin);
-			minX = min(minX, x);
-			minY = min(minY, y);
-			maxX = max(maxX, x);
-			maxY = max(maxY, y);
-		}
-
-		rst.move(move);
-
-		for(std::size_t i = 0; i < 4; ++i){
-			auto [x, y] = rst[i].rotate(cos, sin);
-			minX = min(minX, x);
-			minY = min(minY, y);
-			maxX = max(maxX, x);
-			maxY = max(maxY, y);
-		}
-
-		CHECKED_ASSUME(minX <= maxX);
-		CHECKED_ASSUME(minY <= maxY);
-
-		maxX += move.length();
-
-		rst = rect_box<fp_t>{
-			vector2<fp_t>{minX, minY}.rotate(cos, -sin),
-			vector2<fp_t>{maxX, minY}.rotate(cos, -sin),
-			vector2<fp_t>{maxX, maxY}.rotate(cos, -sin),
-			vector2<fp_t>{minX, maxY}.rotate(cos, -sin)
-		};
-
-		return rst;
-	}
 
 	export
 	FORCE_INLINE constexpr fp_t dst2_to_line(vector2<fp_t> where, const vector2<fp_t> pointOnLine, const vector2<fp_t> lineDirVec) noexcept {
@@ -235,152 +185,150 @@ namespace mo_yanxi::math{
 		return true;
 	}
 
+	using vec_t = vector2<fp_t>;
+
 	export
-	template <quad_like T>
-		// requires requires(const T& t){
-		// 	{ t[int{}] } -> std::convertible_to<vector2<fp_t>>;
-		// }
-	[[nodiscard]] constexpr vector2<fp_t> nearest_edge_normal(const T& rectangle, const vector2<fp_t> p) noexcept {
-		fp_t minDistance = std::numeric_limits<fp_t>::max();
-		vector2<fp_t> closestEdgeNormal{};
+	FORCE_INLINE constexpr possible_point ray_seg_intersection(
+		const vec_t ray_cap, const vec_t ray_dir,
+		const vec_t seg_v1, const vec_t seg_v2){
+		const auto seg_dir = seg_v2 - seg_v1;
+		const auto denom = seg_dir.cross(ray_dir);
 
-		for (int i = 0; i < 4; i++) {
-			auto a = rectangle[i];
-			auto b = rectangle[i + 1];
+		// 处理分母不为零的情况（射线与线段不平行）
+		if(math::abs(denom) > 1e-6f){
+			const auto ao = seg_v1 - ray_cap;
+			const auto t_numerator = ao.cross(seg_dir);
+			const auto s_numerator = ray_dir.cross(ao);
 
-			const fp_t d = ::mo_yanxi::math::dst2_to_segment(p, a, b);
+			const auto t = t_numerator / denom;
+			const auto s = s_numerator / denom;
 
-			if (d < minDistance) {
-				minDistance = d;
-				closestEdgeNormal = rectangle.edge_normal_at(i);
+			if(t >= 0.0f && s >= 0.0f && s <= 1.0f){
+				return {{ray_cap.x + t * ray_dir.x, ray_cap.y + t * ray_dir.y}, true};
 			}
+			return {{}, false};
 		}
 
-		return closestEdgeNormal;
+		// 处理共线情况
+		const auto ab = seg_dir;
+		const auto ao = ray_cap - seg_v1;
+		const auto cross = ab.cross(ao);
+
+		// 检查是否真正共线
+		if(math::abs(cross) > 1e-6f) return {{}, false};
+
+
+		// 检查射线起点是否在线段上
+		const auto dot_ab = ab.dot(ab);
+		const auto dot_ao_ab = ao.dot(ab);
+		const auto k = dot_ab != 0 ? dot_ao_ab / dot_ab : 0;
+
+		if(k >= 0 && k <= 1) return {ray_cap, true};
+
+		// 计算线段端点对应的射线参数
+		fp_t t_a, t_b;
+		if(math::abs(ray_dir.x) > 1e-6f){
+			t_a = (seg_v1.x - ray_cap.x) / ray_dir.x;
+			t_b = (seg_v2.x - ray_cap.x) / ray_dir.x;
+		} else{
+			t_a = (seg_v1.y - ray_cap.y) / ray_dir.y;
+			t_b = (seg_v2.y - ray_cap.y) / ray_dir.y;
+		}
+
+		// 确定有效交点
+		const auto t_min = math::min(t_a, t_b);
+		const auto t_max = math::max(t_a, t_b);
+
+		if(t_max < 0) return {{}, false};
+		if(t_min > 0) return {(t_a < t_b) ? seg_v1 : seg_v2, true};
+
+		// 计算线段参数s
+		if(math::abs(t_a - t_b) < 1e-6f) return {{}, false};
+		const auto s_val = (0 - t_a) / (t_b - t_a);
+
+		if(s_val >= 0 && s_val <= 1){
+			return {
+					vec_t{
+						seg_v1.x + s_val * seg_dir.x,
+						seg_v1.y + s_val * seg_dir.y
+					},
+					true
+				};
+		}
+
+		// 返回有效端点
+		const bool a_valid = t_a >= 0;
+		const bool b_valid = t_b >= 0;
+
+		if(a_valid && b_valid) return {(t_a < t_b) ? seg_v1 : seg_v2, true};
+		if(a_valid) return {seg_v1, true};
+		if(b_valid) return {seg_v2, true};
+
+		return {{}, false};
 	}
-
-	struct weighted_vector{
-		fp_t weight;
-		vector2<fp_t> normal;
-	};
-
-	/**
-	 * @warning Return Value Is NOT Normalized!
-	 */
-	export
-	template <quad_like T>
-	[[nodiscard]] constexpr vector2<fp_t> avg_edge_normal(const T& quad, const vector2<fp_t> where) noexcept {
-
-		std::array<weighted_vector, 4> normals{};
-
-		for (int i = 0; i < 4; i++) {
-			const vector2<fp_t> va = quad[i];
-			const vector2<fp_t> vb = quad[i + 1];
-
-			normals[i].weight = math::dst_to_segment(where, va, vb) * va.dst(vb);
-			normals[i].normal = quad.edge_normal_at(i);
-		}
-
-		const fp_t total = (normals[0].weight + normals[1].weight + normals[2].weight + normals[3].weight);
-		assert(total != 0.f);
-
-		vector2<fp_t> closestEdgeNormal{};
-
-		for(const auto& [weight, normal] : normals) {
-			closestEdgeNormal.sub(normal * math::pow_integral<16>(weight / total));
-		}
-
-		assert(!closestEdgeNormal.is_NaN());
-		if(closestEdgeNormal.is_zero()) [[unlikely]] {
-			closestEdgeNormal = -std::ranges::max_element(normals, {}, &weighted_vector::weight)->normal;
-		}
-
-		return closestEdgeNormal;
-	}
-
-	// struct quad_intersection_result{
-	// 	struct info{
-	// 		vector2<fp_t> pos;
-	// 		unsigned short edgeSbj;
-	// 		unsigned short edgeObj;
-	//
-	// 		static bool onSameEdge(const unsigned short edgeIdxN_1, const unsigned short edgeIdxN_2) noexcept {
-	// 			return edgeIdxN_1 == edgeIdxN_2;
-	// 		}
-	//
-	// 		static bool onNearEdge(const unsigned short edgeIdxN_1, const unsigned short edgeIdxN_2) noexcept {
-	// 			return (edgeIdxN_1 + 1) % 4 == edgeIdxN_2 || (edgeIdxN_2 + 1) % 4 == edgeIdxN_1;
-	// 		}
-	//
-	// 	};
-	// 	array_stack<info, 4, unsigned> points{};
-	//
-	// 	explicit operator bool() const noexcept{
-	// 		return !points.empty();
-	// 	}
-	//
-	// 	[[nodiscard]] constexpr vector2<fp_t> avg() const noexcept{
-	// 		assert(!points.empty());
-	//
-	// 		vector2<fp_t> rst{};
-	// 		for (const auto & intersection : points){
-	// 			rst += intersection.pos;
-	// 		}
-	//
-	// 		return rst / static_cast<fp_t>(points.size());
-	// 	}
-	// };
-
-	// export
-	// template <quad_like L, quad_like R>
-	// auto rectExactAvgIntersection(const L& subjectBox, const R& objectBox) noexcept {
-	// 	quad_intersection_result result{};
-	//
-	// 	vector2<fp_t> rst{};
-	// 	for(unsigned i = 0; i < 4; ++i) {
-	// 		for(unsigned j = 0; j < 4; ++j) {
-	// 			if(intersect_segments(
-	// 				subjectBox[i], subjectBox[(i + 1) % 4],
-	// 				objectBox[j], objectBox[(j + 1) % 4],
-	// 				rst)
-	// 			) {
-	// 				if(!result.points.full()){
-	// 					result.points.push(quad_intersection_result::info{rst, static_cast<unsigned short>(i), static_cast<unsigned short>(j)});
-	// 				}else{
-	// 					return result;
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	//
-	// 	return result;
-	// }
 
 
 	export
-	template <quad_like L, quad_like R>
-	possible_point rect_rough_avg_intersection(const L& subject, const R& object) noexcept {
-		vector2<fp_t> intersections{};
-		unsigned count = 0;
+	FORCE_INLINE fp_t ray_seg_intersection_dst(const vec_t ray_origin, const vec_t ray_dir,
+	                               const vec_t seg_v1, const vec_t seg_v2) {
+	    constexpr auto inf = std::numeric_limits<fp_t>::infinity();
 
-		vector2<fp_t> rst{};
-		for(int i = 0; i < 4; ++i) {
-			for(int j = 0; j < 4; ++j) {
-				if(math::intersect_segments(subject[i], subject[(i + 1)], object[j], object[(j + 1)], rst)) {
-					count++;
-					intersections += rst;
-				}
-			}
-		}
+	    // 计算线段方向向量
+	    const auto seg_dir = seg_v2 - seg_v1;
 
-		if(count > 0) {
-			return {intersections.div(static_cast<fp_t>(count)), true};
-		}
+	    // 计算分母（叉积）
+	    const auto denom = seg_dir.cross(ray_dir);
 
-		return {};
+	    // 处理非平行情况
+	    if (math::abs(denom) > 1e-6f) {
+	        const vec_t ao{seg_v1.x - ray_origin.x, seg_v1.y - ray_origin.y};
+
+	        // 计算射线参数t和线段参数s
+	        const auto t = (ao.y * seg_dir.x - ao.x * seg_dir.y) / denom;
+	        const auto s = (ray_dir.x * ao.y - ray_dir.y * ao.x) / denom;
+
+	        // 检查交点是否有效
+	        if (t >= 0.0f && s >= 0.0f && s <= 1.0f) {
+	            // 计算交点并返回距离
+	            const vec_t intersection{
+	                ray_origin.x + t * ray_dir.x,
+	                ray_origin.y + t * ray_dir.y
+	            };
+	            const float dx = intersection.x - ray_origin.x;
+	            const float dy = intersection.y - ray_origin.y;
+	            return std::hypot(dx, dy);
+	        }
+	        return inf;
+	    }
+
+	    // 处理平行或共线情况
+	    // 检查是否共线
+	    const vec2 ao{seg_v1.x - ray_origin.x, seg_v1.y - ray_origin.y};
+	    const auto cross = ray_dir.x * ao.y - ray_dir.y * ao.x;
+	    if (math::abs(cross) > 1e-6f) return inf; // 平行但不共线
+
+	    // 共线情况 - 计算线段端点在射线上的投影
+	    auto t1 = (seg_v1.x - ray_origin.x) / (math::abs(ray_dir.x) > 1e-6f ? ray_dir.x : 1e-6f);
+	    auto t2 = (seg_v2.x - ray_origin.x) / (math::abs(ray_dir.x) > 1e-6f ? ray_dir.x : 1e-6f);
+
+	    // 如果射线方向y分量较大，使用y坐标计算
+	    if (math::abs(ray_dir.y) > math::abs(ray_dir.x)) {
+	        t1 = (seg_v1.y - ray_origin.y) / ray_dir.y;
+	        t2 = (seg_v2.y - ray_origin.y) / ray_dir.y;
+	    }
+
+	    // 找到有效的t值（t >= 0）
+	    auto min_t = inf;
+	    if (t1 >= 0) min_t = math::min(min_t, t1);
+	    if (t2 >= 0) min_t = math::min(min_t, t2);
+
+	    // 如果找到有效t值，计算距离
+	    if (min_t != inf) {
+	        return min_t * std::hypot(ray_dir.x, ray_dir.y);
+	    }
+
+	    return inf;
 	}
-
-
 	// OrthoRectFloat maxContinousBoundOf(const std::vector<QuadBox>& traces) {
 	// 	const auto& front = traces.front().getMaxOrthoBound();
 	// 	const auto& back  = traces.back().getMaxOrthoBound();

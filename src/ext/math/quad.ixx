@@ -7,6 +7,7 @@ export module mo_yanxi.math.quad;
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.trans2;
+export import mo_yanxi.math.intersection;
 export import mo_yanxi.math;
 
 import std;
@@ -140,13 +141,15 @@ namespace mo_yanxi::math{
 			return self.get_bound().overlap_inclusive(other);
 		}
 
-		constexpr void expand(const T length) noexcept{
+		constexpr vec_t expand(const T length) noexcept{
 			auto center = avg();
 
 			v0 += (v0 - center).set_length(length);
 			v1 += (v1 - center).set_length(length);
 			v2 += (v2 - center).set_length(length);
 			v3 += (v3 - center).set_length(length);
+
+			return center;
 		}
 
 		/**
@@ -285,6 +288,54 @@ namespace mo_yanxi::math{
 			return {};
 		}
 
+		template <any_derived_from<quad> S, any_derived_from<quad> O>
+			requires requires{
+				requires overlay_axis_keys<S>::count > 0;
+				requires overlay_axis_keys<O>::count > 0;
+			}
+		[[nodiscard]] FORCE_INLINE vec_t depart_vector_to_on_vel_rough_min(this const S& sbj, const O& obj, vec_t v) noexcept{
+			const auto depart_vector_on_vec = sbj.depart_vector_to_on_vel(obj, v);
+			const auto depart_vector = sbj.depart_vector_to(obj);
+
+			if(depart_vector.equals({}) || depart_vector_on_vec.equals({}))return {};
+
+			return math::lerp(depart_vector_on_vec, depart_vector,
+				std::sqrt(math::curve(depart_vector_on_vec.copy().normalize().dot(depart_vector.copy().normalize()), -0.995f, 1.25f))
+			);
+
+		}
+
+		template <any_derived_from<quad> S, any_derived_from<quad> O>
+			requires requires{
+				requires overlay_axis_keys<S>::count > 0;
+				requires overlay_axis_keys<O>::count > 0;
+			}
+		[[nodiscard]] FORCE_INLINE vec_t depart_vector_to_on_vel_exact(this const S& sbj, const O& obj, vec_t v) noexcept{
+			v.normalize();
+
+			const vec_t base_depart = sbj.depart_vector_to_on_vel(obj, v) * 1.005f;
+
+			value_type min = std::numeric_limits<value_type>::infinity();
+
+			for(int i = 0; i < 4; ++i){
+				for(int j = 0; j < 4; ++j){
+					auto dst1 = math::ray_seg_intersection_dst(sbj[i] + base_depart, v, obj[j], obj[j + 1]);
+					auto dst2 = math::ray_seg_intersection_dst(obj[i] - base_depart, -v, sbj[j], sbj[j + 1]);
+					min = math::min(min, math::min(dst1, dst2));
+				}
+			}
+
+			if(std::isinf(min)){
+				return {};
+			}
+
+			assert(!std::isnan(min));
+			assert(!v.is_NaN());
+			assert(!base_depart.is_NaN());
+
+			return base_depart + v * min;
+		}
+
 		[[nodiscard]] constexpr bool contains(const vec_t point) const noexcept{
 			if(!get_bound().contains_loose(point)){
 				return false;
@@ -375,17 +426,19 @@ namespace mo_yanxi::math{
 			bounding_box.src += vec;
 		}
 
-		constexpr void expand(const T length) noexcept{
-			base::expand(length);
+		constexpr typename base::vec_t expand(const T length) noexcept{
+			auto rst = base::expand(length);
 
 			bounding_box = base::get_bound();
+
+			return rst;
 		}
 
 		/**
 		 * @warning Breaks Invariant! For Fast Only
 		 */
-		constexpr void expand_unchecked(const T length) noexcept{
-			base::expand(length);
+		constexpr typename base::vec_t expand_unchecked(const T length) noexcept{
+			return base::expand(length);
 		}
 
 		constexpr explicit(false) operator base() const noexcept{
@@ -419,6 +472,8 @@ namespace mo_yanxi::math{
 		using base::depart_vector_to;
 		using base::depart_vector_to_on;
 		using base::depart_vector_to_on_vel;
+		using base::depart_vector_to_on_vel_rough_min;
+		using base::depart_vector_to_on_vel_exact;
 	};
 
 	export
@@ -467,10 +522,10 @@ namespace mo_yanxi::math{
 
 
 		[[nodiscard]] explicit rect_box(const base& base)
-			: base(base), normalU(this->v0 - this->v3), normalV(this->v1 - this->v2){
+			: base(base), normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
 		}
 		[[nodiscard]] explicit rect_box(const typename base::rect_t& rect)
-			: base(rect), normalU(this->v0 - this->v3), normalV(this->v1 - this->v2){
+			: base(rect), normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
 		}
 
 		// [[nodiscard]] RectBoxBrief() = default;
@@ -480,8 +535,8 @@ namespace mo_yanxi::math{
 			const typename base::vec_t::const_pass_t v1,
 			const typename base::vec_t::const_pass_t v2,
 			const typename base::vec_t::const_pass_t v3) noexcept
-			: base{v0, v1, v2, v3}, normalU(this->v0 - this->v3), normalV(this->v1 - this->v2){
-			//TODO invariant check?
+			: base{v0, v1, v2, v3}, normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
+			assert(math::abs(normalU.dot(normalV)) < 1E-3);
 		}
 
 		/**
@@ -520,7 +575,7 @@ namespace mo_yanxi::math{
 		 * \brief Box Origin Point
 		 * Should Be Mass Center if possible!
 		 */
-		trans_t transform{};
+		// trans_t transform{};
 
 		[[nodiscard]] constexpr rect_box_posed() = default;
 
@@ -536,43 +591,33 @@ namespace mo_yanxi::math{
 
 		constexpr rect_box_posed& copy_identity_from(const rect_box_posed& other) noexcept{
 			this->rect_idt_t::operator=(other);
-			transform = other.transform;
+			// transform = other.transform;
 
 			return *this;
 		}
-		//
-		// /**
-		//  *	TODO move this to other place?
-		//  * \param mass
-		//  * \param scale Manually assign a correction scale
-		//  * \param lengthRadiusRatio to decide the R(radius) scale for simple calculation
-		//  * \brief From: [mr^2/4 + ml^2 / 12]
-		//  * \return Rotational Inertia Estimation
-		//  */
+
 		[[nodiscard]] constexpr float get_rotational_inertia(const float mass, const float scale = 1 / 12.0f, const float lengthRadiusRatio = 0.25f) const noexcept {
 			return size.length2() * (scale + lengthRadiusRatio) * mass;
 		}
 
-		/*constexpr*/ void update(const trans_t transform) noexcept{
+		void update(const trans_t transform) noexcept{
 			typename base::value_type rot = transform.rot;
-			//
-			float cos = math::cos_deg(rot);
-			float sin = math::sin_deg(rot);
+			auto [cos, sin] = math::cos_sin_deg(rot);
 
 			v0.set(offset).rotate(cos, sin);
 			v1.set(size.x, 0).rotate(cos, sin);
 			v3.set(0, size.y).rotate(cos, sin);
 			v2 = v1 + v3;
 
-			if(this->transform.rot != transform.rot){
-				normalU = v3;
-				normalV = v1;
+			// if(this->transform.rot != transform.rot){
+			normalU = v3;
+			normalV = v1;
 
-				normalU.normalize();
-				normalV.normalize();
+			normalU.normalize();
+			normalV.normalize();
 
-				this->transform.rot = transform.rot;
-			}
+			// 	this->transform.rot = transform.rot;
+			// }
 
 			v0 += transform.vec;
 			v1 += v0;
@@ -583,14 +628,9 @@ namespace mo_yanxi::math{
 			bounding_box = quad<float>::get_bound();
 		}
 
-		void rotate(const trans_t::angle_t delta_deg) noexcept{
-			update({transform.vec, transform.rot + delta_deg});
-		}
-
-
-		constexpr explicit(false) operator const quad<typename base::value_type>&() const noexcept{
-			return *this;
-		}
+		// void rotate(const trans_t::angle_t delta_deg) noexcept{
+		// 	update({transform.vec, transform.rot + delta_deg});
+		// }
 	};
 
 
@@ -604,4 +644,143 @@ namespace mo_yanxi::math{
 			return quad.edge_normal_at(Idx);
 		}
 	};
+
+	using fp_t = float;
+
+	template <typename T>
+	concept quad_like = std::is_base_of_v<quad<fp_t>, T>;
+
+	export
+	rect_box<fp_t> wrap_striped_box(const vector2<fp_t> move, const rect_box<fp_t>& box) noexcept{
+		if(move.equals({}, std::numeric_limits<fp_t>::epsilon() * 64)) {
+			return box;
+		}
+
+		const auto ang = move.angle();
+		auto [cos, sin] = cos_sin_deg(-ang);
+		fp_t minX = std::numeric_limits<fp_t>::max();
+		fp_t minY = std::numeric_limits<fp_t>::max();
+		fp_t maxX = std::numeric_limits<fp_t>::lowest();
+		fp_t maxY = std::numeric_limits<fp_t>::lowest();
+
+		rect_box<fp_t> rst = box;
+
+		for(std::size_t i = 0; i < 4; ++i){
+			auto [x, y] = rst[i].rotate(cos, sin);
+			minX = min(minX, x);
+			minY = min(minY, y);
+			maxX = max(maxX, x);
+			maxY = max(maxY, y);
+		}
+
+		rst.move(move);
+
+		for(std::size_t i = 0; i < 4; ++i){
+			auto [x, y] = rst[i].rotate(cos, sin);
+			minX = min(minX, x);
+			minY = min(minY, y);
+			maxX = max(maxX, x);
+			maxY = max(maxY, y);
+		}
+
+		CHECKED_ASSUME(minX <= maxX);
+		CHECKED_ASSUME(minY <= maxY);
+
+		maxX += move.length();
+
+		rst = rect_box<fp_t>{
+			vector2<fp_t>{minX, minY}.rotate(cos, -sin),
+			vector2<fp_t>{maxX, minY}.rotate(cos, -sin),
+			vector2<fp_t>{maxX, maxY}.rotate(cos, -sin),
+			vector2<fp_t>{minX, maxY}.rotate(cos, -sin)
+		};
+
+		return rst;
+	}
+
+
+	export
+	template <quad_like T>
+	[[nodiscard]] constexpr vector2<fp_t> nearest_edge_normal(const T& rectangle, const vector2<fp_t> p) noexcept {
+		fp_t minDistance = std::numeric_limits<fp_t>::max();
+		vector2<fp_t> closestEdgeNormal{};
+
+		for (int i = 0; i < 4; i++) {
+			auto a = rectangle[i];
+			auto b = rectangle[i + 1];
+
+			const fp_t d = ::mo_yanxi::math::dst2_to_segment(p, a, b);
+
+			if (d < minDistance) {
+				minDistance = d;
+				closestEdgeNormal = rectangle.edge_normal_at(i);
+			}
+		}
+
+		return closestEdgeNormal;
+	}
+
+	struct weighted_vector{
+		fp_t weight;
+		vector2<fp_t> normal;
+	};
+
+	/**
+	 * @warning Return Value Is NOT Normalized!
+	 */
+	export
+	template <quad_like T>
+	[[nodiscard]] constexpr vector2<fp_t> avg_edge_normal(const T& quad, const vector2<fp_t> where) noexcept {
+
+		std::array<weighted_vector, 4> normals{};
+
+		for (int i = 0; i < 4; i++) {
+			const vector2<fp_t> va = quad[i];
+			const vector2<fp_t> vb = quad[i + 1];
+
+			normals[i].weight = math::dst_to_segment(where, va, vb) * va.dst(vb);
+			normals[i].normal = quad.edge_normal_at(i);
+		}
+
+		const fp_t total = (normals[0].weight + normals[1].weight + normals[2].weight + normals[3].weight);
+		assert(total != 0.f);
+
+		vector2<fp_t> closestEdgeNormal{};
+
+		for(const auto& [weight, normal] : normals) {
+			closestEdgeNormal.sub(normal * math::pow_integral<16>(weight / total));
+		}
+
+		assert(!closestEdgeNormal.is_NaN());
+		if(closestEdgeNormal.is_zero()) [[unlikely]] {
+			closestEdgeNormal = -std::ranges::max_element(normals, {}, &weighted_vector::weight)->normal;
+		}
+
+		return closestEdgeNormal;
+	}
+
+
+	export
+	template <quad_like L, quad_like R>
+	possible_point rect_rough_avg_intersection(const L& subject, const R& object) noexcept {
+		vector2<fp_t> intersections{};
+		unsigned count = 0;
+
+		vector2<fp_t> rst{};
+		for(int i = 0; i < 4; ++i) {
+			for(int j = 0; j < 4; ++j) {
+				if(math::intersect_segments(subject[i], subject[(i + 1)], object[j], object[(j + 1)], rst)) {
+					count++;
+					intersections += rst;
+				}
+			}
+		}
+
+		if(count > 0) {
+			return {intersections.div(static_cast<fp_t>(count)), true};
+		}
+
+		return {};
+	}
+
 }

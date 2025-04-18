@@ -6,7 +6,7 @@ export module mo_yanxi.ui.celled_group;
 
 export import mo_yanxi.ui.loose_group;
 export import mo_yanxi.ui.layout.cell;
-export import mo_yanxi.ui.elem_ptr;
+export import mo_yanxi.ui.basic;
 export import mo_yanxi.handle_wrapper;
 
 import std;

@@ -4,9 +4,7 @@
 
 export module mo_yanxi.ui.scroll_pane;
 
-export import mo_yanxi.ui.elem;
-export import mo_yanxi.ui.group;
-export import mo_yanxi.ui.elem_ptr;
+export import mo_yanxi.ui.basic;
 export import mo_yanxi.ui.layout.policies;
 
 import mo_yanxi.snap_shot;

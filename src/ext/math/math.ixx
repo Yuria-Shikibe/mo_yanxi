@@ -231,8 +231,7 @@ namespace mo_yanxi::math {
 	}
 
 	export
-	template <typename T>
-		requires (std::is_arithmetic_v<T>)
+	template <small_object T>
 	MATH_ATTR constexpr std::ranges::min_max_result<T> minmax(const T a, const T b) noexcept{
 		if(b < a){
 			return {b, a};
@@ -274,8 +273,8 @@ namespace mo_yanxi::math {
 
 
 	export
-	template <typename T, typename... Args>
-		requires (std::is_arithmetic_v<T> && (std::is_arithmetic_v<Args> && ...))
+	template <small_object T, typename... Args>
+		requires (small_object<Args> && ...)
 	MATH_ATTR constexpr std::ranges::min_max_result<T> minmax(T first, T second, Args... args) noexcept{
 		const auto [min1, max1] = math::minmax(first, second);
 

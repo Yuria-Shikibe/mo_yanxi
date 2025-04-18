@@ -14,14 +14,15 @@ namespace mo_yanxi::game::ecs{
 	struct motion_system{
 		void run(component_manager& manager){
 			manager.sliced_each([](
-				component_manager& m,
+				const component_manager& m,
+				const component<chunk_meta>& meta,
 				component<mech_motion>& motion
 				// component<physical_rigid>& rigid
 			){
 
-				motion->apply_and_reset(m.update_delta);
-				if(auto rigid = m.get_entity_partial_chunk<physical_rigid>(motion.id())){
-					motion->apply_drag(m.update_delta, rigid->val().drag);
+				motion.apply_and_reset(m.update_delta);
+				if(auto rigid = meta.id()->try_get<physical_rigid>()){
+					motion.apply_drag(m.update_delta, rigid->drag);
 				}
 			});
 		}

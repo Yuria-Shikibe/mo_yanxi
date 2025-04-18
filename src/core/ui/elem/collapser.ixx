@@ -4,8 +4,8 @@
 
 export module mo_yanxi.ui.elem.collapser;
 
-export import mo_yanxi.ui.elem;
-export import mo_yanxi.ui.group;
+export import mo_yanxi.ui.basic;
+
 export import mo_yanxi.ui.table;
 export import mo_yanxi.ui.elem.button;
 export import mo_yanxi.math.interpolation;

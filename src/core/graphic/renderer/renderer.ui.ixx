@@ -142,10 +142,10 @@ namespace mo_yanxi::graphic{
 		vk::color_attachment color_base{};
 		vk::color_attachment color_light{};
 		vk::color_attachment color_background{};
-		
+
 		vk::storage_image blit_base{};
 		vk::storage_image blit_light{};
-		
+
 	private:
 		vk::descriptor_layout descriptor_layout_proj{};
 		vk::descriptor_buffer descriptor_buffer_proj{};
@@ -480,7 +480,6 @@ namespace mo_yanxi::graphic{
 		}
 	};
 
-	export
 	struct renderer_ui : renderer{
 	public:
 		ui_batch_proxy batch{};

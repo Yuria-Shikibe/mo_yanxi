@@ -1,7 +1,6 @@
 module mo_yanxi.ui.layout.cell;
 
-import mo_yanxi.ui.elem;
-import mo_yanxi.ui.group;
+import mo_yanxi.ui.basic;
 
 void mo_yanxi::ui::basic_cell::apply_to_base(group& group, elem& elem, stated_extent real_cell_extent) const{
 	elem.property.relative_src = get_relative_src();

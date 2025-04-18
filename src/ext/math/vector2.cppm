@@ -442,6 +442,10 @@ export namespace mo_yanxi::math{
 			return math::atan2(this->cross(other), this->dot(other)) * math::rad_to_deg_v<floating_point_t>;
 		}
 
+		[[nodiscard]] FORCE_INLINE floating_point_t angle_between_rad(const_pass_t other) const noexcept {
+			return math::atan2(this->cross(other), this->dot(other));
+		}
+
 		FORCE_INLINE vector2& normalize() noexcept {
 			return div(length());
 		}

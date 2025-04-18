@@ -4,7 +4,7 @@
 
 export module test;
 
-import mo_yanxi.ui.elem;
+import mo_yanxi.ui.basic;
 import mo_yanxi.ui.style;
 import mo_yanxi.graphic.image_atlas;
 import mo_yanxi.graphic.msdf;

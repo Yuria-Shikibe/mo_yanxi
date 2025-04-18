@@ -2,10 +2,10 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.tooltip_interface;
+export module mo_yanxi.ui.basic:tooltip_interface;
 
-export import mo_yanxi.ui.pre_decl;
-export import mo_yanxi.ui.elem_ptr;
+import :pre_decl;
+import :elem_ptr;
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.ui.layout.policies;
 export import align;

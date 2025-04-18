@@ -16,7 +16,7 @@ layout(set = 0, binding = 2) uniform UBO {
     float scale;
 } ubo;
 
-const float radius = 4.f;
+const float radius = 2.5f;
 const float zDiffScl = 1.5f;
 const float zDiffThreshold = 0.025f;
 

@@ -2,7 +2,7 @@
 // Created by Matrix on 2025/3/11.
 //
 
-export module mo_yanxi.ui.pre_decl;
+export module mo_yanxi.ui.basic:pre_decl;
 
 namespace mo_yanxi::ui{
 	export using event_channel_t = unsigned;
@@ -10,10 +10,4 @@ namespace mo_yanxi::ui{
 	export struct elem;
 	export struct group;
 	export struct scene;
-	export struct root;
-
-}
-
-namespace mo_yanxi::graphic{
-	struct renderer_ui;
 }

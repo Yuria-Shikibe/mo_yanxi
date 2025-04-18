@@ -4,13 +4,11 @@ module;
 
 export module mo_yanxi.ui.elem.text_input_area;
 
-export import mo_yanxi.ui.elem;
 export import mo_yanxi.ui.elem.text_elem;
 
 import mo_yanxi.graphic.color;
 import mo_yanxi.math;
 import mo_yanxi.encode;
-import mo_yanxi.ui.scene;
 import std;
 
 namespace mo_yanxi::ui{
