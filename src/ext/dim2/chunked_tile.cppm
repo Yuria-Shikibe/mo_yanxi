@@ -9,6 +9,7 @@ export import mo_yanxi.basic_util;
 export import ext.dim2.plane_concept;
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.dim2.tile;
+export import mo_yanxi.open_addr_hash_map;
 import std;
 
 namespace mo_yanxi::dim2{
@@ -90,6 +91,12 @@ namespace mo_yanxi::dim2{
 	// using T = int;
 	// using SizeType = unsigned;
 
+	export 
+	template <typename T, typename CoordT>
+	concept pos_acceptor = requires(T& t){
+		t.set_pos(CoordT{});
+	};
+	
 	export
 	template <typename T, typename SizeType = unsigned, vec<SizeType> Extent = {ChunkWidth, ChunkHeight}>
 		requires (Extent.area() > 0)
@@ -126,24 +133,22 @@ namespace mo_yanxi::dim2{
 
 		[[nodiscard]] constexpr chunk() = default;
 
-		[[nodiscard]] constexpr explicit chunk(typename global_coord_type::const_pass_type coord)
+		[[nodiscard]] constexpr explicit chunk(typename global_coord_type::const_pass_t coord)
 			: chunk_coord_{coord}{
-			if constexpr (requires (value_type& v){
-				v << global_coord_type{};
-			}){
-				this->each([coord](value_type& tile, size_type x, size_type y){
-					tile << global_coord_type{
+			if constexpr (pos_acceptor<value_type, global_coord_type>){
+				this->each([coord] <pos_acceptor<global_coord_type> Ty> (Ty& tile, size_type x, size_type y){
+					tile.set_pos(global_coord_type{
 						static_cast<global_size_type>(x + coord.x * extent.x),
-						static_cast<global_size_type>(y + coord.y * extent.y)};
+						static_cast<global_size_type>(y + coord.y * extent.y)});
 				});
 			}
 		}
 
-		[[nodiscard]] constexpr global_coord_type to_global(const typename local_coord_type::const_pass_type local_coord) const noexcept{
+		[[nodiscard]] constexpr global_coord_type to_global(const typename local_coord_type::const_pass_t local_coord) const noexcept{
 			return local_coord.template as<global_size_type>() + chunk_coord_ * extent.template as<global_size_type>();
 		}
 
-		[[nodiscard]] static constexpr local_coord_type to_local(const typename global_coord_type::const_pass_type global_coord) noexcept{
+		[[nodiscard]] static constexpr local_coord_type to_local(const typename global_coord_type::const_pass_t global_coord) noexcept{
 			return local_coord_type{dim2::mod_to_positive(global_coord.x, extent.x), dim2::mod_to_positive(global_coord.y, extent.y)};
 		}
 
@@ -190,7 +195,7 @@ namespace mo_yanxi::dim2{
 		using local_coord_type = vec<size_type>;
 		using global_coord_type = vec<global_size_type>;
 
-		std::unordered_map<global_coord_type, value_type> chunks{};
+		fixed_open_addr_hash_map<global_coord_type, value_type, global_coord_type, math::vectors::constant2<typename global_coord_type::value_type>::lowest_vec2> chunks{};
 
 		template <position_acquireable<global_size_type> Coord = global_coord_type>
 		[[nodiscard]] constexpr decltype(auto) tile_at(const Coord global_tile_coord){

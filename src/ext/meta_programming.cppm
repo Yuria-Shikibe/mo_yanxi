@@ -17,8 +17,8 @@ namespace mo_yanxi{
 
 #define ArrangeGen(qfl, qfr) template <typename From, typename To> struct copy_qualifier<qfl From qfr, To> : std::type_identity<qfl To qfr>{};
 
-	ArrangeGen(const);
-	ArrangeGen(const volatile);
+	ArrangeGen(const,);
+	ArrangeGen(const volatile,);
 
 	ArrangeGen(, &);
 	ArrangeGen(, &&);
@@ -668,6 +668,7 @@ namespace mo_yanxi{
 	export
 	template <typename T>
 	constexpr bool is_tuple_v = is_tuple<T>::value;
+
 
 	template <std::size_t idx, typename Ts>
 	struct flatten_tuple_impl{

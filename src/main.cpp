@@ -90,7 +90,7 @@ import mo_yanxi.ui.elem.nested_scene;
 import mo_yanxi.game.graphic.effect;
 import mo_yanxi.game.world.graphic;
 
-import mo_yanxi.game.ecs.component_manager;
+import mo_yanxi.game.ecs.component.manager;
 import mo_yanxi.game.ecs.task_graph;
 import mo_yanxi.game.ecs.dependency_generator;
 
@@ -416,7 +416,9 @@ void main_loop(){
 				   .dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 				   .dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
 				   .src_layout = VK_IMAGE_LAYOUT_GENERAL,
-				   .dst_layout = VK_IMAGE_LAYOUT_GENERAL
+				   .dst_layout = VK_IMAGE_LAYOUT_GENERAL,
+				   .to_wait = merger.get_merge_done_semaphore(),
+				   .to_singal = merger.get_merge_wait_semaphore()
 			   }, false);
 	   });
 
@@ -430,7 +432,10 @@ void main_loop(){
 			.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 			.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
 			.src_layout = VK_IMAGE_LAYOUT_GENERAL,
-			.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+			.dst_layout = VK_IMAGE_LAYOUT_GENERAL,
+			.to_wait = merger.get_merge_done_semaphore(),
+			.to_singal = merger.get_merge_wait_semaphore()
+
 		});
 	}
 
@@ -457,7 +462,7 @@ void main_loop(){
 
 	{
 		math::rand rand{};
-		for(int i = 0; i < 100; ++i){
+		for(int i = 0; i < 2000; ++i){
 			using namespace game::ecs;
 
 			manifold mf{};
@@ -680,6 +685,7 @@ void main_loop(){
 		graphic_context.render_efx();
 
 		renderer_world.batch.batch.consume_all();
+		// vkDeviceWaitIdle(context.get_device());
 		// renderer_world.batch.consume_all_transparent();
 		renderer_world.post_process();
 
@@ -689,6 +695,9 @@ void main_loop(){
 
 		merger.submit();
 
+
+		//TODO semaphore of merger
+		// vkDeviceWaitIdle(context.get_device());
 
 		context.flush();
 	}

@@ -16,7 +16,15 @@ export import mo_yanxi.seq_chunk;
 import std;
 
 namespace mo_yanxi::game::ecs{
-	
+	export struct bad_chunk_access : std::exception{
+		[[nodiscard]] bad_chunk_access() = default;
+
+		[[nodiscard]] explicit bad_chunk_access(char const* Message)
+			: exception(Message){
+		}
+	};
+
+
 	template <typename T>
 	struct alignas(T) type_replacement{
 		std::byte _[sizeof(T)];
@@ -47,11 +55,48 @@ namespace mo_yanxi::game::ecs{
 	export auto invalid_chunk_idx = std::numeric_limits<entity_data_chunk_index>::max();
 
 	export
+	template <typename TupleT>
+	struct archetype;
+
+	export
+	struct chunk_meta{
+
+		template <typename TupleT>
+		friend struct archetype;
+
+	private:
+		entity_id eid_{};
+
+	public:
+		[[nodiscard]] constexpr chunk_meta() = default;
+
+		[[nodiscard]] constexpr explicit(false) chunk_meta(ecs::entity_id entity_id)
+			noexcept : eid_(entity_id){
+		}
+
+		[[nodiscard]] constexpr entity_id id() const noexcept{
+			return eid_;
+		}
+	};
+
+	export
 	template <typename T>
 	struct component;
 
 	export
 	struct archetype_base{
+	protected:
+		template <typename T>
+		[[nodiscard]] static constexpr chunk_meta& meta_of(T& comp) noexcept{
+			return comp.template get<chunk_meta>();
+		}
+
+		template <typename T>
+		[[nodiscard]] static constexpr const chunk_meta& meta_of(const T& comp) noexcept{
+			return comp.template get<chunk_meta>();
+		}
+
+	public:
 		virtual ~archetype_base() = default;
 
 		virtual void reserve(std::size_t sz){
@@ -74,10 +119,6 @@ namespace mo_yanxi::game::ecs{
 
 		virtual void dump_staging() = 0;
 	};
-
-	export
-	template <typename TupleT>
-	struct archetype;
 
 	export
 	struct entity_ref;
@@ -128,31 +169,41 @@ namespace mo_yanxi::game::ecs{
 			return chunk_index() != invalid_chunk_idx;
 		}
 
-		constexpr bool is_expired() const noexcept{
+		[[nodiscard]] constexpr bool is_expired() const noexcept{
 			return get_archetype() == nullptr;
 		}
 
-		constexpr archetype_base* get_archetype() const noexcept{
+		[[nodiscard]] constexpr archetype_base* get_archetype() const noexcept{
 			return archetype_;
 		}
 
 		template <typename T>
-		component<T>* try_get() const noexcept{
+		[[nodiscard]] component<T>* try_get() const noexcept{
 			return archetype_->try_get_comp<T>(chunk_index_);
+		}
+
+		template <typename T>
+		[[nodiscard]] component<T>& at() const noexcept{
+			component<T>* ptr = archetype_->try_get_comp<T>(chunk_index_);
+			if(!ptr){
+				const auto str = std::format("Illegal Access To Chunk<{}> on entity<{}>", typeid(T).name(), type().name());
+				throw bad_chunk_access{str.c_str()};
+			}
+			return *ptr;
 		}
 
 		template <typename Tuple, typename T>
 			requires (contained_in<T, Tuple>)
-		component<T>& unchecked_get() const;
+		[[nodiscard]] component<T>& unchecked_get() const;
 
 		template <typename Tuple>
-		unary_apply_to_tuple_t<component, Tuple>& unchecked_get() const;
+		[[nodiscard]] unary_apply_to_tuple_t<component, Tuple>& unchecked_get() const;
 
 		template <typename Tuple, typename T>
-		component<T>* get() const noexcept;
+		[[nodiscard]] component<T>* get() const noexcept;
 
 		template <typename Tuple>
-		unary_apply_to_tuple_t<component, Tuple>* get() const noexcept;
+		[[nodiscard]] unary_apply_to_tuple_t<component, Tuple>* get() const noexcept;
 	};
 
 
@@ -270,88 +321,8 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	//TODO component doesn't bring an ID, but as the first chunk item??
-
 	template <typename T>
-	struct component : T{
-	/*private:
-		entity_id eid_{};
-		T value{};
-	public:
-
-		[[nodiscard]] component() = default;
-
-		[[nodiscard]] explicit component(entity_id eid) noexcept
-			: eid_(eid){
-		}
-
-		[[nodiscard]] component(entity_id eid, const T& value)
-			: eid_(eid),
-			  value(value){
-		}
-
-		[[nodiscard]] component(entity_id eid, T&& value)
-			: eid_(eid),
-			  value(std::move(value)){
-		}
-
-		[[nodiscard]] constexpr entity_id id() const noexcept{
-			return eid_;
-		}
-
-		constexpr T* operator->() noexcept{
-			return std::addressof(value);
-		}
-
-		constexpr const T* operator->() const noexcept{
-			return std::addressof(value);
-		}
-
-		constexpr T& operator*() noexcept{
-			return value;
-		}
-
-		constexpr const T& operator*() const noexcept{
-			return value;
-		}
-
-		constexpr const T& val() const noexcept{
-			return value;
-		}
-
-		constexpr T& val() noexcept{
-			return value;
-		}
-
-		constexpr explicit(false) operator T&() noexcept{
-			return value;
-		}
-
-		constexpr explicit(false) operator const T&() const noexcept{
-			return value;
-		}*/
-	};
-
-	export
-	struct chunk_meta{
-
-		template <typename TupleT>
-		friend struct archetype;
-
-	private:
-		entity_id eid_{};
-
-	public:
-		[[nodiscard]] constexpr chunk_meta() = default;
-
-		[[nodiscard]] constexpr explicit(false) chunk_meta(ecs::entity_id entity_id)
-			noexcept : eid_(entity_id){
-		}
-
-		[[nodiscard]] constexpr entity_id id() const noexcept{
-			return eid_;
-		}
-	};
+	struct component : T{};
 
 	export
 	struct unwrap_component{
@@ -367,6 +338,42 @@ namespace mo_yanxi::game::ecs{
 	template <typename T>
 	using tuple_to_comp_t = unary_apply_to_tuple_t<component, T>;
 
+	export
+	template <typename T>
+	struct component_custom_behavior_base{
+		using value_type = T;
+
+		static void on_init(const chunk_meta& meta, component<value_type>& comp) = delete;
+		static void on_terminate(const chunk_meta& meta, component<value_type>& comp) = delete;
+	};
+
+	export
+	template <typename T>
+	struct component_custom_behavior : component_custom_behavior_base<T>{};
+
+	template <typename T>
+	struct component_trait{
+		using trait = component_custom_behavior<T>;
+		using value_type = typename trait::value_type;
+
+		static void on_init(const chunk_meta& meta, component<T>& comp) {
+			if constexpr (requires{
+				trait::on_init(meta, comp);
+			}){
+				trait::on_init(meta, comp);
+			}
+		}
+
+		static void on_terminate(const chunk_meta& meta, component<T>& comp) {
+			if constexpr (requires{
+				trait::on_terminate(meta, comp);
+			}){
+				trait::on_terminate(meta, comp);
+			}
+		}
+	};
+
+
 	template <typename TupleT>
 	struct archetype : archetype_base{
 		using raw_tuple = TupleT;
@@ -375,19 +382,6 @@ namespace mo_yanxi::game::ecs{
 		using components = tuple_to_seq_chunk_t<comp_tuple>;
 		static constexpr std::size_t chunk_size = std::tuple_size_v<appended_tuple>;
 
-		/*
-		template <std::size_t Idx>
-		static constexpr std::size_t offset_at = []{
-			constexpr auto sz = sizeof(tuple_take_n_elem_t<Idx, comp_tuple>);
-			constexpr auto align = alignof(std::tuple_element_t<Idx, comp_tuple>);
-			return (sz / align + (sz % align != 0)) * align;
-		}();
-
-		template <typename T>
-		static constexpr std::size_t offset_of = offset_at<tuple_index_v<T, comp_tuple>>;
-		*/
-
-
 		static constexpr std::size_t single_chunk_size = sizeof(components);
 	private:
 		std::vector<components> chunks{};
@@ -395,24 +389,6 @@ namespace mo_yanxi::game::ecs{
 		std::mutex staging_mutex_{};
 		std::vector<components> staging{};
 	protected:
-
-		/*template <typename T, typename Comp>
-			requires requires{
-				requires std::same_as<std::remove_cvref_t<Comp>, components>;
-				requires contained_in<component<T>, components>;
-			}
-		static decltype(auto) get_comp_of(Comp&& comp) noexcept{
-			return std::forward_like<Comp>(std::get<component<T>>(comp));
-		}
-
-		template <typename T, typename Comp>
-			requires requires{
-				requires std::same_as<std::remove_cvref_t<Comp>, components>;
-				requires contained_in<component<T>, components>;
-			}
-		static decltype(auto) get_unwrap_of(Comp&& comp) noexcept{
-			return std::forward_like<Comp>(std::get<component<T>>(comp).val());
-		}*/
 
 		template <typename ...Ts>
 		static decltype(auto) get_unwrap_of(components& comp) noexcept{
@@ -440,26 +416,44 @@ namespace mo_yanxi::game::ecs{
 		std::size_t insert(components&& comp){
 			auto idx = chunks.size();
 			entity_id eid = this->id_of_chunk(comp);
-			eid->chunk_index_ = idx;
 
-			chunks.push_back(std::move(comp));
-			archetype_base::insert(eid);
-			return idx;
-		}
-
-		std::size_t insert(const entity_id e) final {
-			if(!e)return 0;
-
-			auto idx = chunks.size();
-
-			if(e->chunk_index() != invalid_chunk_idx){
+			if(eid->chunk_index() != invalid_chunk_idx || eid->get_archetype() != nullptr){
 				throw std::runtime_error{"Duplicated Insert"};
 			}
 
-			chunks.emplace_back(e->id());
 
-			e->id()->chunk_index_ = idx;
-			archetype_base::insert(e);
+			eid->chunk_index_ = idx;
+			components& added_comp = chunks.emplace_back(std::move(comp));
+			archetype_base::insert(eid);
+
+			[&] <std::size_t... I>(std::index_sequence<I...>){
+				component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp));
+			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
+
+			this->init(added_comp);
+
+			return idx;
+		}
+
+		std::size_t insert(const entity_id eid) final {
+			if(!eid)return 0;
+
+			auto idx = chunks.size();
+
+			if(eid->chunk_index() != invalid_chunk_idx || eid->get_archetype() != nullptr){
+				throw std::runtime_error{"Duplicated Insert"};
+			}
+
+			eid->chunk_index_ = idx;
+			components& added_comp = chunks.emplace_back(eid->id());
+			archetype_base::insert(eid);
+
+			[&] <std::size_t... I>(std::index_sequence<I...>){
+				component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp));
+			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
+
+			this->init(added_comp);
+
 			return idx;
 		}
 
@@ -471,7 +465,13 @@ namespace mo_yanxi::game::ecs{
 				throw std::runtime_error{"Invalid Erase"};
 			}
 
-			this->terminate(chunks[idx]);
+			components& chunk_to_remove = chunks[idx];
+
+			this->terminate(chunk_to_remove);
+
+			[&] <std::size_t... I>(std::index_sequence<I...>){
+				component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(chunk_to_remove), get<I + 1>(chunk_to_remove));
+			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 
 			if(idx == chunk_size - 1){
 				chunks.pop_back();
@@ -481,6 +481,8 @@ namespace mo_yanxi::game::ecs{
 
 				this->id_of_chunk(chunks[idx])->chunk_index_ = idx;
 			}
+
+
 			archetype_base::erase(e);
 			e->id()->chunk_index_ = invalid_chunk_idx;
 		}
@@ -524,31 +526,28 @@ namespace mo_yanxi::game::ecs{
 		void push_staging(const entity_id e, T&& ...args){
 			assert(e);
 
-			using raw_tuple_type = std::tuple<T...>;
-			raw_tuple_type ref_tuple{args...};
+			using raw_tuple_type = std::tuple<T&& ...>;
+			raw_tuple_type ref_tuple{std::forward<T>(args)...};
 
 			using in_tuple = std::tuple<std::decay_t<T>...>;
 			constexpr std::size_t in_tuple_size = sizeof...(T);
 
 			e->id()->archetype_ = this;
-			components* comps;
-			{
-				std::lock_guard _{staging_mutex_};
-				comps = &[&] <std::size_t ...Idx>(std::index_sequence<Idx...>) -> auto& {
-					return staging.emplace_back(e, [&] <std::size_t I> (){
-						using cur_type = std::tuple_element_t<I, raw_tuple>;
-						constexpr std::size_t mapped_cur_idx = tuple_index_v<cur_type, in_tuple>;
 
-						if constexpr (mapped_cur_idx == in_tuple_size){
-							return component<cur_type>{};
-						}else{
-							using param_type = std::tuple_element_t<mapped_cur_idx, raw_tuple_type>;
-							return component<cur_type>{std::forward<param_type>(std::get<mapped_cur_idx>(ref_tuple))};
-						}
-					}.template operator()<Idx>() ...);
-				}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>{});
-			}
-			this->init(*comps);
+			std::lock_guard _{staging_mutex_};
+			[&] <std::size_t ...Idx>(std::index_sequence<Idx...>) -> auto& {
+				return staging.emplace_back(e, [&] <std::size_t I> (){
+					using cur_type = std::tuple_element_t<I, raw_tuple>;
+					constexpr std::size_t mapped_cur_idx = tuple_index_v<cur_type, in_tuple>;
+
+					if constexpr (mapped_cur_idx == in_tuple_size){
+						return component<cur_type>{};
+					}else{
+						using param_type = std::tuple_element_t<mapped_cur_idx, raw_tuple_type>;
+						return component<cur_type>{std::forward<param_type>(std::get<mapped_cur_idx>(ref_tuple))};
+					}
+				}.template operator()<Idx>() ...);
+			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>{});
 		}
 
 		void dump_staging() final {

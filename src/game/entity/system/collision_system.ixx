@@ -5,7 +5,7 @@ module;
 
 export module mo_yanxi.game.ecs.system.collision;
 
-export import mo_yanxi.game.ecs.component_manager;
+export import mo_yanxi.game.ecs.component.manager;
 
 export import mo_yanxi.game.ecs.component.manifold;
 export import mo_yanxi.game.ecs.component.physical_property;
@@ -105,7 +105,7 @@ namespace mo_yanxi::game::ecs{
 
 			using math::vec2;
 
-			const vec2 dst_to_sbj = intersection.pos - (sbj.motion->pos() + sbj_correction);
+			const vec2 dst_to_sbj = intersection.pos - sbj.motion->pos();//(sbj.motion->pos() + sbj_correction);
 			const vec2 dst_to_obj = intersection.pos - obj.motion->pos();
 
 			const vec2 sbj_vel = sbj.motion->vel_at(dst_to_sbj);
@@ -114,6 +114,7 @@ namespace mo_yanxi::game::ecs{
 			const vec2 rel_vel = (obj_vel - sbj_vel) * energyScale;
 
 			const vec2 hit_normal = intersection.normal;
+			assert(hit_normal.length2() > 0.75f);
 
 			const auto sbj_mass = sbj.rigid->inertial_mass;
 			const auto obj_mass = obj.rigid->inertial_mass;
@@ -149,23 +150,13 @@ namespace mo_yanxi::game::ecs{
 
 			auto sbj_vel_len2 = sbj.motion->vel.vec.length2();
 			auto obj_vel_len2 = obj.motion->vel.vec.length2();
-			if(math::zero(sbj_vel_len2 - obj_vel_len2, 4.f) && sbj_mass <= obj_mass){
+			if(/*math::zero(sbj_vel_len2 - obj_vel_len2, 2.f) && */sbj_mass <= obj_mass && std::ranges::contains(sbj.manifold->last_collided, obj.id, &entity_ref::id)){
 				math::rect_box box{sbj.manifold->hitbox[intersection.index.sbj_idx].box};
 				box.move(sbj_correction);
 
 				vec2 min_correction = box.depart_vector_to(obj.manifold->hitbox[intersection.index.obj_idx].box);
 
-				sbj.manifold->collision_correction_vec += min_correction.set_length(1.f);
-
-				sbj.manifold->is_under_correction = true;
-
-			}else if(sbj_vel_len2 > obj_vel_len2/* && std::ranges::contains(sbj.manifold->last_collided, obj.id, &entity_ref::id)*/){
-				math::rect_box box{sbj.manifold->hitbox[intersection.index.sbj_idx].box};
-				box.move(sbj_correction);
-
-				vec2 min_correction = box.depart_vector_to_on_vel_rough_min(obj.manifold->hitbox[intersection.index.obj_idx].box, sbj.motion->vel.vec);
-
-				sbj.manifold->collision_correction_vec += min_correction.set_length(1.f);
+				sbj.manifold->collision_correction_vec += min_correction.set_length(1.5f);// + min_correction.set_length(1.f);///*min_correction * .05f +*/ min_correction.copy().set_length(3.f);
 
 				sbj.manifold->is_under_correction = true;
 
@@ -213,35 +204,32 @@ namespace mo_yanxi::game::ecs{
 					math::rect_box sbj = sbj_box[index.sbj_idx].box;
 					math::rect_box obj = obj_box[index.obj_idx].box;
 
-					if(!manifold.is_under_correction){
+					// if(!manifold.is_under_correction){
 						sbj.move(sbj_box.get_back_trace_move());
-					}
+					// }
 					obj.move(obj_box.get_back_trace_move());
 
-					// math::vec2 correction{approachTest(
-					// 	sbj, sbj_box.get_back_trace_unit_move(),
-					// 	obj, obj_box.get_back_trace_unit_move()
-					// )};
+					assert(sbj.overlap_exact(obj));
 
-					math::vec2 correction{};
 
-					if(motion.vel.vec.length2() > collision.other.motion->vel.vec.length2()){
-						//Only apply over-pierce correction to object with faster speed
-						correction = sbj.depart_vector_to_on_vel(obj, motion.vel.vec);
-						sbj.move(correction);
-					}
+					math::vec2 correction = approachTest(
+							sbj, sbj_box.get_back_trace_unit_move(),
+							obj, obj_box.get_back_trace_unit_move()
+						);
 
 					const auto avg_s = sbj.expand_unchecked(2);
 					const auto avg_o = obj.expand_unchecked(2);
 
 					auto avg = math::rect_rough_avg_intersection(sbj, obj);
-					if(!avg)avg.pos = (avg_s + avg_o) / 2;
+					if(!avg){
+						avg.pos = (avg_s + avg_o) / 2;
+					}
 
 					pre_correction_sum += correction;
-
 					auto& data = manifold.confirmed_collision.emplace_back(
 						collision.other,
-						correction, manifold::intersection{
+						correction,
+						manifold::intersection{
 							.pos = avg.pos,
 							.normal = math::avg_edge_normal(obj, avg.pos).normalize(),
 							.index = index
@@ -255,8 +243,9 @@ namespace mo_yanxi::game::ecs{
 
 			if(!manifold.confirmed_collision.empty()){
 				pre_correction_sum /= manifold.confirmed_collision.size();
-				motion.trans.vec += pre_correction_sum;
 			}
+
+			motion.trans.vec += pre_correction_sum;
 		}
 
 		FORCE_INLINE static void collisionsPostProcess_3(manifold::collision_object object) noexcept{
@@ -266,6 +255,16 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		FORCE_INLINE static void collisionsPostProcess_4(manifold& manifold, mech_motion& motion) noexcept{
+			math::vec2 pre_correction_sum{};
+			//
+			if(!manifold.confirmed_collision.empty()){
+				for (const auto & confirmed_collision : manifold.confirmed_collision){
+					pre_correction_sum += confirmed_collision.correction;
+				}
+
+				pre_correction_sum /= manifold.confirmed_collision.size();
+			}
+
 			motion.trans.vec += manifold.collision_correction_vec;
 			motion.vel += manifold.collision_vel_trans_sum;
 			// motion.vel.rot.clamp(20.f);

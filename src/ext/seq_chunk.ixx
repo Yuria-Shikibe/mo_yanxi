@@ -116,23 +116,26 @@ namespace mo_yanxi{
 	// export
 	// template <typename V, typename Chunk>
 	// inline constexpr std::size_t seq_chunk_offset_of = seq_chunk_offset_at<tuple_index_v<V, typename Chunk::tuple_type>, Chunk>;
-}
 
 
-export namespace std{
-	template <mo_yanxi::spec_of<mo_yanxi::seq_chunk> T>
-	struct tuple_size<T> : std::integral_constant<std::size_t, std::tuple_size_v<typename T::tuple_type>>{};
-
-	template <std::size_t Idx, mo_yanxi::spec_of<mo_yanxi::seq_chunk> T>
-	struct tuple_element<Idx, T> : std::type_identity<std::tuple_element_t<Idx, typename T::tuple_type>>{};
-
+	export
 	template <typename T, mo_yanxi::decayed_spec_of<mo_yanxi::seq_chunk> Chunk>
 	constexpr decltype(auto) get(Chunk&& chunk) noexcept{
 		return chunk.template get<T>();
 	}
 
+	export
 	template <std::size_t Idx, mo_yanxi::decayed_spec_of<mo_yanxi::seq_chunk> Chunk>
 	constexpr decltype(auto) get(Chunk&& chunk) noexcept{
 		return chunk.template get<Idx>();
 	}
+}
+
+
+namespace std{
+	template <typename ...T>
+	struct tuple_size<mo_yanxi::seq_chunk<T...>> : std::integral_constant<std::size_t, sizeof...(T)>{};
+
+	template <std::size_t Idx, typename ...T>
+	struct tuple_element<Idx, mo_yanxi::seq_chunk<T...>> : std::tuple_element<Idx, std::tuple<T...>>{};
 }

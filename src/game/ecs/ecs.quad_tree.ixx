@@ -635,6 +635,32 @@ namespace mo_yanxi::game::ecs{
 			}
 		}
 
+		template <
+			typename Region,
+			std::predicate<const Region&, const rect_type&> Pred,
+			std::invocable<const Region&, value_type&> Func
+		>
+			requires !std::same_as<Region, rect_type>
+		void intersect_then(
+			const Region& region,
+			Pred boundCheck,
+			Func func){
+			if(isBranchEmpty() || !std::invoke(boundCheck, region, this->boundary)) return;
+
+			// If this node has children, check if the rectangle overlaps with any rectangle in the children
+			if(this->has_valid_children()){
+				for (quad_tree_node & node : children->nodes){
+					node.template intersect_then<Region>(region, mo_yanxi::pass_fn(boundCheck), mo_yanxi::pass_fn(func));
+				}
+			}
+
+			for(auto cont : this->items){
+				if(std::invoke(boundCheck, region, trait::bound_of(*cont))){
+					std::invoke(func, region, *cont);
+				}
+			}
+		}
+
 	/*
 	private:
 		template <std::predicate<const ItemTy&, const ItemTy&> Filter>
@@ -773,6 +799,8 @@ namespace mo_yanxi::game::ecs{
 		using base = quad_tree_node<ItemTy, T>;
 
 	public:
+		[[nodiscard]] quad_tree() = default;
+
 		[[nodiscard]] explicit quad_tree(typename base::rect_type boundary)
 			: base(&this->pool, boundary)
 		{}

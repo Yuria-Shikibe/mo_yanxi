@@ -6,7 +6,7 @@ module;
 
 #include "../src/ext/adapted_attributes.hpp"
 
-export module mo_yanxi.game.ecs.component_manager;
+export module mo_yanxi.game.ecs.component.manager;
 
 export import mo_yanxi.game.ecs.entity;
 export import mo_yanxi.heterogeneous.open_addr_hash;
@@ -78,7 +78,6 @@ namespace mo_yanxi::game::ecs{
 
 		type_fixed_hash_map<std::vector<archetype_slice>> type_to_archetype{};
 
-		// std::vector<entity_id> deferred_entity_add_request{};
 	public:
 		float update_delta;
 		/**
@@ -101,12 +100,12 @@ namespace mo_yanxi::game::ecs{
 			return ent;
 		}
 
-		template <typename Tuple, std::derived_from<archetype<Tuple>> Archetype = archetype<Tuple>>
+		template <typename Tuple, std::derived_from<archetype<Tuple>> Archetype = archetype<Tuple>, typename ... Args>
 			requires (is_tuple_v<Tuple>)
-		auto& add_archetype(){
+		auto& add_archetype(Args&& ...args){
 			std::type_index idx = typeid(Tuple);
 
-			return static_cast<Archetype&>(*archetypes.try_emplace(idx, create_new_archetype_map<Tuple, Archetype>()).first->second);
+			return static_cast<Archetype&>(*archetypes.try_emplace(idx, this->create_new_archetype_map<Tuple, Archetype>(std::forward<Args>(args))).first->second);
 		}
 
 		template <typename Archetype>
@@ -441,9 +440,9 @@ namespace mo_yanxi::game::ecs{
 		}
 
 
-		template <typename Tuple, std::derived_from<archetype<Tuple>> Archetype = archetype<Tuple>>
-		std::unique_ptr<archetype_base> create_new_archetype_map(){
-			std::unique_ptr<archetype_base> ptr = std::make_unique<Archetype>();
+		template <typename Tuple, std::derived_from<archetype<Tuple>> Archetype = archetype<Tuple>, typename ...Args>
+		std::unique_ptr<archetype_base> create_new_archetype_map(Args&& ...args){
+			std::unique_ptr<archetype_base> ptr = std::make_unique<Archetype>(std::forward<Args>(args)...);
 			this->add_new_archetype_map<Tuple>(static_cast<Archetype&>(*ptr));
 			return ptr;
 		}

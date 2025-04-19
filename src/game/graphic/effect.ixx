@@ -442,4 +442,13 @@ namespace mo_yanxi::game::fx{
 			}, style);
 		}
 	};
+
+
+	float fx::effect_drawer_base::get_effect_prog(const effect& e) noexcept{
+		return e.duration.get();
+	}
+
+	math::vec2 fx::effect_drawer_base::get_effect_pos(const effect& e) noexcept{
+		return e.trans.vec;
+	}
 }

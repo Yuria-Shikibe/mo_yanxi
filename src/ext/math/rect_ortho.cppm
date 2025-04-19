@@ -1,6 +1,7 @@
 module;
 
 #include <cassert>
+#include <immintrin.h>
 #include "../adapted_attributes.hpp"
 
 export module mo_yanxi.math.rect_ortho;
@@ -342,19 +343,76 @@ namespace mo_yanxi::math{
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr bool overlap_exclusive(const rect_ortho& r) const noexcept{
-			return
-				get_src_x() < r.get_end_x() &&
-				get_end_x() > r.get_src_x() &&
-				get_src_y() < r.get_end_y() &&
-				get_end_y() > r.get_src_y();
+			if (std::is_constant_evaluated()){
+				return
+					get_src_x() < r.get_end_x() &&
+					get_end_x() > r.get_src_x() &&
+					get_src_y() < r.get_end_y() &&
+					get_end_y() > r.get_src_y();
+			}else{
+				const float a_src_x = get_src_x();
+				const float a_end_x = get_end_x();
+				const float a_src_y = get_src_y();
+				const float a_end_y = get_end_y();
+
+				// 提取矩形r的坐标
+				const float b_src_x = r.get_src_x();
+				const float b_end_x = r.get_end_x();
+				const float b_src_y = r.get_src_y();
+				const float b_end_y = r.get_end_y();
+
+				// 构造比较向量：
+				// vec1 = [a_src_x, a_src_y, b_src_x, b_src_y]
+				// vec2 = [b_end_x, b_end_y, a_end_x, a_end_y]
+				__m128 vec1 = _mm_set_ps(b_src_y, b_src_x, a_src_y, a_src_x);
+				__m128 vec2 = _mm_set_ps(a_end_y, a_end_x, b_end_y, b_end_x);
+
+				// 并行比较所有条件：vec1 <= vec2
+				__m128 cmp = _mm_cmplt_ps(vec1, vec2);
+
+				// 将比较结果转换为位掩码
+				int mask = _mm_movemask_ps(cmp);
+
+				// 检查所有四个条件是否均满足（掩码为0b1111）
+				return (mask == 0x0F);
+			}
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr bool overlap_inclusive(const rect_ortho& r) const noexcept{
-			return
+			if (std::is_constant_evaluated()){
+				return
 				get_src_x() <= r.get_end_x() &&
 				get_end_x() >= r.get_src_x() &&
 				get_src_y() <= r.get_end_y() &&
 				get_end_y() >= r.get_src_y();
+			}else{
+				const float a_src_x = get_src_x();
+				const float a_end_x = get_end_x();
+				const float a_src_y = get_src_y();
+				const float a_end_y = get_end_y();
+
+				// 提取矩形r的坐标
+				const float b_src_x = r.get_src_x();
+				const float b_end_x = r.get_end_x();
+				const float b_src_y = r.get_src_y();
+				const float b_end_y = r.get_end_y();
+
+				// 构造比较向量：
+				// vec1 = [a_src_x, a_src_y, b_src_x, b_src_y]
+				// vec2 = [b_end_x, b_end_y, a_end_x, a_end_y]
+				__m128 vec1 = _mm_set_ps(b_src_y, b_src_x, a_src_y, a_src_x);
+				__m128 vec2 = _mm_set_ps(a_end_y, a_end_x, b_end_y, b_end_x);
+
+				// 并行比较所有条件：vec1 <= vec2
+				__m128 cmp = _mm_cmple_ps(vec1, vec2);
+
+				// 将比较结果转换为位掩码
+				int mask = _mm_movemask_ps(cmp);
+
+				// 检查所有四个条件是否均满足（掩码为0b1111）
+				return (mask == 0x0F);
+			}
+
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr bool overlap_exclusive(

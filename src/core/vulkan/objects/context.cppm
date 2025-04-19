@@ -60,6 +60,10 @@ namespace mo_yanxi::vk{
 
 		VkImageLayout src_layout{};
 		VkImageLayout dst_layout{VK_IMAGE_LAYOUT_UNDEFINED};
+
+		VkSemaphore to_wait{};
+		VkSemaphore to_singal{};
+
 	};
 
 
@@ -137,7 +141,9 @@ namespace mo_yanxi::vk{
 				}
 			}
 
-			cmd::submit_command(
+			// vkDeviceWaitIdle(device);
+
+			cmd::submit_command/*<2, 2>*/(
 				device.primary_graphics_queue(),
 				swap_chain_frames[imageIndex].post_command,
 				current_syncs.fence,

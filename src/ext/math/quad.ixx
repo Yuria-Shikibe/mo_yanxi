@@ -1,6 +1,7 @@
 module;
 
 #include "../src/ext/adapted_attributes.hpp"
+#include <immintrin.h>
 
 export module mo_yanxi.math.quad;
 
@@ -13,6 +14,15 @@ export import mo_yanxi.math;
 import std;
 
 namespace mo_yanxi::math{
+	template<bool IsMin>
+	FORCE_INLINE float horizontal_extreme(__m128 v) noexcept {
+		__m128 v1 = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2,3,0,1)); // swap 0-1, 2-3
+		__m128 m1 = IsMin ? _mm_min_ps(v, v1) : _mm_max_ps(v, v1);
+		__m128 m2 = _mm_shuffle_ps(m1, m1, _MM_SHUFFLE(1,0,3,2)); // swap pairs
+		__m128 res = IsMin ? _mm_min_ps(m1, m2) : _mm_max_ps(m1, m2);
+		return _mm_cvtss_f32(_mm_shuffle_ps(res, res, _MM_SHUFFLE(0,0,0,0)));
+	}
+
 	template <typename T = unsigned>
 	constexpr inline T vertex_mask{0b11};
 	template <typename D, typename Base>
@@ -115,6 +125,29 @@ namespace mo_yanxi::math{
 		constexpr friend bool operator==(const quad& lhs, const quad& rhs) noexcept = default;
 
 		FORCE_INLINE constexpr void move(typename vec_t::const_pass_t vec) noexcept{
+			if constexpr (std::same_as<float, value_type>){
+				if (!std::is_constant_evaluated()){
+					/* 创建重复的vec.x/vec.y模式 */
+					const __m256 vec_x = ::_mm256_broadcast_ss(&vec.x); // [x,x,x,x,x,x,x,x]
+					const __m256 vec_y = ::_mm256_broadcast_ss(&vec.y); // [y,y,y,y,y,y,y,y]
+
+					// 通过解包操作生成[x,y,x,y,x,y,x,y]模式
+					const __m256 vec_pattern = _mm256_unpacklo_ps(vec_x, vec_y);
+
+					/* 一次性加载全部4个vec_t（8个float） */
+					auto base_ptr = reinterpret_cast<float*>(this);
+					__m256 data = _mm256_loadu_ps(base_ptr);
+
+					/* 执行向量加法 */
+					data = _mm256_add_ps(data, vec_pattern);
+
+					/* 存回内存 */
+					_mm256_storeu_ps(base_ptr, data);
+					return;
+				}
+			}
+
+
 			v0 += vec;
 			v1 += vec;
 			v2 += vec;
@@ -175,6 +208,43 @@ namespace mo_yanxi::math{
 
 		template <any_derived_from<quad> S, typename O>
 		[[nodiscard]] FORCE_INLINE constexpr bool axis_proj_overlaps(this const S& sbj, const O& obj, const vec_t axis) noexcept{
+			if constexpr (std::same_as<value_type, float> && any_derived_from<O, quad>){
+				if (!std::is_constant_evaluated()){
+					static constexpr std::int32_t PERMUTE_IDX[8] = {0, 2, 4, 6, 1, 3, 5, 7};
+					// 加载并重组数据
+					const __m256i idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(PERMUTE_IDX));
+
+					// 同时加载sbj和obj数据
+					const __m256 sbj_data = _mm256_loadu_ps(reinterpret_cast<const float*>(&sbj));
+					const __m256 obj_data = _mm256_loadu_ps(reinterpret_cast<const float*>(&obj));
+
+					// 构造axis向量
+					const __m256 axis_xy = _mm256_set_m128(
+						_mm_set1_ps(axis.y),  // 高128位: yyyyyyyy
+						_mm_set1_ps(axis.x)   // 低128位: xxxxxxxx
+					);
+
+					// 重组并计算点积
+					auto compute_proj = [&](__m256 data) -> __m128 {
+						const __m256 permuted = _mm256_permutexvar_ps(idx, data);
+						const __m256 products = _mm256_mul_ps(permuted, axis_xy);
+						return _mm_add_ps(_mm256_extractf128_ps(products, 0),
+										 _mm256_extractf128_ps(products, 1));
+					};
+
+					// 并行计算两个对象的投影
+					const __m128 sbj_dots = compute_proj(sbj_data);
+					const __m128 obj_dots = compute_proj(obj_data);
+
+					// 快速极值计算
+					const float min1 = horizontal_extreme<true>(sbj_dots);
+					const float max1 = horizontal_extreme<false>(sbj_dots);
+					const float min2 = horizontal_extreme<true>(obj_dots);
+					const float max2 = horizontal_extreme<false>(obj_dots);
+					// 检查重叠
+					return (max1 >= min2) && (max2 >= min1);
+				}
+			}
 			const auto [min1, max1] = math::minmax(sbj[0].dot(axis), sbj[1].dot(axis), sbj[2].dot(axis), sbj[3].dot(axis));
 			const auto [min2, max2] = math::minmax(obj[0].dot(axis), obj[1].dot(axis), obj[2].dot(axis), obj[3].dot(axis));
 
@@ -195,7 +265,7 @@ namespace mo_yanxi::math{
 				requires overlay_axis_keys<S>::count > 0;
 				requires overlay_axis_keys<O>::count > 0;
 			}
-		[[nodiscard]] FORCE_INLINE bool overlap_exact(this const S& sbj, const O& obj) noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool overlap_exact(this const S& sbj, const O& obj) noexcept{
 			using SbjKeys = overlay_axis_keys<S>;
 			using ObjKeys = overlay_axis_keys<O>;
 
@@ -252,7 +322,7 @@ namespace mo_yanxi::math{
 				requires overlay_axis_keys<S>::count > 0;
 				requires overlay_axis_keys<O>::count > 0;
 			}
-		[[nodiscard]] FORCE_INLINE vec_t depart_vector_to_on(this const S& sbj, const O& obj, math::vec2 line_to_align) noexcept{
+		[[nodiscard]] FORCE_INLINE vec_t depart_vector_to_on(this const S& sbj, const O& obj, vec2 line_to_align) noexcept{
 			line_to_align.normalize();
 
 			auto proj = sbj.axis_proj_dst(obj, line_to_align);
@@ -358,6 +428,21 @@ namespace mo_yanxi::math{
 			return oddNodes;
 		}
 
+		[[nodiscard]] FORCE_INLINE constexpr vec_t v00() const noexcept{
+			return v0;
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr vec_t v10() const noexcept{
+			return v1;
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr vec_t v11() const noexcept{
+			return v2;
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr vec_t v01() const noexcept{
+			return v3;
+		}
 	};
 
 	export using fquad = quad<float>;
@@ -474,6 +559,10 @@ namespace mo_yanxi::math{
 		using base::depart_vector_to_on_vel;
 		using base::depart_vector_to_on_vel_rough_min;
 		using base::depart_vector_to_on_vel_exact;
+		using base::v00;
+		using base::v10;
+		using base::v11;
+		using base::v01;
 	};
 
 	export
@@ -530,13 +619,13 @@ namespace mo_yanxi::math{
 
 		// [[nodiscard]] RectBoxBrief() = default;
 		//
-		[[nodiscard]] constexpr explicit rect_box(
+		[[nodiscard]] constexpr rect_box(
 			const typename base::vec_t::const_pass_t v0,
 			const typename base::vec_t::const_pass_t v1,
 			const typename base::vec_t::const_pass_t v2,
 			const typename base::vec_t::const_pass_t v3) noexcept
 			: base{v0, v1, v2, v3}, normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
-			assert(math::abs(normalU.dot(normalV)) < 1E-3);
+			assert(math::abs(normalU.dot(normalV)) < 1E-2);
 		}
 
 		/**
@@ -585,7 +674,7 @@ namespace mo_yanxi::math{
 			updateNormal();
 		}
 
-		[[nodiscard]] explicit(false) rect_box_posed(const typename base::vec_t size, const trans_t transform = {})
+		[[nodiscard]] explicit(false) rect_box_posed(const vec_t size, const trans_t transform = {})
 			: rect_box_posed{{size, size / -2.f}, transform}{
 		}
 
@@ -601,8 +690,8 @@ namespace mo_yanxi::math{
 		}
 
 		void update(const trans_t transform) noexcept{
-			typename base::value_type rot = transform.rot;
-			auto [cos, sin] = math::cos_sin_deg(rot);
+			value_type rot = transform.rot;
+			auto [cos, sin] = cos_sin_deg(rot);
 
 			v0.set(offset).rotate(cos, sin);
 			v1.set(size.x, 0).rotate(cos, sin);
@@ -647,6 +736,7 @@ namespace mo_yanxi::math{
 
 	using fp_t = float;
 
+	export
 	template <typename T>
 	concept quad_like = std::is_base_of_v<quad<fp_t>, T>;
 
@@ -709,7 +799,7 @@ namespace mo_yanxi::math{
 			auto a = rectangle[i];
 			auto b = rectangle[i + 1];
 
-			const fp_t d = ::mo_yanxi::math::dst2_to_segment(p, a, b);
+			const fp_t d = math::dst2_to_segment(p, a, b);
 
 			if (d < minDistance) {
 				minDistance = d;
@@ -738,7 +828,7 @@ namespace mo_yanxi::math{
 			const vector2<fp_t> va = quad[i];
 			const vector2<fp_t> vb = quad[i + 1];
 
-			normals[i].weight = math::dst_to_segment(where, va, vb) * va.dst(vb);
+			normals[i].weight = dst_to_segment(where, va, vb) * va.dst(vb);
 			normals[i].normal = quad.edge_normal_at(i);
 		}
 

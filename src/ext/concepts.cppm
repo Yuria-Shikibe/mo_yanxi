@@ -104,8 +104,9 @@ namespace mo_yanxi {
 	template <class T, template <class...> class Template>
 	struct is_spec_of : std::bool_constant<spec_of<T, Template>>{};
 
-
-
+	export
+	template <typename T>
+	concept tuple_spec = spec_of<T, std::tuple>;
 
     template <typename T>
     concept complete_type = requires{

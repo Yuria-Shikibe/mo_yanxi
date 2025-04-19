@@ -87,7 +87,7 @@ void main() {
     bool upSacling = up_sampling(ubo.mip_index);
 
     float approach = (current_index + 1) / ubo.total_layer;
-    float lastMix = 0.25f * (0.5f + 0.5f * approach);
+    float lastMix = 0;//0.15f * (0.5f + 0.5f * approach);
 
     if(upSacling){
         vec4 colorSrc;

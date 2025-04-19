@@ -21,13 +21,6 @@ namespace mo_yanxi::game{
 		return graphic::draw::white_region;
 	}
 
-	float fx::effect_drawer_base::get_effect_prog(const effect& e) noexcept{
-		return e.duration.get();
-	}
-
-	math::vec2 fx::effect_drawer_base::get_effect_pos(const effect& e) noexcept{
-		return e.trans.vec;
-	}
 
 	void fx::shape_rect_ortho::operator()(const effect& e, const effect_draw_context& ctx) const noexcept{
 		const float prog = e.duration.get();
