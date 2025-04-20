@@ -32,7 +32,7 @@ namespace mo_yanxi::vk{
 
 		[[nodiscard]] VkResult get_status() const noexcept{
 			assert(handle && device);
-			vkGetFenceStatus(device, handle);
+			return vkGetFenceStatus(device, handle);
 		}
 
 		void reset() const{

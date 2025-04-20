@@ -70,6 +70,10 @@ namespace mo_yanxi::dim2{
 		return rst;
 	}
 
+	struct div_result{
+
+	};
+
 	template <
 		std::integral T1, std::integral T2, position_acquireable<T1> P1, position_acquireable<T2> P2>
 	constexpr auto div_to_positive(const P1& lhs, const P2& rhs){
@@ -153,11 +157,11 @@ namespace mo_yanxi::dim2{
 		}
 
 		[[nodiscard]] static constexpr size_type width() noexcept{
-			return ChunkWidth;
+			return extent.x;
 		}
 
 		[[nodiscard]] static constexpr size_type height() noexcept{
-			return ChunkHeight;
+			return extent.y;
 		}
 
 		[[nodiscard]] constexpr global_coord_type chunk_coord() const noexcept{
@@ -195,7 +199,8 @@ namespace mo_yanxi::dim2{
 		using local_coord_type = vec<size_type>;
 		using global_coord_type = vec<global_size_type>;
 
-		fixed_open_addr_hash_map<global_coord_type, value_type, global_coord_type, math::vectors::constant2<typename global_coord_type::value_type>::lowest_vec2> chunks{};
+		fixed_open_addr_hash_map<global_coord_type, value_type, global_coord_type, math::vectors::constant2<global_size_type>::lowest_vec2> chunks{};
+		// std::unordered_map<global_coord_type, value_type> chunks{};
 
 		template <position_acquireable<global_size_type> Coord = global_coord_type>
 		[[nodiscard]] constexpr decltype(auto) tile_at(const Coord global_tile_coord){

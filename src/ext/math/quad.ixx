@@ -210,7 +210,13 @@ namespace mo_yanxi::math{
 		[[nodiscard]] FORCE_INLINE constexpr bool axis_proj_overlaps(this const S& sbj, const O& obj, const vec_t axis) noexcept{
 			if constexpr (std::same_as<value_type, float> && any_derived_from<O, quad>){
 				if (!std::is_constant_evaluated()){
-					static constexpr std::int32_t PERMUTE_IDX[8] = {0, 2, 4, 6, 1, 3, 5, 7};
+					// struct alignas(32) IDXS{
+					// 	std::int32_t PERMUTE_IDX[8] {0, 2, 4, 6, 1, 3, 5, 7};
+					// };
+					// constexpr IDXS PERMUTE_IDX{};
+
+					 alignas(32) constexpr std::int32_t PERMUTE_IDX[8] {0, 2, 4, 6, 1, 3, 5, 7};
+
 					// 加载并重组数据
 					const __m256i idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(PERMUTE_IDX));
 

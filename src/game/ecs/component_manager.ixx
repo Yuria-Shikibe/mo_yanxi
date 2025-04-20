@@ -48,7 +48,7 @@ namespace mo_yanxi::game::ecs{
 		template <typename T>
 		[[nodiscard]] constexpr strided_span<component<T>> slice() const noexcept {
 			auto span = getter(idt);
-			return strided_span<component<T>>{reinterpret_cast<component<T>*>(span.data()), span.size() / sizeof (component<T>), span.stride()};
+			return strided_span<component<T>>{reinterpret_cast<component<T>*>(span.data()), span.size(), span.stride()};
 		}
 
 		constexpr auto operator<=>(const archetype_slice& o) const noexcept{
@@ -105,7 +105,7 @@ namespace mo_yanxi::game::ecs{
 		auto& add_archetype(Args&& ...args){
 			std::type_index idx = typeid(Tuple);
 
-			return static_cast<Archetype&>(*archetypes.try_emplace(idx, this->create_new_archetype_map<Tuple, Archetype>(std::forward<Args>(args))).first->second);
+			return static_cast<Archetype&>(*archetypes.try_emplace(idx, this->create_new_archetype_map<Tuple, Archetype>(std::forward<Args>(args) ...)).first->second);
 		}
 
 		template <typename Archetype>
@@ -221,7 +221,7 @@ namespace mo_yanxi::game::ecs{
 				using params = unary_apply_to_tuple_t<std::decay_t, tuple_drop_first_elem_t<raw_params>>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				this->slice_and_then<unary_apply_to_tuple_t<unwrap_first_element_t, params>>([this, f = std::move(fn)](const span_tuple& p){
+				this->slice_and_then<params>([this, f = std::move(fn)](const span_tuple& p){
 					auto count = std::ranges::size(std::get<0>(p));
 
 					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
@@ -240,7 +240,7 @@ namespace mo_yanxi::game::ecs{
 				using params = unary_apply_to_tuple_t<std::decay_t, raw_params>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				this->slice_and_then<unary_apply_to_tuple_t<unwrap_first_element_t, params>>([f = std::move(fn)](const span_tuple& p){
+				this->slice_and_then<params>([f = std::move(fn)](const span_tuple& p){
 					auto count = std::ranges::size(std::get<0>(p));
 
 					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
@@ -421,8 +421,24 @@ namespace mo_yanxi::game::ecs{
 	private:
 		template <typename Tuple = std::tuple<>>
 		void add_new_archetype_map(archetype<Tuple>& type){
-			auto insert = [this](std::type_index idx, archetype_slice&& elem){
+			using archetype_t = archetype<Tuple>;
+
+			auto insert = [&, this]<typename T>(){
+				std::type_index idx{typeid(T)};
 				auto& vector = type_to_archetype[idx];
+
+				archetype_slice elem{
+					&type,
+					+[](void* arg) noexcept -> strided_span<std::byte>{
+						auto slice = static_cast<archetype_t*>(arg)->template slice<T>();
+						return strided_span<std::byte>{
+							const_cast<std::byte*>(reinterpret_cast<const std::byte*>(std::ranges::data(slice))),
+							slice.size(),
+							slice.stride()
+						};
+					}
+				};
+
 				auto it = std::ranges::lower_bound(vector, elem);
 				vector.insert(it, std::move(elem));
 			};
@@ -430,13 +446,12 @@ namespace mo_yanxi::game::ecs{
 			using appended = tuple_cat_t<std::tuple<chunk_meta>, Tuple>;
 
 			[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
-				(insert(typeid(std::tuple_element_t<Idx, appended>), archetype_slice{
-					&type,
-					+[](void* arg) noexcept -> strided_span<std::byte>{
-						return strided_span<std::byte>{static_cast<archetype<Tuple>*>(arg)->template slice<std::tuple_element_t<Idx, appended>>()};
-					}
-				}), ...);
+				(insert.template operator()<std::tuple_element_t<Idx, appended>>(), ...);
 			}(std::make_index_sequence<std::tuple_size_v<appended>>{});
+
+			[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+				(insert.template operator()<typename std::tuple_element_t<Idx, typename archetype_t::derive_map>::first_type>(), ...);
+			}(std::make_index_sequence<std::tuple_size_v<typename archetype_t::derive_map>>{});
 		}
 
 
@@ -472,19 +487,19 @@ namespace mo_yanxi::game::ecs{
 	template <typename T>
 	using readonly_const_decay_t = typename readonly_decay<T>::type;
 
-	template <typename T>
-	struct is_component : std::false_type{};
-
-	template <typename T>
-	struct is_component<component<T>> : std::true_type{};
-
-	export
-	template <typename T>
-	constexpr bool is_component_v = is_component<T>::value;
-
-	export
-	template <typename Tuple>
-	using get_used_components = tuple_drop_front_n_elem_t<tuple_find_first_v<is_component, unary_apply_to_tuple_t<std::decay_t, Tuple>>, Tuple>;
+	// template <typename T>
+	// struct is_component : std::false_type{};
+	//
+	// template <typename T>
+	// struct is_component<component<T>> : std::true_type{};
+	//
+	// export
+	// template <typename T>
+	// constexpr bool is_component_v = is_component<T>::value;
+	//
+	// export
+	// template <typename Tuple>
+	// using get_used_components = tuple_drop_front_n_elem_t<tuple_find_first_v<is_component, unary_apply_to_tuple_t<std::decay_t, Tuple>>, Tuple>;
 
 }
 

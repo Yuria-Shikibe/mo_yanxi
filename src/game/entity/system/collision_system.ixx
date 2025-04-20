@@ -91,9 +91,10 @@ namespace mo_yanxi::game::ecs{
 	struct collision_system{
 	private:
 		std::vector<manifold*> pre_passed_manifolds{};
+		using collision_test_tuple = std::tuple<component<const chunk_meta>&, component<manifold>&, component<mech_motion>&, component<physical_rigid>&>;
 
 		quad_tree<manifold::collision_object> tree{{{0, 0}, 100000}};
-
+		shared_stack<collision_test_tuple> passed_entites{};
 
 		FORCE_INLINE static void rigidCollideWith(
 			const manifold::collision_object& sbj,
@@ -105,7 +106,7 @@ namespace mo_yanxi::game::ecs{
 
 			using math::vec2;
 
-			const vec2 dst_to_sbj = intersection.pos - sbj.motion->pos();//(sbj.motion->pos() + sbj_correction);
+			const vec2 dst_to_sbj = intersection.pos - sbj.motion->pos();
 			const vec2 dst_to_obj = intersection.pos - obj.motion->pos();
 
 			const vec2 sbj_vel = sbj.motion->vel_at(dst_to_sbj);
@@ -220,7 +221,7 @@ namespace mo_yanxi::game::ecs{
 					const auto avg_s = sbj.expand_unchecked(2);
 					const auto avg_o = obj.expand_unchecked(2);
 
-					auto avg = math::rect_rough_avg_intersection(sbj, obj);
+					auto avg = rect_rough_avg_intersection(sbj, obj);
 					if(!avg){
 						avg.pos = (avg_s + avg_o) / 2;
 					}
@@ -231,7 +232,7 @@ namespace mo_yanxi::game::ecs{
 						correction,
 						manifold::intersection{
 							.pos = avg.pos,
-							.normal = math::avg_edge_normal(obj, avg.pos).normalize(),
+							.normal = avg_edge_normal(obj, avg.pos).normalize(),
 							.index = index
 						});
 
@@ -287,46 +288,72 @@ namespace mo_yanxi::game::ecs{
 				component<mech_motion>& motion,
 				component<physical_rigid>& rigid
 			){
-					tree.insert({meta.id(), &manifold, &motion, &rigid});
-				});
+				tree.insert({meta.id(), &manifold, &motion, &rigid});
+			});
 		}
 
-		void run(component_manager& component_manager){
-			component_manager.sliced_each([this](
-				const component<chunk_meta>& meta,
-				component<manifold>& mf,
-				component<mech_motion>& motion,
-				component<physical_rigid>& rigid
+		void run_collision_test_pre(component_manager& component_manager){
+			using RangeT = decltype(component_manager.get_slice_of<const chunk_meta, manifold, mech_motion, physical_rigid>());
+			auto ranges =
+				component_manager.get_slice_of<const chunk_meta, manifold, mech_motion, physical_rigid>() | std::views::transform([](RangeT::const_reference value){
+				using T = unary_apply_to_tuple_t<std::remove_reference_t, unary_apply_to_tuple_t<std::ranges::range_reference_t, RangeT::value_type>>;
+
+
+				return strided_multi_span<T>{value};
+			}) | std::ranges::to<std::vector>();
+
+			auto view = ranges | std::views::join;
+
+			auto entity_count = std::ranges::fold_left(ranges | std::views::transform([](auto& v){
+				return v.size();
+			}), std::size_t{0}, std::plus{});
+
+			std::atomic_size_t possible_counts{};
+			std::for_each(std::execution::par, view.begin(), view.end(), [&, this](
+				collision_test_tuple data
 			){
+				auto [meta, mf, motion, rigid] = data;
 				tree.intersect_all({meta.id(), &mf, &motion, &rigid}, [&](const manifold::collision_object& sbj, const manifold::collision_object& obj){
 					if(sbj == obj)return;
-					sbj.manifold->test_intersection_with(obj);
+					if(sbj.manifold->test_intersection_with(obj)){
+						possible_counts.fetch_add(1, std::memory_order_relaxed);
+					}
 				}, roughIntersectWith);
 			});
 
-			component_manager.sliced_each([](
-				component<manifold>& mf,
-				component<mech_motion>& motion
-			){
-					if(!check_pre_collision(mf, motion)) return;
+			auto count = possible_counts.load(std::memory_order_relaxed);
 
-					collapse_possible_collisions(mf, motion);
-				});
+			if(count * 2 < passed_entites.capacity() && passed_entites.capacity() > 128){
+				passed_entites.reset();
+			}
+			passed_entites.clear_and_reserve(count);
 
-			component_manager.sliced_each([](
-				const component<chunk_meta>& meta,
-				component<manifold>& mf,
-				component<mech_motion>& motion,
-				component<physical_rigid>& rigid
+
+			std::for_each(std::execution::par, view.begin(), view.end(), [&, this](
+				collision_test_tuple data
 			){
-					collisionsPostProcess_3({meta.id(), &mf, &motion, &rigid});
-				});
-			component_manager.sliced_each([](
-				component<manifold>& mf,
-				component<mech_motion>& motion
-			){
-					collisionsPostProcess_4(mf, motion);
-				});
+				auto [meta, mf, motion, rigid] = data;
+
+				if(!check_pre_collision(mf, motion)) return;
+
+				collapse_possible_collisions(mf, motion);
+
+				passed_entites.push(data);
+			});
+		}
+
+		void run(component_manager& component_manager){
+			run_collision_test_pre(component_manager);
+
+			auto rng = passed_entites.locked_range();
+
+			for (auto [meta, mf, motion, rigid] : rng){
+				collisionsPostProcess_3({meta.id(), &mf, &motion, &rigid});
+			}
+
+			for (auto [meta, mf, motion, rigid] : rng){
+				collisionsPostProcess_4(mf, motion);
+			}
 		}
 	};
 }

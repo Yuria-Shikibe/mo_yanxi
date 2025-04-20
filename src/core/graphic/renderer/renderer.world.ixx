@@ -38,7 +38,8 @@ namespace mo_yanxi::graphic{
 
 
 	struct world_vertex_uniform{
-		vk::padded_mat3 view;
+		vk::padded_mat3 view{math::mat3_idt};
+		vk::padded_mat3 proj{math::mat3_idt};
 	};
 
 	struct world_fragment_uniform{
@@ -198,11 +199,14 @@ namespace mo_yanxi::graphic{
 		vk::descriptor_layout descriptor_layout{};
 		vk::descriptor_buffer descriptor_buffer{};
 
-		world_vertex_uniform proj{};
-		vk::uniform_buffer proj_ubo{};
+		// world_vertex_uniform proj{};
+		// vk::uniform_buffer proj_ubo{};
+
+		std::vector<math::mat3> projs{};
 
 	public:
 		batch_layer_data<world_fragment_uniform> frag_data{};
+		batch_layer_data<world_vertex_uniform> vert_data{};
 
 	private:
 		world_layer_default main_layer{};
@@ -237,9 +241,10 @@ namespace mo_yanxi::graphic{
 				context.get_allocator(),
 				descriptor_layout,
 				descriptor_layout.binding_count(), batch.get_chunk_count()),
-			proj_ubo(context.get_allocator(), sizeof(world_vertex_uniform)),
 
 			frag_data{context, batch.get_chunk_count()},
+			vert_data{context, batch.get_chunk_count()},
+
 			main_layer(context, batch.get_chunk_count(), {descriptor_layout, batch.descriptor_layout()}),
 			oit_blender{
 				context, std::bit_cast<math::usize2>(context.get_extent()),
@@ -251,7 +256,7 @@ namespace mo_yanxi::graphic{
 
 			for(std::size_t i = 0; i < batch.get_chunk_count(); ++i){
 				(void)vk::descriptor_mapper{descriptor_buffer}
-				.set_uniform_buffer(0, proj_ubo, 0, i)
+				.set_uniform_buffer(0, vert_data.ubo.get_address() + decltype(vert_data)::chunk_size * i, decltype(vert_data)::chunk_size, i)
 				.set_uniform_buffer(1, frag_data.ubo.get_address() + decltype(frag_data)::chunk_size * i, decltype(frag_data)::chunk_size, i);
 			}
 
@@ -266,9 +271,28 @@ namespace mo_yanxi::graphic{
 			on_resize(extent);
 		}
 
-		void update_proj(const world_vertex_uniform& proj){
-			this->proj = proj;
-			(void)vk::buffer_mapper{proj_ubo}.load(proj);
+		void push_proj(const math::mat3& proj){
+			if(projs.empty()){
+				vert_data.current.proj = proj;
+				projs.push_back(proj);
+			}else{
+				vert_data.current.proj = proj * vert_data.current.proj;
+				projs.push_back(proj);
+			}
+		}
+
+		void pop_proj(){
+			if(projs.empty()){
+				throw std::out_of_range("projs is empty");
+			}
+
+			if(projs.size() == 1){
+				vert_data.current.proj = math::mat3_idt;
+				projs.pop_back();
+			}else{
+				vert_data.current.proj = projs.back().inv() * vert_data.current.proj;
+				projs.pop_back();
+			}
 		}
 
 		void blit() {
@@ -416,6 +440,7 @@ namespace mo_yanxi::graphic{
 		VkCommandBuffer submit(std::size_t index){
 
 			frag_data.update<true>(index);
+			vert_data.update<true>(index);
 
 			return main_layer.submit(context(), index);
 		}
@@ -518,7 +543,7 @@ namespace mo_yanxi::graphic{
 		void update(float delta_in_tick){
 			camera.update(delta_in_tick, true);
 			if(camera.check_changed()){
-				batch.update_proj({camera.get_world_to_uniformed()});
+				batch.vert_data.current.view = {camera.get_world_to_uniformed()};
 			}
 
 			ssao.set_scale(camera.map_scale(0.15f, 2.5f) * 1.5f);

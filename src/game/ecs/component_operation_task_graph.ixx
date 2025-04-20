@@ -125,7 +125,9 @@ namespace mo_yanxi::game::ecs{
 			typename Fn>
 		concurrent::event_id run(std::optional<concurrent::event_id> id, DepRng&& depRng, Fn&& fn){
 			using fn_params = remove_mfptr_this_args<Fn>;
-			using comps = get_used_components<fn_params>;
+
+			//TODO replace this: pick all used params
+			using comps = std::tuple<>;//get_used_components<fn_params>;
 
 			constexpr bool has_task_context = std::same_as<concurrent::task_context, std::remove_cvref_t<std::tuple_element_t<0, fn_params>>>;
 
@@ -151,7 +153,8 @@ namespace mo_yanxi::game::ecs{
 			[&] <std::size_t ...Idx>(std::index_sequence<Idx...>){
 				([&]<typename F>(){
 					using fn_params = remove_mfptr_this_args<Fn>;
-					using comps = get_used_components<fn_params>;
+					//TODO replace this: pick all used params
+					using comps = std::tuple<>;//get_used_components<fn_params>;
 					constexpr bool has_task_context = std::same_as<concurrent::task_context, std::remove_cvref_t<std::tuple_element_t<0, fn_params>>>;
 					has_manually_context |= has_task_context;
 

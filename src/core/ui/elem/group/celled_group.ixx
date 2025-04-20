@@ -103,7 +103,7 @@ namespace mo_yanxi::ui{
 
 	export
 	template <std::derived_from<basic_cell> T>
-		requires (std::is_copy_assignable_v<T> && std::is_default_constructible_v<T>)
+		// requires (std::is_copy_assignable_v<T> && std::is_default_constructible_v<T>)
 	struct cell_adaptor{
 		using cell_type = T;
 		elem* element{};
@@ -130,10 +130,10 @@ namespace mo_yanxi::ui{
 	};
 
 	export
-	template <std::derived_from<basic_cell> CellTy, std::derived_from<cell_adaptor<CellTy>> Adaptor = cell_adaptor<CellTy>>
-		requires requires(elem* e, const CellTy& cell){
-			Adaptor{e, cell};
-		}
+	template <std::derived_from<basic_cell> CellTy, typename Adaptor = cell_adaptor<CellTy>>
+		// requires requires(elem* e, const CellTy& cell){
+		// 	Adaptor{e, cell};
+		// }
 	struct universal_group : public basic_group{
 		using cell_type = CellTy;
 		using adaptor_type = Adaptor;

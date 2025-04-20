@@ -28,8 +28,6 @@ namespace mo_yanxi::graphic{
 		vk::command_buffer merge_command{};
 		vk::storage_image merge_result{};
 
-		vk::semaphore merge_done_semaphore{};
-		vk::semaphore merge_wait_semaphore{};
 
 	public:
 		[[nodiscard]] renderer_merge() = default;
@@ -48,19 +46,9 @@ namespace mo_yanxi::graphic{
 		merge_command{context.get_compute_command_pool().obtain()},
 		merge_result{
 		context.get_allocator(), context.get_extent(), 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-		},
-		merge_done_semaphore(context.get_device()),
-		merge_wait_semaphore(context.get_device())
+		}
 		{
 			on_resize(context.get_extent());
-
-			{
-				auto cmd = context.get_compute_command_pool().obtain();
-				vk::fence fence{context.get_device(), false};
-				{vk::scoped_recorder sr{cmd};}
-				vk::cmd::submit_command(context.graphic_queue(), cmd, fence, nullptr, 0, merge_wait_semaphore.get(), VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT);
-				fence.wait();
-			}
 		}
 
 		[[nodiscard]] vk::image_handle get_result() const noexcept{
@@ -69,8 +57,6 @@ namespace mo_yanxi::graphic{
 
 		void submit() const{
 			vk::cmd::submit_command(context->compute_queue(), merge_command, nullptr
-				// merge_wait_semaphore, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				// merge_done_semaphore, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
 			);
 		}
 
@@ -78,14 +64,6 @@ namespace mo_yanxi::graphic{
 			merge_result.resize(ext);
 
 			on_resize(ext);
-		}
-
-		[[nodiscard]] VkSemaphore get_merge_done_semaphore() const noexcept{
-			return merge_done_semaphore;
-		}
-
-		[[nodiscard]] VkSemaphore get_merge_wait_semaphore() const noexcept{
-			return merge_wait_semaphore;
 		}
 
 	private:

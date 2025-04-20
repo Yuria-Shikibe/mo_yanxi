@@ -1,6 +1,7 @@
 module;
 
 #include <cassert>
+#include <gch/small_vector.hpp>
 
 export module mo_yanxi.game.ecs.component.chamber:grid;
 
@@ -20,11 +21,12 @@ import :tile;
 
 import std;
 
-namespace mo_yanxi::game::ecs::chamber{
+namespace mo_yanxi::game::ecs{
+	using namespace chamber;
 
 	export
 	template <>
-	struct quad_tree_trait_adaptor : quad_tree_adaptor_base<tile, float>{
+	struct quad_tree_trait_adaptor<tile, float> : quad_tree_adaptor_base<tile, float>{
 		[[nodiscard]] static rect_type get_bound(const_reference self) noexcept{
 			return self.get_bound();
 		}
@@ -40,22 +42,44 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 	};
 
+
+	export
+	template <>
+	struct component_custom_behavior<building_data> : component_custom_behavior_base<building_data>{
+		static void on_init(const chunk_meta& meta, const component<value_type>& comp);
+
+		static void on_terminate(const chunk_meta& meta, const component<value_type>& comp);
+
+		static void on_relocate(const chunk_meta& meta, component<value_type>& comp){
+			comp.building().data = &comp;
+		}
+	};
+
+}
+
+namespace mo_yanxi::game::ecs::chamber{
+
 	class tile_grid{
-		friend grid_instance;
+		friend chamber_grid;
 	public:
 		using tile_type = tile;
 
-		using grid_type = dim2::grid<tile_type>;
+		using grid_type = dim2::grid<tile_type, unsigned, {16u, 16u}>;
 
 		void insert(entity_id building){
 			assert(building);
 
 			auto& region = building->at<building_data>();
-			wrap_bound_.expand_by(region.get_bound());
+			if(wrap_bound_.area() == 0){
+				wrap_bound_ = region.get_bound();
+			}else{
+				wrap_bound_.expand_by(region.get_bound());
+			}
+
 
 			const bool quad_tree_valid = quad_tree_.get_boundary().contains_loose(wrap_bound_);
 
-			assert(!region.grid);
+			// assert(!region.grid);
 			region.region.each([&, this](tile_coord coord){
 				auto& tile = tiles[coord];
 				assert(!tile.building);
@@ -125,6 +149,22 @@ namespace mo_yanxi::game::ecs::chamber{
 			});
 		}
 
+		void each_tile(std::invocable<tile_type&> auto fn) {
+			for (auto && value : tiles){
+				for (auto && second : value.second){
+					std::invoke(fn, second);
+				}
+			}
+		}
+
+		void each_tile(std::invocable<const tile_type&> auto fn) const {
+			for (auto && value : tiles){
+				for (auto && second : value.second){
+					std::invoke(fn, second);
+				}
+			}
+		}
+
 		[[nodiscard]] auto* find(tile_coord coord) const noexcept{
 			return tiles.find(coord);
 		}
@@ -133,17 +173,24 @@ namespace mo_yanxi::game::ecs::chamber{
 			return tiles.find(coord);
 		}
 
+		[[nodiscard]] quad_tree<tile_type>& quad_tree(){
+			return quad_tree_;
+		}
+
 	private:
 		math::frect wrap_bound_{};
-		quad_tree<tile_type> quad_tree_{{}};
+		ecs::quad_tree<tile_type> quad_tree_{{}};
 		grid_type tiles{};
 
 		void rebuild_tree(){
-			decltype(quad_tree_) new_quad_tree{wrap_bound_};
-			quad_tree_.each([&, this](tile_type& coord){
-				new_quad_tree.insert(std::move(coord));
+			std::destroy_at(&quad_tree_);
+			std::construct_at(&quad_tree_, wrap_bound_.copy().expand(tile_size * 2));
+
+			each_tile([this](const tile_type& tile){
+				if(tile.building){
+					quad_tree_.insert(tile);
+				}
 			});
-			quad_tree_ = std::move(new_quad_tree);
 		}
 	};
 
@@ -155,16 +202,9 @@ namespace mo_yanxi::game::ecs::chamber{
 
 
 
-	export
-	template <>
-	struct component_custom_behavior<building_data> : component_custom_behavior_base<building_data>{
-		static void on_init(const chunk_meta& meta, const component<value_type>& comp);
-
-		static void on_terminate(const chunk_meta& meta, const component<value_type>& comp);
-	};
 
 
-	template <typename Tpl>
+	/*template <typename Tpl>
 	struct building_archetype : archetype<Tpl>{
 		tile_grid* grid{};
 
@@ -181,15 +221,15 @@ namespace mo_yanxi::game::ecs::chamber{
 			auto& meta = archetype_base::meta_of(comps);
 			grid->insert(meta);
 		}
-	};
+	};*/
 
-	class grid_instance{
+	export
+	class chamber_grid{
 	public:
 		using grid = tile_grid;
 		grid local_grid{};
 
 		component_manager manager{};
-
 
 		struct in_viewports{
 			std::vector<grid::tile_type*> tiles{};
@@ -200,12 +240,14 @@ namespace mo_yanxi::game::ecs::chamber{
 				return tiles.empty() && builds.empty();
 			}
 
-			void update(grid_instance& grid, const math::rect_box<float>& viewport_in_global) noexcept{
+			void update(chamber_grid& grid, const math::rect_box<float>& viewport_in_global) noexcept{
 				viewport_in_local = grid.box_to_local(viewport_in_global);
 				tiles.clear();
 				builds.clear();
 
-				grid.local_grid.quad_tree_.intersect_then(viewport_in_local, GridBoxCollidePred{},
+				grid.local_grid.quad_tree_.intersect_then(
+					viewport_in_local,
+					GridBoxCollidePred::operator(),
 					[&, this](auto&&, grid::tile_type& tile){
 					tiles.push_back(&tile);
 					if(tile.building){
@@ -260,14 +302,33 @@ namespace mo_yanxi::game::ecs::chamber{
 			return inViewports;
 		}
 
-		template <tuple_spec Tuple, typename Args>
+		template <tuple_spec Tuple>
+		void add_building_type(){
+			if constexpr (std::same_as<building_data, std::tuple_element_t<0, Tuple>>){
+				manager.add_archetype<Tuple>();
+			}else{
+				using building_ty = tuple_cat_t<std::tuple<building_data>, Tuple>;
+				manager.add_archetype<building_ty>();
+			}
+		}
+
+		template <tuple_spec Tuple, typename ...Args>
 		building_ref add_building(tile_region region, Args&& ...args){
-			static_assert(!std::same_as<building_data, std::tuple_element_t<0, Tuple>>);
-			using building_ty = tuple_cat_t<std::tuple<building_data>, Tuple>;
-			return manager.create_entity_deferred<building_ty>(building_data{
-				.region = region,
-				.grid = this
-			}, std::forward<Args>(args)...);
+			if(region.area() == 0){
+				throw std::invalid_argument("invalid region");
+			}
+
+			if constexpr (std::same_as<building_data, std::tuple_element_t<0, Tuple>>){
+				return manager.create_entity_deferred<Tuple>(building_data{
+					.region = region,
+					.grid = this
+				}, std::forward<Args>(args)...);
+			}else{
+				using building_ty = tuple_cat_t<std::tuple<building_data>, Tuple>;
+				return manager.create_entity_deferred<building_ty>(building_data{
+					region, this
+				}, std::forward<Args>(args)...);
+			}
 		}
 
 	private:
@@ -286,13 +347,18 @@ namespace mo_yanxi::game::ecs::chamber{
 	};
 
 
-	template <>
-	void component_custom_behavior<>::on_init(const chunk_meta& meta, const component<value_type>& comp){
+}
+
+namespace mo_yanxi::game::ecs{
+
+	using namespace chamber;
+
+	void component_custom_behavior<building_data>::on_init(const chunk_meta& meta, const component<value_type>& comp){
 		comp.grid->local_grid.insert(meta.id());
 	}
 
-	template <>
-	void component_custom_behavior<>::on_terminate(const chunk_meta& meta, const component<value_type>& comp){
+	void component_custom_behavior<building_data>::on_terminate(const chunk_meta& meta,
+		const component<value_type>& comp){
 		comp.grid->local_grid.erase(meta.id());
 	}
 }

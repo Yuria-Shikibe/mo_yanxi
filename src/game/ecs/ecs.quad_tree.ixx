@@ -149,7 +149,6 @@ namespace mo_yanxi::game::ecs{
 
 		};
 
-
 		struct sub_node_ptr{
 		private:
 			exclusive_handle_member<pool_type*> pool_{};
@@ -654,9 +653,9 @@ namespace mo_yanxi::game::ecs{
 				}
 			}
 
-			for(auto cont : this->items){
-				if(std::invoke(boundCheck, region, trait::bound_of(*cont))){
-					std::invoke(func, region, *cont);
+			for(auto& cont : this->items){
+				if(std::invoke(boundCheck, region, trait::bound_of(cont))){
+					std::invoke(func, region, cont);
 				}
 			}
 		}
@@ -804,6 +803,11 @@ namespace mo_yanxi::game::ecs{
 		[[nodiscard]] explicit quad_tree(typename base::rect_type boundary)
 			: base(&this->pool, boundary)
 		{}
+
+		quad_tree(const quad_tree& other) = delete;
+		quad_tree(quad_tree&& other) noexcept = delete;
+		quad_tree& operator=(const quad_tree& other) = delete;
+		quad_tree& operator=(quad_tree&& other) noexcept = delete;
 	};
 
 }

@@ -73,13 +73,13 @@ namespace mo_yanxi{
 			return *std::construct_at(where, std::forward<Args>(args)...);
 		}
 
-		T& push(T&& val) noexcept(std::is_nothrow_move_assignable_v<T>) requires (std::is_move_assignable_v<T>){
+		T& push(T&& val) noexcept(std::is_nothrow_move_constructible_v<T>) requires (std::is_nothrow_move_constructible_v<T>){
 			auto where = push_uninitialized();
 
 			return *std::construct_at(where, std::move(val));
 		}
 
-		T& push(const T& val) noexcept(std::is_nothrow_copy_assignable_v<T>) requires (std::is_copy_assignable_v<T>){
+		T& push(const T& val) noexcept(std::is_nothrow_copy_constructible_v<T>) requires (std::is_nothrow_copy_constructible_v<T>){
 			auto where = push_uninitialized();
 
 			return *std::construct_at(where, val);
@@ -139,12 +139,21 @@ namespace mo_yanxi{
 			this->allocate(newSize);
 		}
 
+		void reset(){
+			destroy();
+			top.store(0, std::memory_order_release);
+
+			this->free();
+			this->data = nullptr;
+			this->cap = 0;
+		}
+
 		constexpr auto locked_range() const noexcept{
-			return std::ranges::subrange{begin(), end()};
+			return std::span{begin(), end()};
 		}
 
 		constexpr auto locked_range() noexcept{
-			return std::ranges::subrange{begin(), end()};
+			return std::span{begin(), end()};
 		}
 
 	private:

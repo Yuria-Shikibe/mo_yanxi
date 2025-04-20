@@ -4,6 +4,22 @@ import std;
 
 namespace mo_yanxi{
 	export
+	template <typename From, typename To>
+	struct copy_const : std::type_identity<To>{
+
+	};
+
+	export
+	template <typename From, typename To>
+	struct copy_const<const From, To> : std::type_identity<const To>{
+
+	};
+
+	export
+	template <typename From, typename To>
+	using copy_const_t = typename copy_const<From, To>::type;
+
+	export
 	template <typename T, T a, T b>
 	constexpr inline T max_const = a > b ? a : b;
 
@@ -61,11 +77,24 @@ namespace mo_yanxi{
 	template <typename T>
 	using unwrap_first_element_t = std::tuple_element_t<0, typename unwrap<T>::type>;
 
+	template <template <typename...> typename W, typename T>
+	consteval auto push_all_to() noexcept{
+		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+			return std::type_identity<W<std::tuple_element_t<Idx, T> ...>>{};
+		}(std::make_index_sequence<std::tuple_size_v<T>>{});
+	}
+
+	export
+	template <template <typename...> typename W, typename T>
+	using all_apply_to = typename decltype(push_all_to<W, T>())::type;
+
 
 	template <std::size_t i, template <typename > typename UnaryPred, typename Tuple>
 	constexpr void modify(std::size_t& index){
 		if (index != std::tuple_size_v<Tuple>) return;
-		if constexpr (UnaryPred<std::tuple_element_t<i, Tuple>>::value) {
+		if constexpr (i >= std::tuple_size_v<Tuple>){
+			return;
+		}else if constexpr (UnaryPred<std::tuple_element_t<i, Tuple>>::value) {
 			index = i;
 		}
 	}
@@ -76,6 +105,27 @@ namespace mo_yanxi{
 		std::size_t index = std::tuple_size_v<Tuple>;
 		[&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
 			(modify<Idx, UnaryPred, Tuple>(index), ...);
+		}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+
+		return index;
+	}();
+
+	template <std::size_t i, template <typename, typename > typename BinaryPred, typename Tuple, typename T>
+	constexpr void modify(std::size_t& index){
+		if (index != std::tuple_size_v<Tuple>) return;
+		if constexpr (i >= std::tuple_size_v<Tuple>){
+			return;
+		}else if constexpr (BinaryPred<std::tuple_element_t<i, Tuple>, T>::value) {
+			index = i;
+		}
+	}
+
+	export
+	template <template <typename, typename > typename BinaryPred, typename Tuple, typename T>
+	constexpr inline std::size_t tuple_match_first_v = []() constexpr -> std::size_t {
+		std::size_t index = std::tuple_size_v<Tuple>;
+		[&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
+			(modify<Idx, BinaryPred, Tuple, T>(index), ...);
 		}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
 
 		return index;
@@ -105,9 +155,21 @@ namespace mo_yanxi{
 		}(std::make_index_sequence<std::tuple_size_v<T>>{});
 	}
 
+	template <typename T>
+	consteval auto apply_ext_const_to_inner() noexcept{
+		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+			return std::type_identity<
+				std::tuple<std::conditional_t<std::is_const_v<T>, std::add_const_t<std::tuple_element_t<Idx, std::remove_const_t<T>>>, std::tuple_element_t<Idx, T>> ...>>{};
+		}(std::make_index_sequence<std::tuple_size_v<T>>{});
+	}
+
 	export
 	template <template <typename > typename UnaryTrait, typename T>
 	using unary_apply_to_tuple_t = typename decltype(apply_to<UnaryTrait, T>())::type;
+
+	export
+	template <typename T>
+	using tuple_const_to_inner_t = typename decltype(apply_ext_const_to_inner<T>())::type;
 
 	constexpr std::size_t a = tuple_find_first_v<std::is_floating_point, std::tuple<int, float>>;
 
@@ -411,7 +473,7 @@ namespace mo_yanxi{
 	consteval std::size_t find_first_index_in_tuple() {
 		if constexpr (Index >= std::tuple_size_v<Tuple>){
 			return Index;
-		}else if constexpr (std::is_same_v<T, std::tuple_element_t<Index, Tuple>>) {
+		}else if constexpr (std::same_as<T, std::tuple_element_t<Index, Tuple>>) {
 			return Index;
 		} else {
 			// 递归检查下一个元素
@@ -422,6 +484,8 @@ namespace mo_yanxi{
 	export
 	template <typename T, typename Tuple>
 	constexpr std::size_t tuple_index_v = find_first_index_in_tuple<T, Tuple>();
+
+	static_assert(tuple_index_v<int, std::tuple<float, double>> == 2);
 	//Tuple Offset Of
 
 	template <typename T>

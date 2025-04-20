@@ -4,9 +4,15 @@ module;
 
 export module mo_yanxi.strided_span;
 
+import mo_yanxi.meta_programming;
 import std;
 
 namespace mo_yanxi{
+
+
+	using A = copy_const_t<std::remove_reference_t<const int&>, float>;
+
+
 	template <class It, class T>
 	concept Span_compatible_iterator =
 		std::contiguous_iterator<It> && std::is_convertible_v<std::remove_reference_t<std::iter_reference_t<It>> (*)[], T (*)[]>;
@@ -137,7 +143,11 @@ namespace mo_yanxi{
 		}
 
 		[[nodiscard]] constexpr difference_type operator-(const strided_span_iterator& right) const noexcept {
-			return ptr - right.ptr;
+			if(stride.value){
+				return (reinterpret_cast<const std::byte*>(ptr) - reinterpret_cast<const std::byte*>(right.ptr)) / stride.value;
+			}else{
+				return ptr - right.ptr;
+			}
 		}
 
 		[[nodiscard]] constexpr reference operator[](const difference_type off) const noexcept {
@@ -201,6 +211,10 @@ namespace mo_yanxi{
 			: ptr_(std::to_address(first)), extent_(count), stride_(stride){
 		}
 
+		constexpr explicit(Extent != std::dynamic_extent) strided_span(pointer first, size_type count, difference_type stride = 0) noexcept // strengthened
+			: ptr_(first), extent_(count), stride_(stride){
+		}
+
 
 		template <Span_compatible_iterator<element_type> It, Span_compatible_sentinel<It> Se>
 		constexpr explicit(Extent != std::dynamic_extent) strided_span(It first, Se last, difference_type stride = 0)
@@ -214,11 +228,11 @@ namespace mo_yanxi{
 		}
 
 
-		template <std::size_t Sz>
-			requires (Extent == std::dynamic_extent || Extent == Sz)
-		constexpr strided_span(std::type_identity_t<element_type> (&arr)[Sz], difference_type stride = 0) noexcept
-			: ptr_(arr), extent_(Sz), stride_(stride){
-		}
+		// template <std::size_t Sz>
+		// 	requires (Extent == std::dynamic_extent || Extent == Sz)
+		// constexpr strided_span(std::type_identity_t<element_type> (&arr)[Sz], difference_type stride = 0) noexcept requires (!std::is_abstract_v<Ty>)
+		// 	: ptr_(arr), extent_(Sz), stride_(stride){
+		// }
 
 		strided_span(const strided_span& other) = default;
 		strided_span(strided_span&& other) noexcept = default;
@@ -411,6 +425,211 @@ namespace mo_yanxi{
 				const auto end = ptr_ + extent_.value;
 				return iterator{end};
 			}
+		}
+
+		[[nodiscard]] constexpr const_iterator cbegin() const noexcept {
+			return begin();
+		}
+
+		[[nodiscard]] constexpr const_iterator cend() const noexcept {
+			return end();
+		}
+
+		[[nodiscard]] constexpr reverse_iterator rbegin() const noexcept{
+			return reverse_iterator{end()};
+		}
+
+		[[nodiscard]] constexpr reverse_iterator rend() const noexcept{
+			return reverse_iterator{begin()};
+		}
+
+		[[nodiscard]] constexpr const_reverse_iterator crbegin() const noexcept {
+			return rbegin();
+		}
+
+		[[nodiscard]] constexpr const_reverse_iterator crend() const noexcept {
+			return rend();
+		}
+	};
+
+	template <typename Ty, typename Cond>
+	using cond_add_const_to = std::conditional_t<std::is_const_v<Cond>, std::add_const_t<Ty>, Ty>;
+
+	export
+	template <class ValueTuple>
+	struct strided_multi_span_iterator {
+		using base_types = tuple_const_to_inner_t<ValueTuple>;
+		using ptr_internal = std::byte*;
+
+	public:
+		using iterator_concept  = std::contiguous_iterator_tag;
+		using iterator_category = std::random_access_iterator_tag;
+		using value_type        = unary_apply_to_tuple_t<std::add_lvalue_reference_t, tuple_const_to_inner_t<ValueTuple>>;
+		using difference_type   = std::ptrdiff_t;
+		using pointer           = value_type*;
+		using reference         = value_type&;
+
+		[[nodiscard]] constexpr value_type operator*() const noexcept {
+			return [this] <std::size_t ...Idx>(std::index_sequence<Idx...>) {
+				return value_type{reinterpret_cast<std::tuple_element_t<Idx, value_type>>(*(ptr + offsets_[Idx])) ...};
+			}(std::make_index_sequence<std::tuple_size_v<value_type>>{});
+		}
+
+		constexpr strided_multi_span_iterator& operator++() noexcept {
+			ptr += stride;
+
+			return *this;
+		}
+
+		constexpr strided_multi_span_iterator operator++(int) noexcept {
+			strided_multi_span_iterator tmp{*this};
+			++*this;
+			return tmp;
+		}
+
+		constexpr strided_multi_span_iterator& operator--() noexcept {
+			ptr -= stride;
+
+			return *this;
+		}
+
+		constexpr strided_multi_span_iterator operator--(int) noexcept {
+			strided_multi_span_iterator tmp{*this};
+			--*this;
+			return tmp;
+		}
+
+		constexpr strided_multi_span_iterator& operator+=(const difference_type off) noexcept {
+			ptr += off * stride;
+
+
+			return *this;
+		}
+
+		[[nodiscard]] constexpr strided_multi_span_iterator operator+(const difference_type Off) const noexcept {
+			strided_multi_span_iterator Tmp{*this};
+			Tmp += Off;
+			return Tmp;
+		}
+
+		[[nodiscard]] friend constexpr strided_multi_span_iterator operator+(const difference_type Off, strided_multi_span_iterator Next) noexcept {
+			Next += Off;
+			return Next;
+		}
+
+		constexpr strided_multi_span_iterator& operator-=(const difference_type off) noexcept {
+			ptr -= off * stride;
+
+
+			return *this;
+		}
+
+		[[nodiscard]] constexpr strided_multi_span_iterator operator-(const difference_type off) const noexcept {
+			strided_multi_span_iterator tmp{*this};
+			tmp -= off;
+			return tmp;
+		}
+
+		[[nodiscard]] constexpr difference_type operator-(const strided_multi_span_iterator& right) const noexcept {
+			return (ptr - right.ptr) / stride;
+		}
+
+		[[nodiscard]] constexpr reference operator[](const difference_type off) const noexcept {
+			return *(*this + off);
+		}
+
+		[[nodiscard]] constexpr bool operator==(const strided_multi_span_iterator& right) const noexcept {
+			return ptr == right.ptr;
+		}
+
+		[[nodiscard]] constexpr auto operator<=>(const strided_multi_span_iterator& right) const noexcept {
+			return ptr <=> right.ptr;
+		}
+
+		[[nodiscard]] strided_multi_span_iterator() = default;
+
+		[[nodiscard]] explicit(false) strided_multi_span_iterator(ptr_internal ptr) : ptr(ptr){}
+
+		[[nodiscard]] explicit(false) strided_multi_span_iterator(
+			ptr_internal ptr,
+			std::array<std::ptrdiff_t, std::tuple_size_v<ValueTuple>> offs,
+			std::ptrdiff_t stride)
+			: ptr(ptr),
+			  offsets_(offs),
+			  stride(stride){
+		}
+
+	private:
+		ptr_internal ptr = nullptr;
+		std::array<std::ptrdiff_t, std::tuple_size_v<ValueTuple>> offsets_;
+		std::ptrdiff_t stride;
+	};
+
+	export
+	template <typename ValueTuple>
+	struct strided_multi_span{
+	private:
+		static constexpr auto tuple_sz = std::tuple_size_v<ValueTuple>;
+		static_assert(tuple_sz != 0);
+		std::byte* data_;
+		std::array<std::ptrdiff_t, std::tuple_size_v<ValueTuple>> offsets_;
+		std::size_t size_;
+		std::ptrdiff_t stride_;
+
+	public:
+		using value_type        = unary_apply_to_tuple_t<std::add_lvalue_reference_t, tuple_const_to_inner_t<ValueTuple>>;
+		using size_type = std::size_t;
+		using difference_type = std::ptrdiff_t;
+		using pointer = value_type*;
+		using const_pointer = const value_type*;
+		using reference = value_type&;
+		using const_reference = const value_type&;
+		using iterator = strided_multi_span_iterator<value_type>;
+		using reverse_iterator = std::reverse_iterator<iterator>;
+		using const_iterator         = strided_multi_span_iterator<const value_type>;
+		using const_reverse_iterator = std::const_iterator<reverse_iterator>;
+
+		[[nodiscard]] constexpr strided_multi_span() = default;
+
+		template <typename ...Ty>
+		[[nodiscard]] constexpr strided_multi_span(strided_span<Ty> ...spans) noexcept
+			:
+			data_(std::min(std::initializer_list<std::byte*>{
+					const_cast<std::byte*>(reinterpret_cast<const std::byte*>(spans.data())) ...
+				})),
+			offsets_{
+				(const_cast<std::byte*>(reinterpret_cast<const std::byte*>(spans.data())) - data_) ...
+			},
+			size_(std::min(std::initializer_list<std::size_t>{spans.size() ...})),
+			stride_((spans.stride(), ...))
+		{
+			if(((stride_ != spans.stride()) || ...)){
+				throw std::invalid_argument{"spans must have same stride"};
+			}
+		}
+
+		[[nodiscard]] constexpr strided_multi_span(const unary_apply_to_tuple_t<strided_span, tuple_const_to_inner_t<ValueTuple>>& spans) noexcept{
+			[&, this] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+				this->operator=(strided_multi_span{std::get<Idx>(spans) ...});
+			}(std::make_index_sequence<tuple_sz>{});
+		}
+
+		value_type operator[](std::size_t idx) const noexcept{
+			return [&, this] <std::size_t ...Idx>(std::index_sequence<Idx...>) {
+				return value_type{reinterpret_cast<std::tuple_element_t<Idx, value_type>>(*(data_ + idx * offsets_ + offsets_[Idx])) ...};
+			}(std::make_index_sequence<std::tuple_size_v<value_type>>{});
+		}
+
+		[[nodiscard]] constexpr std::size_t size() const noexcept{
+			return size_;
+		}
+
+		[[nodiscard]] iterator begin() const noexcept{
+			return iterator{data_, offsets_, stride_};
+		}
+
+		[[nodiscard]] iterator end() const noexcept{
+			return iterator{data_ + size_ * stride_};
 		}
 
 		[[nodiscard]] constexpr const_iterator cbegin() const noexcept {

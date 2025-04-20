@@ -81,7 +81,7 @@ namespace mo_yanxi::game::ecs{
 
 	export
 	template <typename T>
-	struct component;
+	using component = T;//: T{};
 
 	export
 	struct archetype_base{
@@ -146,7 +146,7 @@ namespace mo_yanxi::game::ecs{
 			noexcept : type_(type){
 		}
 
-		std::size_t get_ref_count() const noexcept{
+		[[nodiscard]] std::size_t get_ref_count() const noexcept{
 			return referenced_count.load(std::memory_order_relaxed);
 		}
 
@@ -321,9 +321,6 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	template <typename T>
-	struct component : T{};
-
 	export
 	struct unwrap_component{
 		template <typename T>
@@ -345,44 +342,144 @@ namespace mo_yanxi::game::ecs{
 
 		static void on_init(const chunk_meta& meta, component<value_type>& comp) = delete;
 		static void on_terminate(const chunk_meta& meta, component<value_type>& comp) = delete;
+		static void on_relocate(const chunk_meta& meta, component<value_type>& comp) = delete;
 	};
 
 	export
 	template <typename T>
 	struct component_custom_behavior : component_custom_behavior_base<T>{};
 
+	/*template <typename B, std::derived_from<B> D>
+	constexpr std::ptrdiff_t offset_between = [](){
+		union{
+			D d{};
+			char a[sizeof(D)];
+		};
+
+		const void* dp = std::addressof(d);
+		const void* bp = std::addressof(static_cast<const B&>(d));
+
+		std::destroy_at(&d);
+
+		std::ptrdiff_t doff{};
+		std::ptrdiff_t boff{};
+
+		for(std::ptrdiff_t i = 0; i < sizeof(D); ++i){
+			if(a + i == dp){
+				doff = i;
+				break;
+			}
+		}
+
+		for(std::ptrdiff_t i = 0; i < sizeof(D); ++i){
+			if(a + i == bp){
+				boff = i;
+				break;
+			}
+		}
+
+		return boff - doff;
+	}();
+
+
+
+	constexpr auto a = offset_between<A, C>;*/
+
+	//TODO derive check
+	// template <typename T, typename Tpl>
+	// constexpr inline bool all_derived_from = []() constexpr {
+	// 	bool
+	// }();
+
 	template <typename T>
 	struct component_trait{
-		using trait = component_custom_behavior<T>;
-		using value_type = typename trait::value_type;
+		// using trait = component_custom_behavior<T>;
+		using value_type = typename component_custom_behavior<T>::value_type;
+
+		using base_types = typename decltype([]{
+			if constexpr (requires{
+				typename component_custom_behavior<T>::base_types;
+			}){
+				if constexpr (is_tuple_v<typename component_custom_behavior<T>::base_types>){
+					return std::type_identity<typename component_custom_behavior<T>::base_types>{};
+				}else{
+					return std::type_identity<std::tuple<typename component_custom_behavior<T>::base_types>>{};
+				}
+
+			}else{
+				return std::type_identity<std::tuple<value_type>>{};
+			}
+		}())::type;
+
+		static constexpr bool is_polymorphic = !requires{
+			typename component_custom_behavior<T>::base_types;
+		};
 
 		static void on_init(const chunk_meta& meta, component<T>& comp) {
 			if constexpr (requires{
-				trait::on_init(meta, comp);
+				component_custom_behavior<T>::on_init(meta, comp);
 			}){
-				trait::on_init(meta, comp);
+				component_custom_behavior<T>::on_init(meta, comp);
 			}
 		}
 
 		static void on_terminate(const chunk_meta& meta, component<T>& comp) {
 			if constexpr (requires{
-				trait::on_terminate(meta, comp);
+				component_custom_behavior<T>::on_terminate(meta, comp);
 			}){
-				trait::on_terminate(meta, comp);
+				component_custom_behavior<T>::on_terminate(meta, comp);
+			}
+		}
+
+		static void on_relocate(const chunk_meta& meta, component<T>& comp) {
+			if constexpr (requires{
+				component_custom_behavior<T>::on_relocate(meta, comp);
+			}){
+				component_custom_behavior<T>::on_relocate(meta, comp);
 			}
 		}
 	};
 
+	template <typename L, typename R>
+	struct type_pair{
+		using first_type = L;
+		using second_type = R;
+	};
+
+	template <typename T>
+	using derive_map_of_trait = typename decltype([]{
+		if constexpr (!component_trait<T>::is_polymorphic){
+			using bases = typename component_trait<T>::base_types;
+			return []<std::size_t ...Idx>(std::index_sequence<Idx...>){
+				return std::type_identity<std::tuple<
+					type_pair<std::tuple_element_t<Idx, bases>, T> ...
+				>>{};
+			}(std::make_index_sequence<std::tuple_size_v<bases>>{});
+		}else{
+			return std::type_identity<std::tuple<>>{};
+		}
+	}())::type;
+
+	export
+	template <typename Pair, typename Ty>
+	struct find_if_first_equal : std::bool_constant<std::same_as<typename Pair::first_type, Ty>>{};
+
+	// using Base = derive_map_of_trait<C>;
+
+	// constexpr auto a = tuple_match_first_v<find_if_first_equal, Base, C>;
 
 	template <typename TupleT>
 	struct archetype : archetype_base{
 		using raw_tuple = TupleT;
+		// using raw_tuple = std::tuple<int>;
 		using appended_tuple = tuple_cat_t<std::tuple<chunk_meta>, raw_tuple>;
 		using comp_tuple = unary_apply_to_tuple_t<component, appended_tuple>;
 		using components = tuple_to_seq_chunk_t<comp_tuple>;
 		static constexpr std::size_t chunk_size = std::tuple_size_v<appended_tuple>;
 
 		static constexpr std::size_t single_chunk_size = sizeof(components);
+
+		using derive_map = all_apply_to<tuple_cat_t, unary_apply_to_tuple_t<derive_map_of_trait, raw_tuple>>;
 	private:
 		std::vector<components> chunks{};
 
@@ -413,27 +510,29 @@ namespace mo_yanxi::game::ecs{
 			chunks.reserve(sz);
 		}
 
+	private:
+		template <bool set_archetype = true>
 		std::size_t insert(components&& comp){
 			auto idx = chunks.size();
 			entity_id eid = this->id_of_chunk(comp);
 
-			if(eid->chunk_index() != invalid_chunk_idx || eid->get_archetype() != nullptr){
+			if(eid->chunk_index() != invalid_chunk_idx || (set_archetype && eid->get_archetype() != nullptr)){
 				throw std::runtime_error{"Duplicated Insert"};
 			}
 
-
 			eid->chunk_index_ = idx;
 			components& added_comp = chunks.emplace_back(std::move(comp));
-			archetype_base::insert(eid);
+			if constexpr (set_archetype)archetype_base::insert(eid);
 
 			[&] <std::size_t... I>(std::index_sequence<I...>){
-				component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp));
+				(component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp)), ...);
 			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 
 			this->init(added_comp);
 
 			return idx;
 		}
+	public:
 
 		std::size_t insert(const entity_id eid) final {
 			if(!eid)return 0;
@@ -449,7 +548,7 @@ namespace mo_yanxi::game::ecs{
 			archetype_base::insert(eid);
 
 			[&] <std::size_t... I>(std::index_sequence<I...>){
-				component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp));
+				(component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp)), ...);
 			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 
 			this->init(added_comp);
@@ -465,21 +564,25 @@ namespace mo_yanxi::game::ecs{
 				throw std::runtime_error{"Invalid Erase"};
 			}
 
-			components& chunk_to_remove = chunks[idx];
+			components& chunk = chunks[idx];
 
-			this->terminate(chunk_to_remove);
+			this->terminate(chunk);
 
 			[&] <std::size_t... I>(std::index_sequence<I...>){
-				component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(chunk_to_remove), get<I + 1>(chunk_to_remove));
+				(component_trait<std::tuple_element_t<I, raw_tuple>>::on_terminate(get<0>(chunk), get<I + 1>(chunk)), ...);
 			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 
 			if(idx == chunk_size - 1){
 				chunks.pop_back();
 			}else{
-				chunks[idx] = std::move(chunks.back());
+				chunk = std::move(chunks.back());
 				chunks.pop_back();
 
-				this->id_of_chunk(chunks[idx])->chunk_index_ = idx;
+				this->id_of_chunk(chunk)->chunk_index_ = idx;
+
+				[&] <std::size_t... I>(std::index_sequence<I...>){
+					(component_trait<std::tuple_element_t<I, raw_tuple>>::on_relocate(get<0>(chunk), get<I + 1>(chunk)), ...);
+				}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 			}
 
 
@@ -553,9 +656,8 @@ namespace mo_yanxi::game::ecs{
 		void dump_staging() final {
 			auto sz = chunks.size();
 			chunks.reserve(sz + staging.size());
-			for (auto && [idx, data] : staging | std::views::enumerate){
-				this->id_of_chunk(data)->chunk_index_ = sz + idx;
-				chunks.push_back(std::move(data));
+			for (auto && data : staging){
+				this->insert<false>(std::move(data));
 			}
 
 			if(staging.size() > 128){
@@ -578,20 +680,48 @@ namespace mo_yanxi::game::ecs{
 	public:
 		template <typename T>
 		[[nodiscard]] strided_span<component<T>> slice() noexcept{
-			return strided_span<component<T>>{
-				reinterpret_cast<component<T>*>(reinterpret_cast<std::byte*>(chunks.data()) +
-					chunk_tuple_offset_of_v<component<T>, comp_tuple>),
-				chunks.size(), single_chunk_size
-			};
+			constexpr auto idx = tuple_match_first_v<find_if_first_equal, derive_map, T>;
+			if constexpr (idx != std::tuple_size_v<derive_map>){
+				if(chunks.empty()){
+					return {};
+				}else{
+					return strided_span<component<T>>{
+						static_cast<component<T>*>(&get<typename std::tuple_element_t<idx, derive_map>::second_type>(chunks.front())),
+						chunks.size(), single_chunk_size
+					};
+				}
+			}else if constexpr (contained_in<component<T>, comp_tuple>){
+				return strided_span<component<T>>{
+					reinterpret_cast<component<T>*>(reinterpret_cast<std::byte*>(chunks.data()) +
+						chunk_tuple_offset_of_v<component<T>, comp_tuple>),
+					chunks.size(), single_chunk_size
+				};
+			}else{
+				static_assert(false, "Invalid Type!");
+			}
 		}
 
 		template <typename T>
 		[[nodiscard]] strided_span<const component<T>> slice() const noexcept{
-			return strided_span<const component<T>>{
-				reinterpret_cast<const component<T>*>(reinterpret_cast<const std::byte*>(chunks.data()) +
-					chunk_tuple_offset_of_v<component<T>, comp_tuple>),
-				chunks.size(), single_chunk_size
-			};
+			constexpr auto idx = tuple_match_first_v<find_if_first_equal, derive_map, T>;
+			if constexpr (idx != std::tuple_size_v<derive_map>){
+				if(chunks.empty()){
+					return {};
+				}else{
+					return strided_span<component<T>>{
+						static_cast<const component<T>*>(&get<typename std::tuple_element_t<idx, derive_map>::second_type>(chunks.front())),
+						chunks.size(), single_chunk_size
+					};
+				}
+			}else if constexpr (contained_in<component<T>, comp_tuple>){
+				return strided_span<const component<T>>{
+					reinterpret_cast<const component<T>*>(reinterpret_cast<const std::byte*>(chunks.data()) +
+						chunk_tuple_offset_of_v<const component<T>, comp_tuple>),
+					chunks.size(), single_chunk_size
+				};
+			}else{
+				static_assert(false, "Invalid Type!");
+			}
 		}
 	};
 

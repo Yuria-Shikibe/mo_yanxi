@@ -47,9 +47,9 @@ namespace mo_yanxi::io{
 			return *this;
 		}
 
-		explicit operator fs::directory_entry() const{
-			return fs::directory_entry{rawPath};
-		}
+		// explicit operator fs::directory_entry() const{
+		// 	return fs::directory_entry{rawPath};
+		// }
 
 		explicit(false) operator const fs::path&() const{
 			return rawPath;

@@ -49,12 +49,12 @@ namespace mo_yanxi::ui{
 	export using rect = math::frect;
 
 	//TODO boarder requirement ?
-	export struct debug_elem_drawer final : public style_drawer<struct elem>{
-		void draw(const struct elem& element, rect region, float opacityScl) const override;
+	export struct debug_elem_drawer final : style_drawer<elem>{
+		void draw(const elem& element, rect region, float opacityScl) const override;
 	};
 
-	export struct empty_drawer final : public style_drawer<struct elem>{
-		void draw(const struct elem& element, rect region, float opacityScl) const override{
+	export struct empty_drawer final : style_drawer<elem>{
+		void draw(const elem& element, rect region, float opacityScl) const override{
 		}
 
 		// float content_opacity(const elem& element) const override{}
@@ -76,7 +76,7 @@ namespace mo_yanxi::ui{
 
 	export using elem_event_manager =
 	mo_yanxi::events::event_manager<
-		std::move_only_function<void(struct elem&) const>,
+		std::move_only_function<void(elem&) const>,
 		// events::GeneralCodeEvent,
 		// events::ElementConnection,
 		events::click,
@@ -88,12 +88,12 @@ namespace mo_yanxi::ui{
 		events::scroll,
 		events::cursor_moved>;
 
-	const style_drawer<struct elem>* getDefaultStyleDrawer(){
+	const style_drawer<elem>* getDefaultStyleDrawer(){
 		return global_style_drawer ? global_style_drawer : &DefaultStyleDrawer;
 	}
 
 	export struct elem_graphic_data{
-		const style_drawer<struct elem>* drawer{getDefaultStyleDrawer()};
+		const style_drawer<elem>* drawer{getDefaultStyleDrawer()};
 
 		graphic::color style_color_scl{graphic::colors::white};
 		graphic::color style_color_ovr{};
@@ -358,14 +358,14 @@ namespace mo_yanxi::ui{
 	export struct elem :
 
 	elem_datas,
-	stated_tooltip_owner<struct elem>,
-	spreadable_event_handler<struct elem,
-		events::collapser_state_changed,
-		events::check_box_state_changed
+	stated_tooltip_owner<elem>,
+	spreadable_event_handler<elem,
+	                         events::collapser_state_changed,
+	                         events::check_box_state_changed
 	>,
 
 		// StatedToolTipOwner<elem>,
-		math::quad_tree_adaptor<struct elem>
+		math::quad_tree_adaptor<elem>
 	{
 
 		[[nodiscard]] elem(){
@@ -789,7 +789,7 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] elem* get_parent_to_elem() const noexcept;
 	};
 
-	void iterateAll_DFSImpl(math::vec2 cursorPos, std::vector<struct elem*>& selected, struct elem* current);
+	void iterateAll_DFSImpl(math::vec2 cursorPos, std::vector<elem*>& selected, elem* current);
 	//
 	// export void elementBuildTooltip(elem& element) noexcept{
 	// 	if(!element.hasTooltip()){

@@ -26,6 +26,7 @@ out gl_PerVertex {
 
 layout(set = 0, binding = 0) uniform UBO {
     mat3 view;
+    mat3 proj;
 } transform;
 
 float nor_luma(float luminance, float maxLuminance) {
@@ -67,7 +68,7 @@ void main() {
 
     const float minLuma = 1;
     const float maxLuma = 2;
-    gl_Position = vec4((transform.view * vec3(in_pos.xy, 1.0)).xy , in_pos.z / zScale, 1.0);
+    gl_Position = vec4((transform.view * transform.proj * vec3(in_pos.xy, 1.0)).xy , in_pos.z / zScale, 1.0);
 
     float base_luma = luma(in_color_scl.rgb);
     float clamped = clamp(base_luma, minLuma, maxLuma);

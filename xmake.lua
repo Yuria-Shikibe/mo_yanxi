@@ -1,6 +1,7 @@
 add_rules("mode.debug", "mode.release")
 
 set_arch("x64")
+
 set_policy("build.c++.modules", true)
 set_policy("build.ccache", true)
 
@@ -25,24 +26,15 @@ add_requires("msdfgen", {
  })
 add_requires("freetype")
 add_requires("nanosvg")
--- add_requires("boost")
-
--- set_toolchains("clang-cl")
-local msvc_path = "D:/lib/msvc/VC/Tools/MSVC/14.44.34823"
-local llvm_path = "D:/lib/LLVM/bin"
-
-set_toolchains("msvc")
-
-set_toolset("cc", path.join(msvc_path, "/bin/Hostx64/x64/cl.exe"))
-set_toolset("cxx", path.join(msvc_path, "/bin/Hostx64/x64/cl.exe"))
--- set_toolset("cc", path.join(llvm_path, "/bin/clang-cl.exe"))
--- set_toolset("cxx", path.join(llvm_path, "/bin/clang-cl.exe"))
-add_includedirs(path.join(msvc_path, "/include"))
 
 if is_mode("release") then
     set_symbols("debug")
     set_optimize("fastest")
 end
+
+set_toolchains("msvc")
+add_linkdirs("C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64")
+
 
 target("mo_yanxi")
     set_kind("binary")
@@ -70,6 +62,7 @@ target("mo_yanxi")
     add_cxflags("/wd4267")
     add_cxflags("/wd4189")
     add_cxflags("/wd5030")
+    add_cxflags("/bigobj")
 
     add_files("src/**.cppm")
     add_files("src/**.ixx")
@@ -114,6 +107,30 @@ target("mo_yanxi")
 
         add_defines("VK_USE_64_BIT_PTR_DEFINES=1")
     end
+target_end()
+
+task("gen_cmake")
+    on_run(function ()
+        os.exec("xmake project -k cmake")
+
+        local cmake_file = path.join(os.projectdir(), "CMakeLists.txt")
+
+        local content = io.readfile(cmake_file) or ""
+        local cleaned = content:gsub("add_custom_command%(%s-.-%)%s*\n", "")
+                               :gsub("add_custom_command%(%s-.-%b())%s*\n", "")
+                               :gsub("set_source_files_properties%(%s-.-%)%s*\n", "")
+                               :gsub("set_source_files_properties%(%s-.-%b())%s*\n", "")
+
+        io.writefile(cmake_file, cleaned)
+
+        print("Removed all add_custom_command from CMakeLists.txt")
+    end)
+
+    set_menu{usage = "create cmakelists", description = "", options = {}}
+task_end()
+
+-- rule("cmake")
+
 
 --
 -- If you want to known more usage about xmake, please see https://xmake.io

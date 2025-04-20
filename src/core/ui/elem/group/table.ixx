@@ -11,7 +11,10 @@ namespace mo_yanxi::ui{
 	using table_size_t = unsigned;
 
 	export struct table_cell_adaptor : cell_adaptor<mastering_cell>{
-		using cell_adaptor::cell_adaptor;
+		[[nodiscard]] constexpr table_cell_adaptor() noexcept = default;
+
+		[[nodiscard]] constexpr table_cell_adaptor(elem* element, const mastering_cell& cell) noexcept
+			: cell_adaptor{element, cell}{}
 
 		bool line_feed{};
 	};
