@@ -64,7 +64,7 @@ namespace mo_yanxi::game{
 			[&](const math::trans2 trans, math::rand& rand){
 				draw::line::line_angle(
 					acquirer.get_reserved(4),
-					{e.trans.vec + trans.vec, trans.rot - 180},
+					{e.trans.vec + trans.vec, trans.rot - math::pi},
 					len_base + rand.random(length.append.src, length.append.dst) * len_append_prog,
 					stroke_base + rand.random(stroke_append),
 					color_edge, color_inner

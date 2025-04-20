@@ -20,7 +20,7 @@ namespace mo_yanxi::game::fx{
 		unsigned count{};
 		float progress{};
 		float direction{};
-		float tolerance_angle{180};
+		float tolerance_angle{math::pi};
 		float base_range{};
 		math::range range{};
 	};
@@ -36,8 +36,8 @@ namespace mo_yanxi::game::fx{
 		math::vec2 curVec{};
 
 		for(unsigned i = 0; i < param.count; ++i){
-			auto ang = rand(param.direction - param.tolerance_angle, param.direction + param.tolerance_angle);
-			curVec.set_polar(ang, param.base_range + rand.random(param.range.from, param.range.to) * param.progress);
+			const auto ang = param.direction + rand(param.tolerance_angle);
+			curVec.set_polar_rad(ang, param.base_range + rand.random(param.range.from, param.range.to) * param.progress);
 
 			if constexpr (std::invocable<Fn, math::trans2, math::rand&>){
 				std::invoke(fn, math::trans2{curVec, ang}, rand);

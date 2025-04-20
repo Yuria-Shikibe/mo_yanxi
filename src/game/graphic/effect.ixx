@@ -286,7 +286,7 @@ namespace mo_yanxi::game::fx{
 
 		unsigned count{12};
 		float base_range{32};
-		float distribute_angle{180};
+		float distribute_angle{math::pi};
 		math::range range{};
 		math::based_section<gradient<float>> stroke{};
 		math::based_section<gradient<float>> length{};

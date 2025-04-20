@@ -102,18 +102,19 @@ namespace mo_yanxi::math{
 		}
 		
 		FORCE_INLINE constexpr matrix3& from_transform(const trans2_t translation) noexcept{
-			from_rotation(translation.rot);
-			c3 = static_cast<vec3_t>(translation.vec);
+			from_rotation_rad(translation.rot);
+			c3.x = translation.vec.x;
+			c3.y = translation.vec.y;
 			c3.z = 1;
 			return *this;
 		}
 
 		[[nodiscard]] FORCE_INLINE trans2_t to_transform() const noexcept{
-			return trans2_t{get_translation(), get_rotation()};
+			return trans2_t{get_translation(), get_rotation_rad()};
 		}
 
 		FORCE_INLINE constexpr matrix3& transform(const trans2_t translation) noexcept{
-			return rotate(translation.rot).move(translation.vec);
+			return rotate_rad(translation.rot).move(translation.vec);
 		}
 
 		FORCE_INLINE constexpr auto operator[](const std::size_t index_column_major) const noexcept{
@@ -172,21 +173,20 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		FORCE_INLINE constexpr matrix3& from_rotation(const floating_point_t degrees) noexcept {
+		FORCE_INLINE constexpr matrix3& from_rotation_deg(const floating_point_t degrees) noexcept {
 			return from_rotation_rad(math::deg_to_rad_v<floating_point_t> * degrees);
 		}
 
 		FORCE_INLINE constexpr matrix3& from_rotation_rad(const floating_point_t radians) noexcept {
-			return set_rotation(radians).set_translation({});
+			return set_rotation_rad(radians).set_translation({});
 		}
 
-		FORCE_INLINE constexpr matrix3& set_rotation(const floating_point_t degrees) noexcept {
+		FORCE_INLINE constexpr matrix3& set_rotation_deg(const floating_point_t degrees) noexcept {
 			return set_rotation_rad(math::deg_to_rad_v<floating_point_t> * degrees);
 		}
 
 		FORCE_INLINE constexpr matrix3& set_rotation_rad(const floating_point_t radians) noexcept {
-			auto cos = math::cos(radians);
-			auto sin = math::sin(radians);
+			auto [cos, sin] = math::cos_sin(radians);
 
 			c1 = { cos, sin, 0};
 			c2 = {-sin, cos, 0};
@@ -370,7 +370,7 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		FORCE_INLINE constexpr matrix3& rotate(const floating_point_t degrees) noexcept {
+		FORCE_INLINE constexpr matrix3& rotate_deg(const floating_point_t degrees) noexcept {
 			return rotate_rad(math::deg_to_rad_v<floating_point_t> * degrees);
 		}
 
@@ -405,7 +405,7 @@ namespace mo_yanxi::math{
 			return {c1.x, c2.y};
 		}
 
-		[[nodiscard]] FORCE_INLINE floating_point_t get_rotation() const noexcept{
+		[[nodiscard]] FORCE_INLINE floating_point_t get_rotation_deg() const noexcept{
 			return math::rad_to_deg_v<floating_point_t> * get_rotation_rad();
 		}
 

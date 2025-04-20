@@ -149,7 +149,7 @@ namespace mo_yanxi::graphic{
 					shakeReload += delta;
 				}
 
-				auto randVec = math::vec2::from_polar(rand.random(360.0f), rand.random(shakeIntensity));
+				auto randVec = math::vec2::from_polar_deg(rand.random(360.0f), rand.random(shakeIntensity));
 				const auto dstScl = math::curve(randVec.dst(viewport.get_center() - get_stable_center()) / shakeIntensity, 0.85f, 1.65f) * .35f;
 
 				randVec.scl((1 - dstScl) * shakeIntensityScl);

@@ -176,7 +176,7 @@ namespace mo_yanxi::graphic::draw{
 			const float radius,
 			const col center_color = colors::white,
 			const col edge_color = colors::white){
-			const float space = math::circle_deg_full / static_cast<float>(sides);
+			const float space = math::pi_2 / static_cast<float>(sides);
 
 			static constexpr std::size_t MaxReserve = 128;
 
@@ -186,12 +186,9 @@ namespace mo_yanxi::graphic::draw{
 				for(; i < sides - 1; i+= 2){
 					const float abase = space * static_cast<float>(i) + trans.rot;
 
-					float cos1 = math::cos_deg(abase);
-					float sin1 = math::sin_deg(abase);
-					float cos2 = math::cos_deg(abase + space);
-					float sin2 = math::sin_deg(abase + space);
-					float cos3 = math::cos_deg(abase + space * 2);
-					float sin3 = math::sin_deg(abase + space * 2);
+					auto [cos1, sin1] = math::cos_sin(abase);
+					auto [cos2, sin2] = math::cos_sin(abase + space);
+					auto [cos3, sin3] = math::cos_sin(abase + space * 2);
 
 					fill::fill(
 						auto_param[i / 2],
@@ -206,10 +203,8 @@ namespace mo_yanxi::graphic::draw{
 				if(i == sides)return;
 				const float abase = space * static_cast<float>(i) + trans.rot;
 
-				float cos1 = math::cos_deg(abase);
-				float sin1 = math::sin_deg(abase);
-				float cos2 = math::cos_deg(abase + space);
-				float sin2 = math::sin_deg(abase + space);
+				auto [cos1, sin1] = math::cos_sin(abase);
+				auto [cos2, sin2] = math::cos_sin(abase + space);
 
 				fill::fill(
 					auto_param[i / 2],
@@ -224,12 +219,9 @@ namespace mo_yanxi::graphic::draw{
 				for(; i < sides - 1; i+= 2){
 					const float abase = space * static_cast<float>(i) + trans.rot;
 
-					float cos1 = math::cos_deg(abase);
-					float sin1 = math::sin_deg(abase);
-					float cos2 = math::cos_deg(abase + space);
-					float sin2 = math::sin_deg(abase + space);
-					float cos3 = math::cos_deg(abase + space * 2);
-					float sin3 = math::sin_deg(abase + space * 2);
+					auto [cos1, sin1] = math::cos_sin(abase);
+					auto [cos2, sin2] = math::cos_sin(abase + space);
+					auto [cos3, sin3] = math::cos_sin(abase + space * 2);
 
 					fill::fill(
 						auto_param.get_reserved(math::min<std::size_t>((sides - i) / 2 + (sides & 1), MaxReserve)),
@@ -244,10 +236,8 @@ namespace mo_yanxi::graphic::draw{
 				if(i == sides)return;
 				const float abase = space * static_cast<float>(i) + trans.rot;
 
-				float cos1 = math::cos_deg(abase);
-				float sin1 = math::sin_deg(abase);
-				float cos2 = math::cos_deg(abase + space);
-				float sin2 = math::sin_deg(abase + space);
+				auto [cos1, sin1] = math::cos_sin(abase);
+				auto [cos2, sin2] = math::cos_sin(abase + space);
 
 				fill::fill(
 					auto_param.get(),
@@ -326,7 +316,7 @@ namespace mo_yanxi::graphic::draw{
 			const col color_ovr_dst = {}){
 			vec vec{};
 
-			vec.set_polar(trans.rot, length * 0.5f);
+			vec.set_polar_rad(trans.rot, length * 0.5f);
 
 			line::line<cap>(param, trans.vec - vec, trans.vec + vec, stroke,
 			                color_scl_src,
@@ -349,7 +339,7 @@ namespace mo_yanxi::graphic::draw{
 			const col color_ovr_dst = {}){
 			vec vec{};
 
-			vec.set_polar(trans.rot, length * 0.5f);
+			vec.set_polar_rad(trans.rot, length * 0.5f);
 
 			line::line<cap>(param, trans.vec, trans.vec + vec, stroke,
 							color_scl_src,
@@ -427,7 +417,7 @@ namespace mo_yanxi::graphic::draw{
 
 			vec vec2_0{}, vec2_1{}, vec2_2{}, vec2_3{}, vec2_4{};
 
-			vec2_0.set_polar(trans.rot, 1);
+			vec2_0.set_polar_rad(trans.rot, 1);
 
 			vec2_1.set(vec2_0);
 			vec2_2.set(vec2_0);
@@ -474,15 +464,15 @@ namespace mo_yanxi::graphic::draw{
 #endif
 				const auto fSides = static_cast<float>(sides);
 
-				const float space = math::circle_deg_full / fSides;
-				float h_step = stroke / 2.0f / math::cos_deg(space / 2.0f);
+				const float space = math::pi_2 / fSides;
+				float h_step = stroke / 2.0f / math::cos(space / 2.0f);
 				const float r1 = radius - h_step;
 				const float r2 = radius + h_step;
 
 				float currentRatio;
 
 				float currentAng = trans.rot;
-				auto [cos1, sin1] = math::cos_sin_deg(currentAng);
+				auto [cos1, sin1] = math::cos_sin(currentAng);
 				float sin2, cos2;
 
 				int progress = 0;
@@ -498,8 +488,8 @@ namespace mo_yanxi::graphic::draw{
 					// NOLINT(cert-flp30-c)
 					currentAng = trans.rot + (fp + 1.0f) * space;
 
-					cos2 = math::cos_deg(currentAng);
-					sin2 = math::sin_deg(currentAng);
+					cos2 = math::cos(currentAng);
+					sin2 = math::sin(currentAng);
 
 					currentRatio = fp / fSides;
 
@@ -526,8 +516,8 @@ namespace mo_yanxi::graphic::draw{
 
 				currentAng = trans.rot + (fp + 1.0f) * space;
 
-				cos2 = math::lerp(cos1, math::cos_deg(currentAng), remainRatio);
-				sin2 = math::lerp(sin1, math::sin_deg(currentAng), remainRatio);
+				cos2 = math::lerp(cos1, math::cos(currentAng), remainRatio);
+				sin2 = math::lerp(sin1, math::sin(currentAng), remainRatio);
 
 				lerpColor2.lerp(fp / fSides, colorGroup);
 				lerpColor2.lerp(lerpColor1, 1.0f - remainRatio);
@@ -556,15 +546,15 @@ namespace mo_yanxi::graphic::draw{
 			){
 				const auto fSides = static_cast<float>(sides);
 
-				const float space = math::circle_deg_full / fSides;
-				float h_step = stroke / 2.0f / math::cos_deg(space / 2.0f);
+				const float space = math::pi_2 / fSides;
+				float h_step = stroke / 2.0f / math::cos(space / 2.0f);
 				const float r1 = radius - h_step;
 				const float r2 = radius + h_step;
 
 				float currentRatio;
 
 				float currentAng = trans.rot;
-				auto [cos1, sin1] = math::cos_sin_deg(currentAng);
+				auto [cos1, sin1] = math::cos_sin(currentAng);
 				float sin2, cos2;
 
 				int progress = 0;
@@ -578,8 +568,8 @@ namespace mo_yanxi::graphic::draw{
 					// NOLINT(cert-flp30-c)
 					currentAng = trans.rot + (fp + 1.0f) * space;
 
-					cos2 = math::cos_deg(currentAng);
-					sin2 = math::sin_deg(currentAng);
+					cos2 = math::cos(currentAng);
+					sin2 = math::sin(currentAng);
 
 					currentRatio = fp / fSides;
 
@@ -602,8 +592,8 @@ namespace mo_yanxi::graphic::draw{
 
 				currentAng = trans.rot + (fp + 1.0f) * space;
 
-				cos2 = math::lerp(cos1, math::cos_deg(currentAng), remainRatio);
-				sin2 = math::lerp(sin1, math::sin_deg(currentAng), remainRatio);
+				cos2 = math::lerp(cos1, math::cos(currentAng), remainRatio);
+				sin2 = math::lerp(sin1, math::sin(currentAng), remainRatio);
 
 				fill::fill(
 					auto_param.get(),
@@ -625,8 +615,8 @@ namespace mo_yanxi::graphic::draw{
 			const col color_inner = colors::white,
 			const col color_outer = colors::white,
 			const float stroke = 2.f){
-			const float space = math::circle_deg_full / static_cast<float>(sides);
-			float h_step = stroke / 2.0f / math::cos_deg(space / 2.0f);
+			const float space = math::pi_2 / static_cast<float>(sides);
+			float h_step = stroke / 2.0f / math::cos(space / 2.0f);
 			const float r1 = radius - h_step;
 			const float r2 = radius + h_step;
 
@@ -636,10 +626,8 @@ namespace mo_yanxi::graphic::draw{
 				acquirer_guard _{auto_param, MaxReserve};
 				for(int i = 0; i < sides; i++){
 					const float a = space * static_cast<float>(i) + trans.rot;
-					float cos1 = math::cos_deg(a);
-					float sin1 = math::sin_deg(a);
-					float cos2 = math::cos_deg(a + space);
-					float sin2 = math::sin_deg(a + space);
+					auto [cos1, sin1] = math::cos_sin(a);
+					auto [cos2, sin2] = math::cos_sin(a + space);
 					fill::fill(
 						auto_param[i],
 						vec{trans.vec.x + r1 * cos1, trans.vec.y + r1 * sin1},
@@ -652,10 +640,8 @@ namespace mo_yanxi::graphic::draw{
 			}else{
 				for(int i = 0; i < sides; i++){
 					const float a = space * static_cast<float>(i) + trans.rot;
-					float cos1 = math::cos_deg(a);
-					float sin1 = math::sin_deg(a);
-					float cos2 = math::cos_deg(a + space);
-					float sin2 = math::sin_deg(a + space);
+					auto [cos1, sin1] = math::cos_sin(a);
+					auto [cos2, sin2] = math::cos_sin(a + space);
 					fill::fill(
 						auto_param.get_reserved(math::min<std::size_t>(sides - i, MaxReserve)),
 						vec{trans.vec.x + r1 * cos1, trans.vec.y + r1 * sin1},
@@ -709,16 +695,8 @@ namespace mo_yanxi::graphic::draw{
 			const col inner_edge_color = colors::white,
 			const float outline_stroke = 2.f
 		){
-			static constexpr std::size_t MaxReserve = 64;
-
-			const float space = math::circle_deg_full / static_cast<float>(sides);
-			float h_step = outline_stroke / math::cos_deg(space / 2.0f);
-			const float r1 = radius;
-			const float r2 = radius + h_step;
-
 			line::poly(auto_param, trans, sides, radius + outline_stroke / 2.f, edge_inner_color, edge_outer_color, outline_stroke);
 			fill::poly(auto_param, trans, sides, radius, inner_center_color, inner_edge_color);
-
 		}
 
 		export

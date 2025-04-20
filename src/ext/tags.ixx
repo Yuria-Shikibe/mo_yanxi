@@ -8,10 +8,14 @@ namespace mo_yanxi::tags{
 	export struct from_rad_t{
 	};
 
+	export struct from_deg_t{
+	};
+
 	export struct unchecked_t{
 	};
 
 	export constexpr inline from_rad_t from_rad{};
+	export constexpr inline from_deg_t from_deg{};
 	export constexpr inline unchecked_t unchecked{};
 
 

@@ -429,16 +429,19 @@ export namespace mo_yanxi::math{
 		 * @brief
 		 * @return angle in [-180 deg, 180 deg]
 		 */
-		[[nodiscard]] FORCE_INLINE float angle() const noexcept {
-			return angle_rad() * math::rad_to_deg;
+		[[nodiscard]] FORCE_INLINE float angle_deg() const noexcept {
+			return angle_rad();
 		}
 
-
-		[[nodiscard]] FORCE_INLINE floating_point_t angle_to(const_pass_t where) const noexcept {
-			return (where - *this).angle();
+		[[nodiscard]] FORCE_INLINE floating_point_t angle_to_deg(const_pass_t where) const noexcept {
+			return (where - *this).angle_deg();
 		}
 
-		[[nodiscard]] FORCE_INLINE floating_point_t angle_between(const_pass_t other) const noexcept {
+		[[nodiscard]] FORCE_INLINE floating_point_t angle_to_rad(const_pass_t where) const noexcept {
+			return (where - *this).angle_rad();
+		}
+
+		[[nodiscard]] FORCE_INLINE floating_point_t angle_between_deg(const_pass_t other) const noexcept {
 			return math::atan2(this->cross(other), this->dot(other)) * math::rad_to_deg_v<floating_point_t>;
 		}
 
@@ -478,7 +481,7 @@ export namespace mo_yanxi::math{
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& rotate(const Fp degree) noexcept{
+		FORCE_INLINE constexpr vector2& rotate_deg(const Fp degree) noexcept{
 			return this->rotate_rad(degree * math::deg_to_rad_v<Fp>);
 		}
 
@@ -504,17 +507,28 @@ export namespace mo_yanxi::math{
 		}
 
 		template <std::floating_point Fp>
-		[[nodiscard]] FORCE_INLINE static constexpr vector2 from_polar(const Fp angDeg, const T length = 1) noexcept{
+		[[nodiscard]] FORCE_INLINE static constexpr vector2 from_polar_deg(const Fp angDeg, const T length = 1) noexcept{
 			return vector2::from_polar_rad(angDeg * math::deg_to_rad_v<Fp>, length);
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& set_polar(const Fp angDeg, const T length) noexcept{
-			return vector2::set(length * math::cos(angDeg * math::deg_to_rad_v<Fp>), length * math::sin(angDeg * math::deg_to_rad_v<Fp>));
+		FORCE_INLINE constexpr vector2& set_polar_deg(const Fp angDeg, const T length) noexcept{
+			return vector2::set_polar_rad(angDeg * math::deg_to_rad_v<Fp>, length);
 		}
 
-		FORCE_INLINE constexpr vector2& set_polar(const float angDeg) noexcept{
-			return set_polar(angDeg, length());
+		template <std::floating_point Fp>
+		FORCE_INLINE constexpr vector2& set_polar_deg(const Fp angDeg) noexcept{
+			return vector2::set_polar_deg(angDeg, length());
+		}
+
+		template <std::floating_point Fp>
+		FORCE_INLINE constexpr vector2& set_polar_rad(const Fp angDeg, const T length) noexcept{
+			return vector2::set(length * math::cos(angDeg), length * math::sin(angDeg));
+		}
+
+		template <std::floating_point Fp>
+		FORCE_INLINE constexpr vector2& set_polar_rad(const Fp angDeg) noexcept{
+			return vector2::set_polar_deg(angDeg, length());
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr T dot(const_pass_t tgt) const noexcept{
@@ -1065,7 +1079,7 @@ export namespace mo_yanxi::math{
 			return tangent.cross(p);
 		}
 
-		constexpr vec2 direction(const float angle_Degree) noexcept{
+		constexpr vec2 direction_deg(const float angle_Degree) noexcept{
 			return {math::cos_deg(angle_Degree), math::sin_deg(angle_Degree)};
 		}
 

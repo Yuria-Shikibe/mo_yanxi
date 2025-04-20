@@ -25,11 +25,11 @@ export namespace mo_yanxi::math{
 			rot = 0.0f;
 		}
 
-		template <float NaN = std::numeric_limits<angle_t>::signaling_NaN()>
-		FORCE_INLINE constexpr void set_nan() noexcept requires std::is_floating_point_v<angle_t>{
-			vec.set(NaN, NaN);
-			rot = NaN;
-		}
+		// template <float NaN = std::numeric_limits<angle_t>::signaling_NaN()>
+		// FORCE_INLINE constexpr void set_nan() noexcept requires std::is_floating_point_v<angle_t>{
+		// 	vec.set(NaN, NaN);
+		// 	// rot = NaN;
+		// }
 
 		[[nodiscard]] FORCE_INLINE constexpr bool is_NaN() const noexcept {
 			return vec.is_NaN() || std::isnan(rot);
@@ -43,19 +43,19 @@ export namespace mo_yanxi::math{
 		}
 
 		FORCE_INLINE constexpr transform2& apply(const transform2 rebaseTarget) noexcept{
-			vec.rotate(static_cast<float>(rebaseTarget.rot)).add(rebaseTarget.vec);
+			vec.rotate_rad(static_cast<float>(rebaseTarget.rot)).add(rebaseTarget.vec);
 			rot += rebaseTarget.rot;
 
 			return *this;
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr vec_t apply_inv_to(vec_t debaseTarget) const noexcept{
-			debaseTarget.sub(vec).rotate(-static_cast<float>(rot));
+			debaseTarget.sub(vec).rotate_rad(-static_cast<float>(rot));
 			return debaseTarget;
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr vec_t apply_to(vec_t target) const noexcept{
-			target.rotate(static_cast<float>(rot)).add(vec);
+			target.rotate_rad(static_cast<float>(rot)).add(vec);
 			return target;
 		}
 
@@ -98,7 +98,7 @@ export namespace mo_yanxi::math{
 
 		[[nodiscard]] FORCE_INLINE constexpr friend transform2 operator-(transform2 self) noexcept{
 			self.vec.reverse();
-			self.rot *= -1;
+			self.rot = -self.rot;
 			return self;
 		}
 
@@ -119,7 +119,7 @@ export namespace mo_yanxi::math{
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr friend vec_t& operator|=(vec_t& vec, const transform2 transform) noexcept{
-			return vec.rotate(static_cast<float>(transform.rot)).add(transform.vec);
+			return vec.rotate_rad(static_cast<float>(transform.rot)).add(transform.vec);
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr friend vec_t operator|(vec_t vec, const transform2 transform) noexcept{
@@ -129,7 +129,7 @@ export namespace mo_yanxi::math{
 		friend bool operator==(const transform2& lhs, const transform2& rhs) noexcept = default;
 
 		[[nodiscard]] constexpr math::cos_sin_result rot_cos_sin() const noexcept{
-			return math::cos_sin_deg(rot);
+			return math::cos_sin(rot);
 		}
 	};
 

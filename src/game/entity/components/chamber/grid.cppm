@@ -270,8 +270,8 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 
 		void update_transform(math::trans2 trans){
-			static constexpr math::vec2 Offset = math::vec2{tile_size, tile_size} / 2.f;
-			trans.vec -= Offset.copy().rotate(trans.rot);
+			// static constexpr math::vec2 Offset = math::vec2{tile_size, tile_size} / 2.f;
+			// trans.vec -= Offset.copy().rotate(trans.rot);
 
 			if(transform != trans){
 				transform = trans;

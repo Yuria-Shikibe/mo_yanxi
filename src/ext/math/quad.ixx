@@ -466,7 +466,7 @@ namespace mo_yanxi::math{
 	export
 	template <typename T>
 	constexpr quad<T> rect_ortho_to_quad(
-		const rect_ortho<T>& rect, typename rect_ortho<T>::vec_t::const_pass_t center, float cos, float sin) noexcept{
+		const rect_ortho<T>& rect, typename rect_ortho<T>::vec_t::const_pass_t center, T cos, T sin) noexcept{
 		return quad<T>{
 			center + (rect.vert_00() - center).rotate(cos, sin),
 			center + (rect.vert_10() - center).rotate(cos, sin),
@@ -631,7 +631,7 @@ namespace mo_yanxi::math{
 			const typename base::vec_t::const_pass_t v2,
 			const typename base::vec_t::const_pass_t v3) noexcept
 			: base{v0, v1, v2, v3}, normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
-			assert(math::abs(normalU.dot(normalV)) < 1E-2);
+			// assert(math::abs(normalU.dot(normalV)) < 1E-2);
 		}
 
 		/**
@@ -697,7 +697,7 @@ namespace mo_yanxi::math{
 
 		void update(const trans_t transform) noexcept{
 			value_type rot = transform.rot;
-			auto [cos, sin] = cos_sin_deg(rot);
+			auto [cos, sin] = cos_sin(rot);
 
 			v0.set(offset).rotate(cos, sin);
 			v1.set(size.x, 0).rotate(cos, sin);
@@ -722,10 +722,6 @@ namespace mo_yanxi::math{
 
 			bounding_box = quad<float>::get_bound();
 		}
-
-		// void rotate(const trans_t::angle_t delta_deg) noexcept{
-		// 	update({transform.vec, transform.rot + delta_deg});
-		// }
 	};
 
 
@@ -752,8 +748,8 @@ namespace mo_yanxi::math{
 			return box;
 		}
 
-		const auto ang = move.angle();
-		auto [cos, sin] = cos_sin_deg(-ang);
+		const auto ang = move.angle_rad();
+		auto [cos, sin] = cos_sin(-ang);
 		fp_t minX = std::numeric_limits<fp_t>::max();
 		fp_t minY = std::numeric_limits<fp_t>::max();
 		fp_t maxX = std::numeric_limits<fp_t>::lowest();

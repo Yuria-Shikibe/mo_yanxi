@@ -272,6 +272,8 @@ namespace mo_yanxi::graphic{
 		}
 
 		void push_proj(const math::mat3& proj){
+			batch.consume_all();
+
 			if(projs.empty()){
 				vert_data.current.proj = proj;
 				projs.push_back(proj);
@@ -285,6 +287,8 @@ namespace mo_yanxi::graphic{
 			if(projs.empty()){
 				throw std::out_of_range("projs is empty");
 			}
+
+			batch.consume_all();
 
 			if(projs.size() == 1){
 				vert_data.current.proj = math::mat3_idt;

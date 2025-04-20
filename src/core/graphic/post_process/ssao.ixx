@@ -58,7 +58,7 @@ namespace mo_yanxi::graphic{
 
 	        	for(std::size_t count{}; const auto& param : SSAO_Params){
 	        		for(std::size_t i = 0; i < param.count; ++i){
-	        			kernal[count].off.set_polar(
+	        			kernal[count].off.set_polar_deg(
 							(360.f / static_cast<float>(param.count)) * static_cast<float>(i), param.distance) *= screen_scale;
 	        			kernal[count].weight = param.weight;
 	        			count++;

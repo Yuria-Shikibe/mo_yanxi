@@ -54,7 +54,7 @@ export namespace mo_yanxi::game::ecs{
 		}
 
 		[[nodiscard]] constexpr math::vec2 vel_at(const math::vec2 dst_to_self) const noexcept{
-			return vel.vec - dst_to_self.cross(math::clamp_range(static_cast<float>(vel.rot) * math::deg_to_rad_v<decltype(trans)::angle_t::value_type>, 15.f));
+			return vel.vec - dst_to_self.cross(math::clamp_range(static_cast<float>(vel.rot), 15.f));
 		}
 	};
 	

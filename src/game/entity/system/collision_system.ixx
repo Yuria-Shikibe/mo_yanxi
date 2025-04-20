@@ -121,8 +121,8 @@ namespace mo_yanxi::game::ecs{
 			const auto obj_mass = obj.rigid->inertial_mass;
 
 			const auto scaled_mass = 1 / sbj_mass + 1 / obj_mass;
-			const auto sbj_rotational_inertia = sbj.manifold->hitbox.getRotationalInertia(sbj_mass, sbj.rigid->rotational_inertia_scale);
-			const auto obj_rotational_inertia = obj.manifold->hitbox.getRotationalInertia(obj_mass, obj.rigid->rotational_inertia_scale);
+			const auto sbj_rotational_inertia = sbj.manifold->hitbox.get_rotational_inertia(sbj_mass, sbj.rigid->rotational_inertia_scale);
+			const auto obj_rotational_inertia = obj.manifold->hitbox.get_rotational_inertia(obj_mass, obj.rigid->rotational_inertia_scale);
 
 			const vec2 vert_hit_vel{rel_vel.copy().project_scaled(hit_normal)};
 			const vec2 hori_hit_vel{(rel_vel - vert_hit_vel)};
@@ -147,7 +147,7 @@ namespace mo_yanxi::game::ecs{
 			const vec2 impulse = impulse_normal + impulse_tangent;
 
 			sbj.manifold->collision_vel_trans_sum.vec += impulse / sbj.rigid->inertial_mass;
-			sbj.manifold->collision_vel_trans_sum.rot += dst_to_sbj.cross(impulse) / sbj_rotational_inertia * math::rad_to_deg;
+			sbj.manifold->collision_vel_trans_sum.rot += dst_to_sbj.cross(impulse) / sbj_rotational_inertia;
 
 			auto sbj_vel_len2 = sbj.motion->vel.vec.length2();
 			auto obj_vel_len2 = obj.motion->vel.vec.length2();
@@ -249,14 +249,14 @@ namespace mo_yanxi::game::ecs{
 			motion.trans.vec += pre_correction_sum;
 		}
 
-		FORCE_INLINE static void collisionsPostProcess_3(manifold::collision_object object) noexcept{
+		FORCE_INLINE static void collisionsPostProcess_3(const manifold::collision_object& object) noexcept{
 			for(const auto& data : object.manifold->confirmed_collision){
 				rigidCollideWith(object, data.other, data.intersection, data.correction, 1 / static_cast<float>(object.manifold->confirmed_collision.size()));
 			}
 		}
 
 		FORCE_INLINE static void collisionsPostProcess_4(manifold& manifold, mech_motion& motion) noexcept{
-			math::vec2 pre_correction_sum{};
+			/*math::vec2 pre_correction_sum{};
 			//
 			if(!manifold.confirmed_collision.empty()){
 				for (const auto & confirmed_collision : manifold.confirmed_collision){
@@ -264,7 +264,7 @@ namespace mo_yanxi::game::ecs{
 				}
 
 				pre_correction_sum /= manifold.confirmed_collision.size();
-			}
+			}*/
 
 			motion.trans.vec += manifold.collision_correction_vec;
 			motion.vel += manifold.collision_vel_trans_sum;

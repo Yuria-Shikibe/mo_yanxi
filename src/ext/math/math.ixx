@@ -218,18 +218,6 @@ namespace mo_yanxi::math {
 		return x + y; // returns 0 for 0,0 or NaN if either y or x is NaN
 	}
 
-	export MATH_ATTR float vec_to_angle_deg(const float x, const float y) noexcept {
-		float result = atan2(y, x) * RAD_DEG;
-		if(result < 0) result += circle_deg_full;
-		return result;
-	}
-
-	export MATH_ATTR float vec_to_angle_rad(const float x, const float y) noexcept {
-		float result = atan2(y, x);
-		if(result < 0) result += pi_2;
-		return result;
-	}
-
 	export
 	template <small_object T>
 	MATH_ATTR constexpr std::ranges::min_max_result<T> minmax(const T a, const T b) noexcept{
@@ -601,7 +589,7 @@ namespace mo_yanxi::math {
 	 * @param progress interpolation value in the range [0, 1]
 	 * @return the interpolated angle in the range [0, 360[
 	 */
-	export MATH_ATTR float slerp(const float fromDegrees, const float toDegrees, const float progress) noexcept {
+	export [[deprecated]] MATH_ATTR float slerp(const float fromDegrees, const float toDegrees, const float progress) noexcept {
 		const float delta = std::fmod(toDegrees - fromDegrees + circle_deg_full + 180.0f, circle_deg_full) - 180.0f;
 		return std::fmod(fromDegrees + delta * progress + circle_deg_full, circle_deg_full);
 	}
@@ -877,7 +865,7 @@ namespace mo_yanxi::math {
 	// 	return math::mod<decltype(cur)>(cur, cycle) < trigger;
 	// }
 
-	namespace angles{
+	namespace [[deprecated]] angles{
 		/**
 		 * @return Angle in [0, 360] degree
 		 */
@@ -1055,6 +1043,17 @@ namespace mo_yanxi::math {
 	constexpr MATH_ATTR T snap(T value, T step) {
 		MATH_ASSERT(step > 0);
 		return std::round(value / step) * step;
+	}
+
+
+	export
+	long double operator"" _deg_to_rad(const long double val){
+		return val * deg_to_rad_v<long double>;
+	}
+
+	export
+	long double operator"" _rad_to_deg(const long double val){
+		return val * rad_to_deg_v<long double>;
 	}
 }
 //

@@ -345,8 +345,8 @@ void main_loop(){
 
 			ctx.create_efx().set_data({
 				.style = fx::line_splash{
-					.count = 50,
-					.distribute_angle = 15,
+					.count = 45,
+					.distribute_angle = 15 * math::deg_to_rad,
 					.range = {260, 820},
 					.stroke = {{2, 0}, {6, 0}},
 					.length = {{30, 20}, {30, 480}},
@@ -368,24 +368,24 @@ void main_loop(){
 				.duration = {30}
 				});
 
-			ctx.create_efx().set_data({
-				.style = fx::poly_outlined_out{
-					.radius = {30, 550, math::interp::pow3Out},
-					.stroke = {4},
-					.palette = {
-						{graphic::colors::AQUA.to_light()},
-						{graphic::colors::AQUA.to_light()},
-						{graphic::colors::clear},
-						{
-							graphic::colors::AQUA.create_lerp(graphic::colors::white, .5f).to_light().set_a(.5f),
-							graphic::colors::clear,
-						}
-					}
-				},
-				.trans = wpos,
-				.depth = 0,
-				.duration = {40}
-			});
+			// ctx.create_efx().set_data({
+			// 	.style = fx::poly_outlined_out{
+			// 		.radius = {30, 550, math::interp::pow3Out},
+			// 		.stroke = {4},
+			// 		.palette = {
+			// 			{graphic::colors::AQUA.to_light()},
+			// 			{graphic::colors::AQUA.to_light()},
+			// 			{graphic::colors::clear},
+			// 			{
+			// 				graphic::colors::AQUA.create_lerp(graphic::colors::white, .5f).to_light().set_a(.5f),
+			// 				graphic::colors::clear,
+			// 			}
+			// 		}
+			// 	},
+			// 	.trans = wpos,
+			// 	.depth = 0,
+			// 	.duration = {40}
+			// });
 		});
 	}
 
@@ -479,7 +479,7 @@ void main_loop(){
 				(pos.scl(1, -1).add_y(ctx.renderer().camera.get_screen_size().y) - ctx.renderer().camera.get_screen_center())
 				.set_length(rand(40, 50));
 			manifold mf{};
-			math::trans2 trs = {ctx.renderer().camera.get_stable_center(), dir.angle()};
+			math::trans2 trs = {ctx.renderer().camera.get_stable_center(), dir.angle_rad()};
 			mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{200, 40}}}};
 			component_manager.create_entity_deferred<entity_desc>(mech_motion{.trans = trs, .vel = dir}, std::move(mf));
 		});
@@ -493,7 +493,7 @@ void main_loop(){
 				(pos.scl(1, -1).add_y(ctx.renderer().camera.get_screen_size().y) - ctx.renderer().camera.get_screen_center())
 				.set_length(rand(400, 800));
 			manifold mf{};
-			math::trans2 trs = {ctx.renderer().camera.get_stable_center(), dir.angle()};
+			math::trans2 trs = {ctx.renderer().camera.get_stable_center(), dir.angle_rad()};
 			mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{200, 40}}}};
 			component_manager.create_entity_deferred<entity_desc>(mech_motion{.trans = trs, .vel = dir}, std::move(mf));
 		});
@@ -535,10 +535,10 @@ void main_loop(){
 
 					graphic::draw::fill::quad(
 						acquirer.get(),
-						off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
-						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
-						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
-						off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
+						off - math::vec2{100, 500} + math::vec2{0, 0}.rotate_deg(45.f),
+						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate_deg(45.f),
+						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate_deg(45.f),
+						off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate_deg(45.f),
 						white.copy()
 					);
 
@@ -546,10 +546,10 @@ void main_loop(){
 					acquirer.proj.slightly_decr_depth();
 					graphic::draw::fill::quad(
 						acquirer.get(),
-						off - math::vec2{100, 500} + math::vec2{0, 0}.rotate(45.f),
-						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate(45.f),
-						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate(45.f),
-						off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate(45.f),
+						off - math::vec2{100, 500} + math::vec2{0, 0}.rotate_deg(45.f),
+						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate_deg(45.f),
+						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate_deg(45.f),
+						off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate_deg(45.f),
 						(white.copy() * 2).set_a((i + 3) / 10.f)
 					);
 				}
@@ -614,7 +614,7 @@ void main_loop(){
 					graphic::colors::PURPLE
 				);
 			}
-			auto v = math::vec2::from_polar(25.f + core::global::timer.global_time() * 15, 1);
+			auto v = math::vec2::from_polar_deg(25.f + core::global::timer.global_time() * 15, 1);
 
 			/*if(is_intersected){
 				auto vec_depart_vector = rect2.depart_vector_to_on_vel_exact(rect1, v);
@@ -672,7 +672,7 @@ void main_loop(){
 			component_manager.sliced_each([&](
 			   game::ecs::component<game::ecs::manifold>& manifold,
 			   game::ecs::component<game::ecs::mech_motion>& motion
-			   ){
+			){
 
 			   manifold.hitbox.update_hitbox_with_ccd(motion.trans);
 
@@ -697,6 +697,15 @@ void main_loop(){
 			using namespace graphic;
 			using namespace game::ecs;
 
+			auto t = core::global::timer.global_time() * 3;
+
+			grid.update_transform({t * 5, t * 15, 45});
+
+			math::mat3 mat3{};
+			mat3.from_transform(grid.get_transform());
+
+			renderer_world.batch.push_proj(mat3);
+
 			draw::line::quad(acquirer, grid.local_grid.get_wrap_bound(), 3, colors::AQUA_SKY.to_light());
 
 			grid.local_grid.each_tile([&](const chamber::tile& tile){
@@ -715,6 +724,7 @@ void main_loop(){
 				draw::fill::rect_ortho(acquirer.get(), tile.get_bound(), colors::ACID.to_light().set_a(.3f));
 			});
 
+			renderer_world.batch.pop_proj();
 			// grid.
 			grid.manager.do_deferred();
 		}
@@ -749,22 +759,22 @@ int main(){
 
 	// std::println("{}", vec);
 
-	foo2();
+	// foo2();
 
-	// init_assets();
-	// compile_shaders();
-	//
-	// core::glfw::init();
-	// core::global::graphic::init();
-	// core::global::ui::init();
-	// assets::graphic::load(core::global::graphic::context);
-	//
-	// main_loop();
-	//
-	// assets::graphic::dispose();
-	// core::global::ui::dispose();
-	// core::global::graphic::dispose();
-	// core::glfw::terminate();
+	init_assets();
+	compile_shaders();
+
+	core::glfw::init();
+	core::global::graphic::init();
+	core::global::ui::init();
+	assets::graphic::load(core::global::graphic::context);
+
+	main_loop();
+
+	assets::graphic::dispose();
+	core::global::ui::dispose();
+	core::global::graphic::dispose();
+	core::glfw::terminate();
 }
 
 struct comp_interface{
@@ -802,7 +812,7 @@ void foo2(){
 	using namespace mo_yanxi::game;
 
 	ecs::component_manager cpmg{};
-	ecs::component_operation_task_graph task_graph{cpmg};
+	// ecs::component_operation_task_graph task_graph{cpmg};
 
 	using entity_tuple_1 = std::tuple<A, math::trans2, math::vec2>;
 	using entity_tuple_3 = std::tuple<B, math::vec2>;

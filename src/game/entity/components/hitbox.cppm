@@ -194,9 +194,9 @@ namespace mo_yanxi::game{
 			const auto move = this->trans.vec - nextTrans.vec;
 
 			this->trans = nextTrans;
-			const float ang = move.equals({}, .2f) ? +0.f : move.angle();
+			const float ang = move.equals({}, .2f) ? +0.f : move.angle_rad();
 
-			const auto [cos, sin] = math::cos_sin_deg(-ang);
+			const auto [cos, sin] = math::cos_sin(-ang);
 
 			float minX = std::numeric_limits<float>::max();
 			float minY = std::numeric_limits<float>::max();
@@ -634,7 +634,7 @@ namespace mo_yanxi::game{
 			});
 		}
 
-		[[nodiscard]] constexpr float getRotationalInertia(
+		[[nodiscard]] constexpr float get_rotational_inertia(
 			const float mass,
 			const float scale = 1 / 12.0f,
 			const float lengthRadiusRatio = 0.25f
