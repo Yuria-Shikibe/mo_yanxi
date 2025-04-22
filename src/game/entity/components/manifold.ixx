@@ -13,54 +13,104 @@ export import mo_yanxi.array_stack;
 import std;
 
 namespace mo_yanxi::game::ecs{
+	export
+	struct manifold;
 
 	export
+	struct collision_object{
+		entity_id id;
+		manifold* manifold;
+		mech_motion* motion;
+		physical_rigid* rigid;
+
+		constexpr friend bool operator==(const collision_object& lhs, const collision_object& rhs) noexcept{
+			return lhs.id == rhs.id;
+		}
+	};
+
+	export
+	struct collision_possible{
+		collision_object other;
+		collision_data data;
+
+		[[nodiscard]] entity_id get_other_id() const noexcept{
+			return other.id;
+		}
+	};
+
+	export
+	struct intersection{
+		math::vec2 pos;
+		math::nor_vec2 normal;
+		hitbox_collision_indices index;
+	};
+
+	export
+	struct collision_confirmed{
+		collision_object other{};
+		math::vec2 correction{};
+		intersection intersection{};
+
+		[[nodiscard]] entity_id get_other_id() const noexcept{
+			return other.id;
+		}
+	};
+
+	export
+	struct default_collider{
+		static constexpr bool try_override_collide_by(
+			const collision_object& sbj,
+			const collision_object& obj,
+			const intersection& intersection
+			) noexcept {
+			return false;
+		}
+
+		static constexpr bool try_override_collide_to(
+			const collision_object& sbj,
+			const collision_object& obj,
+			const intersection& intersection
+			) noexcept {
+			return false;
+		}
+	};
+
+	export
+	struct chamber_collider : default_collider{
+		bool try_override_collide_by(
+			const collision_object& sbj,
+			const collision_object& obj,
+			const intersection& intersection
+		) noexcept;
+
+		// bool try_override_collide_to(
+		// 	const collision_object& sbj,
+		// 	const collision_object& obj,
+		// 	const intersection& intersection
+		// ) noexcept{
+		//
+		// }
+	};
+
+
+	using colliders = std::variant<
+		default_collider,
+		chamber_collider
+	>;
+
 	struct manifold{
-
-		struct collision_object{
-			entity_id id;
-			component<manifold>* manifold;
-			component<mech_motion>* motion;
-			component<physical_rigid>* rigid;
-
-			constexpr friend bool operator==(const collision_object& lhs, const collision_object& rhs) noexcept = default;
-		};
-
-		struct collision_possible{
-			collision_object other;
-			collision_data data;
-
-			[[nodiscard]] entity_id get_other_id() const noexcept{
-				return other.id;
-			}
-		};
-
-		struct intersection{
-			math::vec2 pos;
-			math::nor_vec2 normal;
-			hitbox_collision_indices index;
-		};
-
-		struct collision_confirmed{
-			collision_object other{};
-			math::vec2 correction{};
-			intersection intersection{};
-
-			[[nodiscard]] entity_id get_other_id() const noexcept{
-				return other.id;
-			}
-		};
-
-
 		[[nodiscard]] manifold() = default;
 
 		float thickness{0.05f};
 		hitbox hitbox{};
+		colliders colliders{};
 		bool no_backtrace_correction{false};
 
+
+		bool is_under_correction{false};
 		math::trans2 collision_vel_trans_sum{};
 		math::vec2 collision_correction_vec{};
-		bool is_under_correction{false};
+
 		gch::small_vector<entity_ref, 2> last_collided{};
 		gch::small_vector<collision_possible, 2> possible_collision{};
 		gch::small_vector<collision_confirmed, 2> confirmed_collision{};
@@ -68,6 +118,26 @@ namespace mo_yanxi::game::ecs{
 
 		[[nodiscard]] bool collided() const noexcept{
 			return !possible_collision.empty();
+		}
+
+		static bool try_override_collide_by(
+			const collision_object& sbj,
+			const collision_object& obj,
+			const intersection& intersection
+		){
+			return std::visit<bool>([&] <std::derived_from<default_collider> T> (T& c){
+				return c.try_override_collide_by(sbj, obj, intersection);
+			}, sbj.manifold->colliders);
+		}
+
+		static bool try_override_collide_to(
+			const collision_object& sbj,
+			const collision_object& obj,
+			const intersection& intersection
+		){
+			return std::visit<bool>([&] <std::derived_from<default_collider> T> (T& c){
+				return c.try_override_collide_to(sbj, obj, intersection);
+			}, sbj.manifold->colliders);
 		}
 
 		bool filter() noexcept{

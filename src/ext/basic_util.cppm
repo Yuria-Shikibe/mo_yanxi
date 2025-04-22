@@ -8,8 +8,8 @@ import std;
 
 namespace mo_yanxi{
 	export
-	template <typename T, std::predicate<T&> Pred>
-	constexpr void modifiable_erase_if(std::vector<T>& vec, Pred pred) noexcept(
+	template <typename T, std::predicate<std::ranges::range_value_t<T>&> Pred>
+	constexpr void modifiable_erase_if(T& vec, Pred pred) noexcept(
 		std::is_nothrow_invocable_v<Pred, T&> && std::is_nothrow_move_assignable_v<T>
 		) {
 		auto write_pos = vec.begin();

@@ -67,6 +67,33 @@ namespace mo_yanxi::game::fx{
 		pool_type::size_type update(float delta_in_tick) noexcept {
 			if(!staging_pool.empty()){
 				std::scoped_lock guard(mtx);
+
+				{
+					pool_type::size_type count = 0;
+
+					const auto end = staging_pool.end();
+					for(auto current = staging_pool.begin(); current != end; ++current){
+						if(!current->is_referenced()){
+							const pool_type::size_type original_count = ++count;
+							auto last = current;
+
+							while(++last != end && !last->is_referenced()){
+								++count;
+							}
+
+							if(count != original_count){
+								active_pool.insert_range(std::ranges::subrange{current, last} | std::views::as_rvalue);
+								current = staging_pool.erase(current, last);
+							} else{
+								active_pool.insert(std::ranges::iter_move(current));
+								current = staging_pool.erase(current);
+							}
+
+							if(last == end) break;
+						}
+					}
+				}
+
 				active_pool.splice(staging_pool);
 			}
 

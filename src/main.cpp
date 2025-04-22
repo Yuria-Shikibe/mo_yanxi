@@ -99,8 +99,10 @@ import mo_yanxi.game.ecs.component.manifold;
 import mo_yanxi.game.ecs.component.hitbox;
 import mo_yanxi.game.ecs.component.chamber;
 import mo_yanxi.game.ecs.component.physical_property;
+import mo_yanxi.game.ecs.component.projectile_manifold;
 import mo_yanxi.game.ecs.system.collision;
 import mo_yanxi.game.ecs.system.motion_system;
+import mo_yanxi.game.ecs.system.grid_system;
 
 
 import test;
@@ -343,30 +345,7 @@ void main_loop(){
 		wgfx_input.register_bind(mouse::_1, act::press, +[](packed_key_t, math::vec2 pos, world::graphic_context& ctx, game::ecs::component_manager&){
 			const auto wpos = ctx.renderer().camera.get_screen_to_world(pos, {}, true);
 
-			ctx.create_efx().set_data({
-				.style = fx::line_splash{
-					.count = 45,
-					.distribute_angle = 15 * math::deg_to_rad,
-					.range = {260, 820},
-					.stroke = {{2, 0}, {6, 0}},
-					.length = {{30, 20}, {30, 480}},
 
-					.palette = {
-						{
-							graphic::colors::white.create_lerp(graphic::colors::ORANGE, .65f).to_light().set_a(.5),
-							graphic::colors::white.to_light().set_a(0),
-							math::interp::linear_map<0., .55f>
-						}, {
-							graphic::colors::AQUA.to_light().set_a(0.95f),
-							graphic::colors::white.to_light().set_a(0),
-							math::interp::pow3In | math::interp::reverse
-						}
-					}
-				},
-				.trans = {wpos, 45},
-				.depth = 0,
-				.duration = {30}
-				});
 
 			// ctx.create_efx().set_data({
 			// 	.style = fx::poly_outlined_out{
@@ -388,14 +367,6 @@ void main_loop(){
 			// });
 		});
 	}
-
-	using build_tuple = std::tuple<math::vec2>;
-
-	game::ecs::chamber::chamber_grid grid{};
-	grid.add_building_type<build_tuple>();
-	grid.add_building<build_tuple>({-2, -4, 8, 8});
-	grid.add_building<build_tuple>({3, 8, 2, 4});
-
 
 	{
 		context.register_post_resize("test", [&](window_instance::resize_event event){
@@ -444,29 +415,64 @@ void main_loop(){
 	game::ecs::collision_system collision_system{};
 	game::ecs::motion_system motion_system{};
 
-	using entity_desc = std::tuple<game::ecs::mech_motion, game::ecs::manifold, game::ecs::physical_rigid>;
+	using grided_entity_desc = std::tuple<
+		game::ecs::mech_motion,
+		game::ecs::manifold,
+		game::ecs::physical_rigid,
+		game::ecs::chamber::chamber_manifold
+	>;
 
-	struct real_entity : game::ecs::archetype<entity_desc>{
+	using projectile_entity_desc = std::tuple<
+		game::ecs::mech_motion,
+		game::ecs::manifold,
+		game::ecs::physical_rigid,
+		game::ecs::projectile_manifold
+	>;
+
+	struct real_entity : game::ecs::archetype<grided_entity_desc>{
 	protected:
 		void init(components& comps) final{
-			auto [motion, mf] = real_entity::get_unwrap_of<game::ecs::mech_motion, game::ecs::manifold>(comps);
+			auto [motion, mf] = get_unwrap_of<game::ecs::mech_motion, game::ecs::manifold>(comps);
 			mf.hitbox.set_trans_unchecked(motion.trans);
 		}
 	};
 
+	struct projectile_entity : game::ecs::archetype<projectile_entity_desc>{
+	protected:
+		void init(components& comps) final{
+			auto [motion, mf, dmg] = get_unwrap_of<game::ecs::mech_motion, game::ecs::manifold, game::ecs::projectile_manifold>(comps);
+			mf.hitbox.set_trans_unchecked(motion.trans);
+			mf.colliders = game::ecs::chamber_collider{};
+			dmg.damage_group.material_damage.direct = 3000;
+		}
+	};
+	auto& real_entity_archetype = component_manager.add_archetype<real_entity>();
+
+
+	component_manager.add_archetype<projectile_entity>();
+
 	{
-		auto& aty = component_manager.add_archetype<real_entity>();
-		aty.reserve(16384);
+		real_entity_archetype.reserve(16384);
 
 		{
 			math::rand rand{};
-			for(int i = 0; i < 1000; ++i){
+			for(int i = 0; i < 10; ++i){
 				using namespace game::ecs;
 
 				manifold mf{};
-				math::trans2 trs = {{rand(20000.f), rand(20000.f)}, rand(180.f)};
-				mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{rand(0, 300.f), rand(0, 300.f)}}}};
-				component_manager.create_entity_deferred<entity_desc>(mech_motion{.trans = trs}, std::move(mf));
+				math::trans2 trs = {{rand(4000.f), rand(2000.f)}, rand(180.f)};
+				mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 17, chamber::tile_size * 17}}}};
+
+
+				using build_tuple = std::tuple<game::ecs::chamber::building>;
+
+				game::ecs::chamber::chamber_manifold grid{};
+				grid.add_building<build_tuple>({chamber::tile_coord{}, 17});
+				// grid.add_building<build_tuple>({3, 8, 2, 4});
+
+				component_manager.create_entity_deferred<grided_entity_desc>(mech_motion{.trans = trs}, std::move(mf), std::move(grid), physical_rigid{
+					.inertial_mass = 500000
+				});
 			}
 		}
 
@@ -481,7 +487,32 @@ void main_loop(){
 			manifold mf{};
 			math::trans2 trs = {ctx.renderer().camera.get_stable_center(), dir.angle_rad()};
 			mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{200, 40}}}};
-			component_manager.create_entity_deferred<entity_desc>(mech_motion{.trans = trs, .vel = dir}, std::move(mf));
+			component_manager.create_entity_deferred<projectile_entity_desc>(mech_motion{.trans = trs, .vel = dir}, std::move(mf));
+
+			ctx.create_efx().set_data({
+				.style = game::fx::line_splash{
+					.count = 45,
+					.distribute_angle = 15 * math::deg_to_rad,
+					.range = {260, 820},
+					.stroke = {{2, 0}, {6, 0}},
+					.length = {{30, 20}, {30, 480}},
+
+					.palette = {
+						{
+							graphic::colors::white.create_lerp(graphic::colors::ORANGE, .65f).to_light().set_a(.5),
+							graphic::colors::white.to_light().set_a(0),
+							math::interp::linear_map<0., .55f>
+						}, {
+							graphic::colors::AQUA.to_light().set_a(0.95f),
+							graphic::colors::white.to_light().set_a(0),
+							math::interp::pow3In | math::interp::reverse
+						}
+					}
+				},
+				.trans = trs,
+				.depth = 0,
+				.duration = {30}
+				});
 		});
 
 		wgfx_input.register_bind(core::ctrl::key::Q, core::ctrl::act::press, +[](core::ctrl::packed_key_t, math::vec2 pos, game::world::graphic_context& ctx, game::ecs::component_manager& component_manager){
@@ -495,7 +526,32 @@ void main_loop(){
 			manifold mf{};
 			math::trans2 trs = {ctx.renderer().camera.get_stable_center(), dir.angle_rad()};
 			mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{200, 40}}}};
-			component_manager.create_entity_deferred<entity_desc>(mech_motion{.trans = trs, .vel = dir}, std::move(mf));
+			component_manager.create_entity_deferred<projectile_entity_desc>(mech_motion{.trans = trs, .vel = dir}, std::move(mf));
+
+			ctx.create_efx().set_data({
+				.style = game::fx::line_splash{
+					.count = 45,
+					.distribute_angle = 5 * math::deg_to_rad,
+					.range = {260, 2420},
+					.stroke = {{2, 0}, {6, 0}},
+					.length = {{30, 20}, {90, 750, math::interp::slope}},
+
+					.palette = {
+						{
+							graphic::colors::white.create_lerp(graphic::colors::ORANGE, .65f).to_light().set_a(.5),
+							graphic::colors::white.to_light().set_a(0),
+							math::interp::linear_map<0., .55f>
+						}, {
+							graphic::colors::AQUA.to_light().set_a(0.95f),
+							graphic::colors::white.to_light().set_a(0),
+							math::interp::pow3In | math::interp::reverse
+						}
+					}
+				},
+				.trans = trs,
+				.depth = 0,
+				.duration = {38}
+				});
 		});
 	}
 
@@ -506,7 +562,7 @@ void main_loop(){
 		core::global::input.update(core::global::timer.global_delta_tick());
 
 		component_manager.update_delta = core::global::timer.update_delta_tick();
-		graphic_context.update(core::global::timer.global_delta_tick());
+		graphic_context.update(core::global::timer.update_delta_tick());
 		renderer_ui.set_time(core::global::timer.global_time());
 
 		wgfx_input.set_context(core::global::ui::root->focus->cursor_pos);
@@ -517,7 +573,15 @@ void main_loop(){
 		core::global::ui::root->draw();
 
 		graphic::draw::world_acquirer acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
-		math::rect_box_posed rect2{math::vec2{200, 300}};
+		math::rect_box_posed rect2{math::vec2{200, 40}};
+
+		auto cursor_in_world = renderer_world.camera.get_screen_to_world(core::global::ui::root->focus->cursor_pos, {}, true);
+
+		auto dst = cursor_in_world - renderer_world.camera.get_viewport_center();
+
+		rect2.update({
+			cursor_in_world,
+			dst.angle_rad()});
 
 		{
 
@@ -555,27 +619,8 @@ void main_loop(){
 				}
 			}
 
-			auto cursor_in_world = renderer_world.camera.get_screen_to_world(core::global::ui::root->focus->cursor_pos, {}, true);
-
-			// graphic::draw::line::square(
-			// 		acquirer,
-			// 		{cursor_in_world, 45},
-			// 		32,
-			// 		2.f,
-			// 		graphic::colors::AQUA.to_light()
-			// 	);
-
-			rect2.update({
-				cursor_in_world,
-				45});
 
 			acquirer.proj.depth = 0.35f;
-
-			// graphic::draw::fill::rect_ortho(
-			// 		acquirer.get(),
-			// 		{-1000, -1000, 200, 200},
-			// 		graphic::colors::AQUA.copy().set_a(.5)
-			// 	);
 
 			acquirer << graphic::draw::white_region;
 			graphic::draw::fill::rect_ortho(
@@ -585,13 +630,6 @@ void main_loop(){
 				);
 
 			bool is_intersected = rect1.overlap_exact(rect2);
-
-			// graphic::draw::line::quad(
-			// 		acquirer,
-			// 		rect1.view_as_quad(),
-			// 		2.f,
-			// 		is_intersected ? graphic::colors::PALE_GREEN : graphic::colors::white
-			// 	);
 
 			graphic::draw::line::quad(
 					acquirer,
@@ -614,66 +652,22 @@ void main_loop(){
 					graphic::colors::PURPLE
 				);
 			}
-			auto v = math::vec2::from_polar_deg(25.f + core::global::timer.global_time() * 15, 1);
-
-			/*if(is_intersected){
-				auto vec_depart_vector = rect2.depart_vector_to_on_vel_exact(rect1, v);
-
-
-				auto min_depart_vector = rect2.depart_vector_to(rect1);
-				auto p = rect2.avg();
-
-				graphic::draw::line::line(
-					acquirer.get(),
-					p,
-					p + v * 100,
-					3,
-					graphic::colors::AQUA,
-					graphic::colors::AQUA
-				);
-
-				graphic::draw::line::line(
-					acquirer.get(),
-					p,
-					p + min_depart_vector,
-					3,
-					graphic::colors::CRIMSON,
-					graphic::colors::CRIMSON
-				);
-				graphic::draw::line::line(
-					acquirer.get(),
-					p,
-					p + vec_depart_vector,
-					3,
-					graphic::colors::YELLOW,
-					graphic::colors::YELLOW
-				);
-
-				auto b = rect2.view_as_quad();
-				b.move(vec_depart_vector);
-
-				graphic::draw::line::quad(
-						acquirer,
-						b,
-						2.f,
-						graphic::colors::ORANGE
-					);
-			}*/
 
 			acquirer.proj.slightly_decr_depth();
-			// graphic::draw::fill::rect_ortho(
-			// 		acquirer.get(),
-			// 		{math::vec2{}, 30},
-			// 		graphic::colors::AQUA_SKY.to_light()
-			// 	);
+
+			graphic::draw::line::line(acquirer.get(), cursor_in_world, renderer_world.camera.get_viewport_center(),
+				3.,
+				graphic::colors::AQUA.to_light(),
+				graphic::colors::white.to_light().set_a(0)
+			);
 		}
 
 		{
 			component_manager.sliced_each([&](
-			   game::ecs::component<game::ecs::manifold>& manifold,
-			   game::ecs::component<game::ecs::mech_motion>& motion
+				const game::ecs::chunk_meta& meta,
+			   game::ecs::manifold& manifold,
+			   game::ecs::mech_motion& motion
 			){
-
 			   manifold.hitbox.update_hitbox_with_ccd(motion.trans);
 
 			   if(!renderer_world.camera.get_viewport().overlap_exclusive(manifold.hitbox.max_wrap_bound()))return;
@@ -686,47 +680,82 @@ void main_loop(){
 			   draw::line::quad(acquirer, manifold.hitbox.ccd_wrap_box(), 1, colors::PALE_GREEN);
 		   });
 
+			component_manager.sliced_each([&](
+				game::ecs::chamber::chamber_manifold& grid,
+				const game::ecs::mech_motion& motion
+			){
+					grid.update_transform(motion.trans);
+					grid.manager.do_deferred();
+
+					auto viewport = renderer_world.camera.get_viewport();
+
+
+					if(!grid.get_wrap_bound().overlap_rough(viewport) || !grid.get_wrap_bound().
+					                                                           overlap_exact(viewport))
+						return;
+
+					using namespace game::ecs;
+					using namespace graphic;
+
+					math::mat3 mat3{};
+					mat3.from_transform(grid.get_transform());
+
+					renderer_world.batch.push_proj(mat3);
+
+					draw::line::quad(acquirer, grid.local_grid.get_wrap_bound(), 3, colors::AQUA_SKY.to_light());
+
+					grid.local_grid.each_tile([&](const chamber::tile& tile){
+						if(!tile.building) return;
+
+						draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
+						draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
+						                       colors::PALE_GREEN.to_light(1.5f).set_a(
+							                       tile.get_status().valid_hit_point / 100.f));
+					});
+
+					grid.manager.sliced_each([&](const chamber::building_data& building_data){
+						draw::line::rect_ortho(acquirer, building_data.get_bound(), 3, colors::CRIMSON.to_light());
+					});
+
+					auto local_rect = grid.box_to_local(static_cast<const math::rect_box<float>&>(rect2));
+
+					bool any{};
+					grid.local_grid.quad_tree()->intersect_then(
+						local_rect, [](const math::rect_box<float>& rect, math::frect region){
+							return rect.overlap_rough(region) && rect.overlap_exact(region);
+						}, [&](const auto& rect, const chamber::tile& tile){
+							any = true;
+							// draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
+							//                        colors::ACID.to_light().set_a(.3f));
+						});
+
+					if(any){
+						auto rst = grid.get_dst_sorted_tiles(rect2, (rect2[0] + rect2[3]) / 2, dst.normalize());
+						for (const auto& [idx, tile] : rst | std::views::enumerate){
+							draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
+												   colors::AQUA.create_lerp(colors::RED_DUSK, idx / static_cast<float>(rst.size())));
+						}
+					}
+
+					renderer_world.batch.pop_proj();
+				});
+
+				component_manager.sliced_each([&](
+					game::ecs::component_manager& manager,
+				   const game::ecs::chunk_meta& meta,
+				   game::ecs::projectile_manifold& manifold
+				){
+				   if(manifold.damage_group.sum() <= 0.f){
+					   manager.mark_expired(meta.id());
+				   }
+			   });
+
 			collision_system.insert_all(component_manager);
 			collision_system.run(component_manager);
 			motion_system.run(component_manager);
+			game::ecs::grid_system{}.run(component_manager, graphic_context);
 
 			component_manager.do_deferred();
-		}
-
-		{
-			using namespace graphic;
-			using namespace game::ecs;
-
-			auto t = core::global::timer.global_time() * 3;
-
-			grid.update_transform({t * 5, t * 15, 45});
-
-			math::mat3 mat3{};
-			mat3.from_transform(grid.get_transform());
-
-			renderer_world.batch.push_proj(mat3);
-
-			draw::line::quad(acquirer, grid.local_grid.get_wrap_bound(), 3, colors::AQUA_SKY.to_light());
-
-			grid.local_grid.each_tile([&](const chamber::tile& tile){
-				draw::line::rect_ortho(acquirer, tile.get_bound(), 1, (tile.building ? colors::light_gray : colors::dark_gray).to_light());
-			});
-
-			grid.manager.sliced_each([&](const component<chamber::building_data>& building_data){
-				draw::line::rect_ortho(acquirer, building_data.get_bound(), 3, colors::CRIMSON.to_light());
-			});
-
-			auto local_rect = grid.box_to_local(static_cast<const math::rect_box<float>&>(rect2));
-
-			grid.local_grid.quad_tree().intersect_then(local_rect, [](const math::rect_box<float>& rect, math::frect region){
-				return rect.overlap_rough(region) && rect.overlap_exact(region);
-			}, [&](const auto& rect, const chamber::tile& tile){
-				draw::fill::rect_ortho(acquirer.get(), tile.get_bound(), colors::ACID.to_light().set_a(.3f));
-			});
-
-			renderer_world.batch.pop_proj();
-			// grid.
-			grid.manager.do_deferred();
 		}
 
 		graphic_context.render_efx();
@@ -743,7 +772,7 @@ void main_loop(){
 		context.flush();
 	}
 
-	vkDeviceWaitIdle(context.get_device());
+	context.wait_on_device();
 
 
 }
@@ -821,7 +850,6 @@ void foo2(){
 	using M = A::derive_map;
 	constexpr auto idx = tuple_match_first_v<ecs::find_if_first_equal, M, comp_interface>;
 
-
 	struct T{
 		float * a;
 		math::trans2 b;
@@ -845,7 +873,7 @@ void foo2(){
 
 	cpmg.do_deferred();
 
-	cpmg.sliced_each([](ecs::component<comp_interface>& vecs){
+	cpmg.sliced_each([](comp_interface& vecs){
 		vecs.foo();
 	});
 

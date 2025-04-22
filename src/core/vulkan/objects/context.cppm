@@ -139,8 +139,6 @@ namespace mo_yanxi::vk{
 				}
 			}
 
-			// vkDeviceWaitIdle(device);
-
 			cmd::submit_command/*<2, 2>*/(
 				device.primary_graphics_queue(),
 				swap_chain_frames[imageIndex].post_command,
@@ -601,7 +599,7 @@ namespace mo_yanxi::vk{
 				window_.wait_event();
 			}
 
-			vkDeviceWaitIdle(device);
+			wait_on_device();
 
 			if(last_swap_chain)vkDestroySwapchainKHR(device, last_swap_chain, nullptr);
 			last_swap_chain.handle = swap_chain;

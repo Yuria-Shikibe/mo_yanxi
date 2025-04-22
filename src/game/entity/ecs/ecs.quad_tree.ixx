@@ -106,37 +106,44 @@ namespace mo_yanxi::game::ecs{
 		using pool_type = plf::hive<sub_nodes>;
 
 		struct sub_nodes{
-			std::array<quad_tree_node, 4> nodes{};
+			quad_tree_node nodes[4];
+			//TODO remove ub
+			// quad_tree_node bot_lft;
+			// quad_tree_node bot_rit;
+			// quad_tree_node top_lft;
+			// quad_tree_node top_rit;
 
 			[[nodiscard]] explicit sub_nodes(pool_type* node_pool, const std::array<rect_type, 4>& rects)
-				: nodes{
-					quad_tree_node{node_pool, rects[bot_lft_index]},
-					quad_tree_node{node_pool, rects[bot_rit_index]},
-					quad_tree_node{node_pool, rects[top_lft_index]},
-					quad_tree_node{node_pool, rects[top_rit_index]},
-				}{
+				:
+			nodes{
+				quad_tree_node{node_pool, rects[bot_lft_index]},
+				quad_tree_node{node_pool, rects[bot_rit_index]},
+				quad_tree_node{node_pool, rects[top_lft_index]},
+				quad_tree_node{node_pool, rects[top_rit_index]}}
+			{
 			}
 
 			void reserved_clear() noexcept{
-				for (auto& node : nodes){
-					node.reserved_clear();
-				}
+				nodes[0].reserved_clear();
+				nodes[1].reserved_clear();
+				nodes[2].reserved_clear();
+				nodes[3].reserved_clear();
 			}
 
 			constexpr auto begin() noexcept{
-				return nodes.begin();
+				return nodes;
 			}
 
 			constexpr auto end() noexcept{
-				return nodes.end();
+				return nodes + 4;
 			}
 
 			constexpr auto begin() const noexcept{
-				return nodes.begin();
+				return nodes;
 			}
 
 			constexpr auto end() const noexcept{
-				return nodes.end();
+				return nodes + 4;
 			}
 
 			constexpr quad_tree_node& at(const unsigned i) noexcept{
@@ -147,9 +154,15 @@ namespace mo_yanxi::game::ecs{
 				return nodes[i];
 			}
 
+			sub_nodes(const sub_nodes& other) = delete;
+			sub_nodes(sub_nodes&& other) noexcept = delete;
+			sub_nodes& operator=(const sub_nodes& other) = delete;
+			sub_nodes& operator=(sub_nodes&& other) noexcept = delete;
 		};
 
 		struct sub_node_ptr{
+			friend quad_tree_node;
+
 		private:
 			exclusive_handle_member<pool_type*> pool_{};
 			exclusive_handle_member<sub_nodes*> children{};
@@ -188,21 +201,15 @@ namespace mo_yanxi::game::ecs{
 				}
 			}
 
+		private:
 			sub_node_ptr(const sub_node_ptr& other) = delete;
-
-			sub_node_ptr(sub_node_ptr&& other) noexcept = default;
-
+			sub_node_ptr(sub_node_ptr&& other) noexcept = delete;
 			sub_node_ptr& operator=(const sub_node_ptr& other) = delete;
+			sub_node_ptr& operator=(sub_node_ptr&& other) noexcept = delete;
 
-			sub_node_ptr& operator=(sub_node_ptr&& other) noexcept = default;
+		public:
 
-			~sub_node_ptr(){
-				if(pool_ && children){
-					auto itr = pool_->get_iterator(children);
-					assert(itr != pool_->end());
-					pool_->erase(itr);
-				}
-			}
+			~sub_node_ptr() = default;
 
 			[[nodiscard]] pool_type& node_pool() noexcept{
 				return *pool_;
@@ -214,6 +221,22 @@ namespace mo_yanxi::game::ecs{
 
 			explicit operator bool() const noexcept{
 				return children;
+			}
+
+			constexpr auto begin() noexcept{
+				return children->begin();
+			}
+
+			constexpr auto end() noexcept{
+				return children->end();
+			}
+
+			constexpr auto begin() const noexcept{
+				return std::as_const(*children).begin();
+			}
+
+			constexpr auto end() const noexcept{
+				return std::as_const(*children).end();
 			}
 		};
 	protected:
@@ -307,7 +330,7 @@ namespace mo_yanxi::game::ecs{
 			assert(is_children_cached());
 
 			this->items.reserve(this->branch_size);
-			for (quad_tree_node& node : children->nodes){
+			for (auto& node : children){
 				this->items.append(std::exchange(node.items, {}));
 				node.reserved_clear();
 			}
@@ -479,7 +502,7 @@ namespace mo_yanxi::game::ecs{
 			}
 
 			if(this->has_valid_children()){
-				for (quad_tree_node& node : children->nodes){
+				for (auto& node : children){
 					node.each(func);
 				}
 			}
@@ -490,7 +513,7 @@ namespace mo_yanxi::game::ecs{
 			std::invoke(func, *this);
 
 			if(this->has_valid_children()){
-				for (quad_tree_node& node : children->nodes){
+				for (auto& node : children){
 					node.each(mo_yanxi::pass_fn(func));
 				}
 			}
@@ -511,7 +534,7 @@ namespace mo_yanxi::game::ecs{
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (quad_tree_node& node : children->nodes){
+				for (auto& node : children){
 					if(auto rst = node.intersect_any(to_test)){
 						return rst;
 					}
@@ -538,7 +561,7 @@ namespace mo_yanxi::game::ecs{
 			}
 
 			if(this->has_valid_children()){
-				for (quad_tree_node& node : children->nodes){
+				for (auto& node : children){
 					if(auto rst = node.intersect_any(to_test)) return rst;
 				}
 			}
@@ -562,7 +585,7 @@ namespace mo_yanxi::game::ecs{
 			}
 
 			if(this->has_valid_children()){
-				for (quad_tree_node& node : children->nodes){
+				for (auto& node : children){
 					if(auto rst = node.intersect_any(to_test)) return rst;
 				}
 			}
@@ -588,7 +611,7 @@ namespace mo_yanxi::game::ecs{
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (quad_tree_node& node : children->nodes){
+				for (auto& node : children){
 					node.intersect_all(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter));
 				}
 			}
@@ -608,7 +631,7 @@ namespace mo_yanxi::game::ecs{
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (quad_tree_node& node : children->nodes){
+				for (auto& node : children){
 					node.intersect_all(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter));
 				}
 			}
@@ -628,7 +651,7 @@ namespace mo_yanxi::game::ecs{
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (quad_tree_node& node : children->nodes){
+				for (auto& node : children){
 					node.intersect_all(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter));
 				}
 			}
@@ -648,7 +671,32 @@ namespace mo_yanxi::game::ecs{
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (quad_tree_node & node : children->nodes){
+				for (quad_tree_node & node : children){
+					node.template intersect_then<Region>(region, mo_yanxi::pass_fn(boundCheck), mo_yanxi::pass_fn(func));
+				}
+			}
+
+			for(auto& cont : this->items){
+				if(std::invoke(boundCheck, region, trait::bound_of(cont))){
+					std::invoke(func, region, cont);
+				}
+			}
+		}
+		template <
+			typename Region,
+			std::predicate<const Region&, const rect_type&> Pred,
+			std::invocable<const Region&, const value_type&> Func
+		>
+			requires !std::same_as<Region, rect_type>
+		void intersect_then(
+			const Region& region,
+			Pred boundCheck,
+			Func func) const{
+			if(isBranchEmpty() || !std::invoke(boundCheck, region, this->boundary)) return;
+
+			// If this node has children, check if the rectangle overlaps with any rectangle in the children
+			if(this->has_valid_children()){
+				for (const quad_tree_node & node : children){
 					node.template intersect_then<Region>(region, mo_yanxi::pass_fn(boundCheck), mo_yanxi::pass_fn(func));
 				}
 			}
@@ -676,7 +724,7 @@ namespace mo_yanxi::game::ecs{
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (const quad_tree_node & node : children->nodes){
+				for (const quad_tree_node & node : children){
 					node.get_all_intersected_impl(object, filter, out);
 				}
 			}
@@ -704,7 +752,7 @@ namespace mo_yanxi::game::ecs{
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (const quad_tree_node & node : children->nodes){
+				for (const quad_tree_node & node : children){
 					node.intersect_then(object, mo_yanxi::pass_fn(func));
 				}
 			}
@@ -717,7 +765,7 @@ namespace mo_yanxi::game::ecs{
 
 			//If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (const quad_tree_node & node : children->nodes){
+				for (const quad_tree_node & node : children){
 					node.intersect_then(rect, mo_yanxi::pass_fn(func));
 				}
 			}
@@ -736,7 +784,7 @@ namespace mo_yanxi::game::ecs{
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (const quad_tree_node & node : children->nodes){
+				for (const quad_tree_node & node : children){
 					node.template intersect_then<Region>(region, mo_yanxi::pass_fn(boundCheck), mo_yanxi::pass_fn(func));
 				}
 			}
@@ -760,7 +808,7 @@ namespace mo_yanxi::game::ecs{
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (quad_tree_node& node : children->nodes){
+				for (auto& node : children){
 					node.intersect_then(point, mo_yanxi::pass_fn(func));
 				}
 			}
@@ -773,7 +821,7 @@ namespace mo_yanxi::game::ecs{
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
-				for (const quad_tree_node & node : children->nodes){
+				for (const quad_tree_node & node : children){
 					node.within(to_test, radius, mo_yanxi::pass_fn(func));
 				}
 			}
@@ -784,30 +832,35 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	template <typename ItemTy, number T = float>
-	struct quad_tree_root_base{
-	protected:
-		using node = quad_tree_node<ItemTy, T>;
-		typename node::pool_type pool{};
-	};
-
+	// using ItemTy = int;
+	// using T = float;
 	export
 	template <typename ItemTy, number T = float>
-	struct quad_tree : quad_tree_root_base<ItemTy, T>, quad_tree_node<ItemTy, T>{
+	struct quad_tree{
 	private:
-		using base = quad_tree_node<ItemTy, T>;
+		using node = quad_tree_node<ItemTy, T>;
+		typename node::pool_type pool{};
 
+		node* root{};
 	public:
 		[[nodiscard]] quad_tree() = default;
 
-		[[nodiscard]] explicit quad_tree(typename base::rect_type boundary)
-			: base(&this->pool, boundary)
+		[[nodiscard]] explicit quad_tree(typename node::rect_type boundary)
+			: root(&pool.emplace(&pool, std::array{boundary, boundary, boundary, boundary})->at(0))
 		{}
 
+		constexpr node* operator->() noexcept{
+			return root;
+		}
+
+		constexpr const node* operator->() const noexcept{
+			return root;
+		}
+
 		quad_tree(const quad_tree& other) = delete;
-		quad_tree(quad_tree&& other) noexcept = delete;
 		quad_tree& operator=(const quad_tree& other) = delete;
-		quad_tree& operator=(quad_tree&& other) noexcept = delete;
+		quad_tree(quad_tree&& other) noexcept = default;
+		quad_tree& operator=(quad_tree&& other) noexcept = default;
 	};
 
 }

@@ -97,6 +97,14 @@ namespace mo_yanxi::game{
 
 		/** @brief Raw Box Data */
 		math::rect_box_posed box{};
+
+		explicit(false) constexpr operator const math::rect_box_posed&() const noexcept{
+			return box;
+		}
+
+		explicit(false) constexpr operator math::rect_box_posed&() noexcept{
+			return box;
+		}
 	};
 
 	union hitbox_span{

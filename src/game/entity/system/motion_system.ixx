@@ -15,8 +15,8 @@ namespace mo_yanxi::game::ecs{
 		void run(component_manager& manager){
 			manager.sliced_each([](
 				const component_manager& m,
-				const component<chunk_meta>& meta,
-				component<mech_motion>& motion
+				const chunk_meta& meta,
+				mech_motion& motion
 				// component<physical_rigid>& rigid
 			){
 

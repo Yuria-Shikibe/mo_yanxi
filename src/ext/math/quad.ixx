@@ -650,6 +650,9 @@ namespace mo_yanxi::math{
 
 	};
 
+	export
+	using frect_box = rect_box<float>;
+
 
 	template <typename T>
 	struct overlay_axis_keys<rect_box<T>>{

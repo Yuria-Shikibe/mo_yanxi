@@ -50,10 +50,13 @@ target("mo_yanxi")
     if is_mode("debug") then
         add_defines("_DEBUG")
         add_cxflags("/RTCsu", { force = true })
+    else
+        add_cxflags("/GL")
     end
 
     add_cxflags("/FC", { force = true })
     add_cxflags("/diagnostics:column")
+    add_cxflags("/arch:AVX")
     add_cxflags("/arch:AVX2")
 
     add_cxflags("/wd4244")

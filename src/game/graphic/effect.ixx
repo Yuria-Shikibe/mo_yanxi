@@ -365,8 +365,6 @@ namespace mo_yanxi::game::fx{
 		float depth{};
 		math::timed duration{};
 		float min_clip_radius{50};
-
-
 	};
 
 	export
@@ -378,6 +376,10 @@ namespace mo_yanxi::game::fx{
 		bool referenced{};
 
 	public:
+		[[nodiscard]] bool is_referenced() const noexcept{
+			return referenced;
+		}
+
 		static effect_id_type acquire_id() noexcept{
 			return id_counter.fetch_add(1, std::memory_order_relaxed) + 1;
 		}

@@ -9,6 +9,7 @@ export import mo_yanxi.game.ecs.component.manager;
 
 export import mo_yanxi.game.ecs.component.manifold;
 export import mo_yanxi.game.ecs.component.physical_property;
+export import mo_yanxi.game.ecs.component.chamber;
 export import mo_yanxi.game.ecs.quad_tree;
 export import mo_yanxi.shared_stack;
 export import mo_yanxi.math.intersection;
@@ -69,7 +70,7 @@ namespace mo_yanxi::game::ecs{
 
 	export
 	template <>
-	struct quad_tree_trait_adaptor<manifold::collision_object, float> : quad_tree_adaptor_base<manifold::collision_object, float>{
+	struct quad_tree_trait_adaptor<collision_object, float> : quad_tree_adaptor_base<collision_object, float>{
 		[[nodiscard]] static rect_type get_bound(const_reference self) noexcept{
 			return self.manifold->hitbox.max_wrap_bound();
 		}
@@ -91,15 +92,16 @@ namespace mo_yanxi::game::ecs{
 	struct collision_system{
 	private:
 		std::vector<manifold*> pre_passed_manifolds{};
-		using collision_test_tuple = std::tuple<component<const chunk_meta>&, component<manifold>&, component<mech_motion>&, component<physical_rigid>&>;
+		using collision_test_tuple = std::tuple<const chunk_meta&, manifold&, mech_motion&, physical_rigid&>;
+		using collision_test_tuple_store = std::tuple<const chunk_meta*, manifold*, mech_motion*, physical_rigid*>;
 
-		quad_tree<manifold::collision_object> tree{{{0, 0}, 100000}};
-		shared_stack<collision_test_tuple> passed_entites{};
+		quad_tree<collision_object> tree{{{0, 0}, 100000}};
+		shared_stack<collision_test_tuple_store> passed_entites{};
 
 		FORCE_INLINE static void rigidCollideWith(
-			const manifold::collision_object& sbj,
-			const manifold::collision_object& obj,
-			const manifold::intersection& intersection,
+			const collision_object& sbj,
+			const collision_object& obj,
+			const intersection& intersection,
 			const math::vec2 sbj_correction,
 			const float energyScale) noexcept{
 			assert(sbj != obj);
@@ -151,23 +153,46 @@ namespace mo_yanxi::game::ecs{
 
 			auto sbj_vel_len2 = sbj.motion->vel.vec.length2();
 			auto obj_vel_len2 = obj.motion->vel.vec.length2();
-			if(/*math::zero(sbj_vel_len2 - obj_vel_len2, 2.f) && */sbj_mass <= obj_mass && std::ranges::contains(sbj.manifold->last_collided, obj.id, &entity_ref::id)){
+			if(sbj_mass <= obj_mass){
 				math::rect_box box{sbj.manifold->hitbox[intersection.index.sbj_idx].box};
 				box.move(sbj_correction);
+				auto& obj_box = obj.manifold->hitbox[intersection.index.obj_idx].box;
 
-				vec2 min_correction = box.depart_vector_to(obj.manifold->hitbox[intersection.index.obj_idx].box);
+				if(std::ranges::contains(sbj.manifold->last_collided, obj.id, &entity_ref::id)){
+					vec2 min_correction{};
+					auto dot = (box.avg() - obj_box.avg()).dot(sbj.motion->vel.vec);
+					if((sbj.motion->vel.vec - obj.motion->vel.vec).length2() < 25 || math::abs(dot) < 0.5f){
+						min_correction = box.depart_vector_to(obj_box).set_length(1.5f);
+					}else{
+						min_correction = (sbj.motion->vel.vec * (dot > 0 ? 1 : -1)).set_length(1.5f) ;
+					}
 
-				sbj.manifold->collision_correction_vec += min_correction.set_length(1.5f);// + min_correction.set_length(1.f);///*min_correction * .05f +*/ min_correction.copy().set_length(3.f);
 
-				sbj.manifold->is_under_correction = true;
+					sbj.manifold->collision_correction_vec += min_correction;
+
+					sbj.manifold->is_under_correction = true;
+				}else{
+					vec2 min_correction{};
+					auto dot = (box.avg() - obj_box.avg()).dot(sbj.motion->vel.vec);
+					if((sbj.motion->vel.vec - obj.motion->vel.vec).length2() < 25 || math::abs(dot) < 0.65f){
+						min_correction = box.depart_vector_to(obj_box) * .05f;
+					}else{
+						min_correction = box.depart_vector_to_on_vel_rough_min(obj_box, sbj.motion->vel.vec * (dot > 0 ? -1 : 1)) * .75f;
+					}
+
+
+					sbj.manifold->collision_correction_vec += min_correction;
+				}
 
 			}
+
+			assert(!sbj.manifold->collision_vel_trans_sum.is_NaN());
 		}
 
 
 		[[nodiscard]] FORCE_INLINE static bool roughIntersectWith(
-			const manifold::collision_object& sbj,
-			const manifold::collision_object& obj
+			const collision_object& sbj,
+			const collision_object& obj
 		) noexcept{
 			if(std::abs(sbj.motion->depth - obj.motion->depth) > sbj.manifold->thickness + obj.manifold->thickness) return
 				false;
@@ -193,7 +218,7 @@ namespace mo_yanxi::game::ecs{
 			return rst;
 		}
 
-		FORCE_INLINE static void collapse_possible_collisions(component<manifold>& manifold, mech_motion& motion) noexcept{
+		FORCE_INLINE static void collapse_possible_collisions(manifold& manifold, mech_motion& motion) noexcept{
 			math::vec2 pre_correction_sum{};
 
 			for(const auto& collision : manifold.possible_collision){
@@ -205,18 +230,28 @@ namespace mo_yanxi::game::ecs{
 					math::rect_box sbj = sbj_box[index.sbj_idx].box;
 					math::rect_box obj = obj_box[index.obj_idx].box;
 
-					// if(!manifold.is_under_correction){
-						sbj.move(sbj_box.get_back_trace_move());
-					// }
+					sbj.move(sbj_box.get_back_trace_move());
 					obj.move(obj_box.get_back_trace_move());
 
-					assert(sbj.overlap_exact(obj));
+					math::vec2 correction{};
+					const auto sbjMove = sbj_box.get_back_trace_unit_move();
+					const auto objMove = obj_box.get_back_trace_unit_move();
+					if(
+						manifold.is_under_correction ||
+						sbjMove.length2() + objMove.length2() < math::sqr(15) ||
+						std::ranges::contains(manifold.last_collided, collision.other.id, &entity_ref::id)
+					){
+					} else{
+						correction = manifold.is_under_correction
+							                        ? math::vec2{}
+							                        : approachTest(
+								                        sbj, sbj_box.get_back_trace_unit_move(),
+								                        obj, obj_box.get_back_trace_unit_move()
+							                        );
+					}
 
 
-					math::vec2 correction = approachTest(
-							sbj, sbj_box.get_back_trace_unit_move(),
-							obj, obj_box.get_back_trace_unit_move()
-						);
+
 
 					const auto avg_s = sbj.expand_unchecked(2);
 					const auto avg_o = obj.expand_unchecked(2);
@@ -230,7 +265,7 @@ namespace mo_yanxi::game::ecs{
 					auto& data = manifold.confirmed_collision.emplace_back(
 						collision.other,
 						correction,
-						manifold::intersection{
+						intersection{
 							.pos = avg.pos,
 							.normal = avg_edge_normal(obj, avg.pos).normalize(),
 							.index = index
@@ -247,30 +282,46 @@ namespace mo_yanxi::game::ecs{
 			}
 
 			motion.trans.vec += pre_correction_sum;
+			manifold.collision_correction_vec -= pre_correction_sum;
 		}
 
-		FORCE_INLINE static void collisionsPostProcess_3(const manifold::collision_object& object) noexcept{
-			for(const auto& data : object.manifold->confirmed_collision){
-				rigidCollideWith(object, data.other, data.intersection, data.correction, 1 / static_cast<float>(object.manifold->confirmed_collision.size()));
+		FORCE_INLINE static void collisionsPostProcess_3(const collision_object& subject) noexcept{
+			for(const auto& data : subject.manifold->confirmed_collision){
+				if(manifold::try_override_collide_by(data.other, subject, data.intersection)){
+					using gch::erase_if;
+					erase_if(data.other.manifold->confirmed_collision, [&](const collision_confirmed& d){
+						return d.get_other_id() == subject.id;
+					});
+					continue;
+				}
+
+				rigidCollideWith(subject, data.other, data.intersection, data.correction, 1);
 			}
 		}
 
 		FORCE_INLINE static void collisionsPostProcess_4(manifold& manifold, mech_motion& motion) noexcept{
-			/*math::vec2 pre_correction_sum{};
-			//
+			math::vec2 pre_correction_sum{};
 			if(!manifold.confirmed_collision.empty()){
 				for (const auto & confirmed_collision : manifold.confirmed_collision){
 					pre_correction_sum += confirmed_collision.correction;
 				}
 
 				pre_correction_sum /= manifold.confirmed_collision.size();
-			}*/
+			}
 
-			motion.trans.vec += manifold.collision_correction_vec;
+			motion.trans.vec += manifold.collision_correction_vec + pre_correction_sum;
 			motion.vel += manifold.collision_vel_trans_sum;
-			// motion.vel.rot.clamp(20.f);
+
 			manifold.collision_correction_vec = {};
 			manifold.collision_vel_trans_sum = {};
+
+			if(manifold.confirmed_collision.empty()){
+				if(!manifold.no_backtrace_correction && !manifold.is_under_correction){
+					const auto backTrace = manifold.hitbox.get_back_trace_move();
+
+					motion.trans.vec -= backTrace;
+				}
+			}
 
 			manifold.markLast();
 
@@ -280,16 +331,19 @@ namespace mo_yanxi::game::ecs{
 
 	public:
 		void insert_all(component_manager& component_manager) noexcept{
-			tree.reserved_clear();
+			tree->reserved_clear();
 
 			component_manager.sliced_each([this](
-				component<chunk_meta>& meta,
-				component<manifold>& manifold,
-				component<mech_motion>& motion,
-				component<physical_rigid>& rigid
+				const chunk_meta& meta,
+				manifold& manifold,
+				mech_motion& motion,
+				physical_rigid& rigid
 			){
-				tree.insert({meta.id(), &manifold, &motion, &rigid});
+				tree->insert({meta.id(), &manifold, &motion, &rigid});
 			});
+
+			// std::println(std::cerr, "{}", tree->size());
+
 		}
 
 		void run_collision_test_pre(component_manager& component_manager){
@@ -313,7 +367,7 @@ namespace mo_yanxi::game::ecs{
 				collision_test_tuple data
 			){
 				auto [meta, mf, motion, rigid] = data;
-				tree.intersect_all({meta.id(), &mf, &motion, &rigid}, [&](const manifold::collision_object& sbj, const manifold::collision_object& obj){
+				tree->intersect_all({meta.id(), &mf, &motion, &rigid}, [&](const collision_object& sbj, const collision_object& obj){
 					if(sbj == obj)return;
 					if(sbj.manifold->test_intersection_with(obj)){
 						possible_counts.fetch_add(1, std::memory_order_relaxed);
@@ -338,7 +392,7 @@ namespace mo_yanxi::game::ecs{
 
 				collapse_possible_collisions(mf, motion);
 
-				passed_entites.push(data);
+				passed_entites.push({&meta, &mf, &motion, &rigid});
 			});
 		}
 
@@ -347,12 +401,16 @@ namespace mo_yanxi::game::ecs{
 
 			auto rng = passed_entites.locked_range();
 
+			std::ranges::sort(rng, std::ranges::less{}, [](const collision_test_tuple_store& tlp){
+				return std::get<manifold*>(tlp)->colliders.index();
+			});
+
 			for (auto [meta, mf, motion, rigid] : rng){
-				collisionsPostProcess_3({meta.id(), &mf, &motion, &rigid});
+				collisionsPostProcess_3({meta->id(), mf, motion, rigid});
 			}
 
 			for (auto [meta, mf, motion, rigid] : rng){
-				collisionsPostProcess_4(mf, motion);
+				collisionsPostProcess_4(*mf, *motion);
 			}
 		}
 	};

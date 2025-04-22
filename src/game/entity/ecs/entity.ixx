@@ -79,9 +79,11 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
+	/*
 	export
 	template <typename T>
 	using component = T;//: T{};
+	*/
 
 	export
 	struct archetype_base{
@@ -109,13 +111,25 @@ namespace mo_yanxi::game::ecs{
 
 		virtual void* get_chunk_ptr(std::type_index type, std::size_t idx) noexcept = 0;
 
+		[[nodiscard]] virtual bool has_type(std::type_index type) const = 0;
+
+		virtual void set_expired(entity_id entity_id);
+
 		template <typename T>
-		[[nodiscard]] component<T>* try_get_comp(const std::size_t idx) noexcept{
-			return static_cast<component<T>*>(get_chunk_ptr(typeid(T), idx));
+		[[nodiscard]] bool has_type() const noexcept{
+			if constexpr (std::same_as<T, chunk_meta>){
+				return true;
+			}else{
+				return has_type(typeid(T));
+			}
+		}
+		template <typename T>
+		[[nodiscard]] T* try_get_comp(const std::size_t idx) noexcept{
+			return static_cast<T*>(get_chunk_ptr(typeid(T), idx));
 		}
 
 		template <typename T>
-		[[nodiscard]] component<T>* try_get_comp(entity_id id) noexcept;
+		[[nodiscard]] T* try_get_comp(entity_id id) noexcept;
 
 		virtual void dump_staging() = 0;
 	};
@@ -123,6 +137,12 @@ namespace mo_yanxi::game::ecs{
 	export
 	struct entity_ref;
 
+
+	export
+	template <typename Tuple>
+		requires (is_tuple_v<Tuple>)
+	using tuple_to_comp_t = tuple_to_seq_chunk_t<tuple_cat_t<std::tuple<chunk_meta>, Tuple>>;
+	
 	export
 	struct entity{
 
@@ -177,16 +197,28 @@ namespace mo_yanxi::game::ecs{
 			return archetype_;
 		}
 
+		void set_expired() const noexcept{
+			assert(!is_expired());
+
+		}
+
 		template <typename T>
-		[[nodiscard]] component<T>* try_get() const noexcept{
+		[[nodiscard]] T* try_get() const noexcept{
 			return archetype_->try_get_comp<T>(chunk_index_);
 		}
 
 		template <typename T>
-		[[nodiscard]] component<T>& at() const noexcept{
-			component<T>* ptr = archetype_->try_get_comp<T>(chunk_index_);
+		[[nodiscard]] T& at() const noexcept{
+			if(!archetype_){
+				const auto str = std::format("Illegal Access To Chunk<{}> on entity<{}> on empty archetype", typeid(T).name(), type().name());
+				throw bad_chunk_access{str.c_str()};
+			}
+
+			T* ptr = archetype_->try_get_comp<T>(chunk_index_);
 			if(!ptr){
-				const auto str = std::format("Illegal Access To Chunk<{}> on entity<{}>", typeid(T).name(), type().name());
+				T* ptr = archetype_->try_get_comp<T>(chunk_index_);
+
+				const auto str = std::format("Illegal Access To Chunk<{}> on entity<{}> at[{}]", typeid(T).name(), type().name(), chunk_index());
 				throw bad_chunk_access{str.c_str()};
 			}
 			return *ptr;
@@ -194,16 +226,16 @@ namespace mo_yanxi::game::ecs{
 
 		template <typename Tuple, typename T>
 			requires (contained_in<T, Tuple>)
-		[[nodiscard]] component<T>& unchecked_get() const;
+		[[nodiscard]] T& unchecked_get() const;
 
 		template <typename Tuple>
-		[[nodiscard]] unary_apply_to_tuple_t<component, Tuple>& unchecked_get() const;
+		[[nodiscard]] tuple_to_comp_t<Tuple>& unchecked_get() const;
 
 		template <typename Tuple, typename T>
-		[[nodiscard]] component<T>* get() const noexcept;
+		[[nodiscard]] T* get() const noexcept;
 
 		template <typename Tuple>
-		[[nodiscard]] unary_apply_to_tuple_t<component, Tuple>* get() const noexcept;
+		[[nodiscard]] tuple_to_comp_t<Tuple>* get() const noexcept;
 	};
 
 
@@ -332,58 +364,19 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	template <typename T>
-	using tuple_to_comp_t = unary_apply_to_tuple_t<component, T>;
-
 	export
 	template <typename T>
 	struct component_custom_behavior_base{
 		using value_type = T;
 
-		static void on_init(const chunk_meta& meta, component<value_type>& comp) = delete;
-		static void on_terminate(const chunk_meta& meta, component<value_type>& comp) = delete;
-		static void on_relocate(const chunk_meta& meta, component<value_type>& comp) = delete;
+		static void on_init(const chunk_meta& meta, value_type& comp) = delete;
+		static void on_terminate(const chunk_meta& meta, value_type& comp) = delete;
+		static void on_relocate(const chunk_meta& meta, value_type& comp) = delete;
 	};
 
 	export
 	template <typename T>
 	struct component_custom_behavior : component_custom_behavior_base<T>{};
-
-	/*template <typename B, std::derived_from<B> D>
-	constexpr std::ptrdiff_t offset_between = [](){
-		union{
-			D d{};
-			char a[sizeof(D)];
-		};
-
-		const void* dp = std::addressof(d);
-		const void* bp = std::addressof(static_cast<const B&>(d));
-
-		std::destroy_at(&d);
-
-		std::ptrdiff_t doff{};
-		std::ptrdiff_t boff{};
-
-		for(std::ptrdiff_t i = 0; i < sizeof(D); ++i){
-			if(a + i == dp){
-				doff = i;
-				break;
-			}
-		}
-
-		for(std::ptrdiff_t i = 0; i < sizeof(D); ++i){
-			if(a + i == bp){
-				boff = i;
-				break;
-			}
-		}
-
-		return boff - doff;
-	}();
-
-
-
-	constexpr auto a = offset_between<A, C>;*/
 
 	//TODO derive check
 	// template <typename T, typename Tpl>
@@ -401,9 +394,9 @@ namespace mo_yanxi::game::ecs{
 				typename component_custom_behavior<T>::base_types;
 			}){
 				if constexpr (is_tuple_v<typename component_custom_behavior<T>::base_types>){
-					return std::type_identity<typename component_custom_behavior<T>::base_types>{};
+					return std::type_identity<tuple_cat_t<typename component_custom_behavior<T>::base_types, std::tuple<value_type>>>{};
 				}else{
-					return std::type_identity<std::tuple<typename component_custom_behavior<T>::base_types>>{};
+					return std::type_identity<std::tuple<typename component_custom_behavior<T>::base_types, value_type>>{};
 				}
 
 			}else{
@@ -415,7 +408,7 @@ namespace mo_yanxi::game::ecs{
 			typename component_custom_behavior<T>::base_types;
 		};
 
-		static void on_init(const chunk_meta& meta, component<T>& comp) {
+		static void on_init(const chunk_meta& meta, T& comp) {
 			if constexpr (requires{
 				component_custom_behavior<T>::on_init(meta, comp);
 			}){
@@ -423,7 +416,7 @@ namespace mo_yanxi::game::ecs{
 			}
 		}
 
-		static void on_terminate(const chunk_meta& meta, component<T>& comp) {
+		static void on_terminate(const chunk_meta& meta, T& comp) {
 			if constexpr (requires{
 				component_custom_behavior<T>::on_terminate(meta, comp);
 			}){
@@ -431,7 +424,7 @@ namespace mo_yanxi::game::ecs{
 			}
 		}
 
-		static void on_relocate(const chunk_meta& meta, component<T>& comp) {
+		static void on_relocate(const chunk_meta& meta, T& comp) {
 			if constexpr (requires{
 				component_custom_behavior<T>::on_relocate(meta, comp);
 			}){
@@ -448,16 +441,16 @@ namespace mo_yanxi::game::ecs{
 
 	template <typename T>
 	using derive_map_of_trait = typename decltype([]{
-		if constexpr (!component_trait<T>::is_polymorphic){
+		// if constexpr (!component_trait<T>::is_polymorphic){
 			using bases = typename component_trait<T>::base_types;
 			return []<std::size_t ...Idx>(std::index_sequence<Idx...>){
 				return std::type_identity<std::tuple<
 					type_pair<std::tuple_element_t<Idx, bases>, T> ...
 				>>{};
 			}(std::make_index_sequence<std::tuple_size_v<bases>>{});
-		}else{
-			return std::type_identity<std::tuple<>>{};
-		}
+		// }else{
+		// 	return std::type_identity<std::tuple<>>{};
+		// }
 	}())::type;
 
 	export
@@ -473,8 +466,7 @@ namespace mo_yanxi::game::ecs{
 		using raw_tuple = TupleT;
 		// using raw_tuple = std::tuple<int>;
 		using appended_tuple = tuple_cat_t<std::tuple<chunk_meta>, raw_tuple>;
-		using comp_tuple = unary_apply_to_tuple_t<component, appended_tuple>;
-		using components = tuple_to_seq_chunk_t<comp_tuple>;
+		using components = tuple_to_seq_chunk_t<appended_tuple>;
 		static constexpr std::size_t chunk_size = std::tuple_size_v<appended_tuple>;
 
 		static constexpr std::size_t single_chunk_size = sizeof(components);
@@ -485,24 +477,26 @@ namespace mo_yanxi::game::ecs{
 
 		std::mutex staging_mutex_{};
 		std::vector<components> staging{};
+		std::mutex staging_expire_mutex_{};
+		std::vector<entity_id> staging_expires{};
 	protected:
 
 		template <typename ...Ts>
-		static decltype(auto) get_unwrap_of(components& comp) noexcept{
+		static auto get_unwrap_of(components& comp) noexcept{
 			return [&] <std::size_t... I>(std::index_sequence<I...>){
-				return std::tuple<decltype(comp.template get<component<Ts>>()) ...>{comp.template get<component<Ts>>() ...};
+				return std::tie(get<Ts>(comp) ...);
 			}(std::index_sequence_for<Ts ...>{});
 		}
 
 		template <typename ...Ts>
-		static decltype(auto) get_unwrap_of(const components& comp) noexcept{
+		static auto get_unwrap_of(const components& comp) noexcept{
 			return [&] <std::size_t... I>(std::index_sequence<I...>){
-				return std::tuple<decltype(comp.template get<component<Ts>>()) ...>{comp.template get<component<Ts>>() ...};
+				return std::tie(get<Ts>(comp) ...);
 			}(std::index_sequence_for<Ts ...>{});
 		}
 
 		constexpr static entity_id id_of_chunk(const components& comp) noexcept{
-			return static_cast<const component<chunk_meta>&>(comp.template get<component<chunk_meta>>()).eid_;
+			return static_cast<const chunk_meta&>(get<chunk_meta>(comp)).eid_;
 		}
 
 	public:
@@ -590,6 +584,21 @@ namespace mo_yanxi::game::ecs{
 			e->id()->chunk_index_ = invalid_chunk_idx;
 		}
 
+		bool has_type(std::type_index type) const override{
+			bool rst{};
+			[&, this] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+				([&, this]<std::size_t I>(){
+					if(rst)return;
+
+					using Ty = std::tuple_element_t<I, appended_tuple>;
+					if(std::type_index{typeid(Ty)} == type){
+						rst = true;
+					}
+				}.template operator()<Idx>(), ...);
+			}(std::make_index_sequence<std::tuple_size_v<appended_tuple>>{});
+			return rst;
+		}
+
 		void* get_chunk_ptr(std::type_index type, std::size_t idx) noexcept final {
 			if(idx >= chunks.size())return nullptr;
 			void* ptr{};
@@ -599,9 +608,9 @@ namespace mo_yanxi::game::ecs{
 
 					using Ty = std::tuple_element_t<I, appended_tuple>;
 					if(std::type_index{typeid(Ty)} == type){
-						auto chunk = reinterpret_cast<std::byte*>(chunks.data() + idx);
-						constexpr auto off = chunk_tuple_offset_at_v<I, comp_tuple>;
-						ptr = chunk + off;
+						// auto chunk = reinterpret_cast<std::byte*>(chunks.data() + idx);
+						// constexpr auto off = chunk_tuple_offset_at_v<I, appended_tuple>;
+						ptr = &get<Ty>(chunks[idx]);
 					}
 				}.template operator()<Idx>(), ...);
 			}(std::make_index_sequence<std::tuple_size_v<appended_tuple>>{});
@@ -644,13 +653,32 @@ namespace mo_yanxi::game::ecs{
 					constexpr std::size_t mapped_cur_idx = tuple_index_v<cur_type, in_tuple>;
 
 					if constexpr (mapped_cur_idx == in_tuple_size){
-						return component<cur_type>{};
+						return cur_type{};
 					}else{
 						using param_type = std::tuple_element_t<mapped_cur_idx, raw_tuple_type>;
-						return component<cur_type>{std::forward<param_type>(std::get<mapped_cur_idx>(ref_tuple))};
+						return cur_type{std::forward<param_type>(std::get<mapped_cur_idx>(ref_tuple))};
 					}
 				}.template operator()<Idx>() ...);
 			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>{});
+
+			/*
+			* components comp = [&] <std::size_t ...Idx>(std::index_sequence<Idx...>) -> auto {
+				return components{e, [&] <std::size_t I> (){
+					using cur_type = std::tuple_element_t<I, raw_tuple>;
+					constexpr std::size_t mapped_cur_idx = tuple_index_v<cur_type, in_tuple>;
+
+					if constexpr (mapped_cur_idx == in_tuple_size){
+						return cur_type{};
+					}else{
+						using param_type = std::tuple_element_t<mapped_cur_idx, raw_tuple_type>;
+						return cur_type{std::forward<param_type>(std::get<mapped_cur_idx>(ref_tuple))};
+					}
+				}.template operator()<Idx>() ...};
+			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>{});
+
+			std::lock_guard _{staging_mutex_};
+			staging.push_back(std::move(comp));
+			 */
 		}
 
 		void dump_staging() final {
@@ -679,21 +707,21 @@ namespace mo_yanxi::game::ecs{
 
 	public:
 		template <typename T>
-		[[nodiscard]] strided_span<component<T>> slice() noexcept{
+		[[nodiscard]] strided_span<T> slice() noexcept{
 			constexpr auto idx = tuple_match_first_v<find_if_first_equal, derive_map, T>;
 			if constexpr (idx != std::tuple_size_v<derive_map>){
 				if(chunks.empty()){
-					return {};
+					return {nullptr, 0, single_chunk_size};
 				}else{
-					return strided_span<component<T>>{
-						static_cast<component<T>*>(&get<typename std::tuple_element_t<idx, derive_map>::second_type>(chunks.front())),
+					return strided_span<T>{
+						static_cast<T*>(&get<typename std::tuple_element_t<idx, derive_map>::second_type>(chunks.front())),
 						chunks.size(), single_chunk_size
 					};
 				}
-			}else if constexpr (contained_in<component<T>, comp_tuple>){
-				return strided_span<component<T>>{
-					reinterpret_cast<component<T>*>(reinterpret_cast<std::byte*>(chunks.data()) +
-						chunk_tuple_offset_of_v<component<T>, comp_tuple>),
+			}else if constexpr (contained_in<T, appended_tuple>){
+				return strided_span<T>{
+					reinterpret_cast<T*>(reinterpret_cast<std::byte*>(chunks.data()) +
+						chunk_tuple_offset_of_v<T, appended_tuple>),
 					chunks.size(), single_chunk_size
 				};
 			}else{
@@ -702,21 +730,21 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		template <typename T>
-		[[nodiscard]] strided_span<const component<T>> slice() const noexcept{
+		[[nodiscard]] strided_span<const T> slice() const noexcept{
 			constexpr auto idx = tuple_match_first_v<find_if_first_equal, derive_map, T>;
 			if constexpr (idx != std::tuple_size_v<derive_map>){
 				if(chunks.empty()){
-					return {};
+					return {nullptr, 0, single_chunk_size};
 				}else{
-					return strided_span<component<T>>{
-						static_cast<const component<T>*>(&get<typename std::tuple_element_t<idx, derive_map>::second_type>(chunks.front())),
+					return strided_span<T>{
+						static_cast<const T*>(&get<typename std::tuple_element_t<idx, derive_map>::second_type>(chunks.front())),
 						chunks.size(), single_chunk_size
 					};
 				}
-			}else if constexpr (contained_in<component<T>, comp_tuple>){
-				return strided_span<const component<T>>{
-					reinterpret_cast<const component<T>*>(reinterpret_cast<const std::byte*>(chunks.data()) +
-						chunk_tuple_offset_of_v<const component<T>, comp_tuple>),
+			}else if constexpr (contained_in<T, appended_tuple>){
+				return strided_span<const T>{
+					reinterpret_cast<const T*>(reinterpret_cast<const std::byte*>(chunks.data()) +
+						chunk_tuple_offset_of_v<const T, appended_tuple>),
 					chunks.size(), single_chunk_size
 				};
 			}else{
@@ -735,31 +763,35 @@ namespace mo_yanxi::game::ecs{
 	}
 
 	void archetype_base::erase(const entity_id entity){
-		entity->id()->archetype_ = nullptr;
+		entity->archetype_ = nullptr;
+	}
+
+	void archetype_base::set_expired(entity_id entity_id){
+		entity_id->archetype_ = nullptr;
 	}
 
 
 	template <typename T>
-	component<T>* archetype_base::try_get_comp(const entity_id id) noexcept{
+	T* archetype_base::try_get_comp(const entity_id id) noexcept{
 		return try_get_comp<T>(id->chunk_index());
 	}
 
 	template <typename Tuple, typename T> requires (contained_in<T, Tuple>)
-	component<T>& entity::unchecked_get() const{
+	T& entity::unchecked_get() const{
 		assert(archetype_);
 		auto& aty = CHECKED_STATIC_CAST(archetype<Tuple>&)(*archetype_);
 		return aty.template slice<T>()[chunk_index_];
 	}
 
 	template <typename Tuple>
-	unary_apply_to_tuple_t<component, Tuple>& entity::unchecked_get() const{
+	tuple_to_comp_t<Tuple>& entity::unchecked_get() const{
 		assert(archetype_);
 		auto& aty = CHECKED_STATIC_CAST(archetype<Tuple>&)(*archetype_);
 		return aty[chunk_index_];
 	}
 
 	template <typename Tuple, typename T>
-	component<T>* entity::get() const noexcept{
+	T* entity::get() const noexcept{
 		const std::type_index idx = typeid(Tuple);
 		if(idx != type())return nullptr;
 
@@ -767,7 +799,7 @@ namespace mo_yanxi::game::ecs{
 	}
 
 	template <typename Tuple>
-	unary_apply_to_tuple_t<component, Tuple>* entity::get() const noexcept{
+	tuple_to_comp_t<Tuple>* entity::get() const noexcept{
 		const std::type_index idx = typeid(Tuple);
 		if(idx != type())return nullptr;
 

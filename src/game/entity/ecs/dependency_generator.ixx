@@ -1,6 +1,6 @@
 module;
 
-#include "../../ext/enum_operator_gen.hpp"
+#include "../src/ext/enum_operator_gen.hpp"
 #include "../src/ext/adapted_attributes.hpp"
 
 export module mo_yanxi.game.ecs.dependency_generator;
