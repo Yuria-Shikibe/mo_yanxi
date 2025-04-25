@@ -6,14 +6,54 @@ module;
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
-#include <native/stbi/stbi_image_write.h>
-#include <native/stbi/stbi_image.h>
+#include <stb_image_write.h>
+#include <stb_image.h>
 
 export module mo_yanxi.io.image;
 
 import std;
 
 namespace mo_yanxi::io::image{
+	struct image_extent{
+		unsigned width;
+		unsigned height;
+	};
+
+	struct image_data{
+		image_extent extent;
+		unsigned bpp;
+	};
+
+	export [[nodiscard]] std::optional<image_data> read_image_info(const char* path) noexcept {
+		int width, height, channels;
+
+		if (stbi_info(path, &width, &height, &channels)) {
+			return std::optional<image_data>{
+					{
+						static_cast<unsigned>(width),
+						static_cast<unsigned>(height),
+						static_cast<unsigned>(channels)
+					}
+				};
+		} else {
+			return std::nullopt;
+		}
+	}
+	export [[nodiscard]] std::optional<image_extent> read_image_extent(const char* path) noexcept {
+		int width, height, channels;
+
+		if (stbi_info(path, &width, &height, &channels)) {
+			return std::optional<image_extent>{
+					{
+						static_cast<unsigned>(width),
+						static_cast<unsigned>(height)
+					}
+				};
+		} else {
+			return std::nullopt;
+		}
+	}
+
 	export struct stbi_deleter{
 		void operator ()(stbi_uc* ptr) const noexcept{
 			STBI_FREE(ptr);
@@ -37,11 +77,23 @@ namespace mo_yanxi::io::image{
 	//RGBA ~ 4 ~ 32 [0 ~ 255]
 	//RGB ~ 3
 	export
-	[[nodiscard]] std::unique_ptr<stbi_uc, stbi_deleter> load_png(const std::string_view path, int& width, int& height,
+	[[nodiscard]] std::unique_ptr<stbi_uc, stbi_deleter> load_image(const std::string_view path, int& width, int& height,
 	                                                              int& bpp, const int requiredBpp = 4){
 		int w, h, b;
 
 		const auto data = stbi_load(path.data(), &w, &h, &b, requiredBpp);
+		width = w;
+		height = h;
+		bpp = requiredBpp;
+		return std::unique_ptr<stbi_uc, stbi_deleter>{data};
+	}
+
+	export
+	[[nodiscard]] std::unique_ptr<stbi_uc, stbi_deleter> load_image(const char* path, int& width, int& height,
+	                                                              int& bpp, const int requiredBpp = 4){
+		int w, h, b;
+
+		const auto data = stbi_load(path, &w, &h, &b, requiredBpp);
 		width = w;
 		height = h;
 		bpp = requiredBpp;

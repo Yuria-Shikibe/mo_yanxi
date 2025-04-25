@@ -60,7 +60,12 @@ export namespace mo_yanxi::font{
 				auto name = ff.format(key.code, key.size);
 				auto gen = ptr.get_generator(key.size.x, key.size.y);
 
-				const auto aloc = page().register_named_region(std::move(name), gen.crop(key.code), ptr.get_extent());
+				const auto aloc = page().register_named_region(std::move(name),
+				                                               graphic::image_load_description{
+					                                               graphic::sdf_load{
+						                                               gen.crop(key.code), ptr.get_extent()
+					                                               }
+				                                               });
 				return glyph{ptr, aloc.first};
 			}
 

@@ -77,11 +77,11 @@ target("mo_yanxi")
 
     add_packages("nanosvg")
 
+    add_includedirs("src")
     add_includedirs("submodules/VulkanMemoryAllocator/include")
     add_includedirs("submodules/plf_hive")
     add_includedirs("submodules/small_vector/source/include")
-    add_includedirs("includes")
-
+    add_includedirs("submodules/stb")
 
     -- Windows 平台特定配置
     if is_plat("windows") then
@@ -114,7 +114,7 @@ target_end()
 
 task("gen_cmake")
     on_run(function ()
-        os.exec("xmake project -k cmake")
+        os.exec("xmake project -k cmakelists")
 
         local cmake_file = path.join(os.projectdir(), "CMakeLists.txt")
 

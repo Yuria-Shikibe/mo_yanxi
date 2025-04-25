@@ -125,7 +125,6 @@ void init_assets(){
 }
 
 void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& atlas){
-
 	using namespace std::literals;
 	using namespace mo_yanxi;
 
@@ -133,18 +132,30 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 
 	auto& svg_up = ui_page.register_named_region(
 		"svg_up"s,
-		graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\up.svg)"}, {100, 100}).first;
+		graphic::sdf_load{
+			graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\up.svg)"}, {100, 100}
+		}).first;
+
 	auto& svg_down = ui_page.register_named_region(
 		"svg_down"s,
-		graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\down.svg)"}, {100, 100}).first;
-
+		graphic::sdf_load{
+			graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\down.svg)"}, {100, 100}
+		}).first;
 
 	auto& test_svg = ui_page.register_named_region(
 		"test"s,
-		graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\blender_icon_select_subtract.svg)"}, {100, 100}).first;
+		graphic::sdf_load{
+			graphic::msdf::msdf_generator{
+				R"(D:\projects\mo_yanxi\prop\assets\svg\blender_icon_select_subtract.svg)"
+			},
+			{100, 100}
+		}).first;
+
 	auto& line_svg = ui_page.register_named_region(
 		"line"s,
-		graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\line.svg)"}, {40u, 24u}).first;
+		graphic::sdf_load{
+			graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\line.svg)"}, {40u, 24u}
+		}).first;
 
 
 	ui_page.mark_protected("line");
@@ -295,7 +306,10 @@ void main_loop(){
 
 	font::font_manager font_manager{atlas};
 	{
-		auto p = font_manager.page().register_named_region("white", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\assets\texture\white.png)"});
+		auto p = font_manager.page().register_named_region(
+			std::string_view{"white"}, graphic::path_load{
+				R"(D:\projects\mo_yanxi\prop\assets\texture\white.png)"
+			});
 		p.first.uv.shrink(64);
 		font_manager.page().mark_protected("white");
 
@@ -407,9 +421,9 @@ void main_loop(){
 		});
 	}
 
-	graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.light.png)"}).first;
-	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
-	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::bitmap{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
+	graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.light.png)"}).first;
+	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
+	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
 
 
 	game::ecs::collision_system collision_system{};
@@ -740,15 +754,15 @@ void main_loop(){
 					renderer_world.batch.pop_proj();
 				});
 
-				component_manager.sliced_each([&](
-					game::ecs::component_manager& manager,
-				   const game::ecs::chunk_meta& meta,
-				   game::ecs::projectile_manifold& manifold
-				){
-				   if(manifold.damage_group.sum() <= 0.f){
-					   manager.mark_expired(meta.id());
-				   }
-			   });
+			component_manager.sliced_each([&](
+				game::ecs::component_manager& manager,
+				const game::ecs::chunk_meta& meta,
+				game::ecs::projectile_manifold& manifold
+			){
+					if(manifold.damage_group.sum() <= 0.f){
+						manager.mark_expired(meta.id());
+					}
+				});
 
 			collision_system.insert_all(component_manager);
 			collision_system.run(component_manager);

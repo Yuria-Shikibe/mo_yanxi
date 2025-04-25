@@ -68,7 +68,7 @@ namespace mo_yanxi::game::fx{
 			if(!staging_pool.empty()){
 				std::scoped_lock guard(mtx);
 
-				{
+				if(staging_pool.size() < 8){
 					pool_type::size_type count = 0;
 
 					const auto end = staging_pool.end();
@@ -93,6 +93,7 @@ namespace mo_yanxi::game::fx{
 						}
 					}
 				}
+
 
 				active_pool.splice(staging_pool);
 			}

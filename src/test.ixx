@@ -28,8 +28,7 @@ namespace test{
 
 		graphic::allocated_image_region& boarder = page.register_named_region(
 			"edge"s,
-			graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f), 8.},
-			math::usize2{128, 128}
+			graphic::sdf_load{graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f), 8.}, math::usize2{128, 128}}
 		).first;
 
 		nineRegion_edge = {
@@ -40,8 +39,8 @@ namespace test{
 
 		graphic::allocated_image_region& base = page.register_named_region(
 			"base"s,
-			graphic::msdf::msdf_generator{graphic::msdf::create_solid_boarder(12.f), 8.},
-			math::usize2{128, 128}
+			graphic::sdf_load{graphic::msdf::msdf_generator{graphic::msdf::create_solid_boarder(12.f), 8.},
+			math::usize2{128, 128}}
 		).first;
 
 		nineRegion_base = {

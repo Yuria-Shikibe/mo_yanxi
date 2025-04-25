@@ -16,10 +16,13 @@ namespace mo_yanxi::vk{
 	template <typename Prov>
 	concept texture_source_prov = std::is_invocable_r_v<graphic::bitmap, Prov, std::uint32_t, std::uint32_t, std::uint32_t>;
 
+	export
 	constexpr VkDeviceSize get_mipmap_pixels(VkDeviceSize src_area, std::uint32_t mipLevels) noexcept{
 		const auto pow4_m = 1ULL << (2 * mipLevels);
 		return 4 * src_area * (pow4_m - 1) / pow4_m / 3;
 	}
+
+	constexpr VkDeviceSize v = get_mipmap_pixels(4, 2);
 
 	export
 	struct image_handle{
@@ -155,19 +158,37 @@ namespace mo_yanxi::vk{
 				get_mipmap_pixels(region.extent.width * region.extent.height, maxProvMipLevel) * bpi)
 			};
 
+			this->write(command_buffer, region, std::move(prov), staging, maxProvMipLevel, baseLayer, layerCount);
+
+			return staging;
+		}
+
+		template <texture_source_prov Prov>
+		[[nodiscard("Staging buffers must be reserved until the device has finished the command")]]
+		void write(VkCommandBuffer command_buffer,
+			VkRect2D region,
+			Prov prov,
+			vk::buffer& buffer,
+			std::uint32_t maxProvMipLevel = 3,
+			const std::uint32_t baseLayer = 0,
+			const std::uint32_t layerCount = 0 /*0 for all*/){
+			if(region.extent.width == 0 || region.extent.height == 0){
+				return;
+			}
+			maxProvMipLevel = std::min(maxProvMipLevel, mipLevel);
+
+			constexpr VkDeviceSize bpi = 4;
 
 			VkDeviceSize off{};
 			for(std::uint32_t mip_lv = 0; mip_lv < maxProvMipLevel; ++mip_lv){
 				auto scl = 1u << mip_lv;
 				VkExtent2D extent{region.extent.width / scl, region.extent.height / scl};
 				const graphic::bitmap& bitmap = prov(extent.width, extent.height, mip_lv);
-				(void)buffer_mapper{staging}.load_range(bitmap.to_span(), static_cast<std::ptrdiff_t>(off));
-				off += region.extent.width * region.extent.height * bpi;
+				(void)buffer_mapper{buffer}.load_range(bitmap.to_span(), static_cast<std::ptrdiff_t>(off));
+				off += extent.width * extent.height * bpi;
 			}
 			const auto lc = layerCount ? layerCount : layers;
-			cmd::generate_mipmaps(command_buffer, image, staging, region, mipLevel, maxProvMipLevel, baseLayer, lc);
-
-			return staging;
+			cmd::generate_mipmaps(command_buffer, image, buffer, region, mipLevel, maxProvMipLevel, baseLayer, lc);
 		}
 
 		template <range_of<texture_bitmap_write> Rng = std::initializer_list<texture_bitmap_write>>

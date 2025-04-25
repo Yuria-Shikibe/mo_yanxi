@@ -7,7 +7,7 @@ import mo_yanxi.io.file;
 
 mo_yanxi::graphic::bitmap::bitmap(std::string_view path){
 	int width, height, bpp;
-	const auto ptr = io::image::load_png(path, width, height, bpp, channels);
+	const auto ptr = io::image::load_image(path, width, height, bpp, channels);
 
 	create(width, height);
 	std::memcpy(data(), ptr.get(), width * height * bpp);

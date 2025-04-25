@@ -606,7 +606,7 @@ namespace mo_yanxi::vk::cmd{
 		VkBuffer buffer,
 		VkRect2D region,
 		const std::uint32_t mipLevels,
-		const std::uint32_t max_mipLevels,
+		const std::uint32_t provided_levels,
 		const std::uint32_t baseLayer = 0,
 		const std::uint32_t layerCount = 1,
 
@@ -634,7 +634,7 @@ namespace mo_yanxi::vk::cmd{
 		);
 
 		VkDeviceSize offset = 0;
-		for(std::uint32_t i = 0; i < max_mipLevels - 1; ++i){
+		for(std::uint32_t i = 0; i < provided_levels - 1; ++i){
 			cmd::copy_buffer_to_image(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {VkBufferImageCopy{
 				.bufferOffset = offset,
 				.bufferRowLength = 0,
@@ -669,7 +669,7 @@ namespace mo_yanxi::vk::cmd{
 			.bufferImageHeight = 0,
 			.imageSubresource = {
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.mipLevel = max_mipLevels - 1,
+				.mipLevel = provided_levels - 1,
 				.baseArrayLayer = baseLayer,
 				.layerCount = layerCount
 			},
@@ -681,7 +681,7 @@ namespace mo_yanxi::vk::cmd{
 			}
 		}});
 
-		if(max_mipLevels > 1)cmd::memory_barrier(
+		if(provided_levels > 1)cmd::memory_barrier(
 			commandBuffer, image,
 			VK_PIPELINE_STAGE_2_TRANSFER_BIT,
 			VK_ACCESS_2_TRANSFER_WRITE_BIT,
@@ -692,16 +692,16 @@ namespace mo_yanxi::vk::cmd{
 			{
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 				.baseMipLevel = 0,
-				.levelCount = max_mipLevels - 1,
+				.levelCount = provided_levels - 1,
 				.baseArrayLayer = baseLayer,
 				.layerCount = layerCount,
 			}
 		);
 
-		if(max_mipLevels >= mipLevels) return;
+		if(provided_levels >= mipLevels) return;
 
 		std::array arr{region};
-		generate_mipmaps(commandBuffer, image, arr, mipLevels, max_mipLevels, baseLayer, layerCount, stage, access, layout);
+		generate_mipmaps(commandBuffer, image, arr, mipLevels, provided_levels, baseLayer, layerCount, stage, access, layout);
 	}
 
 

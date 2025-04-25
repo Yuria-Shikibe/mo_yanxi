@@ -11,17 +11,29 @@ export import mo_yanxi.graphic.image_region;
 export import mo_yanxi.meta_programming;
 export import mo_yanxi.handle_wrapper;
 export import mo_yanxi.allocator_2D;
+
 export import mo_yanxi.vk.image_derives;
 export import mo_yanxi.vk.resources;
 export import mo_yanxi.vk.context;
+export import mo_yanxi.vk.command_buffer;
+export import mo_yanxi.vk.sync;
+
 export import mo_yanxi.graphic.color;
 export import mo_yanxi.graphic.bitmap;
 export import mo_yanxi.heterogeneous;
+export import mo_yanxi.condition_variable_single;
+
+import mo_yanxi.graphic.msdf;
+import mo_yanxi.io.image;
+
 import std;
 
 namespace mo_yanxi::graphic{
 	constexpr math::usize2 DefaultTexturePageSize = math::vectors::constant2<std::uint32_t>::base_vec2 * (1 << 12);
 
+	struct bad_image_allocation : std::exception{
+
+	};
 
 	export struct sub_page;
 	export struct image_page;
@@ -117,10 +129,187 @@ namespace mo_yanxi::graphic{
 		}
 	};
 
+	struct bad_image_asset : public std::exception{
+		[[nodiscard]] bad_image_asset() = default;
+	};
+
+	export
+	struct path_load{
+		std::string path{};
+
+		[[nodiscard]] math::usize2 get_extent() const{
+			const auto ext = io::image::read_image_extent(path.c_str());
+			if(!ext){
+				throw bad_image_asset{};
+			}
+			return std::bit_cast<math::usize2>(ext.value());
+		}
+
+		bitmap operator()(unsigned w, unsigned h, unsigned level) const{
+			return bitmap(path);
+		}
+	};
+
+	export
+	struct bitmap_load{
+		bitmap bitmap{};
+
+		[[nodiscard]] math::usize2 get_extent() const{
+			return bitmap.extent();
+		}
+
+		graphic::bitmap operator()(unsigned w, unsigned h, unsigned level) const{
+			if(!bitmap){
+				throw bad_image_asset{};
+			}
+			return std::move(bitmap);
+		}
+	};
+
+	export
+	struct sdf_load{
+		std::variant<
+			msdf::msdf_generator,
+			msdf::msdf_glyph_generator_crop
+		> generator{};
+
+		math::usize2 extent{};
+		std::uint32_t prov_levels{3};
+
+		[[nodiscard]] math::usize2 get_extent() const noexcept{
+			return extent;
+		}
+
+		bitmap operator()(unsigned w, unsigned h, unsigned level) const {
+			return std::visit<bitmap>([&]<vk::texture_source_prov T>(const T& prov){
+				return prov.operator()(w, h, level);
+			}, generator);
+		}
+	};
+
+	export
+	struct image_load_description{
+		std::variant<path_load, sdf_load, bitmap_load> raw{};
+
+		[[nodiscard]] math::usize2 get_extent() const{
+			return std::visit([](const auto& v){
+				return v.get_extent();
+			}, raw);
+		}
+
+		[[nodiscard]] std::uint32_t get_prov_levels() const noexcept{
+			return std::visit([]<typename T>(const T& t) -> std::uint32_t {
+				if constexpr (std::same_as<T, sdf_load>){
+					return t.prov_levels;
+				}else{
+					return 1;
+				}
+			}, raw);
+		}
+
+		[[nodiscard]] bitmap get(unsigned w, unsigned h, unsigned level) const{
+			return std::visit<bitmap>([&]<typename T>(const T& gen){
+				return gen(w, h, level);
+			}, raw);
+		}
+	};
+
+	struct allocated_image_load_description{
+		vk::image_handle texture{};
+		std::uint32_t mip_level{};
+		std::uint32_t layer_index{};
+
+		image_load_description desc{};
+		math::urect region{};
+
+	};
+
+	struct async_image_loader{
+	private:
+
+		struct call_back{
+			async_image_loader* loader;
+
+			void operator()() const noexcept{
+				loader->queue_cond.notify_one();
+			}
+		};
+		vk::context* context_{};
+
+		vk::fence fence_{};
+		vk::command_buffer running_command_buffer_{};
+
+		std::jthread working_thread{};
+		std::multimap<VkDeviceSize, vk::buffer> stagings{};
+
+		std::mutex queue_mutex{};
+		condition_variable_single queue_cond{};
+		std::vector<allocated_image_load_description> queue{};
+
+		static void work_func(std::stop_token stop_token, async_image_loader& self){
+			std::vector<allocated_image_load_description> dumped_queue{};
+
+			while(!stop_token.stop_requested()){
+				{
+					std::unique_lock lock(self.queue_mutex);
+
+					self.queue_cond.wait(lock, [&]{
+						return !self.queue.empty() || stop_token.stop_requested();
+					});
+
+					dumped_queue = std::exchange(self.queue, {});
+				}
+
+				for (auto& queue : dumped_queue){
+					self.load(std::move(queue));
+				}
+			}
+
+			self.fence_.wait_and_reset();
+		}
+
+		void load(allocated_image_load_description&& desc);
+
+	public:
+		[[nodiscard]] async_image_loader() = default;
+
+		[[nodiscard]] explicit async_image_loader(vk::context& context)
+			:
+		context_(&context),
+		fence_(context_->get_device(), true),
+		working_thread([this](std::stop_token stop_token){
+				work_func(std::move(stop_token), *this);
+			}){
+		}
+
+		void push(allocated_image_load_description&& desc){
+			{
+				std::lock_guard lock(queue_mutex);
+				queue.push_back(std::move(desc));
+			}
+			queue_cond.notify_one();
+		}
+
+		[[nodiscard]] vk::context& context() const noexcept{
+			assert(context_);
+			return *context_;
+		}
+
+		~async_image_loader(){
+			working_thread.request_stop();
+			queue_cond.notify_one();
+		}
+	};
+
+	struct page_acquire_result{
+		allocated_image_region region;
+		vk::texture* handle;
+	};
 
 	struct sub_page{
 		friend allocated_image_region;
 		friend image_page;
+
 	private:
 		vk::texture texture{};
 		allocator2d allocator{};
@@ -133,12 +322,32 @@ namespace mo_yanxi::graphic{
 			return allocator.deallocate(point);
 		}
 
-
 	public:
 		[[nodiscard]] sub_page() = default;
 
 		[[nodiscard]] explicit sub_page(vk::context& context, const VkExtent2D extent_2d)
 			: texture(context.get_allocator(), extent_2d), allocator({extent_2d.width, extent_2d.height}){
+		}
+
+		//TODO dont use bitcast of rects here?
+
+		std::optional<page_acquire_result> acquire(
+			const math::usize2 extent,
+			const std::uint32_t margin
+		){
+			if(const auto pos = allocate(extent.copy().add(margin))){
+				const math::urect rst{tags::unchecked, tags::from_extent, pos.value(), extent};
+
+				return page_acquire_result{
+						allocated_image_region{
+							*this, texture.get_image_view(),
+							std::bit_cast<math::usize2>(texture.get_image().get_extent2()), rst
+						},
+						&texture
+					};
+			}
+
+			return std::nullopt;
 		}
 
 		std::optional<allocated_image_region> push(
@@ -163,7 +372,6 @@ namespace mo_yanxi::graphic{
 
 			return std::nullopt;
 		}
-
 
 		std::optional<std::pair<allocated_image_region, vk::buffer>> push(
 			VkCommandBuffer commandBuffer,
@@ -192,10 +400,9 @@ namespace mo_yanxi::graphic{
 		}
 	};
 
-
 	struct image_page{
 	private:
-		vk::context* context{};
+		async_image_loader* loader{};
 		math::usize2 page_size{};
 		std::deque<sub_page> subpages{};
 		color clear_color{};
@@ -208,11 +415,11 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] image_page() = default;
 
 		[[nodiscard]] image_page(
-			vk::context& context,
+			async_image_loader& loader,
 			const math::usize2 page_size = DefaultTexturePageSize,
 			const color& clear_color = {},
 			const std::uint32_t margin = 4)
-			: context(&context),
+			: loader(&loader),
 			  page_size(page_size),
 			  clear_color(clear_color),
 			  margin(margin){
@@ -220,7 +427,7 @@ namespace mo_yanxi::graphic{
 
 	private:
 		auto& add_page(VkCommandBuffer command_buffer){
-			auto& subpage = subpages.emplace_back(*context, VkExtent2D{page_size.x, page_size.y});
+			auto& subpage = subpages.emplace_back(loader->context(), VkExtent2D{page_size.x, page_size.y});
 
 			vk::cmd::clear_color(
 				command_buffer,
@@ -243,6 +450,36 @@ namespace mo_yanxi::graphic{
 			return subpage;
 		}
 
+		allocated_image_region async_load(image_load_description&& desc, page_acquire_result&& result) const{
+			loader->push({
+				.texture = *result.handle,
+				.mip_level = result.handle->get_mip_level(),
+				.layer_index = 0,
+				.desc = std::move(desc),
+				.region = result.region.get_region()
+			});
+
+			return std::move(result.region);
+		}
+
+		allocated_image_region async_allocate(image_load_description&& desc){
+			auto extent = desc.get_extent();
+
+			for(auto& subpass : subpages){
+				if(auto rst = subpass.acquire(extent, margin)){
+					return async_load(std::move(desc), std::move(rst.value()));
+				}
+			}
+
+			auto& newSubpage = add_page(loader->context().get_transient_graphic_command_buffer());
+			auto rst = newSubpage.acquire(extent, margin);
+
+			if(!rst){
+				throw bad_image_allocation{};
+			}
+
+			return async_load(std::move(desc), std::move(rst.value()));
+		}
 
 		[[nodiscard]] allocated_image_region allocate(
 			VkCommandBuffer commandBuffer,
@@ -270,7 +507,7 @@ namespace mo_yanxi::graphic{
 			math::usize2 extent,
 			const std::uint32_t max_gen_depth
 		){
-			auto cmd_buf = context->get_transient_graphic_command_buffer();
+			auto cmd_buf = loader->context().get_transient_graphic_command_buffer();
 			for(auto& subpass : subpages){
 				if(auto rst = subpass.push(cmd_buf, std::ref(bitmaps_prov), extent, max_gen_depth, margin)){
 					cmd_buf = {};
@@ -290,14 +527,14 @@ namespace mo_yanxi::graphic{
 		}
 
 		allocated_image_region allocate(const bitmap& bitmap){
-			auto buffer = vk::templates::create_staging_buffer(context->get_allocator(), bitmap.size_bytes());
+			auto buffer = vk::templates::create_staging_buffer(loader->context().get_allocator(), bitmap.size_bytes());
 			(void)vk::buffer_mapper{buffer}.load_range(bitmap.to_span());
-			return allocate(context->get_transient_graphic_command_buffer(), buffer, bitmap.extent());
+			return allocate(loader->context().get_transient_graphic_command_buffer(), buffer, bitmap.extent());
 		}
-
-
 	public:
-		std::pair<allocated_image_region&, bool> register_named_region(std::string&& name, const bitmap& region){
+		std::pair<allocated_image_region&, bool> register_named_region(
+			std::string&& name,
+			const bitmap& region){
 			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
 				return {itr->second, false};
 			}
@@ -305,7 +542,9 @@ namespace mo_yanxi::graphic{
 			return {itr->second, rst};
 		}
 
-		std::pair<allocated_image_region&, bool> register_named_region(const std::string_view name, const bitmap& region){
+		std::pair<allocated_image_region&, bool> register_named_region(
+			const std::string_view name,
+			const bitmap& region){
 			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
 				return {itr->second, false};
 			}
@@ -315,10 +554,62 @@ namespace mo_yanxi::graphic{
 
 		std::pair<allocated_image_region&, bool> register_named_region(
 			std::string&& name,
+			image_load_description&& desc){
+			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
+				return {itr->second, false};
+			}
+			auto [itr, rst] = named_image_regions.try_emplace(std::move(name), async_allocate(std::move(desc)));
+			return {itr->second, rst};
+		}
+
+		std::pair<allocated_image_region&, bool> register_named_region(
+			const std::string_view name,
+			image_load_description&& desc){
+			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
+				return {itr->second, false};
+			}
+			auto [itr, rst] = named_image_regions.try_emplace(name, async_allocate(std::move(desc)));
+			return {itr->second, rst};
+		}
+
+		template <typename T>
+			requires std::constructible_from<image_load_description, T>
+		std::pair<allocated_image_region&, bool> register_named_region(
+			std::string&& name,
+			T&& desc){
+			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
+				return {itr->second, false};
+			}
+			auto [itr, rst] = named_image_regions.try_emplace(std::move(name), this->async_allocate(image_load_description{std::forward<T>(desc)}));
+			return {itr->second, rst};
+		}
+
+		template <typename T>
+			requires std::constructible_from<image_load_description, T>
+		std::pair<allocated_image_region&, bool> register_named_region(
+			const std::string_view name,
+			T&& desc){
+			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
+				return {itr->second, false};
+			}
+			auto [itr, rst] = named_image_regions.try_emplace(std::move(name), this->async_allocate(image_load_description{std::forward<T>(desc)}));
+			return {itr->second, rst};
+		}
+
+		template <typename T>
+			requires std::constructible_from<image_load_description, T>
+		std::pair<allocated_image_region&, bool> register_named_region(
+			const char* name,
+			T&& desc){
+			return this->register_named_region(std::string_view(name), std::forward<T>(desc));
+		}
+
+		std::pair<allocated_image_region&, bool> register_named_region(
+			std::string&& name,
 			vk::texture_source_prov auto bitmaps_prov,
 			math::usize2 extent,
 			const std::uint32_t max_gen_depth = 2
-){
+		){
 			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
 				return {itr->second, false};
 			}
@@ -330,7 +621,7 @@ namespace mo_yanxi::graphic{
 			const std::string_view name,
 			vk::texture_source_prov auto bitmaps_prov,
 			math::usize2 extent,
-			const std::uint32_t max_gen_depth = 2
+			const std::uint32_t max_gen_depth = 3
 
 		){
 			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
@@ -399,12 +690,13 @@ namespace mo_yanxi::graphic{
 	private:
 		vk::context* context_{};
 		string_hash_map<image_page> pages{};
+		std::unique_ptr<async_image_loader> async_image_loader_{};
 
 	public:
 		[[nodiscard]] image_atlas() = default;
 
 		[[nodiscard]] explicit image_atlas(vk::context& context)
-			: context_(&context){
+			: context_(&context), async_image_loader_{std::make_unique<async_image_loader>(context)}{
 		}
 
 		image_page& create_image_page(
@@ -412,7 +704,7 @@ namespace mo_yanxi::graphic{
 			const color clearColor = {},
 			const math::usize2 size = DefaultTexturePageSize,
 			const std::uint32_t margin = 4){
-			return pages.insert_or_assign(name, image_page{*context_, size, clearColor, margin}).first->second;
+			return pages.insert_or_assign(name, image_page{*async_image_loader_, size, clearColor, margin}).first->second;
 		}
 
 		void clean_unused() noexcept{

@@ -7,7 +7,7 @@ export module ext.shared_queue;
 import ext.array_queue;
 import mo_yanxi.meta_programming;
 import mo_yanxi.concepts;
-import ext.condition_variable_single;
+import mo_yanxi.condition_variable_single;
 
 import std;
 

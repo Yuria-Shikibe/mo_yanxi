@@ -110,6 +110,7 @@ namespace mo_yanxi::graphic::msdf{
 		unsigned boarder = sdf_image_boarder;
 	};
 
+	export
 	struct msdf_glyph_generator_crop : msdf_glyph_generator_base{
 		msdfgen::unicode_t code{};
 
@@ -133,10 +134,6 @@ namespace mo_yanxi::graphic::msdf{
 	struct msdf_glyph_generator : msdf_glyph_generator_base{
 		[[nodiscard]] msdf_glyph_generator_crop crop(msdfgen::unicode_t code) const noexcept{
 			return {*this, code};
-		}
-
-		[[nodiscard]] math::usize2 get_boarded_extent(const unsigned w, const unsigned h) const noexcept{
-			return {w/* + boarder * 2*/, h/* + boarder * 2*/};
 		}
 	};
 

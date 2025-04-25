@@ -2,7 +2,7 @@
 // Created by Matrix on 2024/11/2.
 //
 
-export module ext.condition_variable_single;
+export module mo_yanxi.condition_variable_single;
 
 import mo_yanxi.basic_util;
 import std;

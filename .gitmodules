@@ -8,3 +8,6 @@
 [submodule "submodules/small_vector"]
 	path = submodules/small_vector
 	url = https://github.com/gharveymn/small_vector.git
+[submodule "submodules/stb"]
+	path = submodules/stb
+	url = https://github.com/nothings/stb.git
