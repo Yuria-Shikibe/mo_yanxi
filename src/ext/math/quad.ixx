@@ -575,14 +575,14 @@ namespace mo_yanxi::math{
 	template <typename T>
 	struct rect_box_identity{
 		/**
-		 * \brief x for rect width, y for rect height, static
-		 */
-		vector2<T> size;
-
-		/**
 		 * \brief Center To Bottom-Left Offset
 		 */
 		vector2<T> offset;
+
+		/**
+		 * \brief x for rect width, y for rect height, static
+		 */
+		vector2<T> size;
 
 	};
 
@@ -665,7 +665,7 @@ namespace mo_yanxi::math{
 	};
 
 	export
-	struct rect_box_posed : rect_box<float>, rect_box_identity<float>{
+	struct rect_box_posed : rect_box<float>, protected rect_box_identity<float>{
 		using rect_idt_t = rect_box_identity<float>;
 		using base = rect_box<float>;
 		using trans_t = trans2;
@@ -680,17 +680,20 @@ namespace mo_yanxi::math{
 		[[nodiscard]] explicit(false) rect_box_posed(const rect_idt_t& idt, const trans_t transform = {})
 			: rect_box_identity{idt}{
 			update(transform);
-			updateNormal();
 		}
 
 		[[nodiscard]] explicit(false) rect_box_posed(const vec_t size, const trans_t transform = {})
-			: rect_box_posed{{size, size / -2.f}, transform}{
+			: rect_box_posed{{size / -2.f, size}, transform}{
 		}
 
 		constexpr rect_box_posed& copy_identity_from(const rect_box_posed& other) noexcept{
 			this->rect_idt_t::operator=(other);
 			// transform = other.transform;
 
+			return *this;
+		}
+
+		[[nodiscard]] constexpr const rect_box_identity& get_identity() const noexcept{
 			return *this;
 		}
 
@@ -707,15 +710,11 @@ namespace mo_yanxi::math{
 			v3.set(0, size.y).rotate(cos, sin);
 			v2 = v1 + v3;
 
-			// if(this->transform.rot != transform.rot){
 			normalU = v3;
 			normalV = v1;
 
 			normalU.normalize();
 			normalV.normalize();
-
-			// 	this->transform.rot = transform.rot;
-			// }
 
 			v0 += transform.vec;
 			v1 += v0;
@@ -724,6 +723,15 @@ namespace mo_yanxi::math{
 
 
 			bounding_box = quad<float>::get_bound();
+		}
+
+		[[nodiscard]] trans_t deduce_transform() const noexcept{
+
+			const vec2 rotated_offset = offset.x * normalV + offset.y * normalU;
+			const vec2 translation = v0 - rotated_offset;
+			const auto v = (normalV + normalU.copy().rotate_rt_counter_clockwise());
+
+			return {translation, std::atan2(v.y, v.x)};
 		}
 	};
 

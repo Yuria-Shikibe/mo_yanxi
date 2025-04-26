@@ -5,9 +5,12 @@
 #include <vk_mem_alloc.h>
 #include <freetype/freetype.h>
 
+#include "../src/srl/srl.hpp"
+
+
 #include <gch/small_vector.hpp>
 
-import std;
+
 
 import mo_yanxi.graphic.bitmap;
 
@@ -104,9 +107,12 @@ import mo_yanxi.game.ecs.system.collision;
 import mo_yanxi.game.ecs.system.motion_system;
 import mo_yanxi.game.ecs.system.grid_system;
 
-
 import test;
 import hive;
+
+
+import std;
+
 
 void compile_shaders(){
 	using namespace mo_yanxi;
@@ -798,26 +804,34 @@ int main(){
 	using namespace mo_yanxi::game;
 
 
+	test::foot();
+
+	math::rect_box_posed rect{math::vec2{300, 100}, {125, 44, 3.14 / 4}};
+	auto pkg = io::loader<decltype(rect)>::pack(rect);
+	auto rect2 = io::loader<decltype(rect)>::extract(pkg);
+
 	// std::vector<std::vector<math::vec2>> vec{{{0, 1,}, {2, 3}}, {{4, 5}}};
 
 	// std::println("{}", vec);
 
 	// foo2();
 
-	init_assets();
-	compile_shaders();
 
-	core::glfw::init();
-	core::global::graphic::init();
-	core::global::ui::init();
-	assets::graphic::load(core::global::graphic::context);
 
-	main_loop();
-
-	assets::graphic::dispose();
-	core::global::ui::dispose();
-	core::global::graphic::dispose();
-	core::glfw::terminate();
+	// init_assets();
+	// compile_shaders();
+	//
+	// core::glfw::init();
+	// core::global::graphic::init();
+	// core::global::ui::init();
+	// assets::graphic::load(core::global::graphic::context);
+	//
+	// main_loop();
+	//
+	// assets::graphic::dispose();
+	// core::global::ui::dispose();
+	// core::global::graphic::dispose();
+	// core::glfw::terminate();
 }
 
 struct comp_interface{
@@ -852,6 +866,8 @@ namespace mo_yanxi::game::ecs{
 
 void foo2(){
 	using namespace mo_yanxi;
+
+
 	using namespace mo_yanxi::game;
 
 	ecs::component_manager cpmg{};
@@ -869,8 +885,6 @@ void foo2(){
 		math::trans2 b;
 		math::vec2 c;
 	};
-
-
 
 	cpmg.add_archetype<
 		entity_tuple_1,

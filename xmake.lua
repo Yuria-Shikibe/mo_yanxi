@@ -1,5 +1,4 @@
 add_rules("mode.debug", "mode.release")
-
 set_arch("x64")
 
 set_policy("build.c++.modules", true)
@@ -7,10 +6,8 @@ set_policy("build.ccache", true)
 
 if is_mode("debug") then
     set_runtimes("MDd")
-    add_defines("DEBUG_CHECK=1")
 else
     set_runtimes("MD")
-    add_defines("DEBUG_CHECK=0")
 end
 
 set_warnings("all")
@@ -26,36 +23,47 @@ add_requires("msdfgen", {
  })
 add_requires("freetype")
 add_requires("nanosvg")
-
-if is_mode("release") then
-    set_symbols("debug")
-    set_optimize("fastest")
-end
+add_requires("protobuf-cpp", {
+    configs = {
+        zlib = true,
+    }
+})
 
 set_toolchains("msvc")
-add_linkdirs("C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64")
+add_cxflags("/diagnostics:column")
 
+target("protobuf_gen")
+    set_kind("static")
+    set_languages("c++17")
+    add_packages("protobuf-cpp", {public = true})
+    add_rules("protobuf.cpp")
+    add_files("generate/srl/*.cc")
+target_end()
 
 target("mo_yanxi")
     set_kind("binary")
     set_extension(".exe")
     set_languages("c++23")
 
-
-    if is_plat("windows") then
-        add_links("kernel32", "user32")  -- Windows API库
-        add_syslinks("advapi32", "shell32")
-    end
-
     if is_mode("debug") then
         add_defines("_DEBUG")
         add_cxflags("/RTCsu", { force = true })
+        add_defines("DEBUG_CHECK=1")
+
     else
-        add_cxflags("/GL")
+        set_symbols("debug")
+        set_optimize("fastest")
+        add_defines("DEBUG_CHECK=0")
     end
 
+    add_deps("protobuf_gen")
+
+    add_defines("_MSVC_STL_HARDENING=1")
+    add_defines("_MSVC_STL_DESTRUCTOR_TOMBSTONES=1")
+
+    --add_defines("PROTOBUF_NONNULL")
+
     add_cxflags("/FC", { force = true })
-    add_cxflags("/diagnostics:column")
     add_cxflags("/arch:AVX")
     add_cxflags("/arch:AVX2")
 
@@ -70,13 +78,18 @@ target("mo_yanxi")
     add_files("src/**.cppm")
     add_files("src/**.ixx")
     add_files("src/**.cpp")
+    --add_files("generate/srl_relay/*.ixx")
 
     add_packages("glfw")
     add_packages("msdfgen")
     add_packages("freetype")
 
     add_packages("nanosvg")
+    add_packages("protobuf-cpp")
+    --add_packages("protoc")
 
+
+    add_includedirs("generate")
     add_includedirs("src")
     add_includedirs("submodules/VulkanMemoryAllocator/include")
     add_includedirs("submodules/plf_hive")
@@ -130,6 +143,15 @@ task("gen_cmake")
     end)
 
     set_menu{usage = "create cmakelists", description = "", options = {}}
+task_end()
+
+
+task("gen_proto_buf")
+    on_run(function ()
+        os.exec("py ./build_scripts/proto_builder.py -i ./generate/srl/pb.schema -o ./generate/srl")
+    end)
+
+    set_menu{usage = "create protobuf cpp codes", description = "", options = {}}
 task_end()
 
 -- rule("cmake")

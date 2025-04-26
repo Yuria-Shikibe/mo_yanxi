@@ -1,6 +1,6 @@
-//
-// Created by Matrix on 2025/3/16.
-//
+module;
+
+#include "../src/srl/srl.hpp"
 
 export module test;
 
@@ -14,6 +14,15 @@ import mo_yanxi.graphic.image_nine_region;
 import std;
 
 namespace test{
+	export void foot(){
+		// using namespace mo_yanxi;
+		// math::vec2 v{114, 514};
+		// math::vec2 v2;
+		// io::pb::math::vector2 buf;
+		// io::store(buf, v);
+		// io::load(buf, v2);
+		// std::println("{} -> {}", v, v2);
+	}
 	using namespace mo_yanxi;
 
 	export graphic::image_nine_region nineRegion_edge{};

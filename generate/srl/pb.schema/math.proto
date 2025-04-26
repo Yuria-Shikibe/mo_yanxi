@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package mo_yanxi.io.pb.math;
+
+message vector2f{
+  float x = 1;
+  float y = 2;
+}
+
+
+message transform2f{
+  vector2f vec = 1;
+  float rot = 2;
+}
+
+
+message vector2i{
+  sfixed32 x = 1;
+  sfixed32 y = 2;
+}
+
+message vector2u{
+  fixed32 x = 1;
+  fixed32 y = 2;
+}
+
+message rect_orthof{
+  vector2f src = 1;
+  vector2f size = 2;
+}
+
+message rect_orthoi{
+  vector2i src = 1;
+  vector2i size = 2;
+}
+
+message rect_orthou{
+  vector2u src = 1;
+  vector2u size = 2;
+}
+
+message quadf{
+  vector2f v0 = 1;
+  vector2f v1 = 2;
+  vector2f v2 = 3;
+  vector2f v3 = 4;
+}
+
+message rectf{
+  quadf quad = 1;
+}
+
+message rectf_identity{
+  vector2f offset = 1;
+  vector2f size = 2;
+}
+
+message rectf_posed{
+  transform2f trans = 1;
+  rectf_identity identity = 2;
+}

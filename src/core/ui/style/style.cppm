@@ -6,6 +6,7 @@ export module mo_yanxi.ui.style;
 
 export import mo_yanxi.ui.comp.drawer;
 
+import mo_yanxi.ui.basic;
 import mo_yanxi.graphic.image_region;
 import mo_yanxi.graphic.image_nine_region;
 export import mo_yanxi.graphic.color;
@@ -14,10 +15,6 @@ export import align;
 import std;
 
 namespace mo_yanxi::ui{
-	constexpr inline align::spacing DefaultBoarder{BoarderStroke, BoarderStroke, BoarderStroke, BoarderStroke};
-
-	export struct elem;
-
 	export
 	namespace style{
 		struct palette{

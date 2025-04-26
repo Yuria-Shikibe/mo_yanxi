@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package mo_yanxi.io.pb;
+
+message byte_buffer{
+  bytes data = 1;
+}
