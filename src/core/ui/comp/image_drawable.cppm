@@ -24,7 +24,7 @@ namespace mo_yanxi::ui{
 
 		virtual ~drawable() = default;
 
-		virtual void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) const = 0;
+		virtual void draw(const elem& elem, math::frect region, graphic::color color_scl) const = 0;
 
 		[[nodiscard]] virtual std::optional<math::vec2> get_default_size() const{
 			return std::nullopt;
@@ -66,7 +66,7 @@ namespace mo_yanxi::ui{
 			: moded_drawable(flags), image(image_region){
 		}
 
-		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) const override;
+		void draw(const elem& elem, math::frect region, graphic::color color_scl) const override;
 
 		[[nodiscard]] std::optional<math::vec2> get_default_size() const override {
 			return image->get_region().size().as<float>();
@@ -82,8 +82,8 @@ namespace mo_yanxi::ui{
 			: ref(ref){
 		}
 
-		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) const override{
-			if(ref)ref->draw(elem, region, color_scl, color_ovr);
+		void draw(const elem& elem, math::frect region, graphic::color color_scl) const override{
+			if(ref)ref->draw(elem, region, color_scl);
 		}
 
 		[[nodiscard]] std::optional<math::vec2> get_default_size() const override {
@@ -162,7 +162,7 @@ namespace mo_yanxi::ui{
 			  region(region), scale(scale){
 		}
 
-		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) const override;
+		void draw(const elem& elem, math::frect region, graphic::color color_scl) const override;
 
 		[[nodiscard]] std::optional<math::vec2> get_default_size() const override{
 			return region.get_size() * scale;
@@ -182,7 +182,7 @@ namespace mo_yanxi::ui{
 			  region(region){
 		}
 
-		void draw(const elem& elem, math::frect region, graphic::color color_scl, graphic::color color_ovr) const override;
+		void draw(const elem& elem, math::frect region, graphic::color color_scl) const override;
 
 		[[nodiscard]] std::optional<math::vec2> get_default_size() const override{
 			return region.get_size();

@@ -691,15 +691,15 @@ namespace mo_yanxi::graphic{
 		constexpr color SLATE{color::from_rgba8888(0x708090ff)};
 		constexpr color SKY{color::from_rgba8888(0x87ceebff)};
 
-		constexpr color AQUA{color::from_rgba8888(0x85A2F3ff)};
+		constexpr color aqua{color::from_rgba8888(0x85A2F3ff)};
 		constexpr color BLUE_SKY = color::from_lerp_span(0.745f, BLUE, SKY);
-		constexpr color AQUA_SKY = color::from_lerp_span(0.5f, AQUA, SKY);
+		constexpr color AQUA_SKY = color::from_lerp_span(0.5f, aqua, SKY);
 
 		constexpr color CYAN{0, 1, 1, 1};
 		constexpr color TEAL{0, 0.5f, 0.5f, 1};
 
 		constexpr color GREEN{0x00ff00ff};
-		constexpr color PALE_GREEN{color::from_rgba8888(0xa1ecabff)};
+		constexpr color pale_green{color::from_rgba8888(0xa1ecabff)};
 		constexpr color LIGHT_GREEN{color::from_rgba8888(0X62F06CFF)};
 		constexpr color ACID{color::from_rgba8888(0x7fff00ff)};
 		constexpr color LIME{color::from_rgba8888(0x32cd32ff)};
@@ -716,7 +716,7 @@ namespace mo_yanxi::graphic{
 		constexpr color BRICK{color::from_rgba8888(0xb22222ff)};
 
 		constexpr color RED{color::from_rgba8888(0xff0000ff)};
-		constexpr color RED_DUSK{color::from_rgba8888(0xDE6663ff)};
+		constexpr color red_dusted{color::from_rgba8888(0xDE6663ff)};
 		constexpr color SCARLET{color::from_rgba8888(0xff341cff)};
 		constexpr color CRIMSON{color::from_rgba8888(0xdc143cff)};
 		constexpr color CORAL{color::from_rgba8888(0xff7f50ff)};

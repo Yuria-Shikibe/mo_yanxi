@@ -7,6 +7,10 @@ import mo_yanxi.ui.table;
 import mo_yanxi.ui.elem.button;
 import std;
 
+//TODO move styles to other place?
+import mo_yanxi.ui.assets;
+
+
 namespace mo_yanxi::ui{
 	export
 	struct check_box : image_frame {
@@ -49,6 +53,8 @@ namespace mo_yanxi::ui{
 				for (const auto & [idx, drawable] : owner.drawables_ | std::views::enumerate){
 					auto img = table.emplace<button<image_frame>>();
 					img.cell().set_pad({.left = 4, .right = 4}).set_size(96);
+
+					img->set_style(assets::styles::clear);
 					img->set_drawable<drawable_ref>(drawable.drawable.get());
 					img->set_button_callback(button_tags::general, [&owner, idx](elem& elem){
 						owner.current_frame_index = idx;
@@ -58,8 +64,6 @@ namespace mo_yanxi::ui{
 					img->checkers.setActivatedProv([&owner, idx]{
 						return owner.get_frame_index() == idx;
 					});
-					// img->property.set_empty_drawer();
-
 				}
 
 				table.set_edge_pad(0);

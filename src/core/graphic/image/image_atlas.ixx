@@ -133,6 +133,31 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] bad_image_asset() = default;
 	};
 
+	struct bitmap_represent{
+		using byte_span = std::span<const std::byte>;
+
+		std::variant<byte_span, bitmap> present{};
+
+		[[nodiscard]] constexpr bitmap_represent() = default;
+
+		template <typename T>
+			requires std::constructible_from<decltype(present), T>
+		[[nodiscard]] constexpr explicit(false) bitmap_represent(T&& present)
+			: present(std::forward<T>(present)){
+		}
+
+		[[nodiscard]] constexpr byte_span get_bytes() const noexcept{
+			return std::visit([] <typename T> (const T& data){
+				if constexpr (std::same_as<T, bitmap>){
+					const std::span<const bitmap::value_type> s = data.to_span();
+					return byte_span{reinterpret_cast<const std::byte*>(s.data()), s.size_bytes()};
+				}else{
+					return data;
+				}
+			}, present);
+		}
+	};
+
 	export
 	struct path_load{
 		std::string path{};
@@ -145,7 +170,7 @@ namespace mo_yanxi::graphic{
 			return std::bit_cast<math::usize2>(ext.value());
 		}
 
-		bitmap operator()(unsigned w, unsigned h, unsigned level) const{
+		bitmap_represent operator()(unsigned w, unsigned h, unsigned level) const{
 			return bitmap(path);
 		}
 	};
@@ -158,11 +183,11 @@ namespace mo_yanxi::graphic{
 			return bitmap.extent();
 		}
 
-		graphic::bitmap operator()(unsigned w, unsigned h, unsigned level) const{
+		bitmap_represent operator()(unsigned w, unsigned h, unsigned level) const{
 			if(!bitmap){
-				throw bad_image_asset{};
+				return bitmap_represent{};
 			}
-			return std::move(bitmap);
+			return bitmap.to_byte_span();
 		}
 	};
 
@@ -180,7 +205,7 @@ namespace mo_yanxi::graphic{
 			return extent;
 		}
 
-		bitmap operator()(unsigned w, unsigned h, unsigned level) const {
+		bitmap_represent operator()(unsigned w, unsigned h, unsigned level) const {
 			return std::visit<bitmap>([&]<vk::texture_source_prov T>(const T& prov){
 				return prov.operator()(w, h, level);
 			}, generator);
@@ -207,8 +232,8 @@ namespace mo_yanxi::graphic{
 			}, raw);
 		}
 
-		[[nodiscard]] bitmap get(unsigned w, unsigned h, unsigned level) const{
-			return std::visit<bitmap>([&]<typename T>(const T& gen){
+		[[nodiscard]] bitmap_represent get(unsigned w, unsigned h, unsigned level) const{
+			return std::visit<bitmap_represent>([&]<typename T>(const T& gen){
 				return gen(w, h, level);
 			}, raw);
 		}
@@ -226,25 +251,16 @@ namespace mo_yanxi::graphic{
 
 	struct async_image_loader{
 	private:
-
-		struct call_back{
-			async_image_loader* loader;
-
-			void operator()() const noexcept{
-				loader->queue_cond.notify_one();
-			}
-		};
 		vk::context* context_{};
-
 		vk::fence fence_{};
+
 		vk::command_buffer running_command_buffer_{};
-
-		std::jthread working_thread{};
 		std::multimap<VkDeviceSize, vk::buffer> stagings{};
-
 		std::mutex queue_mutex{};
 		condition_variable_single queue_cond{};
 		std::vector<allocated_image_load_description> queue{};
+
+		std::jthread working_thread{};
 
 		static void work_func(std::stop_token stop_token, async_image_loader& self){
 			std::vector<allocated_image_load_description> dumped_queue{};
@@ -261,11 +277,12 @@ namespace mo_yanxi::graphic{
 				}
 
 				for (auto& queue : dumped_queue){
+					if(stop_token.stop_requested())break;
 					self.load(std::move(queue));
 				}
 			}
 
-			self.fence_.wait_and_reset();
+			self.fence_.wait();
 		}
 
 		void load(allocated_image_load_description&& desc);
@@ -298,6 +315,7 @@ namespace mo_yanxi::graphic{
 		~async_image_loader(){
 			working_thread.request_stop();
 			queue_cond.notify_one();
+			fence_.wait();
 		}
 	};
 
@@ -753,10 +771,17 @@ namespace mo_yanxi::graphic{
 			return {category, localName};
 		}
 
-		
+	public:
+		image_atlas(const image_atlas& other) = delete;
+		image_atlas(image_atlas&& other) noexcept = default;
+		image_atlas& operator=(const image_atlas& other) = delete;
+		image_atlas& operator=(image_atlas&& other) noexcept = default;
+
+		~image_atlas() = default;
 	};
 
 	
+	/*
 	export struct borrowed_image_page{
 	private:
 		image_atlas* atlas_{};
@@ -794,18 +819,19 @@ namespace mo_yanxi::graphic{
 		/**
 		 * @param name in format of "<category>.<name>"
 		 * @return Nullable
-		 */
+		 #1#
 		[[nodiscard]] allocated_image_region* find(const std::string_view name) const noexcept{
 			return page_->find(name);
 		}
 
 		/**
 		 * @param name in format of "<category>.<name>"
-		 */
+		 #1#
 		[[nodiscard]] allocated_image_region& at(const std::string_view name) const{
 			return page_->at(name);
 		}
 	};
+	*/
 
 
 	allocated_image_region::~allocated_image_region(){

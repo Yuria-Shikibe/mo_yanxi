@@ -44,9 +44,15 @@ export namespace mo_yanxi::font{
 	public:
 		[[nodiscard]] font_manager() = default;
 
-		[[nodiscard]] explicit font_manager(graphic::image_atlas& atlas, std::string_view fontPageName = "font") :
-			fontPage(&atlas.create_image_page(fontPageName))
+		[[nodiscard]] explicit font_manager(graphic::image_page& page) :
+			fontPage(&page)
 		{}
+
+		void set_page(graphic::image_page& f_page){
+			if(fontPage == &f_page)return;
+			fontPage = &f_page;
+			fontFaces.clear();
+		}
 
 		[[nodiscard]] graphic::image_page& page() const noexcept{
 			assert(fontPage != nullptr);

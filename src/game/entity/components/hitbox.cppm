@@ -92,11 +92,11 @@ namespace mo_yanxi::game{
 
 	export
 	struct hitbox_comp{
-		/** @brief Local Transform */
-		math::trans2 trans{};
-
 		/** @brief Raw Box Data */
 		math::rect_box_posed box{};
+
+		/** @brief Local Transform */
+		math::trans2 trans{};
 
 		explicit(false) constexpr operator const math::rect_box_posed&() const noexcept{
 			return box;
@@ -128,20 +128,58 @@ namespace mo_yanxi::game{
 	using small_vector_of_hitbox_comp = gch::small_vector<hitbox_comp, 4>; 
 
 	export
+	struct hitbox_meta{
+		struct meta{
+			math::rect_box_identity<float> box;
+			math::trans2 trans;
+		};
+
+		std::vector<meta> components{};
+
+		constexpr decltype(auto) operator[](this auto&& self, const std::size_t index) noexcept{
+			return self.components[index];
+		}
+
+		template <typename S>
+		constexpr auto begin(this S&& self) noexcept{
+			return std::ranges::begin(std::forward_like<S>(self.components));
+		}
+
+		template <typename S>
+		constexpr auto end(this S&& self) noexcept{
+			return std::ranges::end(std::forward_like<S>(self.components));
+		}
+
+		[[nodiscard]] constexpr std::size_t size() const noexcept{
+			return components.size();
+		}
+	};
+
+	export
 	struct hitbox_identity{
 		small_vector_of_hitbox_comp components{};
 
-		//TODO Should this member move to ccd hitbox?
-		math::trans2 trans{};
-
 		[[nodiscard]] hitbox_identity() = default;
 
-		[[nodiscard]] explicit hitbox_identity(const std::vector<hitbox_comp>& comps, const math::trans2 transform = {})
-			: components(comps.begin(), comps.end()), trans(transform){
+		template <std::ranges::input_range Rng>
+			requires std::convertible_to<std::ranges::range_value_t<Rng>, hitbox_comp>
+		[[nodiscard]] hitbox_identity(std::from_range_t, Rng&& comps)
+			: components(std::ranges::begin(comps), std::ranges::end(comps)){
 		}
 
-		[[nodiscard]] explicit hitbox_identity(const hitbox_comp& comps, const math::trans2 transform = {})
-			: hitbox_identity(std::vector{comps}, transform){
+		[[nodiscard]] explicit(false) hitbox_identity(const hitbox_meta& comps)
+			: components(comps.size()){
+			for(const auto& [idx, meta] : comps | std::views::enumerate){
+				components[idx] = hitbox_comp{meta.box, meta.trans};
+			}
+		}
+
+		[[nodiscard]] explicit(false) hitbox_identity(const std::vector<hitbox_comp>& comps)
+			: components(comps.begin(), comps.end()){
+		}
+
+		[[nodiscard]] explicit(false) hitbox_identity(const hitbox_comp& comps)
+			: hitbox_identity(std::vector{comps}){
 		}
 
 		constexpr auto& operator[](const std::size_t index) noexcept{
@@ -156,14 +194,14 @@ namespace mo_yanxi::game{
 			return components.size();
 		}
 
-		void set_trans_unchecked(math::trans2 trs) noexcept{
-			trans = trs;
-		};
 	};
 
 	export
 	class ccd_hitbox : protected hitbox_identity{
 	protected:
+
+		//TODO Should this member move to ccd hitbox?
+		math::trans2 trans{};
 		//wrap box
 		rect_comp wrap_bound_ccd_{};
 		math::frect wrap_bound_{};
@@ -171,22 +209,27 @@ namespace mo_yanxi::game{
 	public:
 		constexpr ccd_hitbox() = default;
 
-		using hitbox_identity::operator[];
-		using hitbox_identity::set_trans_unchecked;
 		using hitbox_identity::size;
 
 		[[nodiscard]] explicit(false) ccd_hitbox(const hitbox_identity& identity)
 			: hitbox_identity(identity){
-			if(!components.empty())update(identity.trans);
 		}
 
 		[[nodiscard]] explicit ccd_hitbox(const std::vector<hitbox_comp>& comps, const math::trans2 transform = {})
-			: hitbox_identity(comps, transform){
+			: hitbox_identity(comps){
 			if(!components.empty())update(transform);
 		}
 
 		[[nodiscard]] explicit ccd_hitbox(const hitbox_comp& comps, const math::trans2 transform = {})
 			: ccd_hitbox(std::vector{comps}, transform){
+		}
+
+		constexpr auto& operator[](const std::size_t index) const noexcept{
+			return components[index];
+		}
+
+		void set_trans_unchecked(math::trans2 trs) noexcept{
+			trans = trs;
 		}
 
 		[[nodiscard]] std::span<const hitbox_comp> get_comps() const noexcept{
@@ -277,7 +320,6 @@ namespace mo_yanxi::game{
 		// }
 
 	};
-
 
 	export
 	class hitbox : public ccd_hitbox{

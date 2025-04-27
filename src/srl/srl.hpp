@@ -116,6 +116,14 @@ namespace mo_yanxi::io{
 		return v;
 	}
 
+	template <typename V>
+		requires requires(const V& data){
+			loader<V>::pack(data);
+		}
+	auto pack(const V& data){
+		return loader<V>::pack(data);
+	}
+
 
 	template <>
 	struct loader_impl<math::vector2<float>> : loader_base<pb::math::vector2f, math::vector2<float>>{

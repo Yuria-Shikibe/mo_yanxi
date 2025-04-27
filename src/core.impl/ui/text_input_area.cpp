@@ -10,7 +10,7 @@ void mo_yanxi::ui::text_input_area::draw_content(const rect clipSpace) const{
 		draw_acquirer param{get_renderer().get_batch(), draw::white_region};
 		if(caret_->shouldBlink()){
 			const color caret_Color =
-				(onFailed() ? colors::RED_DUSK : colors::white).copy().mulA(gprop().get_opacity());
+				(onFailed() ? colors::red_dusted : colors::white).copy().mulA(gprop().get_opacity());
 
 			const auto& row = glyph_layout[caret_->range.dst.pos.y];
 			const auto& glyph = row[caret_->range.dst.pos.x];
@@ -38,7 +38,7 @@ void mo_yanxi::ui::text_input_area::draw_content(const rect clipSpace) const{
 		const math::vec2 endPos = (endRow.src + off2).add(endGlyph.region.get_src_x(), endRow.bound.descender);
 
 		const color lineSelectionColor =
-			(onFailed() ? colors::RED_DUSK : colors::white).copy().mulA(.5f);
+			(onFailed() ? colors::red_dusted : colors::white).copy().mulA(.5f);
 
 		if(beg.pos.y == end.pos.y){
 			draw::fill::rect_ortho(param.get(), rect{beginPos, endPos}, lineSelectionColor);

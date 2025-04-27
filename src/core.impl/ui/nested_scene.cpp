@@ -16,7 +16,7 @@ void mo_yanxi::ui::nested_scene::draw_pre(const rect clipSpace) const{
 }
 
 void mo_yanxi::ui::nested_scene::draw_content(const rect clipSpace) const{
-	scene_.draw(rect{tags::from_extent, {}, scene_.region.size()});
+	scene_.draw(camera_.get_viewport());
 	//
 	draw_acquirer acquirer{get_renderer().batch, graphic::draw::white_region};
 	auto cpos = getTransferredPos(get_scene()->cursor_pos);

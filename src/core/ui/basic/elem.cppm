@@ -691,6 +691,8 @@ namespace mo_yanxi::ui{
 
 		virtual void try_draw(const rect clipSpace) const{
 			if(!is_visible()) return;
+
+			if(!clipSpace.overlap_inclusive(get_bound()))return;
 			// if(IgnoreClipWhenDraw || inboundOf(clipSpace)){
 			draw(clipSpace);
 			// }

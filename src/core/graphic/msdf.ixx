@@ -198,7 +198,7 @@ namespace mo_yanxi::graphic::msdf{
 	constexpr double boarder_range = 4;
 
 	export
-	svg_info create_boarder(double radius = 15., double k = .7f, double width = 2.);
+	svg_info create_boarder(double radius = 15., double width = 2., double k = .7f);
 
 	export
 	svg_info create_solid_boarder(double radius = 15., double k = .7f);

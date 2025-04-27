@@ -30,11 +30,11 @@ namespace mo_yanxi::game::ecs{
 								.radius = {5, 25, math::interp::pow3Out},
 								.stroke = {4},
 								.palette = {
-									{graphic::colors::AQUA.to_light()},
-									{graphic::colors::AQUA.to_light()},
+									{graphic::colors::aqua.to_light()},
+									{graphic::colors::aqua.to_light()},
 									{graphic::colors::clear},
 									{
-										graphic::colors::AQUA.create_lerp(graphic::colors::white, .5f).to_light().set_a(.5f),
+										graphic::colors::aqua.create_lerp(graphic::colors::white, .5f).to_light().set_a(.5f),
 										graphic::colors::clear,
 									}
 								}

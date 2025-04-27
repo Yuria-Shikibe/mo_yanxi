@@ -10,7 +10,6 @@ layout (location = 0) in vec2 in_uv;
 layout (location = 1) flat in uvec4 in_indices;
 layout (location = 2) in vec4 in_color_base;
 layout (location = 3) in vec4 in_color_light;
-layout (location = 4) in vec4 in_color_override;
 
 layout (set = 0, binding = 1) uniform UBO {
     uint depth_test;

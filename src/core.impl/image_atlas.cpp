@@ -39,8 +39,8 @@ namespace mo_yanxi::graphic{
 				for(std::uint32_t mip_lv = 0; mip_lv < mipmap_level; ++mip_lv){
 					const auto scl = 1u << mip_lv;
 					const VkExtent2D extent{desc.region.width() / scl, desc.region.height() / scl};
-					bitmap bitmap = desc.desc.get(extent.width, extent.height, mip_lv);
-					(void)vk::buffer_mapper{buffer}.load_range(bitmap.to_span(), static_cast<std::ptrdiff_t>(off));
+					auto bitmap = desc.desc.get(extent.width, extent.height, mip_lv);
+					(void)vk::buffer_mapper{buffer}.load_range(bitmap.get_bytes(), static_cast<std::ptrdiff_t>(off));
 					off += extent.width * extent.height * cahnnel_size;
 				}
 			}

@@ -6,6 +6,7 @@
 #include <freetype/freetype.h>
 
 #include "../src/srl/srl.hpp"
+#include "../src/srl/srl.game.hpp"
 
 
 #include <gch/small_vector.hpp>
@@ -307,10 +308,13 @@ void main_loop(){
 
 	auto& context = core::global::graphic::context;
 
+	font::font_manager font_manager{};
 	graphic::image_atlas atlas{context};
+	font_manager.set_page(atlas.create_image_page("font"));
+
 	graphic::image_page& main_page = atlas.create_image_page("main");
 
-	font::font_manager font_manager{atlas};
+
 	{
 		auto p = font_manager.page().register_named_region(
 			std::string_view{"white"}, graphic::path_load{
@@ -523,7 +527,7 @@ void main_loop(){
 							graphic::colors::white.to_light().set_a(0),
 							math::interp::linear_map<0., .55f>
 						}, {
-							graphic::colors::AQUA.to_light().set_a(0.95f),
+							graphic::colors::aqua.to_light().set_a(0.95f),
 							graphic::colors::white.to_light().set_a(0),
 							math::interp::pow3In | math::interp::reverse
 						}
@@ -562,7 +566,7 @@ void main_loop(){
 							graphic::colors::white.to_light().set_a(0),
 							math::interp::linear_map<0., .55f>
 						}, {
-							graphic::colors::AQUA.to_light().set_a(0.95f),
+							graphic::colors::aqua.to_light().set_a(0.95f),
 							graphic::colors::white.to_light().set_a(0),
 							math::interp::pow3In | math::interp::reverse
 						}
@@ -655,7 +659,7 @@ void main_loop(){
 					acquirer,
 					rect2.view_as_quad(),
 					2.f,
-					is_intersected ? graphic::colors::PALE_GREEN : graphic::colors::white
+					is_intersected ? graphic::colors::pale_green : graphic::colors::white
 				);
 
 			for(int i = 0; i < 4; ++i){
@@ -677,7 +681,7 @@ void main_loop(){
 
 			graphic::draw::line::line(acquirer.get(), cursor_in_world, renderer_world.camera.get_viewport_center(),
 				3.,
-				graphic::colors::AQUA.to_light(),
+				graphic::colors::aqua.to_light(),
 				graphic::colors::white.to_light().set_a(0)
 			);
 		}
@@ -697,7 +701,7 @@ void main_loop(){
 				   draw::line::quad(acquirer, comp.box, 2, colors::white.to_light());
 				   draw::line::rect_ortho(acquirer, comp.box.get_bound(), 1, colors::CRIMSON);
 			   }
-			   draw::line::quad(acquirer, manifold.hitbox.ccd_wrap_box(), 1, colors::PALE_GREEN);
+			   draw::line::quad(acquirer, manifold.hitbox.ccd_wrap_box(), 1, colors::pale_green);
 		   });
 
 			component_manager.sliced_each([&](
@@ -729,7 +733,7 @@ void main_loop(){
 
 						draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
 						draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-						                       colors::PALE_GREEN.to_light(1.5f).set_a(
+						                       colors::pale_green.to_light(1.5f).set_a(
 							                       tile.get_status().valid_hit_point / 100.f));
 					});
 
@@ -753,7 +757,7 @@ void main_loop(){
 						auto rst = grid.get_dst_sorted_tiles(rect2, (rect2[0] + rect2[3]) / 2, dst.normalize());
 						for (const auto& [idx, tile] : rst | std::views::enumerate){
 							draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-												   colors::AQUA.create_lerp(colors::RED_DUSK, idx / static_cast<float>(rst.size())));
+												   colors::aqua.create_lerp(colors::red_dusted, idx / static_cast<float>(rst.size())));
 						}
 					}
 
@@ -804,11 +808,22 @@ int main(){
 	using namespace mo_yanxi::game;
 
 
-	test::foot();
-
-	math::rect_box_posed rect{math::vec2{300, 100}, {125, 44, 3.14 / 4}};
-	auto pkg = io::loader<decltype(rect)>::pack(rect);
-	auto rect2 = io::loader<decltype(rect)>::extract(pkg);
+	// test::foot();
+	//
+	// math::rect_box_posed rect{math::vec2{300, 100}, {125, 44, 3.14 / 4}};
+	// // auto pkg = io::loader<decltype(rect)>::pack(rect);
+	// // auto rect2 = io::loader<decltype(rect)>::extract(pkg);
+	//
+	// game::hitbox_meta meta{
+	// 	{
+	// 		hitbox_meta::meta{rect.get_identity(), rect.deduce_transform()},
+	// 		hitbox_meta::meta{{-10, -20, 20, 40}, {1, 2, 3}},
+	// 	}
+	// };
+	//
+	// auto pkg = io::pack(meta);
+	//
+	// auto meta2 = io::extract<hitbox_meta>(pkg);
 
 	// std::vector<std::vector<math::vec2>> vec{{{0, 1,}, {2, 3}}, {{4, 5}}};
 
@@ -818,20 +833,20 @@ int main(){
 
 
 
-	// init_assets();
-	// compile_shaders();
-	//
-	// core::glfw::init();
-	// core::global::graphic::init();
-	// core::global::ui::init();
-	// assets::graphic::load(core::global::graphic::context);
-	//
-	// main_loop();
-	//
-	// assets::graphic::dispose();
-	// core::global::ui::dispose();
-	// core::global::graphic::dispose();
-	// core::glfw::terminate();
+	init_assets();
+	compile_shaders();
+
+	core::glfw::init();
+	core::global::graphic::init();
+	core::global::ui::init();
+	assets::graphic::load(core::global::graphic::context);
+
+	main_loop();
+
+	assets::graphic::dispose();
+	core::global::ui::dispose();
+	core::global::graphic::dispose();
+	core::glfw::terminate();
 }
 
 struct comp_interface{

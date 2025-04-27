@@ -14,9 +14,9 @@ namespace mo_yanxi{
 		if(element.disabled){
 			color = disabled;
 		} else if(element.get_cursor_state().pressed){
-			color = onPress;
+			color = on_press;
 		} else if(element.get_cursor_state().focused){
-			color = onFocus;
+			color = on_focus;
 		} else if(element.activated){
 			color = activated;
 		} else{

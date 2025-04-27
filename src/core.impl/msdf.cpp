@@ -141,7 +141,7 @@ mo_yanxi::graphic::msdf::msdf_generator::msdf_generator(const char* path, double
 // }
 
 
-mo_yanxi::graphic::msdf::svg_info mo_yanxi::graphic::msdf::create_boarder(double radius, double k, double width){
+mo_yanxi::graphic::msdf::svg_info mo_yanxi::graphic::msdf::create_boarder(double radius, double width, double k){
 	using namespace msdfgen;
 
 	// 创建形状对象

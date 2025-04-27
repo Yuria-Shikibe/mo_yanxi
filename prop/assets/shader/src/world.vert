@@ -6,15 +6,13 @@
 layout(location = 0) in vec3 in_pos;
 layout(location = 1) in uvec4 in_indices;
 layout(location = 2) in vec4 in_color_scl;
-layout(location = 3) in vec4 in_color_override;
-layout(location = 4) in vec2 in_uv;
+layout(location = 3) in vec2 in_uv;
 
 
 layout(location = 0) out vec2 out_uv;
 layout(location = 1) flat out uvec4 out_indices;
 layout(location = 2) out vec4 out_color_base;
 layout(location = 3) out vec4 out_color_light;
-layout(location = 4) out vec4 out_color_override;
 
 const float Overflow = .001f;
 const float LightColorRange = 2550.f;
@@ -79,8 +77,6 @@ void main() {
     vec3 src_color = in_color_scl.rgb / mix(1, base_luma, normalized);
     out_color_base = vec4(src_color, min(in_color_scl.a, 1.f) * (1 - light));
     out_color_light = vec4(src_color, light * in_color_scl.a);
-
-    out_color_override = in_color_override;
 
     out_indices = in_indices;
     out_uv = in_uv;

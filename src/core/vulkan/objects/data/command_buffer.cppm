@@ -80,18 +80,19 @@ namespace mo_yanxi::vk{
 		command_buffer& operator=(const command_buffer& other) = delete;
 
 		command_buffer(command_buffer&& other) noexcept = default;
-		command_buffer& operator=(command_buffer&& other) noexcept = default;
-		// command_buffer& operator=(command_buffer&& other) noexcept{
-		// 	if(this == &other) return *this;
-		// 	if(device && pool && handle)vkFreeCommandBuffers(device, pool, 1, &handle);
-		// 	handle = nullptr;
-		// 	pool = nullptr;
-		// 	device = nullptr;
-		// 	wrapper::operator=(std::move(other));
-		// 	device = std::move(other.device);
-		// 	pool = std::move(other.pool);
-		// 	return *this;
-		// }
+		// command_buffer& operator=(command_buffer&& other) noexcept = default;
+		command_buffer& operator=(command_buffer&& other) noexcept{
+			if(this == &other) return *this;
+			if(device && pool && handle)vkFreeCommandBuffers(device, pool, 1, &handle);
+
+			handle = nullptr;
+			pool = nullptr;
+			device = nullptr;
+			wrapper::operator=(std::move(other));
+			device = std::move(other.device);
+			pool = std::move(other.pool);
+			return *this;
+		}
 
 		[[nodiscard]] VkCommandBufferSubmitInfo submit_info() const noexcept{
 			return {

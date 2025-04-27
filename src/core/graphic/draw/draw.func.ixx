@@ -42,18 +42,14 @@ namespace mo_yanxi::graphic::draw{
 			col color_scl_00 = colors::white,
 			col color_scl_10 = colors::white,
 			col color_scl_11 = colors::white,
-			col color_scl_01 = colors::white,
-			col color_ovr_00 = {},
-			col color_ovr_10 = {},
-			col color_ovr_11 = {},
-			col color_ovr_01 = {}
+			col color_scl_01 = colors::white
 			) noexcept {
 			static constexpr mapper<Vtx> mapper{};
 
-			draw::try_proj(param.proj, mapper(param.target, 0, v00, param.get_texture(), color_scl_00, color_ovr_00, param.uv.v00()));
-			draw::try_proj(param.proj, mapper(param.target, 1, v10, param.get_texture(), color_scl_10, color_ovr_10, param.uv.v10()));
-			draw::try_proj(param.proj, mapper(param.target, 2, v11, param.get_texture(), color_scl_11, color_ovr_11, param.uv.v11()));
-			draw::try_proj(param.proj, mapper(param.target, 3, v01, param.get_texture(), color_scl_01, color_ovr_01, param.uv.v01()));
+			draw::try_proj(param.proj, mapper(param.target, 0, v00, param.get_texture(), color_scl_00, param.uv.v00()));
+			draw::try_proj(param.proj, mapper(param.target, 1, v10, param.get_texture(), color_scl_10, param.uv.v10()));
+			draw::try_proj(param.proj, mapper(param.target, 2, v11, param.get_texture(), color_scl_11, param.uv.v11()));
+			draw::try_proj(param.proj, mapper(param.target, 3, v01, param.get_texture(), color_scl_01, param.uv.v01()));
 			draw::try_proj_primitive(param.proj, *param.target);
 		}
 
@@ -62,14 +58,12 @@ namespace mo_yanxi::graphic::draw{
 		FORCE_INLINE void quad(
 			const batch_draw_param<Vtx, UV, Proj>& param,
 			vec v00, vec v10, vec v11, vec v01,
-			col color_scl = colors::white,
-			col color_ovr = {}
+			col color_scl = colors::white
 			) noexcept {
 			fill::fill(
 				param,
 				v00, v10, v11, v01,
-				color_scl, color_scl, color_scl, color_scl,
-				color_ovr, color_ovr, color_ovr, color_ovr
+				color_scl, color_scl, color_scl, color_scl
 			);
 		}
 
@@ -79,13 +73,12 @@ namespace mo_yanxi::graphic::draw{
 		FORCE_INLINE void quad(
 			const batch_draw_param<Vtx, UV, Proj>& param,
 			const math::fquad& quad,
-			col color_scl = colors::white,
-			col color_ovr = {}
+			col color_scl = colors::white
 			) noexcept {
 			fill::quad(
 				param,
 				quad.v0, quad.v1, quad.v2, quad.v3,
-				color_scl, color_ovr
+				color_scl
 			);
 		}
 
@@ -95,15 +88,13 @@ namespace mo_yanxi::graphic::draw{
 		FORCE_INLINE void rect_ortho(
 			const batch_draw_param<Vtx, UV, Proj>& param,
 			const math::frect rect,
-			col color_scl = colors::white,
-			col color_ovr = {}
+			col color_scl = colors::white
 			) noexcept {
 			fill::fill(
 				param,
 				rect.vert_00(), rect.vert_10(), rect.vert_11(), rect.vert_01(),
-				color_scl, color_scl, color_scl, color_scl,
-				color_ovr, color_ovr, color_ovr, color_ovr
-			);
+				color_scl, color_scl, color_scl, color_scl
+				);
 		}
 
 		export
@@ -112,8 +103,7 @@ namespace mo_yanxi::graphic::draw{
 			const batch_draw_param<Vtx, UV, Proj>& param,
 			const math::trans2 center,
 			const math::frect rect_offset_in_local,
-			col color_scl = colors::white,
-			col color_ovr = {}
+			col color_scl = colors::white
 			) noexcept {
 
 			const auto size = rect_offset_in_local.size() * .5f;
@@ -131,9 +121,7 @@ namespace mo_yanxi::graphic::draw{
 				off + vec{+w1 - w2, +h1 - h2},
 				off + vec{+w1 + w2, +h1 + h2},
 				off + vec{-w1 + w2, -h1 + h2},
-				color_scl, color_scl, color_scl, color_scl,
-				color_ovr, color_ovr, color_ovr, color_ovr
-			);
+				color_scl, color_scl, color_scl, color_scl);
 		}
 
 		export
@@ -142,8 +130,7 @@ namespace mo_yanxi::graphic::draw{
 			const batch_draw_param<Vtx, UV, Proj>& param,
 			const math::trans2 center,
 			const vec size,
-			col color_scl = colors::white,
-			col color_ovr = {}
+			col color_scl = colors::white
 			) noexcept {
 
 			const auto sz = size * .5f;
@@ -161,9 +148,7 @@ namespace mo_yanxi::graphic::draw{
 				center.vec + vec{+w1 - w2, +h1 - h2},
 				center.vec + vec{+w1 + w2, +h1 + h2},
 				center.vec + vec{-w1 + w2, -h1 + h2},
-				color_scl, color_scl, color_scl, color_scl,
-				color_ovr, color_ovr, color_ovr, color_ovr
-			);
+				color_scl, color_scl, color_scl, color_scl);
 		}
 
 		export
@@ -270,9 +255,7 @@ namespace mo_yanxi::graphic::draw{
 			const vec src, const vec dst,
 			const float stroke = 2.f,
 			const col color_scl_src = colors::white,
-			const col color_scl_dst = colors::white,
-			const col color_ovr_src = {},
-			const col color_ovr_dst = {}
+			const col color_scl_dst = colors::white
 			){
 			const float h_stroke = stroke / 2.0f;
 			vec diff = dst - src;
@@ -287,9 +270,7 @@ namespace mo_yanxi::graphic::draw{
 					src + vec{-diff.x + diff.y, -diff.y - diff.x},
 					dst + vec{+diff.x + diff.y, +diff.y - diff.x},
 					dst + vec{+diff.x - diff.y, +diff.y + diff.x},
-					color_scl_src, color_scl_src, color_scl_dst, color_scl_dst,
-					color_ovr_src, color_ovr_src, color_ovr_dst, color_ovr_dst
-				);
+					color_scl_src, color_scl_src, color_scl_dst, color_scl_dst);
 			}else{
 				fill::fill(
 					param,
@@ -297,9 +278,7 @@ namespace mo_yanxi::graphic::draw{
 					src + vec{+diff.y, -diff.x},
 					dst + vec{+diff.y, -diff.x},
 					dst + vec{-diff.y, +diff.x},
-					color_scl_src, color_scl_src, color_scl_dst, color_scl_dst,
-					color_ovr_src, color_ovr_src, color_ovr_dst, color_ovr_dst
-				);
+					color_scl_src, color_scl_src, color_scl_dst, color_scl_dst);
 			}
 		}
 
@@ -311,18 +290,14 @@ namespace mo_yanxi::graphic::draw{
 			const float length,
 			const float stroke = 2.f,
 			const col color_scl_src = colors::white,
-			const col color_scl_dst = colors::white,
-			const col color_ovr_src = {},
-			const col color_ovr_dst = {}){
+			const col color_scl_dst = colors::white){
 			vec vec{};
 
 			vec.set_polar_rad(trans.rot, length * 0.5f);
 
 			line::line<cap>(param, trans.vec - vec, trans.vec + vec, stroke,
 			                color_scl_src,
-			                color_scl_dst,
-			                color_ovr_src,
-			                color_ovr_dst
+			                color_scl_dst
 			);
 		}
 
@@ -334,18 +309,14 @@ namespace mo_yanxi::graphic::draw{
 			const float length,
 			const float stroke = 2.f,
 			const col color_scl_src = colors::white,
-			const col color_scl_dst = colors::white,
-			const col color_ovr_src = {},
-			const col color_ovr_dst = {}){
+			const col color_scl_dst = colors::white){
 			vec vec{};
 
 			vec.set_polar_rad(trans.rot, length * 0.5f);
 
 			line::line<cap>(param, trans.vec, trans.vec + vec, stroke,
 							color_scl_src,
-							color_scl_dst,
-							color_ovr_src,
-							color_ovr_dst
+							color_scl_dst
 			);
 		}
 		
@@ -356,9 +327,7 @@ namespace mo_yanxi::graphic::draw{
 			const vec src, const vec dst,
 			const float stroke = 2.f,
 			const col color_scl_src = colors::white,
-			const col color_scl_dst = colors::white,
-			const col color_ovr_src = {},
-			const col color_ovr_dst = {}
+			const col color_scl_dst = colors::white
 			){
 			const vec diff = (dst - src).sign().scl(stroke / 2.f);
 
@@ -368,9 +337,7 @@ namespace mo_yanxi::graphic::draw{
 				src + vec{-diff.x + diff.y, -diff.y - diff.x},
 				dst + vec{+diff.x + diff.y, +diff.y - diff.x},
 				dst + vec{+diff.x - diff.y, +diff.y + diff.x},
-				color_scl_src, color_scl_src, color_scl_dst, color_scl_dst,
-				color_ovr_src, color_ovr_src, color_ovr_dst, color_ovr_dst
-			);
+				color_scl_src, color_scl_src, color_scl_dst, color_scl_dst);
 		}
 
 		export
@@ -409,9 +376,7 @@ namespace mo_yanxi::graphic::draw{
 				const float radius,
 				const float stroke = 2.f,
 
-				const col color_scl = colors::white,
-				const col color_ovr = {}
-			){
+				const col color_scl = colors::white){
 			trans.rot += 45.000f;
 			const float dst = stroke / math::sqrt2;
 
@@ -434,9 +399,7 @@ namespace mo_yanxi::graphic::draw{
 
 				fill::fill(
 					auto_param[i], vec2_1 + trans.vec, vec2_2 + trans.vec, vec2_4 + trans.vec, vec2_3 + trans.vec,
-					color_scl, color_scl, color_scl, color_scl,
-					color_ovr, color_ovr, color_ovr, color_ovr
-				);
+					color_scl, color_scl, color_scl, color_scl);
 
 				vec2_1 = vec2_3;
 				vec2_2 = vec2_4;

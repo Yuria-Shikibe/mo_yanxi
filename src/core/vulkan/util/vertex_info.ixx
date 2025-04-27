@@ -112,15 +112,6 @@ namespace mo_yanxi::vk{
 			floating_type depth{};
 			texture_indices tex_indices{};
 			math::vector4<floating_type> color{};
-			math::vector4<floating_type> override_color{};
-			math::vector2<floating_type> uv{};
-		};
-
-		export
-		struct vertex_world_transparent{
-			math::vector2<floating_type> pos{};
-			math::vector4<floating_type> color{};
-			math::vector4<floating_type> override_color{};
 			math::vector2<floating_type> uv{};
 		};
 
@@ -129,7 +120,6 @@ namespace mo_yanxi::vk{
 			math::vector2<floating_type> pos{};
 			texture_indices tex_indices{};
 			math::vector4<floating_type> color{};
-			math::vector4<floating_type> override_color{};
 			math::vector2<floating_type> uv{};
 		};
 
@@ -140,8 +130,7 @@ namespace mo_yanxi::vk{
 				{0, VK_FORMAT_R32G32B32_SFLOAT},
 				{12, VK_FORMAT_R8G8B8A8_UINT},
 				{16, VK_FORMAT_R32G32B32A32_SFLOAT},
-				{32, VK_FORMAT_R32G32B32A32_SFLOAT},
-				{48, VK_FORMAT_R32G32_SFLOAT},
+				{32, VK_FORMAT_R32G32_SFLOAT},
 			}
 		};
 
@@ -152,8 +141,7 @@ namespace mo_yanxi::vk{
 				{0, VK_FORMAT_R32G32_SFLOAT},
 				{8, VK_FORMAT_R8G8B8A8_UINT},
 				{12, VK_FORMAT_R32G32B32A32_SFLOAT},
-				{28, VK_FORMAT_R32G32B32A32_SFLOAT},
-				{44, VK_FORMAT_R32G32_SFLOAT},
+				{28, VK_FORMAT_R32G32_SFLOAT},
 			}
 		};
 

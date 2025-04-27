@@ -80,7 +80,7 @@ namespace mo_yanxi::ui{
 			if(!drawable || !drawable->drawable)return;
 			auto sz = get_expected_size(*drawable->drawable, drawable->style, content_size());
 			auto off = align::get_offset_of(default_style.align, sz, property.content_bound_absolute());
-			drawable->drawable->draw(*this, rect{tags::from_extent, off, sz}, (drawable->style.color_scl * gprop().style_color_scl).mulA(gprop().get_opacity()), drawable->style.color_mix);
+			drawable->drawable->draw(*this, rect{tags::from_extent, off, sz}, (drawable->style.color_scl * gprop().style_color_scl).mulA(gprop().get_opacity()));
 		}
 
 		[[nodiscard]] const styled_drawable* get_region() const noexcept{

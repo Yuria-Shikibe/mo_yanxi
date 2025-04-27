@@ -23,7 +23,7 @@ namespace mo_yanxi::graphic::draw{
 	export
 	template <typename Vtx>
 	struct mapper{
-		static FORCE_INLINE constexpr Vtx& operator()(Vtx* ptr, std::size_t idx, math::vec2 pos, vk::vertices::texture_indices, color color_scl, color color_ovr, math::vec2 uv) = delete;
+		static FORCE_INLINE constexpr Vtx& operator()(Vtx* ptr, std::size_t idx, math::vec2 pos, vk::vertices::texture_indices, color color_scl, math::vec2 uv) = delete;
 	};
 
 	export
@@ -35,10 +35,9 @@ namespace mo_yanxi::graphic::draw{
 			math::vec2 pos,
 			vk::vertices::texture_indices texture_indices,
 			color color_scl,
-			color color_ovr,
 			math::vec2 uv
 			) noexcept{
-			return *std::construct_at(ptr + idx, pos, 0., texture_indices, color_scl, color_ovr, uv);
+			return *std::construct_at(ptr + idx, pos, 0., texture_indices, color_scl, uv);
 		}
 	};
 
@@ -51,10 +50,9 @@ namespace mo_yanxi::graphic::draw{
 			math::vec2 pos,
 			vk::vertices::texture_indices texture_indices,
 			color color_scl,
-			color color_ovr,
 			math::vec2 uv
 			) noexcept{
-			return *std::construct_at(ptr + idx, pos, texture_indices, color_scl, color_ovr, uv);
+			return *std::construct_at(ptr + idx, pos, texture_indices, color_scl, uv);
 		}
 	};
 

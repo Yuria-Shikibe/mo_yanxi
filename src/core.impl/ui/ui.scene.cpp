@@ -264,7 +264,7 @@ void mo_yanxi::ui::scene::layout(){
 		root->try_layout();
 
 		count++;
-		if(count > 16){
+		if(count > 8){
 			// break;
 			throw std::runtime_error("Bad Layout: Iteration Too Many Times");
 		}
@@ -274,34 +274,21 @@ void mo_yanxi::ui::scene::layout(){
 }
 
 void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
-	// const auto bound = ();
+	//TODO draw and blit?
 
 	for (auto&& elem : tooltip_manager.get_draw_sequence()){
 		if(elem.belowScene){
 			elem.element->try_draw(clipSpace);
-
-			// renderer->batch->consumeAll();
-			// renderer->blit();
 		}
 	}
 
 	root->draw(clipSpace);
 
-	// renderer->batch->consumeAll();
-	// renderer->blit();
-
 	for (auto&& elem : tooltip_manager.get_draw_sequence()){
 		if(!elem.belowScene){
-			elem.element->try_draw(region);
-
-			// renderer->batch->consumeAll();
-			// renderer->blit();
+			elem.element->try_draw(clipSpace);
 		}
 	}
-
-	// renderer_ui.batch.batch.consume_all();
-
-
 }
 
 mo_yanxi::ui::scene::scene(scene&& other) noexcept:
