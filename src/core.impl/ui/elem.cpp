@@ -12,7 +12,6 @@ import mo_yanxi.graphic.draw;
 import :pre_decl;
 import :scene;
 import :group;
-// }
 
 namespace mo_yanxi{
 	void ui::debug_elem_drawer::draw(const elem& element, rect region, float opacityScl) const{
@@ -21,7 +20,7 @@ namespace mo_yanxi{
 		draw::line::rect_ortho(acquirer, region);
 
 		if(element.cursor_state.focused){
-			draw::fill::rect_ortho(acquirer.get(), region, colors::white.copy().mulA(.35f));
+			draw::fill::rect_ortho(acquirer.get(), region, colors::white.copy().mul_a(.35f));
 		}
 	}
 
@@ -56,19 +55,18 @@ namespace mo_yanxi{
 		event_manager.on<events::exbound>([](auto, elem& self){
 			self.cursor_state.inbound = false;
 		});
-
-		event_manager.on<events::click>([](const events::click& click, elem& self){
-			switch(click.code.action()){
-			case core::ctrl::act::press : self.cursor_state.pressed = true;
-				break;
-			default : self.cursor_state.pressed = false;
-			}
-		});
 	}
 
 
 	graphic::renderer_ui& ui::elem::get_renderer() const noexcept{
 		return *get_scene()->renderer; //fuck fake positive...
+	}
+
+	void ui::elem::set_style(const style_drawer<elem>& drawer){
+		property.graphic_data.drawer = &drawer;
+		if(drawer.apply_to(*this)){
+			notify_layout_changed(spread_direction::all_visible);
+		}
 	}
 
 	ui::group* ui::elem::get_root_parent() const noexcept{
@@ -86,7 +84,7 @@ namespace mo_yanxi{
 	}
 
 	void ui::elem::update_opacity(const float val){
-		if(util::tryModify(property.graphic_data.context_opacity, val)){
+		if(util::try_modify(property.graphic_data.context_opacity, val)){
 			for(const auto& element : get_children()){
 				element->update_opacity(gprop().get_opacity());
 			}
@@ -131,6 +129,13 @@ namespace mo_yanxi{
 	// 	clear_external_references();
 	// 	parent->post_remove(this);
 	// }
+
+	void ui::elem::remove_self_from_parent() noexcept{
+		if(auto p = dynamic_cast<basic_group*>(parent)){
+			clear_external_references();
+			p->post_remove(this);
+		}
+	}
 
 	void ui::elem::clear_external_references() noexcept{
 		if(scene_){
@@ -273,7 +278,7 @@ namespace mo_yanxi{
 	}
 
 	bool ui::elem::update_abs_src(const math::vec2 parent_content_abs_src){
-		if(util::tryModify(property.absolute_src, parent_content_abs_src + property.relative_src)){
+		if(util::try_modify(property.absolute_src, parent_content_abs_src + property.relative_src)){
 			for(const auto& element : get_children()){
 				element->update_abs_src(content_src_pos());
 			}
@@ -314,6 +319,22 @@ namespace mo_yanxi{
 
 		for(const auto& child : current->get_children() | std::views::reverse){
 			iterateAll_DFSImpl(transformed, selected, child.get());
+
+			//TODO better inbound shadow, maybe dialog system instead of add to root
+			if(child->prop().fill_parent.area()){
+				break;
+			}
 		}
+	}
+
+
+	ui::esc_flag ui::util::thoroughly_esc(elem* where) noexcept{
+		while(where){
+			if(where->on_esc() == esc_flag::intercept){
+				return esc_flag::intercept;
+			}
+			where = where->get_parent();
+		}
+		return esc_flag::fall_through;
 	}
 }

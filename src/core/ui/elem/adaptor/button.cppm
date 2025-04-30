@@ -28,7 +28,7 @@ namespace mo_yanxi::ui{
 	}
 
 	export
-	template <std::derived_from<elem> T>
+	template <std::derived_from<elem> T = elem>
 	struct button : public T{
 	protected:
 		using callback_type = std::move_only_function<void(events::click, button&)>;
@@ -39,24 +39,29 @@ namespace mo_yanxi::ui{
 			elem::interactivity = interactivity::enabled;
 			elem::property.maintain_focus_until_mouse_drop = true;
 
-			elem::register_event([](const events::click& e, button& self){
-				if(self.disabled)return;
-				if(self.callback && self.elem::contains(e.pos))self.callback(e, self);
-			});
 
+		}
+
+		events::click_result on_click(const events::click click_event) override {
+			T::on_click(click_event);
+			if(this->disabled)return events::click_result::intercepted;
+			if(callback && elem::contains(click_event.pos))callback(click_event, *this);
+			return events::click_result::intercepted;
 		}
 
 	public:
-		
-		[[nodiscard]] button(scene* s, group* g)
-			requires (std::constructible_from<T, scene*, group*>)
-		: T{s, g}{
+
+		template <typename ...Args>
+		[[nodiscard]] button(scene* s, group* g, Args&& ...args)
+			requires (std::constructible_from<T, scene*, group*, Args...> && !std::constructible_from<T, scene*, group*, std::string_view, Args...>)
+		: T{s, g, std::forward<Args>(args) ...}{
 			add_button_prop();
 		}
 
-		[[nodiscard]] button(scene* s, group* g/*, std::string_view tyName = "button<T>"*/)
-			requires (std::constructible_from<T, scene*, group*, std::string_view>)
-		: T{s, g, "button<T>"}{
+		template <typename ...Args>
+		[[nodiscard]] button(scene* s, group* g, Args&& ...args)
+			requires (std::constructible_from<T, scene*, group*, std::string_view, Args...>)
+		: T{s, g, "button<T>", std::forward<Args>(args) ...}{
 			add_button_prop();
 		}
 

@@ -369,7 +369,7 @@ namespace mo_yanxi::ui{
 		}
 
 		void set_entire_align(const align::pos align){
-			if(util::tryModify(entire_align, align)){
+			if(util::try_modify(entire_align, align)){
 				notify_layout_changed(spread_direction::from_content);
 			}
 		}
@@ -412,37 +412,37 @@ namespace mo_yanxi::ui{
 					switch(layout_policy){
 					case layout_policy::hori_major :{
 						if(minor == 0){
-							changed |= util::tryModify(elem.cell.pad.top, pad.top);
+							changed |= util::try_modify(elem.cell.pad.top, pad.top);
 						}
 
 						if(minor == grid.size() - 1){
-							changed |= util::tryModify(elem.cell.pad.bottom, pad.bottom);
+							changed |= util::try_modify(elem.cell.pad.bottom, pad.bottom);
 						}
 
 						if(major == 0){
-							changed |= util::tryModify(elem.cell.pad.left, pad.left);
+							changed |= util::try_modify(elem.cell.pad.left, pad.left);
 						}
 
 						if(major == end_idx || (elem.cell.saturate && std::ranges::size(line) == 1)){
-							changed |= util::tryModify(elem.cell.pad.right, pad.right);
+							changed |= util::try_modify(elem.cell.pad.right, pad.right);
 						}
 						break;
 					}
 					case layout_policy::vert_major :{
 						if(minor == 0){
-							changed |= util::tryModify(elem.cell.pad.left, pad.left);
+							changed |= util::try_modify(elem.cell.pad.left, pad.left);
 						}
 
 						if(minor == grid.size() - 1){
-							changed |= util::tryModify(elem.cell.pad.right, pad.right);
+							changed |= util::try_modify(elem.cell.pad.right, pad.right);
 						}
 
 						if(major == 0){
-							changed |= util::tryModify(elem.cell.pad.top, pad.top);
+							changed |= util::try_modify(elem.cell.pad.top, pad.top);
 						}
 
 						if(major == end_idx || (elem.cell.saturate && std::ranges::size(line) == 1)){
-							changed |= util::tryModify(elem.cell.pad.bottom, pad.bottom);
+							changed |= util::try_modify(elem.cell.pad.bottom, pad.bottom);
 						}
 					}
 					default : break;

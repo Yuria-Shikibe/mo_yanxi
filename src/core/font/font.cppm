@@ -6,21 +6,17 @@ module;
 #define FT_CONFIG_OPTION_ERROR_STRINGS
 #endif
 
-
-//
-
 #include <cassert>
 #include <ft2build.h>
 #include <freetype/freetype.h>
 
-
+extern "C++"{
+	#include <msdfgen/msdfgen.h>
+	#include <msdfgen/msdfgen-ext.h>
+}
 
 export module mo_yanxi.font;
-
 import std;
-
-import <msdfgen/msdfgen.h>;
-import <msdfgen/msdfgen-ext.h>;
 
 import mo_yanxi.math.rect_ortho;
 import mo_yanxi.math.vector2;

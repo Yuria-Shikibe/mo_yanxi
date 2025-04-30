@@ -1,7 +1,10 @@
 export module mo_yanxi.ui.assets;
 
+
+export import :icons;
+
 export import mo_yanxi.ui.style;
-export import mo_yanxi.graphic.image_nine_region;
+export import mo_yanxi.graphic.image_multi_region;
 import std;
 
 namespace mo_yanxi::ui::assets{
@@ -55,23 +58,26 @@ namespace mo_yanxi::ui::assets{
 			.general = colors::black,
 			.on_focus = colors::dark_gray,
 			.on_press = colors::gray,
-			.disabled = colors::dark_gray.copy().mulA(.226f),
-			.activated = colors::light_gray.copy().mulA(.126f)
+			.disabled = colors::dark_gray.copy().mul_a(.226f),
+			.activated = colors::light_gray.copy().mul_a(.126f)
 		};
 	}
 	
 	namespace shapes{
 		export inline graphic::image_nine_region edge{};
+		export inline graphic::image_nine_region edge_thin{};
 		export inline graphic::image_nine_region base{};
 	}
 
 	namespace styles{
 		export inline style::round_style general{};
+		export inline style::round_style general_static{};
 		export inline style::round_style whisper{};
+		export inline style::round_style humble{};
 		export inline style::round_style accent{};
 		export inline style::round_style hint_valid{};
 		export inline style::round_style hint_invalid{};
-		export inline style::round_style clear{};
+		export inline style::round_style no_edge{};
 	}
 
 

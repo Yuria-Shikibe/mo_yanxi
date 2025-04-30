@@ -81,10 +81,10 @@ namespace mo_yanxi::core::ctrl{
 			return static_cast<int>((code >> 24) & act::Mask);
 		}
 
-		[[nodiscard]] constexpr bool matched(const key_pack state) const noexcept{
+		[[nodiscard]] constexpr bool matched(const key_pack expected_state) const noexcept{
 			auto [tk, ta, tm] = unpack();
-			auto [ok, oa, om] = state.unpack();
-			return key::matched(tk, ok) && act::matched(ta, oa) && act::matched(tm, om);
+			auto [ok, oa, om] = expected_state.unpack();
+			return key::matched(tk, ok) && act::matched(ta, oa) && mode::matched(tm, om);
 		}
 	};
 }

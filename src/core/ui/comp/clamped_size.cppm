@@ -58,7 +58,7 @@ export namespace mo_yanxi::ui{
 		 */
 		constexpr bool set_width(T w) noexcept{
 			w = std::clamp(w, minimumSize.x, maximumSize.x);
-			return util::tryModify(size.x, w);
+			return util::try_modify(size.x, w);
 		}
 
 		/**
@@ -67,7 +67,7 @@ export namespace mo_yanxi::ui{
 		 */
 		constexpr bool set_height(T h) noexcept{
 			h = std::clamp(h, minimumSize.y, maximumSize.y);
-			return util::tryModify(size.y, h);
+			return util::try_modify(size.y, h);
 		}
 
 		/**
@@ -88,7 +88,7 @@ export namespace mo_yanxi::ui{
 		constexpr bool set_minimum_size(SizeType sz) noexcept{
 			if(this->minimumSize != sz){
 				this->minimumSize = sz;
-				return util::tryModify(size, sz.max(size));
+				return util::try_modify(size, sz.max(size));
 			}
 			return false;
 		}
@@ -100,7 +100,7 @@ export namespace mo_yanxi::ui{
 		constexpr bool set_maximum_size(SizeType sz) noexcept{
 			if(this->maximumSize != sz){
 				this->maximumSize = sz;
-				return util::tryModify(size, sz.min(size));
+				return util::try_modify(size, sz.min(size));
 			}
 			return false;
 		}

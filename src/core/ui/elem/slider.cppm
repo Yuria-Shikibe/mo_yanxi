@@ -70,31 +70,6 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] slider(scene* scene, group* group)
 			: elem(scene, group, "Slider"){
 
-			events().on<events::click>([](const events::click& event, elem& e){
-				auto& self = static_cast<slider&>(e);
-
-				const auto [key, action, mode] = event.unpack();
-
-				switch(action){
-					case core::ctrl::act::press :{
-						if(mode == core::ctrl::mode::Ctrl){
-							const auto move =
-								event.pos - (self.get_progress() * self.content_size() + self.content_src_pos());
-							self.moveBar(move);
-							self.applyLast();
-						}
-						break;
-					}
-
-					case core::ctrl::act::release :{
-						self.applyLast();
-					}
-
-					default : break;
-				}
-
-			});
-
 			register_event([](const events::scroll& event, slider& self){
 
 				math::vec2 move = event.pos;
@@ -190,6 +165,33 @@ namespace mo_yanxi::ui{
 
 	protected:
 		void draw_content(rect clipSpace) const override;
+
+		events::click_result on_click(const events::click click_event) override{
+			elem::on_click(click_event);
+
+			const auto [key, action, mode] = click_event.unpack();
+
+			switch(action){
+			case core::ctrl::act::press :{
+				if(mode == core::ctrl::mode::ctrl){
+					const auto move =
+						click_event.pos - (get_progress() * content_size() + content_src_pos());
+					moveBar(move);
+					applyLast();
+				}
+				break;
+			}
+
+			case core::ctrl::act::release :{
+				applyLast();
+			}
+
+			default : break;
+			}
+
+			return events::click_result::intercepted;
+		}
+
 	public:
 
 		[[nodiscard]] constexpr math::vec2 get_bar_size() const noexcept{

@@ -1,7 +1,3 @@
-module;
-
-#include "../src/srl/srl.hpp"
-
 export module test;
 
 import mo_yanxi.ui.basic;
@@ -10,7 +6,7 @@ import mo_yanxi.ui.assets;
 import mo_yanxi.graphic.image_atlas;
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.graphic.color;
-import mo_yanxi.graphic.image_nine_region;
+import mo_yanxi.graphic.image_multi_region;
 
 import std;
 
@@ -26,9 +22,7 @@ namespace test{
 	}
 	using namespace mo_yanxi;
 
-
 	export void load_tex(graphic::image_atlas& atlas){
 		ui::assets::load(&atlas);
-
 	}
 }

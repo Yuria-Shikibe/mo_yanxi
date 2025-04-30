@@ -101,7 +101,7 @@ namespace mo_yanxi::core::ctrl{
 
 		[[nodiscard]] key_code_t get_mode() const noexcept{
 			const auto shift = triggered(key::Left_Shift) || triggered(key::Right_Shift) ? mode::Shift : mode::None;
-			const auto ctrl = triggered(key::Left_Control) || triggered(key::Right_Control) ? mode::Ctrl : mode::None;
+			const auto ctrl = triggered(key::Left_Control) || triggered(key::Right_Control) ? mode::ctrl : mode::None;
 			const auto alt = triggered(key::Left_Alt) || triggered(key::Right_Alt) ? mode::Alt : mode::None;
 			const auto caps = triggered(key::CapsLock) ? mode::CapLock : mode::None;
 			const auto nums = triggered(key::NumLock) ? mode::NumLock : mode::None;

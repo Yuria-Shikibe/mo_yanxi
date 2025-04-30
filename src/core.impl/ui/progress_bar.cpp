@@ -16,8 +16,8 @@ void mo_yanxi::ui::progress_bar_drawer::draw(const progress_bar& elem) const{
 	auto [from, to] = elem.getColor();
 
 	to.lerp(from, 1 - progress);
-	from.mulA(elem.gprop().get_opacity());
-	to.mulA(elem.gprop().get_opacity());
+	from.mul_a(elem.gprop().get_opacity());
+	to.mul_a(elem.gprop().get_opacity());
 
 	draw::fill::fill(
 		param.get(),

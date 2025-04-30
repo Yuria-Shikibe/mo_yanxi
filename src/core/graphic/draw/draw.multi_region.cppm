@@ -4,7 +4,7 @@
 
 export module mo_yanxi.graphic.draw.multi_region;
 
-export import mo_yanxi.graphic.image_nine_region;
+export import mo_yanxi.graphic.image_multi_region;
 export import mo_yanxi.graphic.draw.func;
 
 import std;
@@ -18,7 +18,7 @@ namespace mo_yanxi::graphic::draw{
 		auto_batch_acquirer<Vtx, UV, Proj>& param,
 		const image_nine_region& nineRegion,
 		math::frect bound,
-		const color color){
+		const color color = colors::white){
 		if(color.a <= 0.0){
 			return;
 		}

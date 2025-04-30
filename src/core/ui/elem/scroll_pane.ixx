@@ -2,7 +2,7 @@
 // Created by Matrix on 2025/3/15.
 //
 
-export module mo_yanxi.ui.scroll_pane;
+export module mo_yanxi.ui.elem.scroll_pane;
 
 export import mo_yanxi.ui.basic;
 export import mo_yanxi.ui.layout.policies;
@@ -19,7 +19,7 @@ namespace mo_yanxi::ui{
 		static constexpr float VelocityScale = 20.f;
 
 	private:
-		float scrollBarStroke{20.0f};
+		float scroll_bar_stroke_{20.0f};
 
 		math::vec2 scrollVelocity{};
 		math::vec2 scrollTargetVelocity{};
@@ -62,16 +62,8 @@ namespace mo_yanxi::ui{
 
 				rst.clamp_xy({}, self.get_scrollable_size());
 
-				if(util::tryModify(self.scroll.temp, rst)){
+				if(util::try_modify(self.scroll.temp, rst)){
 					self.updateChildrenAbsSrc();
-				}
-			});
-
-			events().on<events::click>([](const events::click e, elem& el){
-				auto& self = static_cast<scroll_pane&>(el);
-
-				if(e.code.action() == core::ctrl::act::release){
-					self.scroll.apply();
 				}
 			});
 			//
@@ -109,7 +101,7 @@ namespace mo_yanxi::ui{
 				scrollTargetVelocity.lerp({}, delta_in_ticks * VelocityDragSensitivity);
 
 
-				if(util::tryModify(
+				if(util::try_modify(
 					scroll.base,
 						scroll.base.fma(scrollVelocity, delta_in_ticks).clamp_xy({}, get_scrollable_size()) * get_vel_clamp())){
 					scroll.resume();
@@ -163,6 +155,13 @@ namespace mo_yanxi::ui{
 		}
 
 	private:
+		events::click_result on_click(const events::click click_event) override{
+			if(click_event.code.action() == core::ctrl::act::release){
+				scroll.apply();
+			}
+
+			return elem::on_click(click_event);
+		}
 		// [[nodiscard]] math::vec2 get_bound() const noexcept{
 		// 	switch(layout_policy_){
 		// 	case layout_policy::horizontal :
@@ -204,7 +203,7 @@ namespace mo_yanxi::ui{
 					switch(layout_policy_){
 					case layout_policy::hori_major :{
 						if(sz->y > property.content_height()){
-							bound.width.value -= scrollBarStroke;
+							bound.width.value -= scroll_bar_stroke_;
 							bound.width.value = math::clamp_positive(bound.width.value);
 							need_relayout = true;
 						}
@@ -212,7 +211,7 @@ namespace mo_yanxi::ui{
 					}
 					case layout_policy::vert_major :{
 						if(sz->x > property.content_width()){
-							bound.height.value -= scrollBarStroke;
+							bound.height.value -= scroll_bar_stroke_;
 							bound.height.value = math::clamp_positive(bound.height.value);
 							need_relayout = true;
 						}
@@ -292,8 +291,8 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] constexpr math::vec2 get_bar_size() const noexcept{
 			math::vec2 rst{};
 
-			if(enable_hori_scroll())rst.y += scrollBarStroke;
-			if(enable_vert_scroll())rst.x += scrollBarStroke;
+			if(enable_hori_scroll())rst.y += scroll_bar_stroke_;
+			if(enable_vert_scroll())rst.x += scroll_bar_stroke_;
 
 			return rst;
 		}

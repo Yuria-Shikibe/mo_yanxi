@@ -44,7 +44,7 @@ namespace mo_yanxi::graphic::draw{
 				}
 
 				if(glyph.code.code == U'\0'){
-					tempColor.mulA(.65f);
+					tempColor.mul_a(.65f);
 				}
 
 				const auto region = glyph.get_draw_bound().move(lineOff);
@@ -71,10 +71,10 @@ namespace mo_yanxi::graphic::draw{
 				region.vert_10(),
 				region.vert_11(),
 				region.vert_01(),
-				last_elem->color.copy().mulA(opacityScl).to_light_color_copy(toLight),
+				last_elem->color.copy().mul_a(opacityScl).to_light_color_copy(toLight),
 				{},
 				{},
-				last_elem->color.copy().mulA(opacityScl).to_light_color_copy(toLight)
+				last_elem->color.copy().mul_a(opacityScl).to_light_color_copy(toLight)
 			);
 		}
 

@@ -12,8 +12,8 @@ void mo_yanxi::ui::slider::draw_content(const rect clipSpace) const{
 	rect rect{get_bar_size()};
 
 	rect.src = content_src_pos() + get_bar_cur_pos();
-	draw::fill::rect_ortho(param.get(), rect, colors::gray.copy().mulA(gprop().get_opacity()));
+	draw::fill::rect_ortho(param.get(), rect, colors::gray.copy().mul_a(gprop().get_opacity()));
 
 	rect.src = content_src_pos() + get_bar_last_pos();
-	draw::fill::rect_ortho(param.get(), rect, colors::light_gray.copy().mulA(gprop().get_opacity()));
+	draw::fill::rect_ortho(param.get(), rect, colors::light_gray.copy().mul_a(gprop().get_opacity()));
 }

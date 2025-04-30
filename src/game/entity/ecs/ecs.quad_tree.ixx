@@ -16,7 +16,7 @@ import mo_yanxi.handle_wrapper;
 import mo_yanxi.math;
 
 
-namespace mo_yanxi::game::ecs{
+namespace mo_yanxi::game{
 	// using gch::erase_if;
 
 	using math::vector2;
@@ -37,7 +37,7 @@ namespace mo_yanxi::game::ecs{
 
 	template <typename ItemTy, number T>
 	struct quad_tree_trait{
-		using adaptor_type = ecs::quad_tree_trait_adaptor<ItemTy>;
+		using adaptor_type = quad_tree_trait_adaptor<ItemTy>;
 		using vec_t = typename adaptor_type::vector_type;
 		using rect_type = typename adaptor_type::rect_type;
 
@@ -812,7 +812,6 @@ namespace mo_yanxi::game::ecs{
 					node.intersect_then(point, mo_yanxi::pass_fn(func));
 				}
 			}
-
 		}
 
 		template <std::invocable<value_type&, value_type&> Func>

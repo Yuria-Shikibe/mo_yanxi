@@ -46,7 +46,7 @@ namespace mo_yanxi::core::ctrl{
 	namespace mode{
 		export constexpr key_code_t None = 0;
 		export constexpr key_code_t Shift = GLFW_MOD_SHIFT;
-		export constexpr key_code_t Ctrl = GLFW_MOD_CONTROL;
+		export constexpr key_code_t ctrl = GLFW_MOD_CONTROL;
 		export constexpr key_code_t Alt = GLFW_MOD_ALT;
 		export constexpr key_code_t Super = GLFW_MOD_SUPER;
 
@@ -54,7 +54,7 @@ namespace mo_yanxi::core::ctrl{
 		export constexpr key_code_t NumLock = GLFW_MOD_NUM_LOCK;
 		//6Bit
 
-		export constexpr key_code_t Ctrl_Shift = Ctrl | Shift;
+		export constexpr key_code_t Ctrl_Shift = ctrl | Shift;
 
 		// constexpr key_code_t NoIgnore = static_cast<key_code_t>(0b11'00'00'00);
 		export constexpr key_code_t ignore = 0b10'00'00'00;
@@ -62,7 +62,7 @@ namespace mo_yanxi::core::ctrl{
 		constexpr unsigned Bits = 8;
 		export constexpr unsigned Mask = genMaskFromBits(Bits);
 
-		export constexpr key_code_t Frequent_Bound = Shift | Ctrl | Alt/* | Super | CapLock | NumLock */ + 1;
+		export constexpr key_code_t Frequent_Bound = Shift | ctrl | Alt/* | Super | CapLock | NumLock */ + 1;
 
 		export [[nodiscard]] constexpr bool matched(const key_code_t mode, const key_code_t expectedMode) noexcept{
 			return (mode & Mask) == (expectedMode & Mask) || (expectedMode & Mask) & ignore;

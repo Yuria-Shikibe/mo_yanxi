@@ -72,6 +72,10 @@ namespace mo_yanxi::ui{
 			this->pad = pad;
 			return *this;
 		}
+		constexpr auto& set_pad(float pad) noexcept {
+			this->pad.set(pad);
+			return *this;
+		}
 
 		constexpr auto& set_width(float sz) noexcept {
 			stated_extent.width = {size_category::mastering, sz};
@@ -115,7 +119,7 @@ namespace mo_yanxi::ui{
 			return *this;
 		}
 
-		constexpr auto& set_external(math::vec2 weight) noexcept {
+		constexpr auto& set_external_weight(math::vec2 weight) noexcept {
 			if(weight.x > 0){
 				stated_extent.width.type = size_category::external;
 				stated_extent.width.value = weight.x;
@@ -128,11 +132,7 @@ namespace mo_yanxi::ui{
 
 			return *this;
 		}
-		constexpr auto& set_external() noexcept {
-			return set_external({true, true});
-		}
-
-		constexpr auto& set_external_weight(math::vector2<bool> weight) noexcept {
+		constexpr auto& set_external(math::vector2<bool> weight) noexcept {
 			if(weight.x){
 				stated_extent.width.type = size_category::external;
 				stated_extent.width.value = static_cast<float>(weight.x);
@@ -144,6 +144,10 @@ namespace mo_yanxi::ui{
 			}
 
 			return *this;
+		}
+
+		constexpr auto& set_external() noexcept {
+			return set_external({true, true});
 		}
 
 		void apply_to(

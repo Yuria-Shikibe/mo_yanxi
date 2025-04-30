@@ -5,7 +5,6 @@ module;
 export module mo_yanxi.ui.elem.nested_scene;
 
 export import mo_yanxi.ui.basic;
-export import mo_yanxi.ui.loose_group;
 export import mo_yanxi.graphic.camera;
 export import mo_yanxi.math.quad_tree;
 
@@ -124,11 +123,13 @@ namespace mo_yanxi::ui{
 		//
 		// }
 
-		elem& add_children(elem_ptr&& element) override{
+		elem& add_children(elem_ptr&& element, std::size_t where) override{
 			quadTree.insert(*element);
 			// element->update_abs_src({});
-			return basic_group::add_children(std::move(element));
+			return basic_group::add_children(std::move(element), where);
 		}
+
+		using basic_group::add_children;
 
 		// friend Pool;
 
@@ -285,7 +286,7 @@ namespace mo_yanxi::ui{
 			scene_.root_ownership = false;
 			group_.property.set_empty_drawer();
 
-			camera_.move_speed_scale = {.5, -.5};
+			camera_.flip_y = true;
 
 			register_event([](events::cursor_moved e, nested_scene& self){
 				auto p = self.getTransferredPos(self.get_scene()->cursor_pos);
@@ -302,43 +303,12 @@ namespace mo_yanxi::ui{
 				self.set_focused_scroll(false);
 			});
 
-			register_event([](events::click e, nested_scene& self){
-				auto [k, a, m] = e.unpack();
-
-				using namespace core::ctrl;
-
-
-				if(self.drag_state_.has_value()){
-					if(a != act::release)return;
-
-					auto cpos = self.getTransferredPos(e.pos);
-					self.drag_state_->drop(self.group_, cpos);
-					self.drag_state_ = std::nullopt;
-				} else{
-					if(a != act::press) goto pass;
-
-					auto cpos = self.getTransferredPos(e.pos);
-					auto elem = self.group_.try_find(cpos, 8);
-					if(elem && self.group_.try_find(cpos, 1) == elem){
-						elem = nullptr;
-					}
-
-					if(elem){
-						self.drag_state_.emplace(*elem, cpos);
-					}
-				}
-
-			pass:
-
-				if(!self.drag_state_.has_value())self.scene_.on_mouse_action(k, a, m);
-			});
-
 			register_event([](events::scroll e, nested_scene& self){
 
 				if(self.scene_.has_scroll_focus()){
 					self.scene_.on_scroll(e.pos);
 				}else{
-					self.camera_.set_target_scale(self.camera_.get_target_scale() + e.pos.y * 0.05f);
+					self.camera_.set_scale_by_delta(e.pos.y * 0.05f);
 				}
 
 			});
@@ -365,7 +335,7 @@ namespace mo_yanxi::ui{
 			// scene_.resize(property.content_bound_absolute().move_x(math::absin(get_scene()->get_global_time(), 10, property.content_width())));
 
 			elem::update(delta_in_ticks);
-			camera_.update(delta_in_ticks, false);
+			camera_.update(delta_in_ticks);
 
 			scene_.update(delta_in_ticks);
 			scene_.layout();
@@ -388,6 +358,40 @@ namespace mo_yanxi::ui{
 			return false;
 		}
 
+		events::click_result on_click(const events::click click_event) override{
+			elem::on_click(click_event);
+
+			auto [k, a, m] = click_event.unpack();
+
+			using namespace core::ctrl;
+
+
+			if(drag_state_.has_value()){
+				if(a != act::release)return events::click_result::intercepted;
+
+				auto cpos = getTransferredPos(click_event.pos);
+				drag_state_->drop(group_, cpos);
+				drag_state_ = std::nullopt;
+			} else{
+				if(a != act::press) goto pass;
+
+				auto cpos = getTransferredPos(click_event.pos);
+				auto elem = group_.try_find(cpos, 8);
+				if(elem && group_.try_find(cpos, 1) == elem){
+					elem = nullptr;
+				}
+
+				if(elem){
+					drag_state_.emplace(*elem, cpos);
+				}
+			}
+
+			pass:
+
+			if(!drag_state_.has_value())scene_.on_mouse_action(k, a, m);
+
+			return events::click_result::intercepted;
+		}
 
 		void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
 			scene_.on_key_action(key, action, mode);

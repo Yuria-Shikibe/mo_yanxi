@@ -13,7 +13,7 @@ import <msdfgen/msdfgen.h>;
 import <msdfgen/msdfgen-ext.h>;
 
 namespace mo_yanxi::graphic::msdf{
-	export constexpr inline std::uint32_t sdf_image_boarder = 4;
+	export constexpr inline int sdf_image_boarder = 4;
 	export constexpr inline double sdf_image_range = 1.5f;
 
 	void write_to_bitmap(bitmap& bitmap, const msdfgen::Bitmap<float, 3>& region){
@@ -54,7 +54,7 @@ namespace mo_yanxi::graphic::msdf{
 		const svg_info& shape,
 		unsigned w, unsigned h,
 		double range = sdf_image_range,
-		unsigned boarder = sdf_image_boarder);
+		int boarder = sdf_image_boarder);
 
 
 	export
@@ -63,7 +63,7 @@ namespace mo_yanxi::graphic::msdf{
 		msdfgen::unicode_t code,
 		unsigned target_w,
 		unsigned target_h,
-		unsigned boarder,
+		int boarder,
 		double font_w,
 		double font_h,
 		double range = sdf_image_range
@@ -77,16 +77,16 @@ namespace mo_yanxi::graphic::msdf{
 	struct msdf_generator{
 	private:
 		svg_info shape{};
-	public:
 
+	public:
 		double range = sdf_image_range;
-		unsigned boarder = sdf_image_boarder;
+		int boarder = sdf_image_boarder;
 
 		[[nodiscard]] msdf_generator() = default;
 
-		[[nodiscard]] msdf_generator(svg_info&& shape, double range = sdf_image_range, unsigned boarder = sdf_image_boarder);
+		[[nodiscard]] msdf_generator(svg_info&& shape, double range = sdf_image_range, int boarder = sdf_image_boarder);
 
-		[[nodiscard]] msdf_generator(const char* path, double range = sdf_image_range, unsigned boarder = sdf_image_boarder);
+		[[nodiscard]] msdf_generator(const char* path, double range = sdf_image_range, int boarder = sdf_image_boarder);
 
 		graphic::bitmap operator ()(const unsigned w, const unsigned h, const unsigned mip_lv) const {
 			auto scl = 1 << mip_lv;

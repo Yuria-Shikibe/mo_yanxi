@@ -2,7 +2,7 @@ module mo_yanxi.ui.basic;
 
 
 void mo_yanxi::ui::tooltip_owner::tooltip_notify_drop(){
-	if(tooltip_handle)tooltip_handle->get_scene()->tooltip_manager.requestDrop(this);
+	if(tooltip_handle)tooltip_handle->get_scene()->tooltip_manager.request_drop(this);
 }
 
 mo_yanxi::ui::group* mo_yanxi::ui::tooltip_owner::tooltip_deduce_parent(scene& scene) const{

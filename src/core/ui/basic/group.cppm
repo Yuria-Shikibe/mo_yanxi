@@ -92,33 +92,6 @@ namespace mo_yanxi::ui{
 			return false;
 		}
 
-		// bool update_abs_src(const math::vec2 parentAbsSrc) override{
-		// 	if(elem::update_abs_src(parentAbsSrc)){
-		// 		for(const auto& element : get_children()){
-		// 			element->update_abs_src(abs_pos());
-		// 		}
-		// 		return true;
-		// 	}
-		// 	return false;
-		// }
-
-
-		// template <std::derived_from<elem> E>
-		// decltype(auto) emplaceChildren(){
-		// 	auto ptr = ElementUniquePtr{this, scene, new E};
-		// 	auto rst = ptr.get();
-		// 	addChildren(std::move(ptr));
-		// 	return *static_cast<E*>(rst);
-		// }
-		//
-		// template <InvocableElemInitFunc Fn>
-		// 	requires (std::is_default_constructible_v<typename ElemInitFuncTraits<Fn>::ElemType>)
-		// decltype(auto) emplaceInitChildren(Fn init){
-		// 	auto ptr = ElementUniquePtr{this, scene, init};
-		// 	auto rst = ptr.get();
-		// 	addChildren(std::move(ptr));
-		// 	return *static_cast<typename ElemInitFuncTraits<Fn>::ElemType*>(rst);
-		// }
 
 	protected:
 		static bool set_fillparent(
@@ -198,5 +171,87 @@ namespace mo_yanxi::ui{
 			return fx && fy;
 		}
 	// 	void modifyChildren(elem& element);
+	};
+
+	export
+	struct basic_group : public group {
+	protected:
+		std::vector<elem_ptr> toRemove{};
+		std::vector<elem_ptr> children{};
+
+	public:
+		[[nodiscard]] basic_group(scene* scene, group* group, const std::string_view tyName)
+			: group(scene, group, tyName){
+			interactivity = interactivity::children_only;
+		}
+
+		virtual void clear_children() noexcept{
+			toRemove.clear();
+			children.clear();
+			notify_layout_changed(spread_direction::super | spread_direction::from_content);
+		}
+
+		virtual void post_remove(elem* elem){
+			if(const auto itr = find(elem); itr != children.end()){
+				toRemove.push_back(std::move(*itr));
+				children.erase(itr);
+			}
+			notify_layout_changed(spread_direction::all_visible);
+		}
+
+		virtual void instant_remove(elem* elem){
+			if(const auto itr = find(elem); itr != children.end()){
+				children.erase(itr);
+			}
+			notify_layout_changed(spread_direction::all_visible);
+		}
+
+		//TODO emplace
+
+		virtual elem& add_children(elem_ptr&& elem, std::size_t where){
+			setChildrenFillParentSize_legacy(*elem, content_size());
+
+			elem->update_abs_src(content_src_pos());
+			notify_layout_changed(spread_direction::upper | spread_direction::from_content);
+			return **children.insert(children.begin() + std::min<std::size_t>(where, children.size()), std::move(elem));
+		}
+
+		elem& add_children(elem_ptr&& elem){
+			return add_children(std::move(elem), std::numeric_limits<std::size_t>::max());
+		}
+
+		template <typename E, typename ...Args>
+		requires requires{
+			requires std::is_base_of_v<elem, E>;
+		}
+		E& emplace_children_at(std::size_t index, Args&&... args){
+			auto& elem = add_children(elem_ptr{get_scene(), this, std::in_place_type<E>, std::forward<Args>(args) ...});
+			return static_cast<E&>(elem);
+		}
+
+		[[nodiscard]] std::span<const elem_ptr> get_children() const noexcept override{
+			return children;
+		}
+
+		void update(const float delta_in_ticks) override{
+			toRemove.clear();
+
+			elem::update(delta_in_ticks);
+
+			update_children(delta_in_ticks);
+		}
+
+	protected:
+		decltype(children)::iterator find(elem* elem) noexcept{
+			return std::ranges::find(children, elem, &elem_ptr::get);
+		}
+	};
+
+	export
+	struct loose_group : basic_group{
+		[[nodiscard]] loose_group(scene* scene, group* group)
+			: basic_group(scene, group, "loose_group"){
+		}
+
 	};
 }

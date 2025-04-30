@@ -26,7 +26,7 @@ layout(set = 0, binding = 1) uniform UBO{
     float dst;
     float time;
     vec2 extent;
-    float camera_scale;
+    float inv_scale;
     uint cap1;
     uint cap2;
     uint cap3;
@@ -34,16 +34,9 @@ layout(set = 0, binding = 1) uniform UBO{
 
 layout(set = 1, binding = 0) uniform sampler2D textures[4];
 
-const float LightColorRange = 2550.f;
-
 const sline_line_style line_style = sline_line_style(
     45.f, 1.f, 30, 16
 );
-
-float dst_to_rect(vec2 pos, frect rect, vec2 scl){
-    vec2 ppos = clamp(pos, rect.src, rect.dst);
-    return distance(ppos * scl, pos * scl);
-}
 
 void main() {
     vec4 texColor;
@@ -66,14 +59,14 @@ void main() {
 
     if(bool(mode & draw_mode_sdf)){
         float msdf = msdf(textures[in_indices[0]], in_uv, 1, bool(mode & draw_mode_uniformed));
-        msdf = smoothstep(-0.0375 * ubo.camera_scale, 0.09 * ubo.camera_scale, msdf);
+        msdf = smoothstep(-0.0375 * ubo.inv_scale, 0.07 * ubo.inv_scale, msdf);
         texColor = vec4(1, 1, 1, msdf);
     }else{
         texColor = texture(textures[in_indices[0]], in_uv);
     }
 
     if(bool(mode & draw_mode_slide_line)){
-        float scl = is_in_slide_line_smooth(in_pos * ubo.extent * ubo.camera_scale, line_style, ubo.time * 60, 0.175f);
+        float scl = is_in_slide_line_smooth(in_pos * ubo.extent * ubo.inv_scale, line_style, ubo.time * 60, 0.175f);
         texColor.a *= scl;
     }
 

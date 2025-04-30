@@ -288,6 +288,33 @@ namespace mo_yanxi::vk{
 				vertex_group_count = next;
 				return rst;
 			}
+
+			[[nodiscard]] constexpr batch_vertex_allocation fast_acquire(
+				VkImageView image_view,
+				const std::uint32_t acquired_group_count,
+
+				const std::size_t unit_size,
+				const std::size_t chunk_vertex_group_capacity
+			) noexcept{
+				assert(state == region_state::valid);
+
+				if(acquired_group_count + this->vertex_group_count <= chunk_vertex_group_capacity){
+					const auto viewIdx = views.try_push(image_view);
+					if(viewIdx == maximum_images)return {};
+
+					const batch_vertex_allocation rst = {
+						host_vertices.get() + vertex_group_count * unit_size * 4,
+						static_cast<std::uint32_t>(acquired_group_count * unit_size * 4),
+						viewIdx
+					};
+
+					vertex_group_count += acquired_group_count;
+
+					return rst;
+				}
+
+				return {};
+			}
 		};
 
 		struct draw_call{
@@ -439,6 +466,8 @@ namespace mo_yanxi::vk{
 		}
 
 		[[nodiscard]] allocation_group acquire(std::uint32_t vertex_group_count, VkImageView image_view){
+			//TODO order irrelevant acquire
+
 			auto& region = get_current();
 
 			consume_pending();
@@ -449,33 +478,33 @@ namespace mo_yanxi::vk{
 			auto pre_rst = region.acquire(image_view, vertex_group_count, vertex_unit_size, get_vertex_group_count_per_chunk());
 
 			if(pre_rst.size_in_bytes == 0){
+				//Current run out of valid image regions
 				pend_current();
 				advance_chunk();
 				pre_rst = get_current().acquire(image_view, vertex_group_count, vertex_unit_size, get_vertex_group_count_per_chunk());
 			}
 
 			if(pre_rst.get_vertex_group_count(vertex_unit_size) == vertex_group_count){
+				//Current is fit
 				if(get_current().saturate(get_vertex_group_count_per_chunk())){
 					pend_current();
 				}
 
 				return {pre_rst};
 			}else{
+				//Current fit partial the acquire
 				vertex_group_count -= pre_rst.get_vertex_group_count(vertex_unit_size);
 
 				pend_current();
-				if(auto next_region = get_another()){
+				advance_chunk();
 
-					const auto post_rst = next_region->acquire(image_view, vertex_group_count, vertex_unit_size, get_vertex_group_count_per_chunk());
+				const auto post_rst = get_current().acquire(image_view, vertex_group_count, vertex_unit_size, get_vertex_group_count_per_chunk());
 
-					if(post_rst.get_vertex_group_count(vertex_unit_size) != vertex_group_count){
-						std::println(std::cerr, "[Graphic] Too much vertex in one acquisition");
-					}
-
-					return {pre_rst, post_rst};
+				if(post_rst.get_vertex_group_count(vertex_unit_size) != vertex_group_count){
+					std::println(std::cerr, "[Graphic] Too much vertex in one acquisition");
 				}
 
-				return {pre_rst};
+				return {pre_rst, post_rst};
 			}
 		}
 

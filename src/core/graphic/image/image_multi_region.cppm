@@ -1,12 +1,11 @@
 // ReSharper disable CppDFANotInitializedField
 module;
 
-
 #include <vulkan/vulkan.h>
 #include "../src/ext/assume.hpp"
 #include "../src/ext/adapted_attributes.hpp"
 
-export module mo_yanxi.graphic.image_nine_region;
+export module mo_yanxi.graphic.image_multi_region;
 
 export import mo_yanxi.graphic.image_region;
 import mo_yanxi.graphic.grid_generator;

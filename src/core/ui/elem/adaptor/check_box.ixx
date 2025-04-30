@@ -21,26 +21,31 @@ namespace mo_yanxi::ui{
 			interactivity = interactivity::enabled;
 			property.maintain_focus_until_mouse_drop = true;
 
-			register_event([](const events::click& e, check_box& self){
-				if(self.drawables_.empty())return;
-				if(e.code.action() != core::ctrl::act::release)return;
-				if(!self.contains(e.pos))return;
+		}
 
-				switch(e.code.key()){
-				case core::ctrl::mouse::LMB:
-					self.current_frame_index = (self.current_frame_index + 1) % self.drawables_.size();
-					break;
-				case core::ctrl::mouse::RMB:
-					if(self.has_tooltip_builder()){
-						if(self.has_tooltip())self.tooltip_notify_drop();
-						else self.build_tooltip();
-					}
-					break;
-				default:
-					break;
+		events::click_result on_click(const events::click click_event) override{
+			if(drawables_.empty())return events::click_result::intercepted;
+
+			elem::on_click(click_event);
+
+			if(click_event.code.action() != core::ctrl::act::release)return events::click_result::intercepted;
+			if(!contains(click_event.pos))return events::click_result::intercepted;
+
+			switch(click_event.code.key()){
+			case core::ctrl::mouse::LMB:
+				current_frame_index = (current_frame_index + 1) % drawables_.size();
+				break;
+			case core::ctrl::mouse::RMB:
+				if(has_tooltip_builder()){
+					if(has_tooltip())tooltip_notify_drop();
+					else build_tooltip();
 				}
+				break;
+			default:
+				break;
+			}
 
-			});
+			return events::click_result::intercepted;
 		}
 
 		void add_multi_select_tooltip(tooltip_layout_info layout){
@@ -54,7 +59,7 @@ namespace mo_yanxi::ui{
 					auto img = table.emplace<button<image_frame>>();
 					img.cell().set_pad({.left = 4, .right = 4}).set_size(96);
 
-					img->set_style(assets::styles::clear);
+					img->set_style(assets::styles::no_edge);
 					img->set_drawable<drawable_ref>(drawable.drawable.get());
 					img->set_button_callback(button_tags::general, [&owner, idx](elem& elem){
 						owner.current_frame_index = idx;

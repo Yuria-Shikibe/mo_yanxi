@@ -118,7 +118,7 @@ namespace mo_yanxi::ui{
 
 
 		bool root_ownership{true};
-		dependency<group*> root{};
+		dependency<basic_group*> root{};
 
 		elem* currentScrollFocus{nullptr};
 		elem* currentCursorFocus{nullptr};
@@ -137,7 +137,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] scene_base(
 			const std::string_view name,
-			const owner<group*> root,
+			const owner<basic_group*> root,
 			graphic::renderer_ui* renderer = nullptr)
 			: name{name},
 			  root{root},
@@ -156,7 +156,7 @@ namespace mo_yanxi::ui{
 	export struct scene : scene_base{
 		[[nodiscard]] explicit scene(
 			std::string_view name,
-			owner<group*> root,
+			owner<basic_group*> root,
 			graphic::renderer_ui* renderer = nullptr
 		);
 
@@ -170,7 +170,7 @@ namespace mo_yanxi::ui{
 			return focused_camera != nullptr;
 		}
 
-		[[nodiscard]] math::vec2 getCursorDragTransform(const core::ctrl::key_code_t key) const noexcept{
+		[[nodiscard]] math::vec2 get_cursor_drag_transform(const core::ctrl::key_code_t key) const noexcept{
 			return cursor_pos - mouseKeyStates[key].src;
 		}
 
@@ -180,15 +180,19 @@ namespace mo_yanxi::ui{
 
 		// void setIMEPos(Geom::Point2 pos) const;
 
-		void registerAsyncTaskElement(elem* element);
+		[[deprecated]] void registerAsyncTaskElement(elem* element);
 
-		void notifyLayoutUpdate(elem* element);
+		void notify_layout_update(elem* element);
 
 		[[nodiscard]] bool isMousePressed() const noexcept{
 			return std::ranges::any_of(mouseKeyStates, std::identity{}, &MouseState::pressed);
 		}
 
 		// void joinTasks();
+
+		[[nodiscard]] math::vec2 get_cursor_pos() const noexcept{
+			return cursor_pos;
+		}
 
 		[[nodiscard]] core::ctrl::key_code_t get_input_mode() const noexcept;
 

@@ -43,7 +43,7 @@ import std;
 
 
 namespace mo_yanxi::ui{
-
+	// export constexpr inline float preferred_size =
 	export constexpr inline bool IgnoreClipWhenDraw = false;
 
 	export using rect = math::frect;
@@ -56,8 +56,6 @@ namespace mo_yanxi::ui{
 	export struct empty_drawer final : style_drawer<elem>{
 		void draw(const elem& element, rect region, float opacityScl) const override{
 		}
-
-		// float content_opacity(const elem& element) const override{}
 	};
 
 	export constexpr inline align::spacing DefaultBoarder{BoarderStroke, BoarderStroke, BoarderStroke, BoarderStroke};
@@ -68,6 +66,13 @@ namespace mo_yanxi::ui{
 	export inline const style_drawer<elem>* global_style_drawer;
 
 	namespace events{
+
+		export
+		enum struct click_result{
+			intercepted,
+			spread,
+		};
+
 		// export
 		// using ElementConnection = ConnectionEvent<elem>;
 		// export
@@ -79,7 +84,7 @@ namespace mo_yanxi::ui{
 		std::move_only_function<void(elem&) const>,
 		// events::GeneralCodeEvent,
 		// events::ElementConnection,
-		events::click,
+		// events::click,
 		events::drag,
 		events::exbound,
 		events::inbound,
@@ -184,6 +189,10 @@ namespace mo_yanxi::ui{
 		bool focused{};
 		bool pressed{};
 
+		void quit_focus() noexcept{
+			focused = pressed = false;
+		}
+
 		void update(const float delta_in_ticks){
 			if(inbound){
 				math::approach_inplace(time_inbound, maximum_duration, delta_in_ticks);
@@ -205,7 +214,6 @@ namespace mo_yanxi::ui{
 
 		void registerDefEvent(elem_event_manager& event_manager);
 	};
-
 
 
 
@@ -375,7 +383,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] elem(
 			scene* scene,
-			group* group = nullptr,
+			group* group,
 			const std::string_view tyName = "")
 			: elem_datas{tyName}{
 			elem::set_scene(scene);
@@ -412,12 +420,7 @@ namespace mo_yanxi::ui{
 			return cursor_state;
 		}
 
-		void set_style(const style_drawer<elem>& drawer){
-			property.graphic_data.drawer = &drawer;
-			if(drawer.apply_to(*this)){
-				notify_layout_changed(spread_direction::all_visible);
-			}
-		}
+		void set_style(const style_drawer<elem>& drawer);
 
 		void set_style(){
 			property.set_empty_drawer();
@@ -568,7 +571,7 @@ namespace mo_yanxi::ui{
 			return property.absolute_src + property.content_src_offset();
 		}
 
-		// void remove_self_from_parent();
+		void remove_self_from_parent() noexcept;
 		// void remove_self_from_parent_instantly();
 		// void notify_remove();
 
@@ -673,6 +676,21 @@ namespace mo_yanxi::ui{
 		}
 
 		virtual void input_unicode(const char32_t val){
+
+		}
+
+		virtual events::click_result on_click(const events::click click_event){
+			if(!interactable()){
+				return events::click_result::spread;
+			}
+
+			switch(click_event.code.action()){
+			case core::ctrl::act::press : cursor_state.pressed = true;
+				break;
+			default : cursor_state.pressed = false;
+			}
+
+			return events::click_result::intercepted;
 		}
 		// [[nodiscard]] virtual math::vec2 requestSpace(const StatedSize sz, math::vec2 minimumSize,
 		// 											  math::vec2 currentAllocatedSize){
@@ -725,9 +743,9 @@ namespace mo_yanxi::ui{
 		virtual esc_flag on_esc(){
 			if(has_tooltip()){
 				tooltip_notify_drop();
-				return esc_flag::sustain;
+				return esc_flag::intercept;
 			}
-			return esc_flag::droppable;
+			return esc_flag::fall_through;
 		}
 
 
@@ -792,6 +810,18 @@ namespace mo_yanxi::ui{
 	};
 
 	void iterateAll_DFSImpl(math::vec2 cursorPos, std::vector<elem*>& selected, elem* current);
+
+	export
+	namespace util{
+		bool is_valid_release_click(const elem& elem, const events::click& click) noexcept{
+			return elem.contains(click.pos) && click.code.action() == core::ctrl::act::release;
+		}
+
+		esc_flag thoroughly_esc(elem* where) noexcept;
+		esc_flag thoroughly_esc(elem& where) noexcept{
+			return thoroughly_esc(std::addressof(where));
+		}
+	}
 	//
 	// export void elementBuildTooltip(elem& element) noexcept{
 	// 	if(!element.hasTooltip()){

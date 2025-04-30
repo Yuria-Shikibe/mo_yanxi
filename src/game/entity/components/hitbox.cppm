@@ -105,6 +105,14 @@ namespace mo_yanxi::game{
 		explicit(false) constexpr operator math::rect_box_posed&() noexcept{
 			return box;
 		}
+
+		friend bool operator==(const hitbox_comp& lhs, const hitbox_comp& rhs) noexcept{
+			return lhs.box.get_identity() == rhs.box.get_identity() && lhs.trans == rhs.trans;
+		}
+
+		void update() noexcept{
+			box.update(trans);
+		}
 	};
 
 	union hitbox_span{

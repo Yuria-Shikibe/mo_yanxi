@@ -13,6 +13,7 @@ layout(location = 2) out vec2 out_uv;
 
 layout(location = 3) out vec4 out_color_base;
 layout(location = 4) out vec4 out_color_light;
+layout(location = 5) out vec2 out_raw_pos;
 
 
 
@@ -28,6 +29,7 @@ layout(set = 0, binding = 0) uniform UBO {
 } ubo;
 
 void main() {
+    out_raw_pos = in_pos.xy;
     vec2 spos = (ubo.view * vec3(in_pos.xy, 1.0)).xy;
     out_pos = spos;
 

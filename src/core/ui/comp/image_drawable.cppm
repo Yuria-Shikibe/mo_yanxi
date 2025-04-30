@@ -5,12 +5,13 @@
 export module mo_yanxi.ui.image_drawable;
 
 export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.style;
 export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.graphic.color;
 export import mo_yanxi.graphic.image_atlas;
 export import mo_yanxi.graphic.image_region;
-export import mo_yanxi.graphic.image_nine_region;
+export import mo_yanxi.graphic.image_multi_region;
 export import mo_yanxi.vk.vertex_info;
 export import align;
 
@@ -36,8 +37,7 @@ namespace mo_yanxi::ui{
 	struct image_display_style{
 		align::scale scaling{align::scale::fit};
 		align::pos align{align::pos::center};
-		graphic::color color_scl{graphic::colors::white};
-		graphic::color color_mix{};
+		style::palette palette{style::general_palette};
 	};
 
 	export
@@ -57,7 +57,7 @@ namespace mo_yanxi::ui{
 	};
 
 	export
-	struct image_drawable : public moded_drawable{
+	struct image_drawable final : public moded_drawable{
 		graphic::cached_image_region image{};
 
 		[[nodiscard]] image_drawable() = default;
@@ -73,7 +73,26 @@ namespace mo_yanxi::ui{
 		}
 	};
 	export
-	struct drawable_ref : public drawable{
+	struct icon_drawable final : public moded_drawable{
+		using icon_type = graphic::combined_image_region<graphic::size_awared_uv<graphic::uniformed_rect_uv>>;
+		icon_type image{};
+
+		[[nodiscard]] icon_drawable() = default;
+
+		[[nodiscard]] explicit(false) icon_drawable(const icon_type& image_region)
+			: moded_drawable(vk::vertices::mode_flag_bits::sdf), image(image_region){
+		}
+
+		void draw(const elem& elem, math::frect region, graphic::color color_scl) const override;
+
+		[[nodiscard]] std::optional<math::vec2> get_default_size() const override {
+			return image.uv.size.as<float>();
+		}
+	};
+
+
+	export
+	struct drawable_ref final : public drawable{
 		const drawable* ref{};
 
 		[[nodiscard]] drawable_ref() = default;
@@ -148,7 +167,7 @@ namespace mo_yanxi::ui{
 	//
 
 	export
-	struct image_caped_region_drawable : moded_drawable{
+	struct image_caped_region_drawable final : moded_drawable{
 		graphic::image_caped_region region{};
 		float scale{1.f};
 
@@ -170,7 +189,7 @@ namespace mo_yanxi::ui{
 	};
 
 	export
-	struct image_nine_region_drawable : moded_drawable{
+	struct image_nine_region_drawable final : moded_drawable{
 		graphic::image_nine_region region{};
 
 		[[nodiscard]] image_nine_region_drawable() = default;

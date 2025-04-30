@@ -48,7 +48,7 @@ double mo_yanxi::ui::scene::get_global_time() const noexcept{
 
 mo_yanxi::ui::scene::scene(
 	const std::string_view name,
-	const owner<group*> root,
+	const owner<basic_group*> root,
 	graphic::renderer_ui* renderer) :
 	scene_base{name, root, renderer}{
 
@@ -76,7 +76,7 @@ void mo_yanxi::ui::scene::registerAsyncTaskElement(elem* element){
 	asyncTaskOwners.insert(element);
 }
 
-void mo_yanxi::ui::scene::notifyLayoutUpdate(elem* element){
+void mo_yanxi::ui::scene::notify_layout_update(elem* element){
 	independentLayout.insert(element);
 }
 
@@ -115,6 +115,7 @@ void mo_yanxi::ui::scene::swapFocus(elem* newFocus){
 			state.clear(cursor_pos);
 		}
 		currentCursorFocus->events().fire(events::focus_end{cursor_pos});
+		currentCursorFocus->cursor_state.quit_focus();
 	}
 
 	currentCursorFocus = newFocus;
@@ -126,12 +127,12 @@ void mo_yanxi::ui::scene::swapFocus(elem* newFocus){
 
 mo_yanxi::ui::esc_flag mo_yanxi::ui::scene::on_esc(){
 	// return true;
-	if(tooltip_manager.on_esc() != esc_flag::droppable)return esc_flag::sustain;
+	if(tooltip_manager.on_esc() != esc_flag::fall_through)return esc_flag::intercept;
 	//
 	elem* focus = currentKeyFocus;
 	if(!focus) focus = currentCursorFocus;
-	if(!focus)return esc_flag::droppable;
-	else return focus->on_esc();
+
+	return util::thoroughly_esc(focus);
 }
 
 void mo_yanxi::ui::scene::on_mouse_action(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode){
@@ -139,10 +140,10 @@ void mo_yanxi::ui::scene::on_mouse_action(const core::ctrl::key_code_t key, cons
 		currentKeyFocus = nullptr;
 	}
 
-	if(currentCursorFocus)
-		currentCursorFocus->events().fire(
-			events::click{cursor_pos, core::ctrl::key_pack{key, action, mode}}
-		);
+	if(currentCursorFocus){
+		const events::click e{cursor_pos, core::ctrl::key_pack{key, action, mode}};
+		currentCursorFocus->on_click(e);
+	}
 
 	if(action == core::ctrl::act::press){
 		mouseKeyStates[key].reset(cursor_pos);
@@ -164,7 +165,9 @@ void mo_yanxi::ui::scene::on_key_action(const core::ctrl::key_code_t key, const 
 	focus->input_key(key, action, mode);
 	if(action == core::ctrl::act::press){
 		if(key == core::ctrl::key::Esc){
-			(void)on_esc();
+			if(on_esc() == esc_flag::fall_through){
+				on_cursor_pos_update(cursor_pos);
+			}
 		}
 	}
 
@@ -226,7 +229,7 @@ void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos){
 }
 
 void mo_yanxi::ui::scene::resize(const math::frect region){
-	if(util::tryModify(this->region, region)){
+	if(util::try_modify(this->region, region)){
 		// root->update_abs_src({});
 		root->resize(region.size());
 	}
@@ -289,6 +292,8 @@ void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 			elem.element->try_draw(clipSpace);
 		}
 	}
+
+	renderer->batch->consume_all();
 }
 
 mo_yanxi::ui::scene::scene(scene&& other) noexcept:

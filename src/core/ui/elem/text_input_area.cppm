@@ -6,6 +6,7 @@ export module mo_yanxi.ui.elem.text_input_area;
 
 export import mo_yanxi.ui.elem.text_elem;
 
+import mo_yanxi.font.typesetting;
 import mo_yanxi.graphic.color;
 import mo_yanxi.math;
 import mo_yanxi.encode;
@@ -498,7 +499,7 @@ namespace mo_yanxi::ui{
 	struct text_input_area : basic_text_elem{
 		[[nodiscard]] text_input_area(scene* scene, group* group)
 			: basic_text_elem(scene, group, "input_area"){
-			events().on<events::click>([](const events::click& event, elem& e){
+			/*events().on<events::click>([](const events::click& event, elem& e){
 				auto& self = static_cast<text_input_area&>(e);
 
 				if(event.code.action() == core::ctrl::act::release)return;
@@ -511,7 +512,7 @@ namespace mo_yanxi::ui{
 				if(self.caret_){
 					self.set_focused_key(true);
 				}
-			});
+			});*/
 
 			events().on<events::drag>([](const events::drag& event, elem& e){
 				auto& self = static_cast<text_input_area&>(e);
@@ -595,12 +596,27 @@ namespace mo_yanxi::ui{
 		}
 
 
+		events::click_result on_click(const events::click click_event) override{
+			if(click_event.code.action() != core::ctrl::act::release){
+				auto layoutPos = get_layout_pos(click_event.pos);
+
+				caret_ = layoutPos.transform([this](const font::typesetting::layout_pos_t pos){
+					return caret{glyph_layout, pos};
+				});
+
+				if(caret_){
+					set_focused_key(true);
+				}
+			}
+
+			return elem::on_click(click_event);;
+		}
 
 		void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
 			using namespace core::ctrl;
 			if(caret_ && action == act::press || action == act::repeat){
 				bool shift = mode & mode::Shift;
-				bool ctrl = mode & mode::Ctrl;
+				bool ctrl = mode & mode::ctrl;
 				switch(key){
 				case key::Right :
 					if(ctrl){
@@ -686,6 +702,10 @@ namespace mo_yanxi::ui{
 		}
 
 		void input_unicode(const char32_t val) override{
+			if(bannedCodePoints.contains(val)){
+				set_input_invalid();
+				return;
+			}
 			buffer.push_back(val);
 		}
 
@@ -694,16 +714,16 @@ namespace mo_yanxi::ui{
 
 	private:
 		esc_flag on_esc() override{
-			if(elem::on_esc() == esc_flag::droppable){
+			if(elem::on_esc() == esc_flag::fall_through){
 				if(caret_){
 					caret_ = std::nullopt;
 					set_focused_key(false);
-					return esc_flag::sustain;
+					return esc_flag::intercept;
 				}
-				return esc_flag::droppable;
+				return esc_flag::fall_through;
 			}
 
-			return esc_flag::sustain;
+			return esc_flag::intercept;
 		}
 
 		void record(){
@@ -742,7 +762,7 @@ namespace mo_yanxi::ui{
 
 		void insert(std::string&& string, const std::size_t advance){
 			if(string.size() + get_text().size() >= maximumUnits){
-				setInputInvalid();
+				set_input_invalid();
 				return;
 			}
 
@@ -753,7 +773,7 @@ namespace mo_yanxi::ui{
 			layoutTextThenResume(caret_->range);
 			if(glyph_layout.is_clipped()){
 				backtrace();
-				setInputInvalid();
+				set_input_invalid();
 				// glyph_layout.isCompressed = false;
 				return;
 			}
@@ -785,27 +805,36 @@ namespace mo_yanxi::ui{
 		}
 
 	public:
+		void add_file_banned_characters(){
+			bannedCodePoints.insert_range(std::initializer_list{U'<', U'>', U':', U'"', U'/', U'\\', U'|', U'*', U'?'});
+		}
+
+		void set_banned_characters(std::initializer_list<char32_t> chars){
+			bannedCodePoints = chars;
+		}
+
 		[[nodiscard]] std::string_view get_text() const noexcept{
-			if(onHint()){
-				return std::string_view{""};
+			if(on_hint()){
+				return std::string_view{};
 			}
 
 			return basic_text_elem::get_text();
 		}
 
-		[[nodiscard]] bool onHint() const noexcept{
+		[[nodiscard]] bool on_hint() const noexcept{
 			return isHinting;
 		}
 
-		[[nodiscard]] bool onFailed() const noexcept{
+		[[nodiscard]] bool on_failed() const noexcept{
 			return failedHintDuration > 0.f;
 		}
 
 	protected:
-		void setInputInvalid(){
+		void set_input_invalid(){
 			failedHintDuration = 10.f;
 		}
-		void setInputValid(){
+
+		void set_input_valid(){
 			failedHintDuration = 0.;
 		}
 

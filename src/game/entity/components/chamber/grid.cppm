@@ -21,12 +21,12 @@ import :tile;
 
 import std;
 
-namespace mo_yanxi::game::ecs{
+namespace mo_yanxi::game{
 	// using namespace chamber;
 
 	export
 	template <>
-	struct quad_tree_trait_adaptor<chamber::tile, float> : quad_tree_adaptor_base<chamber::tile, float>{
+	struct quad_tree_trait_adaptor<ecs::chamber::tile, float> : quad_tree_adaptor_base<ecs::chamber::tile, float>{
 		[[nodiscard]] static rect_type get_bound(const_reference self) noexcept{
 			return self.get_bound();
 		}
@@ -43,17 +43,21 @@ namespace mo_yanxi::game::ecs{
 	};
 
 
-	export
-	template <>
-	struct component_custom_behavior<chamber::building_data> : component_custom_behavior_base<chamber::building_data>{
-		static void on_init(const chunk_meta& meta, chamber::building_data& comp);
+	namespace ecs{
+		
+		export
+		template <>
+		struct component_custom_behavior<chamber::building_data> : component_custom_behavior_base<chamber::building_data>{
+			static void on_init(const chunk_meta& meta, chamber::building_data& comp);
 
-		static void on_terminate(const chunk_meta& meta, const value_type& comp);
+			static void on_terminate(const chunk_meta& meta, const value_type& comp);
 
-		static void on_relocate(const chunk_meta& meta, value_type& comp){
-			// comp.building().data = &comp;
-		}
-	};
+			static void on_relocate(const chunk_meta& meta, value_type& comp){
+				// comp.building().data = &comp;
+			}
+		};
+	}
+	
 
 }
 
@@ -173,17 +177,17 @@ namespace mo_yanxi::game::ecs::chamber{
 			return tiles.find(coord);
 		}
 
-		[[nodiscard]] ecs::quad_tree<tile_type>& quad_tree(){
+		[[nodiscard]] game::quad_tree<tile_type>& quad_tree(){
 			return quad_tree_;
 		}
 
-		[[nodiscard]] const ecs::quad_tree<tile_type>& quad_tree() const{
+		[[nodiscard]] const game::quad_tree<tile_type>& quad_tree() const{
 			return quad_tree_;
 		}
 
 	private:
 		math::frect wrap_bound_{};
-		ecs::quad_tree<tile_type> quad_tree_{{}};
+		game::quad_tree<tile_type> quad_tree_{{}};
 		grid_type tiles{};
 
 		void rebuild_tree(){

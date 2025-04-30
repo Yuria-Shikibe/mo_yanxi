@@ -8,7 +8,7 @@ export import mo_yanxi.ui.comp.drawer;
 
 import mo_yanxi.ui.basic;
 import mo_yanxi.graphic.image_region;
-import mo_yanxi.graphic.image_nine_region;
+import mo_yanxi.graphic.image_multi_region;
 export import mo_yanxi.graphic.color;
 export import align;
 
@@ -26,22 +26,43 @@ namespace mo_yanxi::ui{
 			graphic::color activated{};
 
 			constexpr palette& mul_alpha(const float alpha) noexcept{
-				general.mulA(alpha);
-				on_focus.mulA(alpha);
-				on_press.mulA(alpha);
+				general.mul_a(alpha);
+				on_focus.mul_a(alpha);
+				on_press.mul_a(alpha);
 
-				disabled.mulA(alpha);
-				activated.mulA(alpha);
+				disabled.mul_a(alpha);
+				activated.mul_a(alpha);
 
 				return *this;
 			}
 
-			[[nodiscard]] graphic::color onInstance(const elem& element) const;
+			constexpr palette& mul_rgb(const float alpha) noexcept{
+				general.mul_rgb(alpha);
+				on_focus.mul_rgb(alpha);
+				on_press.mul_rgb(alpha);
+
+				disabled.mul_rgb(alpha);
+				activated.mul_rgb(alpha);
+
+				return *this;
+			}
+
+			[[nodiscard]] graphic::color on_instance(const elem& element) const;
+		};
+
+		export constexpr palette general_palette{
+			graphic::colors::light_gray,
+			graphic::colors::white,
+			graphic::colors::aqua,
+			graphic::colors::gray,
+			graphic::colors::white,
 		};
 
 		template <typename T>
 		struct palette_with : public T{
 			palette pal{};
+
+			using T::operator=;
 
 			[[nodiscard]] palette_with() = default;
 

@@ -67,7 +67,9 @@ import mo_yanxi.graphic.draw;
 import mo_yanxi.graphic.draw.func;
 import mo_yanxi.graphic.draw.multi_region;
 import mo_yanxi.graphic.image_atlas;
-import mo_yanxi.graphic.image_nine_region;
+import mo_yanxi.graphic.image_multi_region;
+
+import mo_yanxi.graphic.layers.ui.grid_drawer;
 
 import mo_yanxi.font;
 import mo_yanxi.font.manager;
@@ -77,11 +79,10 @@ import mo_yanxi.graphic.msdf;
 
 import mo_yanxi.ui.root;
 import mo_yanxi.ui.basic;
-import mo_yanxi.ui.loose_group;
 import mo_yanxi.ui.manual_table;
 import mo_yanxi.ui.table;
 import mo_yanxi.ui.elem.text_elem;
-import mo_yanxi.ui.scroll_pane;
+import mo_yanxi.ui.elem.scroll_pane;
 import mo_yanxi.ui.elem.text_input_area;
 import mo_yanxi.ui.elem.slider;
 import mo_yanxi.ui.elem.image_frame;
@@ -90,6 +91,8 @@ import mo_yanxi.ui.elem.collapser;
 import mo_yanxi.ui.elem.button;
 import mo_yanxi.ui.elem.check_box;
 import mo_yanxi.ui.elem.nested_scene;
+import mo_yanxi.ui.creation.file_selector;
+import mo_yanxi.ui.assets;
 
 import mo_yanxi.game.graphic.effect;
 import mo_yanxi.game.world.graphic;
@@ -107,6 +110,8 @@ import mo_yanxi.game.ecs.component.projectile_manifold;
 import mo_yanxi.game.ecs.system.collision;
 import mo_yanxi.game.ecs.system.motion_system;
 import mo_yanxi.game.ecs.system.grid_system;
+
+import mo_yanxi.game.ui.hitbox_editor;
 
 import test;
 import hive;
@@ -137,33 +142,11 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 
 	auto& ui_page = *atlas.find_page("ui");
 
-	auto& svg_up = ui_page.register_named_region(
-		"svg_up"s,
-		graphic::sdf_load{
-			graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\up.svg)"}, {100, 100}
-		}).first;
-
-	auto& svg_down = ui_page.register_named_region(
-		"svg_down"s,
-		graphic::sdf_load{
-			graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\down.svg)"}, {100, 100}
-		}).first;
-
-	auto& test_svg = ui_page.register_named_region(
-		"test"s,
-		graphic::sdf_load{
-			graphic::msdf::msdf_generator{
-				R"(D:\projects\mo_yanxi\prop\assets\svg\blender_icon_select_subtract.svg)"
-			},
-			{100, 100}
-		}).first;
-
 	auto& line_svg = ui_page.register_named_region(
 		"line"s,
 		graphic::sdf_load{
 			graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\line.svg)"}, {40u, 24u}
 		}).first;
-
 
 	ui_page.mark_protected("line");
 
@@ -178,12 +161,41 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	e->skip_inbound_capture = true;
 	auto& bed = static_cast<ui::manual_table&>(root.add_children(std::move(e)));
 
+	{
+		auto pane = bed.emplace<ui::button<>>();
+		pane->set_button_callback(ui::button_tags::general, [](ui::elem& elem){
+			using namespace ui;
+			auto& selector = creation::create_file_selector(elem, [](const creation::file_selector& s, const ui::elem&){
+				return s.get_current_main_select().has_value();
+			}, [](const creation::file_selector& s, const ui::elem&){
+				return true;
+			});
+			selector.set_cared_suffix({".png"});
+		});
+		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.3f, 1.f}};
+		pane.cell().align = align::pos::center_left;
+		pane.cell().margin.set(4);
+	}
+
+	{
+		auto pane = bed.emplace<game::ui::hit_box_editor>();
+		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.7f, 1.f}};
+		pane.cell().align = align::pos::center_right;
+		pane.cell().margin.set(4);
+	}
+
+
+
+	// auto pane = bed.emplace<ui::creation::file_selector>();
+	// pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.6f, .9f}};
+	// pane.cell().align = align::pos::center_left;
+
 	// auto spane = bed.emplace<ui::scroll_pane>();
 	// spane.cell().region_scale = {math::vec2{}, math::vec2{.5, .8}};
 	// spane.cell().align = align::pos::top_left;
 	// spane->set_layout_policy(ui::layout_policy::hori_major);
 
-	auto nscene = bed.emplace<ui::nested_scene>();
+	/*auto nscene = bed.emplace<ui::nested_scene>();
 	nscene.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.3f, .5f}};
 	nscene.cell().align = align::pos::bottom_left;
 	//
@@ -203,8 +215,8 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 		t.context_size_restriction = ui::extent_by_external;
 		t.property.relative_src = {-100, 500};
 	});
-	{
 
+	{
 		auto& table = nscene->get_group().emplace<ui::table>();
 		table.property.relative_src = {400, 500};
 
@@ -254,8 +266,8 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 
 			collapser->head().function_init([&](ui::image_frame& img){
 				img.property.set_empty_drawer();
-				img.set_drawable<ui::image_drawable>(0, graphic::draw::mode_flags::sdf, svg_up);
-				img.set_drawable<ui::image_drawable>(1, graphic::draw::mode_flags::sdf, svg_down);
+				img.set_drawable<ui::icon_drawable>(0, ui::assets::icons::up);
+				img.set_drawable<ui::icon_drawable>(1, ui::assets::icons::down);
 				img.add_collapser_image_swapper();
 			}).cell().set_width(60);
 			collapser->head().function_init([&](ui::basic_text_elem& txt){
@@ -265,9 +277,9 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 			}).cell().set_external({false, true}).pad.left = 12;
 
 			collapser->content().function_init([&](ui::check_box& img){
-				img.set_drawable<ui::image_drawable>(0, graphic::draw::mode_flags::sdf, test_svg);
-				img.set_drawable<ui::image_drawable>(1, graphic::draw::mode_flags::sdf, svg_up);
-				img.set_drawable<ui::image_drawable>(2, graphic::draw::mode_flags::sdf, svg_down);
+				img.set_drawable<ui::icon_drawable>(0, ui::assets::icons::left);
+				img.set_drawable<ui::icon_drawable>(1, ui::assets::icons::up);
+				img.set_drawable<ui::icon_drawable>(2, ui::assets::icons::down);
 				img.add_multi_select_tooltip({
 					// .follow = ui::tooltip_follow::owner,
 					// .target_align = ,
@@ -285,7 +297,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 
 
 			auto button = table.end_line().emplace<ui::button<ui::image_frame>>();
-			button->set_drawable<ui::image_drawable>(graphic::draw::mode_flags::sdf, test_svg);
+			button->set_drawable<ui::icon_drawable>(ui::assets::icons::left);
 			button.cell().set_size(60);
 
 			auto bar = table.emplace<ui::progress_bar>();
@@ -300,7 +312,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 
 		table.set_edge_pad(0);
 
-	}
+	}*/
 }
 
 void main_loop(){
@@ -346,6 +358,16 @@ void main_loop(){
 	auto& renderer_world = core::global::graphic::world;
 	auto& renderer_ui = core::global::graphic::ui;
 	auto& merger = core::global::graphic::merger;
+
+	auto& g = renderer_ui.batch.emplace_batch_layer<graphic::layers::grid_drawer>();
+	g.data.current.chunk_size.set(100);
+	g.data.current.solid_spacing.set(5);
+	g.data.current.line_width = 3;
+	g.data.current.main_line_width = 6;
+	g.data.current.line_spacing = 15;
+	g.data.current.line_gap = 5;
+	g.data.current.main_line_color = graphic::colors::pale_green.copy().mul_rgb(.66f);
+	g.data.current.line_color = graphic::colors::dark_gray;
 
 	game::world::graphic_context graphic_context{renderer_world};
 
@@ -596,6 +618,7 @@ void main_loop(){
 		core::global::ui::root->layout();
 		core::global::ui::root->draw();
 
+
 		graphic::draw::world_acquirer acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
 		math::rect_box_posed rect2{math::vec2{200, 40}};
 
@@ -798,6 +821,7 @@ void main_loop(){
 
 	context.wait_on_device();
 
+	core::global::ui::dispose();
 
 }
 
@@ -844,7 +868,6 @@ int main(){
 	main_loop();
 
 	assets::graphic::dispose();
-	core::global::ui::dispose();
 	core::global::graphic::dispose();
 	core::glfw::terminate();
 }

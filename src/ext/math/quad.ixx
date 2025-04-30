@@ -551,6 +551,11 @@ namespace mo_yanxi::math{
 			}
 		}
 
+		constexpr friend bool operator==(const quad_bounded& lhs, const quad_bounded& rhs) noexcept{
+			return static_cast<const quad<T>&>(lhs) == static_cast<const quad<T>&>(rhs);
+		}
+
+
 		using base::avg;
 		using base::axis_proj_dst;
 		using base::axis_proj_overlaps;
@@ -584,6 +589,35 @@ namespace mo_yanxi::math{
 		 */
 		vector2<T> size;
 
+		constexpr rect_box_identity& operator*=(const T value) noexcept{
+			offset *= value;
+			size *= value;
+			return *this;
+		}
+
+		constexpr rect_box_identity& operator*=(const vector2<T> value) noexcept{
+			offset *= value;
+			size *= value;
+			return *this;
+		}
+
+		friend constexpr rect_box_identity operator*(rect_box_identity lhs, const T value) noexcept {
+			return lhs *= value;
+		}
+
+		friend constexpr rect_box_identity operator*(const T value, rect_box_identity rhs) noexcept {
+			return rhs *= value;
+		}
+
+		friend constexpr rect_box_identity operator*(rect_box_identity lhs, const vector2<T>& value) noexcept {
+			return lhs *= value;
+		}
+
+		friend constexpr rect_box_identity operator*(const vector2<T>& value, rect_box_identity rhs) noexcept {
+			return rhs *= value;
+		}
+
+		constexpr bool operator==(const rect_box_identity&) const noexcept = default;
 	};
 
 	export
@@ -613,8 +647,6 @@ namespace mo_yanxi::math{
 
 	public:
 		[[nodiscard]] rect_box() = default;
-
-
 
 		[[nodiscard]] explicit rect_box(const base& base)
 			: base(base), normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){

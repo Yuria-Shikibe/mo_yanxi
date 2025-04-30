@@ -9,6 +9,14 @@ import std;
 
 namespace mo_yanxi::ui{
 
+	[[nodiscard]] static math::vec2 get_expected_size(const drawable& drawable, const image_display_style& style, const math::vec2 bound) noexcept{
+		if(const auto sz = drawable.get_default_size()){
+			return align::embedTo(style.scaling, *sz, bound);
+		}
+
+		return bound;
+	}
+
 	export
 	struct image_frame : public elem{
 		image_display_style default_style{};
@@ -16,12 +24,6 @@ namespace mo_yanxi::ui{
 	protected:
 		std::size_t current_frame_index{};
 		std::vector<styled_drawable> drawables_{};
-		//
-		// [[nodiscard]] image_frame(scene* scene, group* group, const std::string_view tyName)
-		// 	: elem(scene, group, tyName){
-		// }
-
-		// using elem::elem;
 
 	public:
 		[[nodiscard]] image_frame(scene* scene, group* group)
@@ -65,22 +67,13 @@ namespace mo_yanxi::ui{
 
 			std::swap(drawables_[ldx], drawables_[rdx]);
 		}
-		// std::unique_ptr<drawable> image_drawable;
-
-		[[nodiscard]] static math::vec2 get_expected_size(const drawable& drawable, const image_display_style& style, const math::vec2 bound) noexcept{
-			if(const auto sz = drawable.get_default_size()){
-				return align::embedTo(style.scaling, *sz, bound);
-			}
-
-			return bound;
-		}
 
 		void draw_content(const rect clipSpace) const override{
 			auto drawable = get_region();
 			if(!drawable || !drawable->drawable)return;
 			auto sz = get_expected_size(*drawable->drawable, drawable->style, content_size());
 			auto off = align::get_offset_of(default_style.align, sz, property.content_bound_absolute());
-			drawable->drawable->draw(*this, rect{tags::from_extent, off, sz}, (drawable->style.color_scl * gprop().style_color_scl).mulA(gprop().get_opacity()));
+			drawable->drawable->draw(*this, rect{tags::from_extent, off, sz}, (drawable->style.palette.on_instance(*this) * gprop().style_color_scl).mul_a(gprop().get_opacity()));
 		}
 
 		[[nodiscard]] const styled_drawable* get_region() const noexcept{
@@ -88,6 +81,32 @@ namespace mo_yanxi::ui{
 				return &drawables_[current_frame_index];
 			}
 			return nullptr;
+		}
+	};
+
+	export
+	struct icon_frame : public elem{
+		image_display_style icon_style{};
+
+	protected:
+		icon_drawable drawable_;
+
+	public:
+		[[nodiscard]] icon_frame(scene* scene, group* group, const icon_drawable::icon_type& icon = {}, const image_display_style& style = {})
+			: elem(scene, group, "image_frame"), icon_style(style), drawable_(icon){
+		}
+
+		void set_drawable(const icon_drawable::icon_type& icon) noexcept {
+			drawable_ = icon;
+		}
+
+	protected:
+		void draw_content(const rect clipSpace) const override{
+			if(!drawable_.image.view)return;
+
+			auto sz = get_expected_size(drawable_, icon_style, content_size());
+			auto off = align::get_offset_of(icon_style.align, sz, property.content_bound_absolute());
+			drawable_.draw(*this, rect{tags::from_extent, off, sz}, (icon_style.palette.on_instance(*this) * gprop().style_color_scl).mul_a(gprop().get_opacity()));
 		}
 	};
 

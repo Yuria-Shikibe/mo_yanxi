@@ -131,9 +131,28 @@ namespace mo_yanxi{
 
 		using self_type::insert_or_assign;
 
-		template <class Arg>
-		std::pair<typename self_type::iterator, bool> insert_or_assign(const std::string_view key, Arg&& val) {
-			return this->insert_or_assign(static_cast<std::string>(key), std::forward<Arg>(val));
+		template <class ...Arg>
+		std::pair<typename self_type::iterator, bool> try_emplace(const std::string_view key, Arg&& ...val){
+			if(auto itr = this->find(key); itr != this->end()){
+				return {itr, false};
+			}else{
+				return this->emplace(std::string(key), typename self_type::mapped_type{std::forward<Arg>(val) ...});
+			}
+		}
+
+		template <class ...Arg>
+		std::pair<typename self_type::iterator, bool> try_emplace(const char* key, Arg&& ...val){
+			return this->try_emplace(std::string_view{key}, std::forward<Arg>(val) ...);
+		}
+
+		template <class ...Arg>
+		std::pair<typename self_type::iterator, bool> insert_or_assign(const std::string_view key, Arg&& ...val) {
+			return this->insert_or_assign(static_cast<std::string>(key), std::forward<Arg>(val) ...);
+		}
+
+		template <std::size_t sz, class ...Arg>
+		std::pair<typename self_type::iterator, bool> insert_or_assign(const char (&key)[sz], Arg&& ...val) {
+			return this->insert_or_assign(std::string_view(key, sz), std::forward<Arg>(val) ...);
 		}
 
 		using self_type::operator[];

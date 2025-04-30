@@ -4,7 +4,6 @@ module;
 
 export module mo_yanxi.ui.celled_group;
 
-export import mo_yanxi.ui.loose_group;
 export import mo_yanxi.ui.layout.cell;
 export import mo_yanxi.ui.basic;
 export import mo_yanxi.handle_wrapper;
@@ -173,11 +172,13 @@ namespace mo_yanxi::ui{
 			notify_layout_changed(spread_direction::all_visible);
 		}
 
-		elem& add_children(elem_ptr&& element) override{
+		elem& add_children(elem_ptr&& element, std::size_t where) override{
 			//TODO is this always right? e.g. may cause wrong in dynmiac table
 			// element->layoutState.acceptMask_context -= spread_direction::child;
-			return basic_group::add_children(std::move(element));
+			return basic_group::add_children(std::move(element), where);
 		}
+
+		using basic_group::add_children;
 
 		template <typename E, std::derived_from<universal_group> G, typename ...Args>
 			requires requires{

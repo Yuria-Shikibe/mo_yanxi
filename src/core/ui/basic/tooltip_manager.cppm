@@ -85,7 +85,14 @@ namespace mo_yanxi::ui{
 			bool belowScene = false,
 			bool fade_in = true);
 
-		tooltip_instance* try_append_tooltip(tooltip_owner& owner,
+		tooltip_instance& append_tooltip(
+			tooltip_owner& owner,
+			elem_ptr&& elem,
+			bool belowScene = false,
+			bool fade_in = true);
+
+		tooltip_instance* try_append_tooltip(
+			tooltip_owner& owner,
 			bool belowScene = false,
 			bool fade_in = true){
 			if(!owner.has_tooltip() && owner.tooltip_should_build(get_cursor_pos())){
@@ -96,7 +103,7 @@ namespace mo_yanxi::ui{
 
 		void update(float delta_in_time);
 
-		bool requestDrop(const tooltip_owner* owner){
+		bool request_drop(const tooltip_owner* owner){
 			const auto be = std::ranges::find(actives, owner, &tooltip_instance::owner);
 
 			return dropFrom(be);

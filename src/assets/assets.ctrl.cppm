@@ -75,7 +75,6 @@ namespace mo_yanxi::assets::ctrl{
 			}else{
 				core::global::graphic::world.camera.set_target_scale(core::global::graphic::world.camera.get_target_scale() + y * 0.05f);
 			}
-
 		 });
 		//
 		// input->scrollListeners.emplace_back([](const float x, const float y) -> void {

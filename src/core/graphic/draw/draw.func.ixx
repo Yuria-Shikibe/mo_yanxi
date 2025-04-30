@@ -377,7 +377,7 @@ namespace mo_yanxi::graphic::draw{
 				const float stroke = 2.f,
 
 				const col color_scl = colors::white){
-			trans.rot += 45.000f;
+			trans.rot += math::pi / 4.f;
 			const float dst = stroke / math::sqrt2;
 
 			vec vec2_0{}, vec2_1{}, vec2_2{}, vec2_3{}, vec2_4{};

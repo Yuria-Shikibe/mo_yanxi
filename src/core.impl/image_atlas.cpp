@@ -30,7 +30,7 @@ namespace mo_yanxi::graphic{
 			buffer = vk::templates::create_staging_buffer(context_->get_allocator(), ceil);
 		}
 
-		vk::command_buffer command_buffer{context_->get_graphic_command_pool_transient().obtain()};
+		vk::command_buffer command_buffer{command_pool_.obtain()};
 
 		{
 			vk::scoped_recorder scoped_recorder{command_buffer};

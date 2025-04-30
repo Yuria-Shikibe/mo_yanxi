@@ -65,8 +65,8 @@ namespace mo_yanxi::ui{
 			: basic_group(scene, group, "collapser"),
 			  head_(&static_cast<head_type&>(basic_group::add_children(elem_ptr{get_scene(), this, std::in_place_type<head_type>}))),
 			  content_(&static_cast<content_type&>(basic_group::add_children(elem_ptr{
-					  get_scene(), this, std::in_place_type<content_type>
-				  }))){
+				                                                                 get_scene(), this, std::in_place_type<content_type>
+			                                                                 }))){
 			head().property.fill_parent = {true, true};
 			head().interactivity = interactivity::intercepted;
 
@@ -119,7 +119,7 @@ namespace mo_yanxi::ui{
 		}
 
 		bool update_abs_src(math::vec2 parent_content_abs_src) override{
-			if(util::tryModify(property.absolute_src, parent_content_abs_src + property.relative_src)){
+			if(util::try_modify(property.absolute_src, parent_content_abs_src + property.relative_src)){
 				update_item_src();
 				return true;
 			}
@@ -153,7 +153,7 @@ namespace mo_yanxi::ui{
 				math::approach_inplace(prog, 0, expand_speed * delta_in_ticks);
 			}
 
-			if(util::tryModify(expand_progress, prog)){
+			if(util::try_modify(expand_progress, prog)){
 				notify_layout_changed(spread_direction::from_content | spread_direction::local);
 				content_->update_opacity(get_interped_progress());
 			}

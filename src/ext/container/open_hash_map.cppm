@@ -306,6 +306,12 @@ namespace mo_yanxi{
 				: key(key){
 			}
 
+			template <typename T>
+				requires std::constructible_from<key_type, T>
+			[[nodiscard]] constexpr explicit(false) kv_storage(T&& key)
+				: key(std::forward<T>(key)){
+			}
+
 			[[nodiscard]] constexpr kv_storage() : key(getStaticEmptyKey()){}
 
 			constexpr explicit operator bool() const noexcept{

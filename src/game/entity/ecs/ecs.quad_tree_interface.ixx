@@ -9,7 +9,7 @@ export import mo_yanxi.math.rect_ortho;
 import mo_yanxi.concepts;
 import std;
 
-namespace mo_yanxi::game::ecs{
+namespace mo_yanxi::game{
 	export
 	template <typename Target_Ty, number N = float>
 	struct quad_tree_adaptor_base{

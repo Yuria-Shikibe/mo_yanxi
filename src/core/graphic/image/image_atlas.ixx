@@ -15,6 +15,7 @@ export import mo_yanxi.allocator_2D;
 export import mo_yanxi.vk.image_derives;
 export import mo_yanxi.vk.resources;
 export import mo_yanxi.vk.context;
+export import mo_yanxi.vk.command_pool;
 export import mo_yanxi.vk.command_buffer;
 export import mo_yanxi.vk.sync;
 
@@ -254,6 +255,7 @@ namespace mo_yanxi::graphic{
 		vk::context* context_{};
 		vk::fence fence_{};
 
+		vk::command_pool command_pool_{};
 		vk::command_buffer running_command_buffer_{};
 		std::multimap<VkDeviceSize, vk::buffer> stagings{};
 		std::mutex queue_mutex{};
@@ -294,6 +296,7 @@ namespace mo_yanxi::graphic{
 			:
 		context_(&context),
 		fence_(context_->get_device(), true),
+		command_pool_(context_->get_device(), context_->graphic_family(), VK_COMMAND_POOL_CREATE_TRANSIENT_BIT),
 		working_thread([this](std::stop_token stop_token){
 				work_func(std::move(stop_token), *this);
 			}){

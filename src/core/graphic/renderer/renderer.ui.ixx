@@ -72,7 +72,7 @@ namespace mo_yanxi::graphic{
 		float global_time{};
 		math::vec2 viewport_extent{};
 
-		float camera_scale{};
+		float inv_scale{};
 
 		std::uint32_t cap1;
 		std::uint32_t cap2;
@@ -82,12 +82,12 @@ namespace mo_yanxi::graphic{
 	};
 
 	
-	struct ui_layer_default : batch_layer{
+	struct grid_drawer : batch_layer{
 
 	public:
-		[[nodiscard]] ui_layer_default() = default;
+		[[nodiscard]] grid_drawer() = default;
 
-		[[nodiscard]] ui_layer_default(
+		[[nodiscard]] grid_drawer(
 			vk::context& context,
 			const std::size_t chunk_count,
 			const std::initializer_list<VkDescriptorSetLayout> public_sets)
@@ -138,6 +138,7 @@ namespace mo_yanxi::graphic{
 	struct ui_batch_proxy : batch_proxy{
 	private:
 		friend renderer_ui;
+		friend batch_proxy;
 
 		vk::color_attachment color_base{};
 		vk::color_attachment color_light{};
@@ -154,7 +155,7 @@ namespace mo_yanxi::graphic{
 		batch_layer_data<ui_fragment_uniform> frag_data{};
 
 	private:
-		ui_layer_default main_layer{};
+		grid_drawer main_layer{};
 
 		vk::descriptor_layout blit_descriptor_layout{};
 		vk::descriptor_buffer blit_descriptor_buffer{};
@@ -170,6 +171,9 @@ namespace mo_yanxi::graphic{
 		std::vector<math::frect> viewports{};
 		std::vector<scissor_raw> scissors{};
 
+		[[nodiscard]] auto get_public_sets() const noexcept{
+			return std::array<VkDescriptorSetLayout, 2>{descriptor_layout_proj.get(), batch.descriptor_layout()};
+		}
 
 	public:
 		[[nodiscard]] ui_batch_proxy() = default;
@@ -245,7 +249,6 @@ namespace mo_yanxi::graphic{
 		void blit() const{
 			vk::cmd::submit_command(context().compute_queue(), blit_command);
 		}
-
 
 		void push_scissor(scissor_raw scissor){
 			auto back = scissors.back();
@@ -339,6 +342,13 @@ namespace mo_yanxi::graphic{
 
 		}
 
+		batch_layer& get_current_batch_layer() noexcept{
+			if(current_layer_){
+				return *current_layer_;
+			}
+
+			return main_layer;
+		}
 
 	private:
 		[[nodiscard]] math::frect get_last_viewport() const noexcept{
@@ -359,6 +369,11 @@ namespace mo_yanxi::graphic{
 
 			init_image_layout(context().get_transient_graphic_command_buffer(), context().get_transient_compute_command_buffer());
 			update_layer_commands(main_layer);
+
+			for (auto& layer : layers_ | std::views::values){
+				update_layer_commands(*layer);
+			}
+
 			create_blit_command();
 
 			vert_data.current = {{math::mat3{}.set_orthogonal({}, math::vector2{extent.width, extent.height}.as<float>())}};
@@ -426,9 +441,8 @@ namespace mo_yanxi::graphic{
 			vert_data.current.view = proj;
 			vert_data.update<true>(index);
 
-
 			auto csr = scissors.back();
-			// csr.uniform(proj);
+
 			frag_data.current.scissor = csr;
 			frag_data.current.viewport_extent = viewports.back().size();
 
@@ -436,11 +450,12 @@ namespace mo_yanxi::graphic{
 			math::vec2 cur_scale = ~currentProj.get_scale() * 2;
 
 			auto multis = std::sqrt(cur_scale.area() / def_scale.area());
-			frag_data.current.camera_scale = multis;
-
+			frag_data.current.inv_scale = multis;
 			frag_data.update<true>(index);
 
-			return main_layer.submit(context(), index);
+			auto& layer = get_current_batch_layer();
+			layer.try_post_data(index);
+			return layer.submit(context(), index);
 		}
 
 		void create_blit_command(){

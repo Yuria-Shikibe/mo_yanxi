@@ -16,6 +16,29 @@ export import mo_yanxi.math.intersection;
 
 import std;
 
+namespace mo_yanxi::game{
+
+	export
+	template <>
+	struct quad_tree_trait_adaptor<ecs::collision_object, float> : quad_tree_adaptor_base<ecs::collision_object, float>{
+		[[nodiscard]] static rect_type get_bound(const_reference self) noexcept{
+			return self.manifold->hitbox.max_wrap_bound();
+		}
+
+		[[nodiscard]] static bool intersect_with(const_reference self, const_reference other){
+			return self.manifold->hitbox.collide_with_exact(other.manifold->hitbox);
+		}
+
+		[[nodiscard]] static bool contains(const_reference self, vector_type::const_pass_t point){
+			return self.manifold->hitbox.contains(point);
+		}
+
+		[[nodiscard]] static bool equals(const_reference self, const_reference other) noexcept{
+			return self.manifold == other.manifold;
+		}
+	};
+}
+
 namespace mo_yanxi::game::ecs{
 
 	constexpr float MinimumSuccessAccuracy = 1. / 32.;
@@ -68,25 +91,6 @@ namespace mo_yanxi::game::ecs{
 		return sbjBox[0] - beginning;
 	}
 
-	export
-	template <>
-	struct quad_tree_trait_adaptor<collision_object, float> : quad_tree_adaptor_base<collision_object, float>{
-		[[nodiscard]] static rect_type get_bound(const_reference self) noexcept{
-			return self.manifold->hitbox.max_wrap_bound();
-		}
-
-		[[nodiscard]] static bool intersect_with(const_reference self, const_reference other){
-			return self.manifold->hitbox.collide_with_exact(other.manifold->hitbox);
-		}
-
-		[[nodiscard]] static bool contains(const_reference self, vector_type::const_pass_t point){
-			return self.manifold->hitbox.contains(point);
-		}
-
-		[[nodiscard]] static bool equals(const_reference self, const_reference other) noexcept{
-			return self.manifold == other.manifold;
-		}
-	};
 
 	export
 	struct collision_system{

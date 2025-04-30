@@ -72,7 +72,8 @@ vec4 blur(const vec2 where, const vec2 size_inv, const float scale, const uint r
 
 vec4 screen(vec4 src, vec4 dst) {
     vec3 color = 1.0 - (1.0 - src.rgb) * (1.0 - dst.rgb);
-    return vec4(color, (src.a + dst.a) * .65f);
+    vec4 scr = vec4(color, (src.a + dst.a) * .65f);
+    return mix(src + dst, scr, 0.5f);
 }
 
 void main() {

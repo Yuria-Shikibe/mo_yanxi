@@ -14,7 +14,7 @@ mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_shape(
 	const svg_info& shape,
 	unsigned w,
 	unsigned h,
-	double range, unsigned boarder){
+	double range, int boarder){
 	bitmap bitmap = {w + boarder * 2, h + boarder * 2};
 
 	const auto bound = shape.shape.getBounds();
@@ -44,7 +44,7 @@ mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_shape(
 
 mo_yanxi::graphic::bitmap mo_yanxi::graphic::msdf::load_glyph(
 	msdfgen::FontHandle* face, msdfgen::unicode_t code,
-	unsigned target_w, unsigned target_h, unsigned boarder,
+	unsigned target_w, unsigned target_h, int boarder,
 	double font_w, double font_h,
 	double range){
 	using namespace msdfgen;
@@ -125,12 +125,12 @@ mo_yanxi::graphic::msdf::svg_info mo_yanxi::graphic::msdf::svg_to_shape(const ch
 	return {shape, sz};
 }
 
-mo_yanxi::graphic::msdf::msdf_generator::msdf_generator(svg_info&& shape, double range, unsigned boarder): shape(std::move(shape)),
+mo_yanxi::graphic::msdf::msdf_generator::msdf_generator(svg_info&& shape, double range, int boarder): shape(std::move(shape)),
 	range(range),
 	boarder(boarder){
 }
 
-mo_yanxi::graphic::msdf::msdf_generator::msdf_generator(const char* path, double range, unsigned boarder): shape(svg_to_shape(path)),
+mo_yanxi::graphic::msdf::msdf_generator::msdf_generator(const char* path, double range, int boarder): shape(svg_to_shape(path)),
 	range(range),
 	boarder(boarder){
 }

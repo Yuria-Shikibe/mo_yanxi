@@ -14,6 +14,10 @@ export import mo_yanxi.vk.dynamic_rendering;
 export import mo_yanxi.vk.image_derives;
 export import mo_yanxi.vk.util.cmd.render;
 
+export import mo_yanxi.vk.concepts;
+
+import mo_yanxi.heterogeneous.open_addr_hash;
+
 namespace mo_yanxi::graphic{
 	export
 	struct command_buffer_modifier{
@@ -133,30 +137,38 @@ namespace mo_yanxi::graphic{
 
 		std::vector<vk::command_buffer> command_buffers{};
 
-
+		template <vk::contigious_range_of<VkDescriptorSetLayout> Rng = std::initializer_list<VkDescriptorSetLayout>>
 		void create_pipeline(
 			const vk::context& context,
 			const vk::graphic_pipeline_template& pipeline_template,
-			std::initializer_list<VkDescriptorSetLayout> public_sets){
-			if(descriptor_buffer == nullptr){
+			Rng&& public_sets){
+			if(descriptor_layout == nullptr){
 				pipeline_layout = vk::pipeline_layout{context.get_device(), 0, public_sets, constant_layout.get_constant_ranges()};
 			}else{
-				std::vector v = public_sets;
+				std::vector<VkDescriptorSetLayout> v{std::from_range, std::forward<Rng>(public_sets)};
 				v.push_back(descriptor_layout.get());
 				pipeline_layout = vk::pipeline_layout{context.get_device(), 0, v, constant_layout.get_constant_ranges()};
 			}
 
 			pipeline = {context.get_device(), pipeline_layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, pipeline_template};
 		}
+
+		void create_descriptor_buffer(vk::context& context, std::uint32_t chunk_count){
+			if(descriptor_buffer != nullptr)return;
+
+			descriptor_buffer = vk::descriptor_buffer{context.get_allocator(), descriptor_layout, descriptor_layout.binding_count(), chunk_count};
+		}
+
 	public:
 		virtual ~batch_layer() = default;
 
 		[[nodiscard]] batch_layer() = default;
 
+		template <vk::contigious_range_of<VkDescriptorSetLayout> Rng = std::initializer_list<VkDescriptorSetLayout>>
 		[[nodiscard]] batch_layer(
 			vk::context& context,
 			std::size_t chunk_count,
-			std::initializer_list<VkDescriptorSetLayout> public_sets
+			Rng&& public_sets = {}
 			){
 			command_buffers.resize(chunk_count);
 
@@ -171,6 +183,10 @@ namespace mo_yanxi::graphic{
 			// std::span<const VkDescriptorBufferBindingInfoEXT> descriptors
 			VkRect2D region
 		) = 0;
+
+		virtual void try_post_data(std::size_t index){
+
+		}
 
 		[[nodiscard]] virtual bool requires_dump() const noexcept{
 			return false;
@@ -201,6 +217,11 @@ namespace mo_yanxi::graphic{
 			return nullptr;
 		}
 
+		vk::descriptor_mapper get_dbo_mapper() noexcept{
+			return {descriptor_buffer};
+		}
+
+
 		batch_layer(const batch_layer& other) = delete;
 		batch_layer(batch_layer&& other) noexcept = default;
 		batch_layer& operator=(const batch_layer& other) = delete;
@@ -212,12 +233,25 @@ namespace mo_yanxi::graphic{
 		// }
 	};
 
+	template <typename T>
+	concept batch_effect_layer = requires{
+		requires std::derived_from<T, batch_layer>;
+		{ T::layer_name } -> std::convertible_to<std::string_view>;
+	};
+
 	export
 	struct batch_proxy{
-	// protected:
 		vk::batch batch{};
+
+	protected:
 		VkRect2D region{};
-	// public:
+
+		string_open_addr_hash_map<std::unique_ptr<batch_layer>> layers_{};
+		batch_layer* current_layer_ = nullptr;
+
+		void get_public_sets() const noexcept = delete;
+		void update_layer_commands(batch_layer& batch_layer) = delete;
+	public:
 
 		[[nodiscard]] batch_proxy() = default;
 
@@ -225,10 +259,59 @@ namespace mo_yanxi::graphic{
 			: batch(std::move(batch)){
 		}
 
-		//public draw attachments
+		[[nodiscard]] VkRect2D get_region() const noexcept{
+			return region;
+		}
 
-		// public
+		template <batch_effect_layer Lyr, std::derived_from<batch_proxy> S, typename ...Args>
+			requires (std::constructible_from<Lyr, vk::context&, std::size_t, decltype(std::declval<S&>().get_public_sets()), Args...>)
+		Lyr& emplace_batch_layer(this S& self, Args&& ...args){
+			auto [itr, suc] = self.layers_.try_emplace(Lyr::layer_name, std::make_unique<Lyr>(
+				self.context(), self.batch.get_chunk_count(), self.get_public_sets(),
+				std::forward<Args>(args)...)
+			);
 
+			if(!suc){
+				throw std::invalid_argument{"Duplicated Layer Name"};
+			}
+
+			Lyr& rst = static_cast<Lyr&>(*itr->second);
+			self.update_layer_commands(rst);
+			return rst;
+		}
+
+		template <std::derived_from<batch_layer> Lyr>
+		Lyr* find_named_batch_layer(std::string_view name) noexcept{
+			if(const auto itr = layers_.find(name); itr != layers_.end()){
+				return dynamic_cast<Lyr*>(itr->second.get());
+			}
+			return nullptr;
+		}
+
+		template <batch_effect_layer Lyr>
+		Lyr& batch_layer_at() noexcept{
+			return dynamic_cast<Lyr&>(*layers_.at(Lyr::layer_name));
+		}
+
+		batch_layer& get_current_batch_layer() = delete;
+
+		template <std::derived_from<batch_proxy> S>
+		batch_layer* set_batch_layer(this S& self, batch_layer* layer = nullptr) noexcept{
+			return std::exchange(self.current_layer_, layer);
+		}
+
+		template <std::derived_from<batch_proxy> S>
+		batch_layer* set_batch_layer(this S& self, batch_layer& layer) noexcept{
+			return self.set_batch_layer(&layer);
+		}
+
+		vk::batch* operator->() noexcept{
+			return &batch;
+		}
+
+		const vk::batch* operator->() const noexcept{
+			return &batch;
+		}
 
 		[[nodiscard]] vk::context& context() const{
 			assert(batch.get_context());
@@ -244,5 +327,32 @@ namespace mo_yanxi::graphic{
 		}
 	};
 
+	export
+	template <std::derived_from<batch_proxy> Proxy, typename T>
+	struct [[jetbrains::guard]] batch_layer_guard{
+	private:
+		Proxy& proxy;
+		batch_layer* last_layer;
 
+	public:
+		[[nodiscard]] batch_layer_guard(Proxy& proxy, std::in_place_type_t<T>)
+			noexcept : proxy{proxy}, last_layer{(proxy.batch.consume_all(), proxy.set_batch_layer(layer()))}
+		{
+
+		}
+
+		T& layer() const noexcept{
+			return proxy.template batch_layer_at<T>();
+		}
+
+		~batch_layer_guard(){
+			proxy.batch.consume_all();
+			proxy.set_batch_layer(last_layer);
+		}
+
+		batch_layer_guard(const batch_layer_guard& other) = delete;
+		batch_layer_guard(batch_layer_guard&& other) noexcept = delete;
+		batch_layer_guard& operator=(const batch_layer_guard& other) = delete;
+		batch_layer_guard& operator=(batch_layer_guard&& other) noexcept = delete;
+	};
 }

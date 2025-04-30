@@ -22,7 +22,7 @@ namespace mo_yanxi::ui{
 		const font::typesetting::parser* parser{&font::typesetting::global_parser};
 		font::typesetting::glyph_layout glyph_layout{};
 
-
+		float scale{1.f};
 		bool text_expired{false};
 	public:
 		align::pos text_entire_align{align::pos::top_left};
@@ -45,9 +45,19 @@ namespace mo_yanxi::ui{
 			if(glyph_layout.get_text() != text){
 				glyph_layout.set_text(std::string{text});
 				text_expired = true;
-
 				mark_independent_layout_changed();
+			}
+		}
 
+		void set_text(const char* text){
+			set_text(std::string_view{text});
+		}
+
+		void set_text(std::string&& text){
+			if(glyph_layout.get_text() != text){
+				glyph_layout.set_text(std::move(text));
+				text_expired = true;
+				mark_independent_layout_changed();
 			}
 		}
 
@@ -55,7 +65,13 @@ namespace mo_yanxi::ui{
 			if(glyph_layout.set_policy(policy)){
 				text_expired = true;
 				mark_independent_layout_changed();
+			}
+		}
 
+		void set_scale(float scale){
+			if(util::try_modify(this->scale, scale)){
+				text_expired = true;
+				mark_independent_layout_changed();
 			}
 		}
 
@@ -109,13 +125,13 @@ namespace mo_yanxi::ui{
 			if(text_expired){
 				glyph_layout.set_clamp_size(bound);
 				glyph_layout.clear();
-				parser->operator()(glyph_layout);
+				parser->operator()(glyph_layout, scale);
 				text_expired = false;
 			}else{
 				if(glyph_layout.get_clamp_size() != bound){
 					glyph_layout.set_clamp_size(bound);
 					glyph_layout.clear();
-					parser->operator()(glyph_layout);
+					parser->operator()(glyph_layout, scale);
 				}
 			}
 

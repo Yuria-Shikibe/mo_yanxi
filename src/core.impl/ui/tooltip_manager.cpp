@@ -76,6 +76,11 @@ void mo_yanxi::ui::tooltip_instance::update_layout(const tooltip_manager& manage
 
 		break;
 	}
+	case tooltip_follow::owner :{
+		followOffset += policy.pos.value_or({});
+
+		break;
+	}
 	default : break;
 	}
 
@@ -92,7 +97,17 @@ mo_yanxi::ui::tooltip_instance& mo_yanxi::ui::tooltip_manager::append_tooltip(
 	bool belowScene,
 	bool fade_in){
 	auto rst = owner.tooltip_setup(*scene);
-	auto& val = actives.emplace_back(std::move(rst), &owner);
+	return append_tooltip(owner, std::move(rst), belowScene, fade_in);
+}
+
+mo_yanxi::ui::tooltip_instance& mo_yanxi::ui::tooltip_manager::append_tooltip(tooltip_owner& owner, elem_ptr&& elem,
+	bool belowScene, bool fade_in){
+
+	if(owner.has_tooltip()){
+		owner.tooltip_notify_drop();
+	}
+
+	auto& val = actives.emplace_back(std::move(elem), &owner);
 	val.update_layout(*this);
 	scene->on_cursor_pos_update();
 
@@ -144,17 +159,17 @@ void mo_yanxi::ui::tooltip_manager::draw_below() const{
 
 mo_yanxi::ui::esc_flag mo_yanxi::ui::tooltip_manager::on_esc(){
 	for (auto&& elem : actives | std::views::reverse){
-		if(elem.element->on_esc() != esc_flag::droppable){
-			return esc_flag::sustain;
+		if(util::thoroughly_esc(elem.element.get()) != esc_flag::fall_through){
+			return esc_flag::intercept;
 		}
 	}
 
 	if(!actives.empty()){
 		dropBack();
-		return esc_flag::sustain;
+		return esc_flag::intercept;
 	}
 
-	return esc_flag::droppable;
+	return esc_flag::fall_through;
 }
 
 bool mo_yanxi::ui::tooltip_manager::drop(ActivesItr be, ActivesItr se){

@@ -91,8 +91,10 @@ namespace mo_yanxi::ui{
 	protected:
 		[[nodiscard]] virtual elem_ptr tooltip_build_impl(scene& scene, group* group) = 0;
 
+	public:
 		[[nodiscard]] group* tooltip_deduce_parent(scene& scene) const;
 
+	private:
 		/**
 		 * @brief nullptr for default (scene.root)
 		 * @return given parent

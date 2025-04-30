@@ -19,6 +19,7 @@ namespace mo_yanxi::assets::graphic{
 		namespace frag{
 			export vk::shader_module world{};
 			export vk::shader_module ui{};
+			export vk::shader_module ui_grid{};
 
 		}
 

@@ -9,7 +9,7 @@ import mo_yanxi.graphic.draw.multi_region;
 // import Graphic.Draw.NinePatch;
 
 namespace mo_yanxi{
-	graphic::color ui::style::palette::onInstance(const ui::elem& element) const{
+	graphic::color ui::style::palette::on_instance(const ui::elem& element) const{
 		graphic::color color;
 		if(element.disabled){
 			color = disabled;
@@ -23,7 +23,7 @@ namespace mo_yanxi{
 			color = general;
 		}
 
-		return color.mulA(element.gprop().get_opacity());
+		return color.mul_a(element.gprop().get_opacity());
 	}
 
 	void ui::style::round_style::draw(const elem& element, math::frect region, float opacityScl) const{
@@ -31,9 +31,9 @@ namespace mo_yanxi{
 
 		draw_acquirer acquirer{element.get_renderer().get_batch(), {}};
 		acquirer.proj.mode_flag = vk::vertices::mode_flag_bits::sdf;
-		draw::nine_patch(acquirer, base, region, base.pal.onInstance(element).mulA(opacityScl));
+		draw::nine_patch(acquirer, base, region, base.pal.on_instance(element).mul_a(opacityScl));
 
-		draw::nine_patch(acquirer, edge, region, edge.pal.onInstance(element).mulA(opacityScl));
+		draw::nine_patch(acquirer, edge, region, edge.pal.on_instance(element).mul_a(opacityScl));
 		// acquirer.proj.mode_flag = {};
 		// draw::line::rect_ortho(acquirer, region);
 	}
@@ -47,7 +47,7 @@ namespace mo_yanxi{
 	}
 
 	bool ui::style::round_style::apply_to(elem& element) const{
-		return util::tryModify(element.prop().boarder, boarder);
+		return util::try_modify(element.prop().boarder, boarder);
 	}
 
 	// 	void Core::UI::Style::RoundStyle::draw(const Element& element, const Geom::Rect_Orthogonal<float> region,

@@ -7,11 +7,12 @@ module;
 export module mo_yanxi.font.typesetting;
 
 export import mo_yanxi.font.manager;
-export import mo_yanxi.encode;
 export import mo_yanxi.graphic.color;
-export import mo_yanxi.math;
 export import mo_yanxi.heterogeneous.open_addr_hash;
 export import align;
+
+import mo_yanxi.math;
+import mo_yanxi.encode;
 import std;
 
 namespace mo_yanxi{
@@ -1052,7 +1053,7 @@ namespace mo_yanxi::font::typesetting{
 			);
 
 			const auto font_region_scale = context.get_current_correction_scale();
-			float advance = current.glyph.metrics().advance.x * font_region_scale.x * context.get_throughout_scale();
+			float advance = current.glyph.metrics().advance.x * font_region_scale.x;
 			if(code.code == U'\0' || code.code == U'\n'){
 				advance = math::min(advance, layout.get_clamp_size().x - context.pen_pos.x);
 			}
@@ -1297,16 +1298,14 @@ namespace mo_yanxi::font::typesetting{
 			}
 		}
 	public:
-		void operator()(glyph_layout& layout) const{
+		void operator()(glyph_layout& layout, float scale = 1.f) const{
 			layout.elements.clear();
 			parse_context context{};
+			context.set_throughout_scale(scale);
 			tokenized_text formatted_text{layout.get_text(), {.reserve = reserve_tokens}};
 
 			auto idx = parse(layout, context, formatted_text);
 			end_parse(layout, context, formatted_text, idx + 1);
-
-
-
 		}
 
 		glyph_layout operator()(

@@ -484,7 +484,7 @@ namespace mo_yanxi::graphic{
 
 	struct renderer_world : renderer{
 	public:
-		camera2 camera{};
+		camera2_shakeable camera{};
 		world_batch_proxy batch{};
 		//
 		// //Post Process
@@ -545,7 +545,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		void update(float delta_in_tick){
-			camera.update(delta_in_tick, true);
+			camera.update(delta_in_tick);
 			if(camera.check_changed()){
 				batch.vert_data.current.view = {camera.get_world_to_uniformed()};
 			}

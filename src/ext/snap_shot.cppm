@@ -26,12 +26,12 @@ export namespace mo_yanxi{
 
 		using value_type = T;
 
-		T base;
-		T temp; //TODO should it be mutable?
+		T base{};
+		T temp{}; //TODO should it be mutable?
 
 		[[nodiscard]] constexpr snap_shot() requires (std::is_default_constructible_v<T>) = default;
 
-		[[nodiscard]] constexpr explicit snap_shot(const T& ref) : base{ref}, temp{ref}{}
+		[[nodiscard]] constexpr explicit(false) snap_shot(const T& ref) : base{ref}, temp{ref}{}
 
 		constexpr void resume() noexcept(is_nothrow_copy_assignable) {
 			temp = base;

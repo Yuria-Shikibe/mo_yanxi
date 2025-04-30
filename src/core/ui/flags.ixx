@@ -138,7 +138,7 @@ namespace mo_yanxi::ui{
 	};
 
 	export enum struct esc_flag{
-		sustain,
-		droppable,
+		intercept,
+		fall_through,
 	};
 }

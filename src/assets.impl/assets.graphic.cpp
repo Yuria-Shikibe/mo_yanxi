@@ -38,6 +38,7 @@ void mo_yanxi::assets::graphic::load(vk::context& context){
 
 	shaders::frag::world = {context.get_device(), dir::shader_spv / "world.frag.spv"};
 	shaders::frag::ui = {context.get_device(), dir::shader_spv / "ui.frag.spv"};
+	shaders::frag::ui_grid = {context.get_device(), dir::shader_spv / "ui.grid.frag.spv"};
 
 	shaders::comp::resolve = {context.get_device(), dir::shader_spv / "resolve.comp.spv"};
 	shaders::comp::bloom = {context.get_device(), dir::shader_spv / "bloom.comp.spv"};
@@ -60,8 +61,11 @@ void mo_yanxi::assets::graphic::dispose(){
 
 	shaders::vert::world = {};
 	shaders::vert::ui = {};
+
 	shaders::frag::world = {};
 	shaders::frag::ui = {};
+	shaders::frag::ui_grid = {};
+
 	shaders::comp::resolve = {};
 	shaders::comp::bloom = {};
 	shaders::comp::world_merge = {};

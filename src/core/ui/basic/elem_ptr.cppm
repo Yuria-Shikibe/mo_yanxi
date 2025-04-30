@@ -9,6 +9,7 @@ import :pre_decl;
 import std;
 import mo_yanxi.owner;
 import mo_yanxi.meta_programming;
+import mo_yanxi.concepts;
 import mo_yanxi.func_initialzer;
 
 
@@ -35,7 +36,8 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] constexpr explicit elem_ptr(const owner<elem*> element)
 			: element{element}{}
 
-		template <invocable_elem_init_func InitFunc>
+		template <typename InitFunc>
+			requires (!spec_of<InitFunc, std::in_place_type_t> && invocable_elem_init_func<InitFunc>)
 		[[nodiscard]] elem_ptr(scene* scene, group* group, InitFunc initFunc)
 			: elem_ptr{scene, group, std::in_place_type<typename elem_init_func_trait<InitFunc>::elem_type>}{
 			std::invoke(initFunc,

@@ -13,6 +13,12 @@ void mo_yanxi::ui::image_drawable::draw(
 	graphic::draw::fill::rect_ortho(acquirer.get(), region, color_scl);
 }
 
+void mo_yanxi::ui::icon_drawable::draw(const elem& elem, math::frect region, graphic::color color_scl) const{
+	draw_acquirer acquirer{elem.get_renderer().get_batch(), image};
+	acquirer.proj.mode_flag = draw_flags;
+	graphic::draw::fill::rect_ortho(acquirer.get(), region, color_scl);
+}
+
 void mo_yanxi::ui::image_caped_region_drawable::draw(const elem& elem, math::frect region, graphic::color color_scl) const{
 	draw_acquirer acquirer{elem.get_renderer().get_batch()};
 	acquirer.proj.mode_flag = draw_flags;
