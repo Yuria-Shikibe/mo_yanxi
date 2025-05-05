@@ -100,12 +100,12 @@ namespace mo_yanxi::core::ctrl{
 		}
 
 		[[nodiscard]] key_code_t get_mode() const noexcept{
-			const auto shift = triggered(key::Left_Shift) || triggered(key::Right_Shift) ? mode::Shift : mode::None;
-			const auto ctrl = triggered(key::Left_Control) || triggered(key::Right_Control) ? mode::ctrl : mode::None;
-			const auto alt = triggered(key::Left_Alt) || triggered(key::Right_Alt) ? mode::Alt : mode::None;
-			const auto caps = triggered(key::CapsLock) ? mode::CapLock : mode::None;
-			const auto nums = triggered(key::NumLock) ? mode::NumLock : mode::None;
-			const auto super = triggered(key::Left_Super) || triggered(key::Right_Super) ? mode::Super : mode::None;
+			const auto shift = triggered(key::Left_Shift) || triggered(key::Right_Shift) ? mode::shift : mode::none;
+			const auto ctrl = triggered(key::Left_Control) || triggered(key::Right_Control) ? mode::ctrl : mode::none;
+			const auto alt = triggered(key::Left_Alt) || triggered(key::Right_Alt) ? mode::alt : mode::none;
+			const auto caps = triggered(key::CapsLock) ? mode::CapLock : mode::none;
+			const auto nums = triggered(key::NumLock) ? mode::NumLock : mode::none;
+			const auto super = triggered(key::Left_Super) || triggered(key::Right_Super) ? mode::Super : mode::none;
 
 			return shift | ctrl | alt | caps | nums | super;
 		}

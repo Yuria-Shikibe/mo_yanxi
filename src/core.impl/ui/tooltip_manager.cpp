@@ -132,7 +132,7 @@ void mo_yanxi::ui::tooltip_manager::update(float delta_in_time){
 
 	if(!scene->isMousePressed()){
 		const auto lastNotInBound = std::ranges::find_if_not(actives, [this](const tooltip_instance& toolTip){
-			if(toolTip.owner->tooltip_force_drop(get_cursor_pos()))return false;
+			if(toolTip.owner->tooltip_should_force_drop(get_cursor_pos()))return false;
 
 			auto follow = toolTip.owner->tooltip_align_policy().follow;
 

@@ -448,6 +448,7 @@ namespace mo_yanxi::graphic{
 
 	private:
 		auto& add_page(VkCommandBuffer command_buffer){
+			//TODO dynamic page size to handle large image?
 			auto& subpage = subpages.emplace_back(loader->context(), VkExtent2D{page_size.x, page_size.y});
 
 			vk::cmd::clear_color(
@@ -492,6 +493,14 @@ namespace mo_yanxi::graphic{
 				}
 			}
 
+			clear_unused();
+
+			for(auto& subpass : subpages){
+				if(auto rst = subpass.acquire(extent, margin)){
+					return async_load(std::move(desc), std::move(rst.value()));
+				}
+			}
+
 			auto& newSubpage = add_page(loader->context().get_transient_graphic_command_buffer());
 			auto rst = newSubpage.acquire(extent, margin);
 
@@ -507,6 +516,14 @@ namespace mo_yanxi::graphic{
 			VkBuffer buffer,
 			math::usize2 extent
 		){
+			for(auto& subpass : subpages){
+				if(auto rst = subpass.push(commandBuffer, buffer, extent, margin)){
+					return std::move(rst.value());
+				}
+			}
+
+			clear_unused();
+
 			for(auto& subpass : subpages){
 				if(auto rst = subpass.push(commandBuffer, buffer, extent, margin)){
 					return std::move(rst.value());

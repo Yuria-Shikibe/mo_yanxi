@@ -662,7 +662,7 @@ namespace mo_yanxi::game{
 			std::predicate<const Region&, const rect_type&> Pred,
 			std::invocable<const Region&, value_type&> Func
 		>
-			requires !std::same_as<Region, rect_type>
+			// requires !std::same_as<Region, rect_type>
 		void intersect_then(
 			const Region& region,
 			Pred boundCheck,
@@ -687,7 +687,7 @@ namespace mo_yanxi::game{
 			std::predicate<const Region&, const rect_type&> Pred,
 			std::invocable<const Region&, const value_type&> Func
 		>
-			requires !std::same_as<Region, rect_type>
+			// requires !std::same_as<Region, rect_type>
 		void intersect_then(
 			const Region& region,
 			Pred boundCheck,
@@ -796,13 +796,13 @@ namespace mo_yanxi::game{
 			}
 		}*/
 
-		template <std::regular_invocable<value_type&, vec_t> Func>
+		template <std::regular_invocable<vec_t, value_type&> Func>
 		void intersect_then(const vec_t point, Func func){
 			if(isBranchEmpty() || !this->contains(point)) return;
 
 			for(auto& cont : this->items){
 				if(trait::contains(cont, point)){
-					std::invoke(func, cont, point);
+					std::invoke(func, point, cont);
 				}
 			}
 

@@ -74,7 +74,7 @@ namespace mo_yanxi::ui{
 
 				math::vec2 move = event.pos;
 
-				if(event.mode & core::ctrl::mode::Shift){
+				if(event.mode & core::ctrl::mode::shift){
 					move.swap_xy();
 					move.x *= -1;
 				}

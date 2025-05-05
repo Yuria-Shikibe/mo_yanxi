@@ -406,7 +406,7 @@ export namespace mo_yanxi::math{
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr bool is_NaN() const noexcept{
-			if constexpr(std::is_floating_point_v<T>) {
+			if constexpr(std::floating_point<T>) {
 				return std::isnan(x) || std::isnan(y);
 			} else {
 				return false;

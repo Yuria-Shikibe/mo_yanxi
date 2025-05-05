@@ -10,6 +10,7 @@ module;
 #include <ft2build.h>
 #include <freetype/freetype.h>
 
+//TODO hide msdf impl
 extern "C++"{
 	#include <msdfgen/msdfgen.h>
 	#include <msdfgen/msdfgen-ext.h>

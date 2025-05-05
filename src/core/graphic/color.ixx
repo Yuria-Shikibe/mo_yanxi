@@ -698,7 +698,7 @@ namespace mo_yanxi::graphic{
 		constexpr color CYAN{0, 1, 1, 1};
 		constexpr color TEAL{0, 0.5f, 0.5f, 1};
 
-		constexpr color GREEN{0x00ff00ff};
+		constexpr color GREEN{color::from_rgba8888(0x00ff00ff)};
 		constexpr color pale_green{color::from_rgba8888(0xa1ecabff)};
 		constexpr color LIGHT_GREEN{color::from_rgba8888(0X62F06CFF)};
 		constexpr color ACID{color::from_rgba8888(0x7fff00ff)};

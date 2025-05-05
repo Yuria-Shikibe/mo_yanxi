@@ -615,7 +615,7 @@ namespace mo_yanxi::ui{
 		void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
 			using namespace core::ctrl;
 			if(caret_ && action == act::press || action == act::repeat){
-				bool shift = mode & mode::Shift;
+				bool shift = mode & mode::shift;
 				bool ctrl = mode & mode::ctrl;
 				switch(key){
 				case key::Right :

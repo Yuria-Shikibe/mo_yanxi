@@ -72,7 +72,7 @@ namespace mo_yanxi::ui{
 
 				auto cmp = -e.pos;
 
-				if(e.mode & core::ctrl::mode::Shift){
+				if(e.mode & core::ctrl::mode::shift){
 					cmp.swap_xy();
 				}
 

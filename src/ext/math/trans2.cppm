@@ -35,8 +35,9 @@ export namespace mo_yanxi::math{
 			return vec.is_NaN() || std::isnan(rot);
 		}
 
-		FORCE_INLINE constexpr transform2& apply_inv(const transform2 debaseTarget) noexcept{
-			vec.sub(debaseTarget.vec).rotate(-debaseTarget.rot);
+		template <typename Ang>
+		FORCE_INLINE constexpr transform2& apply_inv(const transform2<Ang>& debaseTarget) noexcept{
+			vec.sub(debaseTarget.vec).rotate_rad(-static_cast<float>(debaseTarget.rot));
 			rot -= debaseTarget.rot;
 
 			return *this;
@@ -51,6 +52,12 @@ export namespace mo_yanxi::math{
 
 		[[nodiscard]] FORCE_INLINE constexpr vec_t apply_inv_to(vec_t debaseTarget) const noexcept{
 			debaseTarget.sub(vec).rotate_rad(-static_cast<float>(rot));
+			return debaseTarget;
+		}
+
+		template <typename Ang>
+		[[nodiscard]] FORCE_INLINE constexpr transform2<Ang> apply_inv_to(transform2<Ang> debaseTarget) const noexcept{
+			debaseTarget.apply_inv(*this);
 			return debaseTarget;
 		}
 

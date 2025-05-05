@@ -68,7 +68,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] virtual bool tooltip_should_build(math::vec2 cursorPos) const = 0;
 
-		[[nodiscard]] virtual bool tooltip_force_drop(math::vec2 cursorPos) const{
+		[[nodiscard]] virtual bool tooltip_should_force_drop(math::vec2 cursorPos) const{
 			return false;
 		}
 

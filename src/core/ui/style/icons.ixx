@@ -19,5 +19,9 @@ namespace mo_yanxi::ui::assets{
 		export inline icon_raw_present close{};
 		export inline icon_raw_present check{};
 		export inline icon_raw_present plus{};
+
+		export inline icon_raw_present blender_icon_pivot_active{};
+		export inline icon_raw_present blender_icon_pivot_individual{};
+		export inline icon_raw_present blender_icon_pivot_median{};
 	}
 }

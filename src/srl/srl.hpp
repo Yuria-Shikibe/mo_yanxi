@@ -79,6 +79,21 @@ namespace mo_yanxi::io{
 			base::load(buf, val);
 			return val;
 		}
+
+		static bool serialize_to(std::ostream& stream, const typename base::value_type& data){
+			const auto msg = loader::pack(data);
+			return static_cast<const google::protobuf::MessageLite&>(msg).SerializeToOstream(&stream);
+		}
+
+		static bool parse_from(std::istream& stream, typename base::value_type& data){
+			typename base::buffer_type msg{};
+			if(static_cast<google::protobuf::MessageLite&>(msg).ParseFromIstream(&stream)){
+				base::load(msg, data);
+				return true;
+			}
+			return false;
+		}
+
 	};
 
 	template <typename V>

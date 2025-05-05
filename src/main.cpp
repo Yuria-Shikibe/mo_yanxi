@@ -172,14 +172,14 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 			});
 			selector.set_cared_suffix({".png"});
 		});
-		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.3f, 1.f}};
+		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.1f, 1.f}};
 		pane.cell().align = align::pos::center_left;
 		pane.cell().margin.set(4);
 	}
 
 	{
 		auto pane = bed.emplace<game::ui::hit_box_editor>();
-		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.7f, 1.f}};
+		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.9f, 1.f}};
 		pane.cell().align = align::pos::center_right;
 		pane.cell().margin.set(4);
 	}

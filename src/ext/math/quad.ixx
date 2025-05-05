@@ -753,7 +753,6 @@ namespace mo_yanxi::math{
 			v2 += v0;
 			v3 += v0;
 
-
 			bounding_box = quad<float>::get_bound();
 		}
 

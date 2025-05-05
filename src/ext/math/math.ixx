@@ -154,6 +154,30 @@ namespace mo_yanxi::math {
 
 
 	export
+	template <typename T>
+		requires (std::is_arithmetic_v<T>)
+	constexpr MATH_ATTR T snap_to(T value, T step, T base_offset = {}) noexcept {
+
+		if (step == T(0)) {
+			return value; // 避免除以零
+		}
+
+		if constexpr (std::integral<T>) {
+			T halfStep = step / 2;
+			T remainder = value % step;
+
+			if (remainder <= halfStep) {
+				return value - remainder + base_offset;
+			} else {
+				return value + (step - remainder) + base_offset;
+			}
+		} else {
+			// 浮点数类型的处理
+			return std::round(value / step) * step + base_offset;
+		}
+	}
+
+	export
 	template <std::floating_point T1, std::floating_point T2>
 	[[deprecated]] MATH_ATTR auto angle_exact_positive(const T1 x, const T2 y) noexcept{
 		using Ty = std::common_type_t<T1, T2>;
@@ -1040,7 +1064,7 @@ namespace mo_yanxi::math {
 
 	export
 	template <std::floating_point T>
-	constexpr MATH_ATTR T snap(T value, T step) {
+	[[deprecated]] constexpr MATH_ATTR T snap(T value, T step) {
 		MATH_ASSERT(step > 0);
 		return std::round(value / step) * step;
 	}

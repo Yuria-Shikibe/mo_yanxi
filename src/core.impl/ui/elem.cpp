@@ -138,6 +138,7 @@ namespace mo_yanxi{
 	}
 
 	void ui::elem::clear_external_references() noexcept{
+		tooltip_notify_drop();
 		if(scene_){
 			scene_->dropAllFocus(this);
 			scene_ = nullptr;
