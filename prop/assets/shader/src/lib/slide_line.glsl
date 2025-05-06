@@ -1,4 +1,7 @@
-struct sline_line_style {
+#ifndef LIB_SLIDE_LINE_DEF
+#define LIB_SLIDE_LINE_DEF
+
+struct slide_line_style {
     float angle;
     float scale;
     float spacing;
@@ -24,15 +27,17 @@ float get_dst_at(const float angle, const vec2 T){
     return len;
 }
 
-bool is_in_slide_line(const vec2 T, const sline_line_style style, float phase){
+bool is_in_slide_line(const vec2 T, const slide_line_style style, float phase){
     const float len = get_dst_at(style.angle, T) * style.scale;
 
     return mod(len + phase, style.spacing) < style.stroke;// step(, stroke);
 }
 
-float is_in_slide_line_smooth(const vec2 T, const sline_line_style style, float phase, float range){
+float is_in_slide_line_smooth(const vec2 T, const slide_line_style style, float phase, float range){
     const float len = get_dst_at(style.angle, T) * style.scale;
 
     float v = slope(mod(len + phase, style.spacing) / style.spacing) * style.spacing / style.stroke;
     return smoothstep(1.f - range *.5f, 1.f + range * .5f, v);
 }
+
+#endif

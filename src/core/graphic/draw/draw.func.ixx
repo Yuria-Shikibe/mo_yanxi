@@ -1,7 +1,7 @@
 module;
 
 #include "../src/ext/adapted_attributes.hpp"
-
+#define NO_INITIALIZATION /*[[indeterminate]]*/
 
 export module mo_yanxi.graphic.draw.func;
 export import mo_yanxi.graphic.draw;
@@ -69,15 +69,19 @@ namespace mo_yanxi::graphic::draw{
 
 
 		export
-		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+		template <
+			typename Vtx, std::derived_from<uniformed_rect_uv> UV,
+			typename Proj,
+			math::quad_like Quad
+		>
 		FORCE_INLINE void quad(
 			const batch_draw_param<Vtx, UV, Proj>& param,
-			const math::fquad& quad,
+			const Quad& quad,
 			col color_scl = colors::white
 			) noexcept {
 			fill::quad(
 				param,
-				quad.v0, quad.v1, quad.v2, quad.v3,
+				quad.v00(), quad.v10(), quad.v11(), quad.v01(),
 				color_scl
 			);
 		}
@@ -367,6 +371,32 @@ namespace mo_yanxi::graphic::draw{
 			line::line(auto_param[2], quad[2], quad[3], stroke, color, color);
 			line::line(auto_param[3], quad[3], quad[0], stroke, color, color);
 		}
+
+		export
+		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj, math::quad_like QuadT>
+		FORCE_INLINE void quad_expanded(
+			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+			const QuadT& quad,
+			float expand = 2.f /*Can Be Negative*/,
+			color color = colors::white){
+
+			std::array<math::vec2, 4> pos NO_INITIALIZATION;
+			for(int i = 0; i < 4; ++i){
+				const auto v = quad[i];
+				const auto normalL = quad.edge_normal_at(i - 1);
+				const auto normalR = quad.edge_normal_at(i);
+				const auto vert_normal = (normalR + normalL).normalize();
+				const auto ang = vert_normal.angle_between_rad(normalL);
+				pos[i] = v - vert_normal * (expand / mo_yanxi::math::cos(ang));
+			}
+
+			acquirer_guard _{auto_param, 4};
+			fill::quad(auto_param[0], quad[0], pos[0], pos[1], quad[1], color);
+			fill::quad(auto_param[1], quad[1], pos[1], pos[2], quad[2], color);
+			fill::quad(auto_param[2], quad[2], pos[2], pos[3], quad[3], color);
+			fill::quad(auto_param[3], quad[3], pos[3], pos[0], quad[0], color);
+		}
+
 
 		export
 		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>

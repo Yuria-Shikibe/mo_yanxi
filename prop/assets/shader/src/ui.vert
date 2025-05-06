@@ -11,14 +11,10 @@ layout(location = 0) out vec2 out_pos;
 layout(location = 1) flat out uvec4 out_indices;
 layout(location = 2) out vec2 out_uv;
 
-layout(location = 3) out vec4 out_color_base;
-layout(location = 4) out vec4 out_color_light;
+layout(location = 3) out vec4 out_color;
+layout(location = 4) flat out vec4 out_color_channel;
 layout(location = 5) out vec2 out_raw_pos;
 
-
-
-const float Overflow = .001f;
-const float LightColorRange = 2550.f;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -38,8 +34,16 @@ void main() {
     out_uv = in_uv;
     out_indices = in_indices;
 
-    vec4 base_c = mod(in_color_scl, 10.f);
-    out_color_base = base_c;
-    out_color_light = (in_color_scl - base_c) / LightColorRange;
+    out_color = in_color_scl;
 
+    vec4 channel = vec4(0);
+
+    switch(in_indices[1]){
+        case 0: channel[0] = 1; break;
+        case 1: channel[1] = 1; break;
+        case 2: channel[2] = 1; break;
+        default: break;
+    }
+
+    out_color_channel = channel;
 }

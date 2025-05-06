@@ -673,6 +673,10 @@ namespace mo_yanxi::math{
 			return this->set_vert(src.x, src.y, end.x, end.y);
 		}
 
+		FORCE_INLINE constexpr rect_ortho& max_src(typename vec_t::const_pass_t src) noexcept{
+			this->src.max(src);
+			return *this;
+		}
 
 		FORCE_INLINE constexpr rect_ortho& expand_x(T x) noexcept{
 			if constexpr(std::unsigned_integral<T>){
@@ -718,6 +722,7 @@ namespace mo_yanxi::math{
 
 			return *this;
 		}
+
 		FORCE_INLINE constexpr rect_ortho& expand(const T v) noexcept{
 			(void)this->expand_x(v);
 			(void)this->expand_y(v);

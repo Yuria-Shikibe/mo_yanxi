@@ -8,7 +8,7 @@ export import mo_yanxi.graphic.image_multi_region;
 export import mo_yanxi.graphic.draw.func;
 
 import std;
-import ext.guard;
+import mo_yanxi.guard;
 
 namespace mo_yanxi::graphic::draw{
 

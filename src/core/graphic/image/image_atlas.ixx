@@ -4,7 +4,7 @@ module;
 #include <cassert>
 //
 
-export module mo_yanxi.graphic.image_atlas;
+export module mo_yanxi.graphic.image_manage;
 
 export import mo_yanxi.referenced_ptr;
 export import mo_yanxi.graphic.image_region;
@@ -68,6 +68,10 @@ namespace mo_yanxi::graphic{
 		allocated_image_region(allocated_image_region&& other) noexcept = default;
 		allocated_image_region& operator=(const allocated_image_region& other) = delete;
 		allocated_image_region& operator=(allocated_image_region&& other) noexcept = default;
+
+		explicit operator bool() const noexcept{
+			return view != nullptr;// && get_ref_count() > 0;
+		}
 
 		[[nodiscard]] math::urect get_region() const noexcept{
 			return region;
@@ -350,6 +354,7 @@ namespace mo_yanxi::graphic{
 			: texture(context.get_allocator(), extent_2d), allocator({extent_2d.width, extent_2d.height}){
 		}
 
+		//TODO merge similar code
 		//TODO dont use bitcast of rects here?
 
 		std::optional<page_acquire_result> acquire(
@@ -391,9 +396,9 @@ namespace mo_yanxi::graphic{
 					std::bit_cast<math::usize2>(texture.get_image().get_extent2()), rst};
 			}
 
+
 			return std::nullopt;
 		}
-
 		std::optional<std::pair<allocated_image_region, vk::buffer>> push(
 			VkCommandBuffer commandBuffer,
 			vk::texture_source_prov auto bitmaps_prov,
@@ -422,6 +427,11 @@ namespace mo_yanxi::graphic{
 	};
 
 	struct image_page{
+		static constexpr std::string_view name_main = "main";
+		static constexpr std::string_view name_ui = "ui";
+		static constexpr std::string_view name_font = "font";
+		static constexpr std::string_view name_temp = "temp";
+
 	private:
 		async_image_loader* loader{};
 		math::usize2 page_size{};
@@ -484,6 +494,7 @@ namespace mo_yanxi::graphic{
 			return std::move(result.region);
 		}
 
+	public:
 		allocated_image_region async_allocate(image_load_description&& desc){
 			auto extent = desc.get_extent();
 
@@ -569,7 +580,7 @@ namespace mo_yanxi::graphic{
 			(void)vk::buffer_mapper{buffer}.load_range(bitmap.to_span());
 			return allocate(loader->context().get_transient_graphic_command_buffer(), buffer, bitmap.extent());
 		}
-	public:
+
 		std::pair<allocated_image_region&, bool> register_named_region(
 			std::string&& name,
 			const bitmap& region){
@@ -743,6 +754,11 @@ namespace mo_yanxi::graphic{
 			const math::usize2 size = DefaultTexturePageSize,
 			const std::uint32_t margin = 4){
 			return pages.insert_or_assign(name, image_page{*async_image_loader_, size, clearColor, margin}).first->second;
+		}
+
+		image_page& operator[](
+			const std::string_view name){
+			return pages.try_emplace(name, image_page{*async_image_loader_, DefaultTexturePageSize, {}, 4}).first->second;
 		}
 
 		void clean_unused() noexcept{

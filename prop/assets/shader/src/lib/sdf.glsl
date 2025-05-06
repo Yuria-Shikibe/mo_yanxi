@@ -16,12 +16,12 @@ float msdf(sampler2D samp, vec2 uv, float scale, bool uniformed) {
     return sigDist;
 }
 
-float msdf(sampler2DArray samp, vec3 uv, float scale, bool uniformed) {
-    vec2 msdfUnit = 1. / vec2(textureSize(samp, 0)) * scale;
-    vec3 col = texture(samp, uv).rgb;
-    float sigDist = median(col) - 0.5;
-
-    if(uniformed)sigDist *= dot(msdfUnit, 0.5 / fwidth(uv.xy));
-
-    return sigDist;
-}
+//float msdf(sampler2DArray samp, vec3 uv, float scale, bool uniformed) {
+//    vec2 msdfUnit = 1. / vec2(textureSize(samp, 0)) * scale;
+//    vec3 col = texture(samp, uv).rgb;
+//    float sigDist = median(col) - 0.5;
+//
+//    if(uniformed)sigDist *= dot(msdfUnit, 0.5 / fwidth(uv.xy));
+//
+//    return sigDist;
+//}

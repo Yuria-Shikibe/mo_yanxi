@@ -7,7 +7,7 @@ export module mo_yanxi.font.manager;
 export import mo_yanxi.font;
 
 import mo_yanxi.graphic.image_region;
-import mo_yanxi.graphic.image_atlas;
+import mo_yanxi.graphic.image_manage;
 
 import mo_yanxi.math.vector2;
 

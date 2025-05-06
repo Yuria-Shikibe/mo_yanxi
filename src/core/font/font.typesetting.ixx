@@ -1261,6 +1261,9 @@ namespace mo_yanxi::font::typesetting{
 							}
 							if(itr++.base()->code == U'\n')break;
 						}
+
+						if(itr == view.end())break;
+
 						if(!end_line(layout, context, true)){
 							return end_idx();
 						}

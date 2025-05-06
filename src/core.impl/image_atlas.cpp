@@ -3,7 +3,7 @@ module;
 #include <vulkan/vulkan.h>
 #include <cassert>
 
-module mo_yanxi.graphic.image_atlas;
+module mo_yanxi.graphic.image_manage;
 
 import mo_yanxi.vk.util.cmd.render;
 

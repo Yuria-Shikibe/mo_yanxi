@@ -744,6 +744,7 @@ namespace mo_yanxi::ui::creation{
 
 		table* menu{};
 		table* entries{};
+		basic_text_elem* current_entry_bar{};
 
 		path current{};
 		history_stack<path> history{};
@@ -806,6 +807,8 @@ namespace mo_yanxi::ui::creation{
 		}
 
 		void build_ui() noexcept{
+			current_entry_bar->set_text(std::format("..< | {:?}", current.string()));
+
 			if(!std::filesystem::exists(current) || !std::filesystem::is_directory(current)){
 				auto pathes = core::plat::get_drive_letters();
 				transformListToEntryElements(
@@ -876,7 +879,7 @@ namespace mo_yanxi::ui::creation{
 			auto return_to_parent_button = rtable->emplace<button<basic_text_elem>>();
 			return_to_parent_button->set_scale(.65f);
 			return_to_parent_button->prop().boarder.set_vert(12);
-			return_to_parent_button->set_text("..<");
+			return_to_parent_button->set_text(std::format("..< | {:?}", current.string()));
 			return_to_parent_button->set_button_callback(button_tags::general, [this]{
 				visit_parent_directory();
 			});
@@ -885,6 +888,7 @@ namespace mo_yanxi::ui::creation{
 			});
 			return_to_parent_button.cell().set_external({false, true}).set_pad({.bottom = 8});
 
+			current_entry_bar = std::to_address(return_to_parent_button);
 
 			auto pane = rtable->end_line().emplace<scroll_pane>();
 			pane->prop().set_empty_drawer();
@@ -1065,14 +1069,23 @@ namespace mo_yanxi::ui::creation{
 
 	export
 	template <std::derived_from<elem> T, std::predicate<const file_selector&, const T&> Checker, std::predicate<file_selector&, T&> Yielder>
-	file_selector& create_file_selector(T& requester, Checker&& checker, Yielder&& yielder){
+	struct file_selector_create_info{
+		T& requester;
+		Checker checker;
+		Yielder yielder;
+		bool add_file_create_button{};
+	};
+
+	export
+	template <std::derived_from<elem> T, std::predicate<const file_selector&, const T&> Checker, std::predicate<file_selector&, T&> Yielder>
+	file_selector& create_file_selector(file_selector_create_info<T, Checker, Yielder>&& create_info){
 		struct selector : file_selector{
 			T* owner;
 			std::decay_t<Checker> checker;
 			std::decay_t<Yielder> yielder;
 
-			[[nodiscard]] selector(scene* scene, group* group, T& o, Checker&& c, Yielder&& y)
-				: file_selector(scene, group), owner(&o), checker(std::forward<Checker>(c)), yielder(std::forward<Yielder>(y)){
+			[[nodiscard]] selector(scene* scene, group* group, file_selector_create_info<T, Checker, Yielder>& create_info)
+				: file_selector(scene, group), owner(&create_info.requester), checker(std::forward<Checker>(create_info.checker)), yielder(std::forward<Yielder>(create_info.yielder)){
 
 				auto close_b = menu->end_line().emplace<button<icon_frame>>(assets::icons::close);
 				close_b->set_style(assets::styles::no_edge);
@@ -1089,7 +1102,10 @@ namespace mo_yanxi::ui::creation{
 					return !check_path();
 				});
 
-				add_file_create_button();
+				if(create_info.add_file_create_button){
+					add_file_create_button();
+				}
+
 			}
 
 			void yield_path() override{
@@ -1108,13 +1124,13 @@ namespace mo_yanxi::ui::creation{
 			}
 		};
 
-		scene& scene = *requester.get_scene();
 
+		scene& scene = *create_info.requester.get_scene();
 		elem_ptr selector{
 			&scene,
 			scene.root.handle,
 			std::in_place_type<struct selector>,
-			requester, std::forward<Checker>(checker), std::forward<Yielder>(yielder)};
+			create_info};
 
 		selector->prop().fill_parent = {true, true};
 		return static_cast<file_selector&>(scene.root->add_children(std::move(selector)));

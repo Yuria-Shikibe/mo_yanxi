@@ -252,4 +252,166 @@ namespace mo_yanxi::vk{
 			}
 		}
 	};
+
+	export
+	struct command_chunk{
+	private:
+		VkDevice device{};
+		VkCommandPool pool{};
+
+	public:
+		struct unit{
+			friend command_chunk;
+		private:
+			VkCommandBuffer command_buffer{};
+			VkSemaphore semaphore{};
+			std::uint64_t counting{};
+
+		public:
+			explicit(false) operator VkCommandBuffer() const noexcept{
+				return command_buffer;
+			}
+
+			void submit(VkQueue queue, VkPipelineStageFlags2 signal_stage) & noexcept{
+				VkSemaphoreSubmitInfo to_signal{
+						.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+						.semaphore = semaphore,
+						.value = ++counting,
+						.stageMask = signal_stage
+					};
+
+				const VkCommandBufferSubmitInfo cmd_info{
+						.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+						.commandBuffer = command_buffer,
+					};
+
+				VkSubmitInfo2 submit_info{
+						.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+						.waitSemaphoreInfoCount = 0,
+						.pWaitSemaphoreInfos = nullptr,
+						.commandBufferInfoCount = 1,
+						.pCommandBufferInfos = &cmd_info,
+						.signalSemaphoreInfoCount = 1,
+						.pSignalSemaphoreInfos = &to_signal
+					};
+
+				vkQueueSubmit2(queue, 1, &submit_info, nullptr);
+			}
+
+			void wait(VkDevice device, std::uint64_t timeout = std::numeric_limits<std::uint64_t>::max()) const noexcept{
+				const VkSemaphoreWaitInfo info{
+					.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+					.pNext = nullptr,
+					.flags = 0,
+					.semaphoreCount = 1,
+					.pSemaphores = &semaphore,
+					.pValues = &counting
+				};
+
+				vkWaitSemaphores(device, &info, timeout);
+			}
+
+			[[nodiscard]] unit() = default;
+
+			unit(const unit& other) = delete;
+			unit(unit&& other) noexcept = default;
+			unit& operator=(const unit& other) = delete;
+			unit& operator=(unit&& other) noexcept = default;
+		};
+
+	private:
+		std::vector<unit> units{};
+
+	public:
+		using container_type = decltype(units);
+
+		[[nodiscard]] command_chunk() = default;
+
+		[[nodiscard]] command_chunk(VkDevice device, VkCommandPool pool, const std::size_t chunk_count)
+			: device(device), pool(pool), units{chunk_count}
+		{
+			for (auto&& value : units){
+				const VkCommandBufferAllocateInfo allocInfo{
+					.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+					.pNext = nullptr,
+					.commandPool = pool,
+					.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+					.commandBufferCount = 1
+				};
+
+				if(const auto rst = vkAllocateCommandBuffers(device, &allocInfo, &value.command_buffer)){
+					throw vk_error(rst, "Failed to allocate command buffers!");
+				}
+
+				constexpr VkSemaphoreTypeCreateInfo semaphore_create_info{
+					.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+					.pNext = nullptr,
+					.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+					.initialValue = 0
+				};
+
+				const VkSemaphoreCreateInfo semaphoreInfo{
+					.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+					.pNext = &semaphore_create_info,
+					.flags = 0
+				};
+
+				if(const auto rst = vkCreateSemaphore(device, &semaphoreInfo, nullptr, &value.semaphore)){
+					throw vk_error(rst, "Failed to create semaphore!");
+				}
+
+
+			}
+		}
+
+	private:
+		void free() const noexcept{
+			if(!device || !pool) return;
+
+			for (auto&& value : units){
+				vkDestroySemaphore(device, value.semaphore, nullptr);
+				vkFreeCommandBuffers(device, pool, 1, &value.command_buffer);
+			}
+		}
+
+	public:
+
+		~command_chunk(){
+			free();
+		}
+
+		command_chunk(const command_chunk& other) = delete;
+		command_chunk& operator=(const command_chunk& other) = delete;
+
+		command_chunk(command_chunk&& other) noexcept
+			: device{std::exchange(other.device, {})},
+			  pool{std::exchange(other.pool, {})},
+			  units{std::move(other.units)}{
+		}
+
+		command_chunk& operator=(command_chunk&& other) noexcept{
+			if(this == &other) return *this;
+			free();
+			device = std::exchange(other.device, {});
+			pool = std::exchange(other.pool, {});
+			units = std::move(other.units);
+			return *this;
+		}
+
+		[[nodiscard]] container_type::const_iterator begin() const noexcept{
+			return units.begin();
+		}
+
+		[[nodiscard]] container_type::const_iterator end() const noexcept{
+			return units.end();
+		}
+
+		[[nodiscard]] unit& operator[](const std::size_t index) noexcept{
+			return units[index];
+		}
+
+		[[nodiscard]] container_type::size_type size() const noexcept{
+			return units.size();
+		}
+	};
 }

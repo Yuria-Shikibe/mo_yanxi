@@ -18,6 +18,8 @@ export import mo_yanxi.graphic.post_processor.resolve;
 export import mo_yanxi.graphic.post_processor.bloom;
 export import mo_yanxi.graphic.post_processor.ssao;
 
+import mo_yanxi.vk.vma;
+
 import std;
 
 namespace mo_yanxi::graphic{
@@ -81,6 +83,11 @@ namespace mo_yanxi::graphic{
 		constexpr friend bool operator==(const ui_fragment_uniform& lhs, const ui_fragment_uniform& rhs) noexcept = default;
 	};
 
+	struct ui_blit_info{
+		math::usize2 offset{};
+		math::usize2 cap{};
+	};
+
 	
 	struct grid_drawer : batch_layer{
 
@@ -131,6 +138,55 @@ namespace mo_yanxi::graphic{
 		}
 	};
 
+	struct indirect_dispatcher{
+		using value_type = VkDispatchIndirectCommand;
+
+	private:
+		vk::buffer buffer{};
+		value_type current{};
+
+	public:
+		[[nodiscard]] indirect_dispatcher() = default;
+
+		[[nodiscard]] indirect_dispatcher(vk::allocator& allocator, const std::size_t chunk_count)
+			: buffer(allocator, VkBufferCreateInfo{
+				.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+				.size = sizeof(value_type) * chunk_count,
+				.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+			}, {
+				.usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+			})
+		{}
+
+		void set(math::u32size2 extent, math::u32size2 group_extent = post_processor::compute_group_unit_size2) noexcept{
+			extent.add(group_extent.copy().sub(1u, 1u)).div(group_extent);
+
+			current = value_type{
+				.x = extent.x,
+				.y = extent.y,
+				.z = 1
+			};
+		}
+
+		void update(std::size_t index){
+			assert(index < buffer.get_size() / sizeof(value_type));
+
+			(void)vk::buffer_mapper{buffer}.load(
+					current, sizeof(value_type) * index
+				);
+		}
+
+		[[nodiscard]] VkDeviceSize offset_at(std::size_t index) const noexcept{
+			assert(index < buffer.get_size() / sizeof(value_type));
+
+			return index * sizeof(value_type);
+		}
+
+		explicit(false) operator VkBuffer() const noexcept{
+			return buffer;
+		}
+	};
+
 	
 	export struct renderer_ui;
 
@@ -157,11 +213,18 @@ namespace mo_yanxi::graphic{
 	private:
 		grid_drawer main_layer{};
 
+		static constexpr std::size_t blit_chunk_count = 3;
+		std::size_t current_blit_chunk_index{};
+		vk::command_chunk blit_command_chunk{};
+
 		vk::descriptor_layout blit_descriptor_layout{};
 		vk::descriptor_buffer blit_descriptor_buffer{};
 		vk::pipeline_layout blit_pipeline_layout{};
 		vk::pipeline blit_pipeline{};
-		vk::command_buffer blit_command{};
+
+		// vk::command_buffer blit_command{};
+		indirect_dispatcher blit_dispatcher{};
+		batch_layer_data<ui_blit_info> blit_data{};
 
 		// math::mat3 current_proj{math::mat3_idt};
 		math::mat3 current_transform{math::mat3_idt};
@@ -183,9 +246,9 @@ namespace mo_yanxi::graphic{
 					context, assets::graphic::buffers::indices_buffer, assets::graphic::samplers::ui_sampler, 4,
 					sizeof(vk::vertices::vertex_ui), 512
 				}),
-			color_base{context.get_allocator(), context.get_extent(), VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT},
-			color_light{context.get_allocator(), context.get_extent(), VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT},
-			color_background{context.get_allocator(), context.get_extent(), VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT},
+			color_base{context.get_allocator(), context.get_extent(), VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT},
+			color_light{context.get_allocator(), context.get_extent(), VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT},
+			color_background{context.get_allocator(), context.get_extent(), VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT},
 			blit_base{context.get_allocator(), context.get_extent(), 1},
 			blit_light{context.get_allocator(), context.get_extent(), 1},
 
@@ -204,25 +267,30 @@ namespace mo_yanxi::graphic{
 			frag_data{context, batch.get_chunk_count()},
 			main_layer(context, batch.get_chunk_count(), {descriptor_layout_proj, batch.descriptor_layout()}),
 
+			blit_command_chunk{context.get_device(), context.get_compute_command_pool(), blit_chunk_count},
+
 			blit_descriptor_layout{
 				context.get_device(), [](vk::descriptor_layout_builder& builder){
-					builder.push_seq(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT);
-					builder.push_seq(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT);
-					builder.push_seq(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT);
 					builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 					builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+					builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+					builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+					builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+					builder.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 				}
 			},
 			blit_descriptor_buffer(
 				context.get_allocator(),
 				blit_descriptor_layout,
-				blit_descriptor_layout.binding_count()),
+				blit_descriptor_layout.binding_count(), blit_command_chunk.size()),
 			blit_pipeline_layout{context.get_device(), 0, {blit_descriptor_layout}},
+
 			blit_pipeline{
 				context.get_device(), blit_pipeline_layout,
 				VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
 				assets::graphic::shaders::comp::ui_blit.get_create_info()},
-			blit_command(context.get_compute_command_pool().obtain())
+			blit_dispatcher(context.get_allocator(), blit_command_chunk.size()),
+			blit_data(context, blit_command_chunk.size())
 		{
 
 			batch.set_consumer([this](std::size_t indices){
@@ -246,8 +314,40 @@ namespace mo_yanxi::graphic{
 			on_resize(extent);
 		}
 
-		void blit() const{
-			vk::cmd::submit_command(context().compute_queue(), blit_command);
+		void blit(const math::urect region){
+			auto clamped = region.intersection_with({tags::unchecked,
+				static_cast<std::uint32_t>(this->region.offset.x),
+				static_cast<std::uint32_t>(this->region.offset.y),
+				this->region.extent.width,
+				this->region.extent.height});
+
+			blit_data.current.offset = clamped.src;
+			blit_dispatcher.set(clamped.size());
+
+
+			auto& cur = blit_command_chunk[current_blit_chunk_index];
+			cur.wait(context().get_device());
+
+			blit_data.update<true>(current_blit_chunk_index);
+			blit_dispatcher.update(current_blit_chunk_index);
+			cur.submit(context().compute_queue(), VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+
+			current_blit_chunk_index = (current_blit_chunk_index + 1) % blit_command_chunk.size();
+		}
+
+		void blit(){
+			blit_data.current.offset.set(region.offset.x, region.offset.y);
+			blit_dispatcher.set({region.extent.width, region.extent.height});
+
+
+			auto& cur = blit_command_chunk[current_blit_chunk_index];
+			cur.wait(context().get_device());
+
+			blit_data.update<true>(current_blit_chunk_index);
+			blit_dispatcher.update(current_blit_chunk_index);
+			cur.submit(context().compute_queue(), VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+
+			current_blit_chunk_index = (current_blit_chunk_index + 1) % blit_command_chunk.size();
 		}
 
 		void push_scissor(scissor_raw scissor){
@@ -364,6 +464,7 @@ namespace mo_yanxi::graphic{
 			}
 			return last_viewport;
 		}
+
 		void on_resize(const VkExtent2D extent){
 			region.extent = extent;
 
@@ -382,6 +483,7 @@ namespace mo_yanxi::graphic{
 				.distance = 0.f,
 			});
 
+			// blit_dispatcher.set({extent.width / 2, extent.height / 2});
 		}
 
 		void update_layer_commands(batch_layer& batch_layer){
@@ -414,14 +516,19 @@ namespace mo_yanxi::graphic{
 			blit_light.init_layout_general(compute_command_buffer);
 
 			VkSampler sampler = assets::graphic::samplers::blit_sampler;
-			vk::descriptor_mapper{blit_descriptor_buffer}
-				.set_image(0, color_base.get_image_view(), 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-				.set_image(1, color_light.get_image_view(), 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-				.set_image(2, color_background.get_image_view(), 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-				.set_image(3, blit_base.get_image_view(), 0, VK_IMAGE_LAYOUT_GENERAL, nullptr, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-				.set_image(4, blit_light.get_image_view(), 0, VK_IMAGE_LAYOUT_GENERAL, nullptr, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+			vk::descriptor_mapper blit_binder{blit_descriptor_buffer};
 
-			;
+			for(int i = 0; i < blit_command_chunk.size(); ++i){
+				blit_binder
+					.set_storage_image(0, color_base.get_image_view(), VK_IMAGE_LAYOUT_GENERAL, i)
+					.set_storage_image(1, color_light.get_image_view(), VK_IMAGE_LAYOUT_GENERAL, i)
+					.set_storage_image(2, color_background.get_image_view(), VK_IMAGE_LAYOUT_GENERAL, i)
+					.set_storage_image(3, blit_base.get_image_view(), VK_IMAGE_LAYOUT_GENERAL, i)
+					.set_storage_image(4, blit_light.get_image_view(), VK_IMAGE_LAYOUT_GENERAL, i)
+				;
+			}
+
+			blit_data.bind_to(blit_binder, 5);
 		}
 
 		[[nodiscard]] math::mat3 get_cur_full_proj() const noexcept{
@@ -459,40 +566,50 @@ namespace mo_yanxi::graphic{
 		}
 
 		void create_blit_command(){
-			const vk::scoped_recorder scoped_recorder{blit_command, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
-			std::array attachments{&color_base, &color_light, &color_background};
+			for (auto && [idx, unit] : blit_command_chunk | std::views::enumerate){
+				const vk::scoped_recorder scoped_recorder{unit, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
+				std::array attachments{&color_base, &color_light, &color_background};
 
-			for(const auto attachment : attachments){
-				attachment->set_layout_to_read_optimal(
-					scoped_recorder,
-					context().graphic_family(),
-					context().compute_family()
-				);
-			}
+				vk::cmd::dependency_gen dependency_gen{};
 
+				for(const auto attachment : attachments){
+					dependency_gen.push(
+						attachment->get_image(),
+						VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+						VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+						VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+						VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+						VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+						VK_IMAGE_LAYOUT_GENERAL,
+						vk::image::default_image_subrange
+					);
+				}
 
-			blit_pipeline.bind(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE);
-			blit_descriptor_buffer.bind_to(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE, blit_pipeline_layout, 0);
+				dependency_gen.apply(scoped_recorder);
 
-			auto group = post_processor::get_work_group_size(std::bit_cast<math::u32size2>(blit_base.get_image().get_extent2()));
-			vkCmdDispatch(scoped_recorder, group.x, group.y, 1);
+				blit_pipeline.bind(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE);
+				blit_descriptor_buffer.bind_chunk_to(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE, blit_pipeline_layout, 0, idx);
 
-			for(const auto attachment : attachments){
-				vk::cmd::clear_color(
-					scoped_recorder, attachment->get_image(), {},
+				vkCmdDispatchIndirect(scoped_recorder, blit_dispatcher, blit_dispatcher.offset_at(idx));
 
-					vk::image::default_image_subrange,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-					VK_ACCESS_SHADER_READ_BIT,
-					VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-					context().compute_family(),
-					context().compute_family(),
-					context().graphic_family()
-				);
+				for(const auto attachment : attachments){
+					vk::cmd::clear_color(
+						scoped_recorder, attachment->get_image(), {},
+
+						vk::image::default_image_subrange,
+						VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+						VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+						VK_ACCESS_SHADER_READ_BIT,
+						VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+						VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+						context().compute_family(),
+						context().compute_family(),
+						context().graphic_family()
+					);
+				}
 			}
 		}
+
 	};
 
 	struct renderer_ui : renderer{
@@ -517,7 +634,7 @@ namespace mo_yanxi::graphic{
 				context, std::bit_cast<math::usize2>(context.get_extent()),
 				assets::graphic::shaders::comp::bloom,
 				assets::graphic::samplers::blit_sampler,
-				6, 0.35f
+				6, 1.f
 			},
 			merge_descriptor_layout(context.get_device(), [](vk::descriptor_layout_builder& builder){
 				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
@@ -536,7 +653,7 @@ namespace mo_yanxi::graphic{
 				assets::graphic::shaders::comp::ui_merge.get_create_info()),
 			merge_command(context.get_compute_command_pool().obtain()){
 
-			bloom.set_strength(.75f, .75f);
+			bloom.set_strength(.725f, .725f);
 
 			init_layout(context.get_transient_compute_command_buffer());
 			create_merge_commands();

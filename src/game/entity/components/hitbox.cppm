@@ -12,6 +12,8 @@ export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.matrix3;
 export import mo_yanxi.math;
 
+export import mo_yanxi.game.component.hitbox_meta;
+
 import std;
 import mo_yanxi.array_stack;
 
@@ -135,33 +137,6 @@ namespace mo_yanxi::game{
 
 	using small_vector_of_hitbox_comp = gch::small_vector<hitbox_comp, 4>; 
 
-	export
-	struct hitbox_meta{
-		struct meta{
-			math::rect_box_identity<float> box;
-			math::trans2 trans;
-		};
-
-		std::vector<meta> components{};
-
-		constexpr decltype(auto) operator[](this auto&& self, const std::size_t index) noexcept{
-			return self.components[index];
-		}
-
-		template <typename S>
-		constexpr auto begin(this S&& self) noexcept{
-			return std::ranges::begin(std::forward_like<S>(self.components));
-		}
-
-		template <typename S>
-		constexpr auto end(this S&& self) noexcept{
-			return std::ranges::end(std::forward_like<S>(self.components));
-		}
-
-		[[nodiscard]] constexpr std::size_t size() const noexcept{
-			return components.size();
-		}
-	};
 
 	export
 	struct hitbox_identity{

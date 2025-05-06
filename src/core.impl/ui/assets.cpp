@@ -1,6 +1,6 @@
 module mo_yanxi.ui.assets;
 
-import mo_yanxi.graphic.image_atlas;
+import mo_yanxi.graphic.image_manage;
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.assets.directories;
 
@@ -113,7 +113,8 @@ void mo_yanxi::ui::assets::load(void* erased_image_atlas){
 		using namespace styles;
 
 		general.edge = style::palette_with{shapes::edge, pal::front};
-		general.base = style::palette_with{shapes::base, style::palette{pal::back}.mul_alpha(0.65f)};
+		general.base = style::palette_with{shapes::base, pal::base};
+		general.back = style::palette_with{shapes::base, pal::back_black};
 
 		whisper = general;
 		whisper.edge.pal = pal::front_whisper;
@@ -143,6 +144,7 @@ void mo_yanxi::ui::assets::load(void* erased_image_atlas){
 		general_static = general;
 		general_static.base.pal.on_focus = {};
 		general_static.base.pal.on_press = {};
+		// general_static.back.pal = pal::back_black;
 
 		global_style_drawer = &general;
 

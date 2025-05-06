@@ -11,4 +11,11 @@ export import mo_yanxi.graphic.draw.multi_region;
 
 namespace mo_yanxi::ui{
 	export using draw_acquirer = graphic::draw::ui_acquirer;
+	export enum struct draw_layers : unsigned char{
+		def = 0,
+
+		light = 0,
+		base,
+		background,
+	};
 }

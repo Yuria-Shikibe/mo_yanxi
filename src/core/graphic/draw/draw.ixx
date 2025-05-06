@@ -66,10 +66,16 @@ namespace mo_yanxi::graphic::draw{
 
 	export
 	struct mode_bit_proj{
+		std::uint8_t layer{};
 		vk::vertices::mode_flag_bits mode_flag{};
 
+		template <typename T>
+		FORCE_INLINE void set_layer(const T& val) noexcept{
+			layer = static_cast<std::uint8_t>(val);
+		}
+
 		FORCE_INLINE constexpr vk::vertices::texture_indices operator()(const std::uint32_t index) const noexcept {
-			return {static_cast<std::uint8_t>(index), 0, mode_flag};
+			return {static_cast<std::uint8_t>(index), layer, mode_flag};
 		}
 	};
 
@@ -114,16 +120,17 @@ namespace mo_yanxi::graphic::draw{
 		using vertex_type = Vtx;
 		using uv_type = UV;
 		using projection = Proj;
+		using region_type = combined_image_region<UV>;
 
 	protected:
-		combined_image_region<UV> region{};
+		region_type region{};
 
 	public:
 		ADAPTED_NO_UNIQUE_ADDRESS Proj proj{};
 
 		[[nodiscard]] auto_acquirer_trait() = default;
 
-		[[nodiscard]] explicit auto_acquirer_trait(const combined_image_region<UV>& region)
+		[[nodiscard]] explicit auto_acquirer_trait(const region_type& region)
 			: region(region){
 		}
 
@@ -135,6 +142,10 @@ namespace mo_yanxi::graphic::draw{
 
 		[[nodiscard]] VkImageView get_view() const noexcept{
 			return region.view;
+		}
+
+		[[nodiscard]] region_type get_region() const noexcept{
+			return region;
 		}
 	};
 

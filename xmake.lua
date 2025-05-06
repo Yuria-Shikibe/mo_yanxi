@@ -49,10 +49,11 @@ target("mo_yanxi")
         add_defines("_DEBUG")
         add_cxflags("/RTCsu", { force = true })
         add_defines("DEBUG_CHECK=1")
-
     else
         set_symbols("debug")
         set_optimize("fastest")
+        add_cxflags("/GL")
+
         add_defines("DEBUG_CHECK=0")
     end
 

@@ -108,6 +108,9 @@ namespace mo_yanxi{
 		friend struct referenced_ptr;
 	};
 
+
+	//TODO remove wrong atomic support
+
 	export
 	template <bool isAtomic = false>
 	struct referenced_object{
@@ -163,9 +166,7 @@ namespace mo_yanxi{
 				return prev == 1;
 			}else{
 				//TODO should this marked as illegal?
-				if(reference_count == 0){
-					return false;
-				}
+				assert(reference_count != 0);
 
 				--reference_count;
 				return reference_count == 0;

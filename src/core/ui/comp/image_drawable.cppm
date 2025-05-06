@@ -9,7 +9,7 @@ export import mo_yanxi.ui.style;
 export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.graphic.color;
-export import mo_yanxi.graphic.image_atlas;
+export import mo_yanxi.graphic.image_manage;
 export import mo_yanxi.graphic.image_region;
 export import mo_yanxi.graphic.image_multi_region;
 export import mo_yanxi.vk.vertex_info;

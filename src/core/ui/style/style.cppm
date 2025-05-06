@@ -66,7 +66,7 @@ namespace mo_yanxi::ui{
 
 			[[nodiscard]] palette_with() = default;
 
-			[[nodiscard]] explicit palette_with(const T& val, const palette& pal)
+			[[nodiscard]] palette_with(const T& val, const palette& pal)
 				requires (std::is_copy_constructible_v<T>)
 				: T{val}, pal{pal}{}
 		};
@@ -75,6 +75,7 @@ namespace mo_yanxi::ui{
 			align::spacing boarder{DefaultBoarder};
 			palette_with<graphic::image_nine_region> base{};
 			palette_with<graphic::image_nine_region> edge{};
+			palette_with<graphic::image_nine_region> back{};
 
 			float disabledOpacity{.5f};
 

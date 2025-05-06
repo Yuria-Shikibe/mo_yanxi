@@ -54,12 +54,30 @@ namespace mo_yanxi::ui::assets{
 		}()};
 
 		export inline
+		constexpr style::palette base{
+			.general = colors::clear,
+			.on_focus = colors::dark_gray.copy().set_a(.2f),
+			.on_press = colors::gray.copy().set_a(.25f),
+			.disabled = colors::clear,
+			.activated = colors::dark_gray.copy().set_a(.25f)
+		};
+
+		export inline
 		constexpr style::palette back{
 			.general = colors::black,
 			.on_focus = colors::dark_gray,
 			.on_press = colors::gray,
-			.disabled = colors::dark_gray.copy().mul_a(.226f),
-			.activated = colors::light_gray.copy().mul_a(.126f)
+			.disabled = colors::black,
+			.activated = colors::dark_gray
+		};
+
+		export inline
+		constexpr style::palette back_black{
+			.general = colors::black,
+			.on_focus = colors::black,
+			.on_press = colors::black,
+			.disabled = colors::black,
+			.activated = colors::black
 		};
 	}
 	

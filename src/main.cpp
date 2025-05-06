@@ -58,6 +58,7 @@ import mo_yanxi.graphic.camera;
 import mo_yanxi.core.global;
 import mo_yanxi.core.global.ui;
 import mo_yanxi.core.global.graphic;
+import mo_yanxi.core.global.assets;
 
 import mo_yanxi.graphic.renderer;
 import mo_yanxi.graphic.renderer.world;
@@ -66,7 +67,7 @@ import mo_yanxi.graphic.renderer.merger;
 import mo_yanxi.graphic.draw;
 import mo_yanxi.graphic.draw.func;
 import mo_yanxi.graphic.draw.multi_region;
-import mo_yanxi.graphic.image_atlas;
+import mo_yanxi.graphic.image_manage;
 import mo_yanxi.graphic.image_multi_region;
 
 import mo_yanxi.graphic.layers.ui.grid_drawer;
@@ -119,7 +120,6 @@ import hive;
 
 import std;
 
-
 void compile_shaders(){
 	using namespace mo_yanxi;
 
@@ -165,11 +165,11 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 		auto pane = bed.emplace<ui::button<>>();
 		pane->set_button_callback(ui::button_tags::general, [](ui::elem& elem){
 			using namespace ui;
-			auto& selector = creation::create_file_selector(elem, [](const creation::file_selector& s, const ui::elem&){
+			auto& selector = creation::create_file_selector(creation::file_selector_create_info{elem, [](const creation::file_selector& s, const ui::elem&){
 				return s.get_current_main_select().has_value();
 			}, [](const creation::file_selector& s, const ui::elem&){
 				return true;
-			});
+			}});
 			selector.set_cared_suffix({".png"});
 		});
 		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.1f, 1.f}};
@@ -320,40 +320,11 @@ void main_loop(){
 
 	auto& context = core::global::graphic::context;
 
-	font::font_manager font_manager{};
-	graphic::image_atlas atlas{context};
-	font_manager.set_page(atlas.create_image_page("font"));
-
+	graphic::image_atlas& atlas{core::global::assets::atlas};
 	graphic::image_page& main_page = atlas.create_image_page("main");
 
-
-	{
-		auto p = font_manager.page().register_named_region(
-			std::string_view{"white"}, graphic::path_load{
-				R"(D:\projects\mo_yanxi\prop\assets\texture\white.png)"
-			});
-		p.first.uv.shrink(64);
-		font_manager.page().mark_protected("white");
-
-		graphic::draw::white_region = p.first;
-
-		auto& face_tele = font_manager.register_face("tele", R"(D:\projects\mo_yanxi\prop\assets\fonts\telegrama.otf)");
-		auto& face_srch = font_manager.register_face("srch", R"(D:\projects\mo_yanxi\prop\assets\fonts\SourceHanSerifSC-SemiBold.otf)");
-		auto& face_timesi = font_manager.register_face("timesi", R"(D:\projects\mo_yanxi\prop\assets\fonts\timesi.ttf)");
-		auto& face_ui = font_manager.register_face("segui", R"(D:\projects\mo_yanxi\prop\assets\fonts\seguisym.ttf)");
-
-		face_tele.fallback = &face_srch;
-		face_srch.fallback = &face_ui;
-		font::typesetting::default_font_manager = &font_manager;
-		font::typesetting::default_font = &face_tele;
-	}
-
 	test::load_tex(atlas);
-
-	font::typesetting::parser parser{};
-
-
-	core::global::graphic::post_init();
+	core::global::graphic::init_renderers();
 
 	auto& renderer_world = core::global::graphic::world;
 	auto& renderer_ui = core::global::graphic::ui;
@@ -619,7 +590,7 @@ void main_loop(){
 		core::global::ui::root->draw();
 
 
-		graphic::draw::world_acquirer acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
+		/*graphic::draw::world_acquirer acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
 		math::rect_box_posed rect2{math::vec2{200, 40}};
 
 		auto cursor_in_world = renderer_world.camera.get_screen_to_world(core::global::ui::root->focus->cursor_pos, {}, true);
@@ -808,10 +779,10 @@ void main_loop(){
 		graphic_context.render_efx();
 
 		renderer_world.batch.batch.consume_all();
-		renderer_world.post_process();
+		renderer_world.post_process();*/
 
-		renderer_ui.batch.batch.consume_all();
-		renderer_ui.batch.blit();
+		// renderer_ui.batch.batch.consume_all();
+		// renderer_ui.batch.blit();
 		renderer_ui.post_process();
 
 		merger.submit();
@@ -861,13 +832,15 @@ int main(){
 	compile_shaders();
 
 	core::glfw::init();
-	core::global::graphic::init();
+	core::global::graphic::init_vk();
+	core::global::assets::init(&core::global::graphic::context);
 	core::global::ui::init();
 	assets::graphic::load(core::global::graphic::context);
 
 	main_loop();
 
 	assets::graphic::dispose();
+	core::global::assets::dispose();
 	core::global::graphic::dispose();
 	core::glfw::terminate();
 }

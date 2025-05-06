@@ -279,17 +279,31 @@ void mo_yanxi::ui::scene::layout(){
 void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 	//TODO draw and blit?
 
+	//TODO fix blit bound(apply viewport transform) when draw nested scene
+
+	constexpr auto to_uint_bound = [](rect region) static  {
+		return region.expand(8).round<std::int32_t>().max_src({}).as<std::uint32_t>();
+	};
+
 	for (auto&& elem : tooltip_manager.get_draw_sequence()){
 		if(elem.belowScene){
 			elem.element->try_draw(clipSpace);
+			renderer->batch->consume_all();
+			renderer->batch.blit(to_uint_bound(elem.element->get_bound()));
 		}
 	}
 
-	root->draw(clipSpace);
+	for (auto& elem : root->get_children()){
+		elem->try_draw(clipSpace);
+		renderer->batch->consume_all();
+		renderer->batch.blit(to_uint_bound(elem->get_bound()));
+	}
 
 	for (auto&& elem : tooltip_manager.get_draw_sequence()){
 		if(!elem.belowScene){
 			elem.element->try_draw(clipSpace);
+			renderer->batch->consume_all();
+			renderer->batch.blit(to_uint_bound(elem.element->get_bound()));
 		}
 	}
 

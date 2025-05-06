@@ -3,7 +3,7 @@ export module test;
 import mo_yanxi.ui.basic;
 import mo_yanxi.ui.style;
 import mo_yanxi.ui.assets;
-import mo_yanxi.graphic.image_atlas;
+import mo_yanxi.graphic.image_manage;
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.graphic.color;
 import mo_yanxi.graphic.image_multi_region;

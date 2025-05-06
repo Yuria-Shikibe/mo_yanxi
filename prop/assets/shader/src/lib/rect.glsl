@@ -1,3 +1,6 @@
+#ifndef LIB_RECT_DEF
+#define LIB_RECT_DEF
+
 struct frect {
     vec2 src;
     vec2 dst;
@@ -15,3 +18,5 @@ float dst_to_rect(vec2 pos, frect rect, vec2 scl){
     vec2 ppos = clamp(pos, rect.src, rect.dst);
     return distance(ppos * scl, pos * scl);
 }
+
+#endif

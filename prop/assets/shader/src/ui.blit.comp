@@ -4,15 +4,20 @@
 
 layout (local_size_x = 16, local_size_y = 16) in;
 
-layout (binding = 0) uniform sampler2D in_base;
-layout (binding = 1) uniform sampler2D in_light;
-layout (binding = 2) uniform sampler2D in_background;
+restrict layout (binding = 0, rgba32f) uniform readonly image2D in_base;
+restrict layout (binding = 1, rgba32f) uniform readonly image2D in_light;
+restrict layout (binding = 2, rgba32f) uniform readonly image2D in_background;
 
 restrict layout (binding = 3, rgba32f) uniform image2D out_base;
 restrict layout (binding = 4, rgba32f) uniform image2D out_light;
 
+layout(set = 0, binding = 5) uniform UBO{
+    uvec2 offset;
+    uvec2 cap;
+}ubo;
 
-vec4 applyShadow(vec4 baseColor, vec4 shadowColor) {
+
+vec4 applyShadow(vec4 shadowColor, vec4 baseColor) {
     float shadowIntensity = shadowColor.a;
     vec3 darkenedRGB = mix(vec3(1.f), shadowColor.rgb, shadowIntensity);
     vec4 darkenedColor = vec4(darkenedRGB * baseColor.rgb, baseColor.a);
@@ -21,19 +26,20 @@ vec4 applyShadow(vec4 baseColor, vec4 shadowColor) {
 }
 
 void main() {
-    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
-//    vec2 uv = (vec2(pos) + vec2(0.5f, 0.5f)) / vec2(imageSize(outputImageGeneral));
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy + ubo.offset);
 
-    vec4 color_base_src = texelFetch(in_base, pos, 0);
-    vec4 color_base_dst = imageLoad(out_base, pos);
+    vec4 color_background_src = imageLoad(in_background, pos);
+    //TODO make alpha ctrlable by using blend and clear color?
 
-    vec4 color_light_src = texelFetch(in_light, pos, 0);
-    vec4 color_light_dst = imageLoad(out_light, pos);
-    //TODO
-    imageStore(out_base, pos, blend(color_base_src, color_base_dst));
-    imageStore(out_light, pos, blend(color_light_src, color_light_dst));
+    vec4 shadow1 = vec4(color_background_src.rgb, color_background_src.a * .65f);
+    vec4 shadow2 = vec4(color_background_src.rgb, color_background_src.a * .9f);
 
-//    imageStore(out_base, pos, blend2(generalSrcColor, applyShadow(generalDstColor, backgroundSrcColor)));
-//    imageStore(out_light, pos, alphaBlend(backgroundSrcColor, backgroundDstColor));
-//    imageStore(outputImageBase, pos, baseSrcColor);
+    vec4 color_base_src = imageLoad(in_base, pos);
+    vec4 color_light_src = imageLoad(in_light, pos);
+
+    vec4 color_base_dst  = blend(shadow1, imageLoad(out_base, pos));
+    vec4 color_light_dst = blend(shadow2, imageLoad(out_light, pos));
+
+    imageStore(out_base, pos, blend(blend2(color_base_src, shadow1), color_base_dst));
+    imageStore(out_light, pos, blend2(color_light_src, color_light_dst));
 }

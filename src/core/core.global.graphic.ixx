@@ -20,9 +20,9 @@ namespace mo_yanxi::core::global::graphic{
 	export mo_yanxi::graphic::renderer_ui ui;
 	export mo_yanxi::graphic::renderer_merge merger;
 
-	export void init();
+	export void init_vk();
 
-	export void post_init();
+	export void init_renderers();
 
 	export void dispose(){
 		merger = {};

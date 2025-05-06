@@ -223,6 +223,13 @@ export namespace mo_yanxi::math{
 			return *this;
 		}
 
+		FORCE_INLINE constexpr vector2& snap_to(const_pass_t snap, const_pass_t offset = {}) noexcept {
+			this->x = math::snap_to(x, snap.x, offset.x);
+			this->y = math::snap_to(y, snap.y, offset.y);
+
+			return *this;
+		}
+
 		FORCE_INLINE constexpr vector2& set(const T val) noexcept {
 			return this->set(val, val);
 		}

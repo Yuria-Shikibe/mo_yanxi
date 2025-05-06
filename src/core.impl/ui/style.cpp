@@ -5,8 +5,7 @@ import mo_yanxi.ui.basic;
 import mo_yanxi.ui.graphic;
 import mo_yanxi.graphic.draw.func;
 import mo_yanxi.graphic.draw.multi_region;
-// import Core.UI.Graphic;
-// import Graphic.Draw.NinePatch;
+
 
 namespace mo_yanxi{
 	graphic::color ui::style::palette::on_instance(const ui::elem& element) const{
@@ -31,11 +30,14 @@ namespace mo_yanxi{
 
 		draw_acquirer acquirer{element.get_renderer().get_batch(), {}};
 		acquirer.proj.mode_flag = vk::vertices::mode_flag_bits::sdf;
+
+
+		acquirer.proj.set_layer(draw_layers::def);
+		draw::nine_patch(acquirer, edge, region, edge.pal.on_instance(element).mul_a(opacityScl));
 		draw::nine_patch(acquirer, base, region, base.pal.on_instance(element).mul_a(opacityScl));
 
-		draw::nine_patch(acquirer, edge, region, edge.pal.on_instance(element).mul_a(opacityScl));
-		// acquirer.proj.mode_flag = {};
-		// draw::line::rect_ortho(acquirer, region);
+		acquirer.proj.set_layer(draw_layers::background);
+		draw::nine_patch(acquirer, back, region, back.pal.on_instance(element).mul_a(opacityScl));
 	}
 
 	float ui::style::round_style::content_opacity(const elem& element) const{
