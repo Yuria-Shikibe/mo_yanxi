@@ -388,7 +388,7 @@ namespace mo_yanxi::graphic{
 		// 	return clampCond<doClamp>();
 		// }
 
-		template <bool doClamp = true>
+		template <bool doClamp = false>
 		FORCE_INLINE constexpr color& lerpRGB(const color& target, const float t) noexcept{
 			math::lerp_inplace(r, target.r, t);
 			math::lerp_inplace(g, target.g, t);
@@ -396,7 +396,7 @@ namespace mo_yanxi::graphic{
 			return clampCond<doClamp>();
 		}
 
-		template <bool doClamp = true>
+		template <bool doClamp = false>
 		[[nodiscard]] FORCE_INLINE constexpr color create_lerp(const color& target, const float t) const noexcept{
 			color newColor{
 					math::lerp(r, target.r, t),
@@ -408,7 +408,7 @@ namespace mo_yanxi::graphic{
 			return newColor.clampCond<doClamp>();
 		}
 
-		template <bool doClamp = true>
+		template <bool doClamp = false>
 		FORCE_INLINE constexpr color& lerp(const float tr, const float tg, const float tb, const float ta,
 		                                   const float t) noexcept{
 			this->r += t * (tr - this->r);

@@ -84,7 +84,6 @@ namespace mo_yanxi::vk{
 	export
 	struct texture : combined_image{
 	private:
-
 		std::uint32_t mipLevel{};
 		std::uint32_t layers{};
 
@@ -286,6 +285,7 @@ namespace mo_yanxi::vk{
 	export
 	struct color_attachment : combined_image{
 	private:
+		VkFormat format_;
 		VkImageUsageFlags usage;
 		VkSampleCountFlagBits samples;
 	public:
@@ -293,21 +293,24 @@ namespace mo_yanxi::vk{
 
 		[[nodiscard]] color_attachment(
 			allocator& allocator,
-			const VkExtent2D extent, VkImageUsageFlags usage, VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT) :
+			const VkExtent2D extent,
+			VkImageUsageFlags usage,
+			VkFormat format = VK_FORMAT_R8G8B8A8_UNORM,
+			VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT) :
 			combined_image({
 				               allocator,
 				               {extent.width, extent.height, 1},
 				               usage,
-				               VK_FORMAT_R8G8B8A8_UNORM,
+				               format,
 				               1, 1, samples, VK_IMAGE_TYPE_2D
 			               }, {
 					               .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 					               .viewType = VK_IMAGE_VIEW_TYPE_2D,
-					               .format = VK_FORMAT_R8G8B8A8_UNORM,
+					               .format = format,
 					               .components = {},
 					               .subresourceRange = image::default_image_subrange
 				               }),
-			usage{usage}, samples(samples){
+			usage{usage}, samples(samples), format_{format}{
 		}
 
 		void init_layout(VkCommandBuffer command_buffer) const noexcept{
@@ -344,7 +347,7 @@ namespace mo_yanxi::vk{
 				*image.get_allocator(),
 				{extent.width, extent.height, 1},
 				usage,
-				VK_FORMAT_R8G8B8A8_UNORM,
+				format_,
 				1, 1, samples, VK_IMAGE_TYPE_2D
 			};
 
@@ -352,7 +355,7 @@ namespace mo_yanxi::vk{
 				.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 				.image = image.get(),
 				.viewType = VK_IMAGE_VIEW_TYPE_2D,
-				.format = VK_FORMAT_R8G8B8A8_UNORM,
+				.format = format_,
 				.components = {},
 				.subresourceRange = image::default_image_subrange
 			}};

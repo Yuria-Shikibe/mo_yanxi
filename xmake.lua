@@ -53,6 +53,7 @@ target("mo_yanxi")
         set_symbols("debug")
         set_optimize("fastest")
         add_cxflags("/GL")
+        add_ldflags("/LTCG")
 
         add_defines("DEBUG_CHECK=0")
     end

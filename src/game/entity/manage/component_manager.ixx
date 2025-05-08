@@ -81,8 +81,8 @@ namespace mo_yanxi::game::ecs{
 	struct component_manager{
 		template <typename T>
 		using small_vector_of = gch::small_vector<T>;
-		using archetype_map_type = type_fixed_hash_map<std::unique_ptr<archetype_base>>;
-		// using archetype_map_type = std::unordered_map<std::type_index, std::unique_ptr<archetype_base>>;
+		// using archetype_map_type = type_fixed_hash_map<std::unique_ptr<archetype_base>>;
+		using archetype_map_type = std::unordered_map<std::type_index, std::unique_ptr<archetype_base>>;
 
 	private:
 		//manager should always moved thread safely
@@ -96,11 +96,16 @@ namespace mo_yanxi::game::ecs{
 		plf::hive<entity> entities{};
 		archetype_map_type archetypes{};
 
-		type_fixed_hash_map<std::vector<archetype_slice>> type_to_archetype{};
-		// std::unordered_map<std::type_index, std::vector<archetype_slice>> type_to_archetype{};
+		// type_fixed_hash_map<std::vector<archetype_slice>> type_to_archetype{};
+		std::unordered_map<std::type_index, std::vector<archetype_slice>> type_to_archetype{};
 
 	public:
 		float update_delta;
+
+		[[nodiscard]] FORCE_INLINE constexpr float get_update_delta() const noexcept{
+			return update_delta;
+		}
+
 		/**
 		 * @brief deferred add entity, whose archtype must have been created
 		 * @return entity handle
@@ -237,15 +242,15 @@ namespace mo_yanxi::game::ecs{
 			searched_spans result{};
 
 			this->slice_and_then<Tuple>([&](chunk_spans spans){
-				result.push_back(spans);
-			}, [&](std::size_t sz){
-				result.reserve(sz);
-			});
+				                            result.push_back(spans);
+			                            }, [&](std::size_t sz){
+				                            result.reserve(sz);
+			                            });
 
 			return result;
 		}
 
-		template <typename Fn>
+		template <typename Exclusives = std::tuple<>, typename Fn>
 		FORCE_INLINE void sliced_each(Fn fn){
 			using raw_params = remove_mfptr_this_args<Fn>;
 
@@ -253,7 +258,7 @@ namespace mo_yanxi::game::ecs{
 				using params = unary_apply_to_tuple_t<std::decay_t, tuple_drop_first_elem_t<raw_params>>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				this->slice_and_then<params>([this, f = std::move(fn)](const span_tuple& p){
+				this->slice_and_then<params, Exclusives>([this, f = std::move(fn)](const span_tuple& p){
 					auto count = std::ranges::size(std::get<0>(p));
 
 					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
@@ -272,7 +277,7 @@ namespace mo_yanxi::game::ecs{
 				using params = unary_apply_to_tuple_t<std::decay_t, raw_params>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				this->slice_and_then<params>([f = std::move(fn)](const span_tuple& p){
+				this->slice_and_then<params, Exclusives>([f = std::move(fn)](const span_tuple& p){
 					auto count = std::ranges::size(std::get<0>(p));
 
 					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
@@ -367,19 +372,42 @@ namespace mo_yanxi::game::ecs{
 
 	public:
 		template <
-			typename Tuple = std::tuple<>,
+			tuple_spec Tuple = std::tuple<>,
+			tuple_spec Exclusives = std::tuple<>,
 			typename Fn,
 			std::invocable<std::size_t>	ReserveFn = std::identity>
-			requires (is_tuple_v<Tuple>)
+			requires (!tuple_has_duplicate_types_v<tuple_cat_t<Tuple, Exclusives>>)
 		void slice_and_then(Fn fn, ReserveFn reserve_fn = {}){
-			// using Tuple = std::tuple<int>;
 			static_assert(std::tuple_size_v<Tuple> > 0);
 			using chunk_spans = unary_apply_to_tuple_t<strided_span, Tuple>;
 
 			std::array<std::span<const archetype_slice>, std::tuple_size_v<Tuple>> spans{};
 
+			static constexpr auto ExclusiveSize = std::tuple_size_v<Exclusives>;
+
+			gch::small_vector<const void*, std::clamp<std::size_t>(std::bit_ceil(ExclusiveSize * 2), 4, 32)> exclusives{};
+
+			if constexpr (ExclusiveSize > 0){
+				[&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>){
+					([&, this](std::type_index idx){
+						if(auto itr = type_to_archetype.find(idx); itr != type_to_archetype.end()){
+							for (const auto & slice : itr->second){
+								exclusives.push_back(slice.identity());
+							}
+						}
+					}(typeid(std::tuple_element_t<Idx, Exclusives>)), ...);
+				}(std::make_index_sequence<ExclusiveSize>{});
+
+				std::ranges::sort(exclusives);
+				const auto rst = std::ranges::unique(exclusives);
+				exclusives.erase(rst.begin(), rst.end());
+			}
+
 			std::size_t maximum_size{};
+
 			{
+				//TODO consider that 'none' is really casual, remove it?
+
 				bool none = false;
 				auto try_find = [&, this](std::type_index idx) -> std::span<const archetype_slice>{
 					// std::println(std::cerr, "{}", idx.name());
@@ -429,6 +457,14 @@ namespace mo_yanxi::game::ecs{
 				}
 
 				if(last_itr_min == cur_itr_min){
+					if constexpr (ExclusiveSize > 0){
+						for (const auto& archetype_slice : ranges){
+							if(std::ranges::binary_search(exclusives, archetype_slice.front().identity())){
+								goto skip;
+							}
+						}
+					}
+
 					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
 						if constexpr (std::invocable<Fn, std::array<archetype_slice, std::tuple_size_v<Tuple>>>){
 							std::invoke(fn, std::array<archetype_slice, std::tuple_size_v<Tuple>>{static_cast<subrange&>(ranges[Idx]).front() ...});
@@ -438,6 +474,8 @@ namespace mo_yanxi::game::ecs{
 							std::invoke(fn, static_cast<subrange&>(ranges[Idx]).front().slice<std::tuple_element_t<Idx, Tuple>>() ...);
 						}
 					}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+
+				skip:
 
 					for (auto&& archetype_slice : ranges){
 						++archetype_slice.begin_itr;

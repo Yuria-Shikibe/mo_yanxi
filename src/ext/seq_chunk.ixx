@@ -35,7 +35,14 @@ namespace mo_yanxi{
 
 	export
 	template <typename... T>
-	struct seq_chunk : private std::conditional_t<std::is_fundamental_v<T>, raw_wrap<T>, T>...{
+	struct seq_chunk final : private std::conditional_t<std::is_fundamental_v<T>, raw_wrap<T>, T>...{
+
+		template <typename Ty>
+			requires (contained_within<std::remove_cvref_t<Ty>, T...>)
+		static copy_qualifier_t<Ty, seq_chunk>* cast_from(Ty* p) noexcept{
+			return static_cast<copy_qualifier_t<Ty, seq_chunk>*>(p);
+		}
+
 		using tuple_type = std::tuple<T...>;
 
 		[[nodiscard]] constexpr seq_chunk() noexcept = default;
@@ -94,6 +101,36 @@ namespace mo_yanxi{
 	template <typename Tuple>
 	using tuple_to_seq_chunk_t = typename decltype(ttsc<Tuple>())::type;
 
+
+	export
+	template <typename Ty, spec_of<seq_chunk> Chunk>
+	constexpr copy_qualifier_t<Ty, Chunk>* seq_chunk_cast(Ty* p) noexcept{
+		return Chunk::cast_from(p);
+	}
+
+	export
+	template <typename Tgt, spec_of<seq_chunk> ChunkTy, typename ChunkPartial>
+		requires requires{
+		requires contained_in<Tgt, typename ChunkTy::tuple_type>;
+		requires contained_in<std::remove_cvref_t<ChunkPartial>, typename ChunkTy::tuple_type>;
+		}
+	constexpr [[nodiscard]] decltype(auto) neighbour_of(ChunkPartial& value) noexcept{
+		using CTy = copy_qualifier_t<ChunkPartial, std::remove_cvref_t<ChunkTy>>;
+		CTy* chunk = CTy::cast_from(std::addressof(value));
+		return chunk->template get<Tgt>();//std::forward_like<ChunkPartial>();
+	}
+
+	export
+	template <typename Tgt, tuple_spec ChunkTy, typename ChunkPartial>
+		requires requires{
+		requires contained_in<Tgt, ChunkTy>;
+		requires contained_in<std::remove_cvref_t<ChunkPartial>, ChunkTy>;
+		}
+	constexpr [[nodiscard]] decltype(auto) neighbour_of(ChunkPartial& value) noexcept{
+		using CTy = copy_qualifier_t<ChunkPartial, tuple_to_seq_chunk_t<std::remove_cvref_t<ChunkTy>>>;
+		CTy* chunk = CTy::cast_from(std::addressof(value));
+		return chunk->template get<Tgt>();//std::forward_like<ChunkPartial>();
+	}
 
 
 	/*export

@@ -2,27 +2,27 @@ module;
 
 #include <vulkan/vulkan.h>
 #include <cassert>
-//
 
 export module mo_yanxi.graphic.image_manage;
 
-export import mo_yanxi.referenced_ptr;
 export import mo_yanxi.graphic.image_region;
-export import mo_yanxi.meta_programming;
-export import mo_yanxi.handle_wrapper;
-export import mo_yanxi.allocator_2D;
-
-export import mo_yanxi.vk.image_derives;
-export import mo_yanxi.vk.resources;
-export import mo_yanxi.vk.context;
-export import mo_yanxi.vk.command_pool;
-export import mo_yanxi.vk.command_buffer;
-export import mo_yanxi.vk.sync;
-
 export import mo_yanxi.graphic.color;
 export import mo_yanxi.graphic.bitmap;
-export import mo_yanxi.heterogeneous;
-export import mo_yanxi.condition_variable_single;
+
+import mo_yanxi.referenced_ptr;
+import mo_yanxi.meta_programming;
+import mo_yanxi.handle_wrapper;
+import mo_yanxi.allocator_2D;
+
+import mo_yanxi.vk.image_derives;
+import mo_yanxi.vk.resources;
+import mo_yanxi.vk.context;
+import mo_yanxi.vk.command_pool;
+import mo_yanxi.vk.command_buffer;
+import mo_yanxi.vk.sync;
+
+import mo_yanxi.heterogeneous;
+import mo_yanxi.condition_variable_single;
 
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.io.image;

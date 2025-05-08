@@ -39,7 +39,7 @@ namespace mo_yanxi::game{
 	};
 }
 
-namespace mo_yanxi::game::ecs{
+namespace mo_yanxi::game::ecs::system{
 
 	constexpr float MinimumSuccessAccuracy = 1. / 32.;
 	constexpr float MinimumFailedAccuracy = 1. / 32.;
@@ -100,6 +100,7 @@ namespace mo_yanxi::game::ecs{
 		using collision_test_tuple_store = std::tuple<const chunk_meta*, manifold*, mech_motion*, physical_rigid*>;
 
 		quad_tree<collision_object> tree{{{0, 0}, 100000}};
+
 		shared_stack<collision_test_tuple_store> passed_entites{};
 
 		FORCE_INLINE static void rigidCollideWith(
@@ -165,7 +166,7 @@ namespace mo_yanxi::game::ecs{
 				if(std::ranges::contains(sbj.manifold->last_collided, obj.id, &entity_ref::id)){
 					vec2 min_correction{};
 					auto dot = (box.avg() - obj_box.avg()).dot(sbj.motion->vel.vec);
-					if((sbj.motion->vel.vec - obj.motion->vel.vec).length2() < 25 || math::abs(dot) < 0.5f){
+					if((sbj.motion->vel.vec - obj.motion->vel.vec).length2() < 25 || math::abs(dot) < 0.65f){
 						min_correction = box.depart_vector_to(obj_box).set_length(1.5f);
 					}else{
 						min_correction = (sbj.motion->vel.vec * (dot > 0 ? 1 : -1)).set_length(1.5f) ;
@@ -291,15 +292,24 @@ namespace mo_yanxi::game::ecs{
 
 		FORCE_INLINE static void collisionsPostProcess_3(const collision_object& subject) noexcept{
 			for(const auto& data : subject.manifold->confirmed_collision){
-				if(manifold::try_override_collide_by(data.other, subject, data.intersection)){
+				auto rst = manifold::try_collide_to(subject, data.other, data.intersection);
+				if((rst & collision_result::obj_passed) == collision_result{}){
 					using gch::erase_if;
 					erase_if(data.other.manifold->confirmed_collision, [&](const collision_confirmed& d){
 						return d.get_other_id() == subject.id;
 					});
-					continue;
 				}
 
-				rigidCollideWith(subject, data.other, data.intersection, data.correction, 1);
+				if((rst & collision_result::sbj_passed) == collision_result{}){
+					//Notice that this is required, or else the other will goto last hit
+					using gch::erase_if;
+					erase_if(subject.manifold->confirmed_collision, [&](const collision_confirmed& d){
+						return d.get_other_id() == data.other.id;
+					});
+				}else{
+					rigidCollideWith(subject, data.other, data.intersection, data.correction, 1);
+				}
+
 			}
 		}
 
@@ -345,9 +355,6 @@ namespace mo_yanxi::game::ecs{
 			){
 				tree->insert({meta.id(), &manifold, &motion, &rigid});
 			});
-
-			// std::println(std::cerr, "{}", tree->size());
-
 		}
 
 		void run_collision_test_pre(component_manager& component_manager){
@@ -400,12 +407,13 @@ namespace mo_yanxi::game::ecs{
 			});
 		}
 
-		void run(component_manager& component_manager){
+		void run_collision_test_post(component_manager& component_manager){
 			run_collision_test_pre(component_manager);
 
 			auto rng = passed_entites.locked_range();
 
-			std::ranges::sort(rng, std::ranges::less{}, [](const collision_test_tuple_store& tlp){
+			//TODO make it resversed: object with high priority firstly try collision, if passed, remove both collision test from itself and the target
+			std::ranges::sort(rng, std::ranges::greater{}, [](const collision_test_tuple_store& tlp){
 				return std::get<manifold*>(tlp)->colliders.index();
 			});
 

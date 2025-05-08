@@ -75,8 +75,8 @@ void main() {
     float light = normalized;
 
     vec3 src_color = in_color_scl.rgb / mix(1, base_luma, normalized);
-    out_color_base = vec4(src_color, min(in_color_scl.a, 1.f) * (1 - light));
-    out_color_light = vec4(src_color, light * in_color_scl.a);
+    out_color_base = vec4(in_color_scl.rgb, min(in_color_scl.a, 1.f) * (1 - light));
+    out_color_light = vec4(in_color_scl.rgb, light * in_color_scl.a);
 
     out_indices = in_indices;
     out_uv = in_uv;

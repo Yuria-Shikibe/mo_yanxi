@@ -12,7 +12,9 @@ export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.timed;
 export import mo_yanxi.math.interpolation;
 export import mo_yanxi.graphic.color;
+export import mo_yanxi.graphic.gradient;
 export import mo_yanxi.graphic.image_region;
+export import mo_yanxi.graphic.trail;
 
 //TODO isolate this in future
 export import mo_yanxi.graphic.renderer.world;
@@ -22,99 +24,6 @@ import std;
 namespace mo_yanxi::game::fx{
 
 
-	export
-	template <typename T>
-	struct mix_func{
-		FORCE_INLINE constexpr static T operator()(const T& src, const T& dst, float interp) noexcept{
-			return src * (1 - interp) + dst * interp;
-		}
-	};
-
-	export
-	template <>
-	struct mix_func<float>{
-		FORCE_INLINE constexpr static auto operator()(const float src, const float dst, float interp) noexcept{
-			return math::lerp(src, dst, interp);
-		}
-	};
-	//
-	// export
-	// template <>
-	// struct mix_func<graphic::color>{
-	// 	FORCE_INLINE constexpr static auto operator()(graphic::color src, const graphic::color& dst, float interp) noexcept{
-	// 		return src.light_reserved_lerp(dst, interp);
-	// 	}
-	// };
-
-	template <typename T>
-	struct mix_func<math::vector2<T>>{
-		FORCE_INLINE constexpr static auto operator(
-		)(math::vector2<T> src, math::vector2<T> dst, float interp) noexcept{
-			return src.scl(1 - interp).fma(dst, interp);
-		}
-	};
-
-	export
-	struct interp{
-		math::interp::no_state_interp_func func{};
-
-		[[nodiscard]] constexpr interp() = default;
-
-		[[nodiscard]] constexpr explicit(false) interp(math::interp::no_state_interp_func func)
-			: func(func){
-		}
-
-		[[nodiscard]] constexpr explicit(false) interp(const std::convertible_to<math::interp::no_state_interp_func> auto& func)
-			: func(func){
-		}
-
-		constexpr float operator()(float prog) const noexcept{
-			if(!func)return prog;
-			return func(prog);
-		}
-
-		explicit constexpr operator bool() const noexcept{
-			return func != nullptr;
-		}
-	};
-
-	export
-	template <typename T>
-	struct gradient{
-		T src;
-		T dst;
-		interp interp{};
-
-		constexpr T operator[](float prog) const noexcept{
-			return mix_func<T>::operator()(src, dst, interp(prog));
-		}
-	};
-
-	export
-	struct color_gradient : gradient<graphic::color>{
-		[[nodiscard]] constexpr color_gradient() noexcept = default;
-
-		[[nodiscard]] constexpr explicit(false) color_gradient(const graphic::color color) noexcept : gradient{color, color}{
-		}
-
-		[[nodiscard]] constexpr explicit(false) color_gradient(
-			const graphic::color src, const graphic::color dst,
-			const fx::interp interp = {}) noexcept : gradient{
-				src, dst, interp
-			}{
-		}
-	};
-
-	export
-	template <typename T>
-	struct trivial_gradient{
-		T src;
-		T dst;
-
-		constexpr T operator[](float prog) const noexcept{
-			return mix_func<T>::operator()(src, dst, prog);
-		}
-	};
 
 	export namespace pal{
 		template <std::size_t Sz>
@@ -130,7 +39,7 @@ namespace mo_yanxi::game::fx{
 		template <std::size_t Sz>
 			requires (Sz > 0)
 		struct trivial_gradient_colors{
-			std::array<trivial_gradient<graphic::color>, Sz> colors;
+			std::array<graphic::trivial_gradient<graphic::color>, Sz> colors;
 
 			constexpr graphic::color operator [](std::size_t idx, float lerp) const noexcept{
 				return colors[idx % Sz][lerp];
@@ -138,12 +47,12 @@ namespace mo_yanxi::game::fx{
 		};
 
 		template <std::size_t Sz>
-		trivial_gradient_colors(const trivial_gradient<graphic::color>(&)[Sz]) -> trivial_gradient_colors<Sz>;
+		trivial_gradient_colors(const graphic::trivial_gradient<graphic::color>(&)[Sz]) -> trivial_gradient_colors<Sz>;
 
 		template <std::size_t Sz>
 			requires (Sz > 0)
 		struct gradient_colors{
-			std::array<gradient<graphic::color>, Sz> colors;
+			std::array<graphic::gradient<graphic::color>, Sz> colors;
 
 			constexpr graphic::color operator [](std::size_t idx, float lerp) const noexcept{
 				return colors[idx % Sz][lerp];
@@ -151,7 +60,7 @@ namespace mo_yanxi::game::fx{
 		};
 
 		template <std::size_t Sz>
-		gradient_colors(const gradient<graphic::color>(&)[Sz]) -> gradient_colors<Sz>;
+		gradient_colors(const graphic::gradient<graphic::color>(&)[Sz]) -> gradient_colors<Sz>;
 
 		template <std::size_t Sz>
 			requires (Sz > 0)
@@ -164,15 +73,15 @@ namespace mo_yanxi::game::fx{
 		};
 
 		struct in_out_palette{
-			color_gradient in;
-			color_gradient out;
+			graphic::color_gradient in;
+			graphic::color_gradient out;
 		};
 
 		struct outlined_in_out_palette{
-			color_gradient edge_in;
-			color_gradient edge_out;
-			color_gradient center_in;
-			color_gradient center_out;
+			graphic::color_gradient edge_in;
+			graphic::color_gradient edge_out;
+			graphic::color_gradient center_in;
+			graphic::color_gradient center_out;
 		};
 	}
 
@@ -262,12 +171,23 @@ namespace mo_yanxi::game::fx{
 	};
 
 	export
-	struct shape_rect_ortho : effect_drawer_base{
-		gradient<math::vec2> size;
-		gradient<math::vec2> offset;
-		gradient<float> stroke;
+	struct trail_effect : effect_drawer_base{
+		graphic::trail trail{};
+		pal::in_out_palette color{};
 
-		color_gradient color;
+
+		void operator()(const effect& e, const effect_draw_context& ctx) const noexcept;
+
+		[[nodiscard]] math::frect get_clip_region(const effect& e, float) const noexcept;
+	};
+
+	export
+	struct shape_rect_ortho : effect_drawer_base{
+		graphic::gradient<math::vec2> size;
+		graphic::gradient<math::vec2> offset;
+		graphic::gradient<float> stroke;
+
+		graphic::color_gradient color;
 
 		[[nodiscard]] constexpr math::frect get_rect(const math::vec2 pos, const float interp) const noexcept{
 			const auto off = offset[interp] + pos;
@@ -288,9 +208,9 @@ namespace mo_yanxi::game::fx{
 		float base_range{32};
 		float distribute_angle{math::pi};
 		math::range range{};
-		math::based_section<gradient<float>> stroke{};
-		math::based_section<gradient<float>> length{};
-		interp radius_interp{math::interp::pow3Out};
+		math::based_section<graphic::gradient<float>> stroke{};
+		math::based_section<graphic::gradient<float>> length{};
+		graphic::interp radius_interp{math::interp::pow3Out};
 
 		pal::in_out_palette palette{};
 
@@ -304,8 +224,8 @@ namespace mo_yanxi::game::fx{
 	export
 	struct poly_line_out : effect_drawer_base{
 		int sides{};
-		gradient<float> radius{};
-		gradient<float> stroke{};
+		graphic::gradient<float> radius{};
+		graphic::gradient<float> stroke{};
 
 		pal::in_out_palette palette{};
 
@@ -323,8 +243,8 @@ namespace mo_yanxi::game::fx{
 	export
 	struct poly_outlined_out : effect_drawer_base{
 		int sides{};
-		gradient<float> radius{};
-		gradient<float> stroke{};
+		graphic::gradient<float> radius{};
+		graphic::gradient<float> stroke{};
 
 		pal::outlined_in_out_palette palette{};
 
@@ -351,7 +271,8 @@ namespace mo_yanxi::game::fx{
 		shape_rect_ortho,
 		line_splash,
 		poly_outlined_out,
-		poly_line_out
+		poly_line_out,
+		trail_effect
 	>;
 
 	export

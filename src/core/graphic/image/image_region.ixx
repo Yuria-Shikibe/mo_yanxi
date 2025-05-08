@@ -126,6 +126,10 @@ namespace mo_yanxi::graphic{
 	export
 	template <std::derived_from<uniformed_rect_uv> Ty>
 	struct size_awared_uv : Ty{
+		/**
+		 * @brief Size of the whole image, not the region.
+		 * To get the size of the region, call {@link get_region().size() @endlink }
+		 */
 		math::u32size2 size;
 
 
@@ -152,6 +156,16 @@ namespace mo_yanxi::graphic{
 
 		[[nodiscard]] constexpr math::urect get_region() const noexcept{
 			return this->Ty::proj_region(math::urect{tags::unchecked, {}, size});
+		}
+
+		template <typename T = std::uint32_t>
+		[[nodiscard]] constexpr math::vector2<T> get_region_size() const noexcept{
+			auto sz = get_region().size();
+			if constexpr (std::floating_point<T>){
+				return sz.as<T>();
+			}else{
+				return sz.round<T>();
+			}
 		}
 
 		template <typename N>
@@ -196,5 +210,5 @@ namespace mo_yanxi::graphic{
 
 	// static_assert(std::is_trivial_v<combined_image_region<uniformed_uv>>);
 
-	export using rect_region = combined_image_region<uniformed_rect_uv>;
+	export using image_rect_region = combined_image_region<uniformed_rect_uv>;
 }

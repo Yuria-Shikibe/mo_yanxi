@@ -517,12 +517,12 @@ namespace mo_yanxi::math {
 
 	/** Approaches a value at linear speed. */
 	export MATH_ATTR constexpr auto approach(const auto from, const auto to, const auto speed) noexcept {
-		return from + math::clamp(to - from, -speed, speed);
+		return from + math::clamp<decltype(from)>(to - from, -speed, speed);
 	}
 
 	/** Approaches a value at linear speed. */
 	export FORCE_INLINE constexpr void approach_inplace(auto& from, const auto to, const auto speed) noexcept {
-		from += math::clamp(to - from, -speed, speed);
+		from += math::clamp<std::remove_cvref_t<decltype(from)>>(to - from, -speed, speed);
 	}
 
 	export

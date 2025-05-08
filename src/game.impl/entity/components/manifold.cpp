@@ -4,7 +4,7 @@ module;
 
 module mo_yanxi.game.ecs.component.manifold;
 
-import mo_yanxi.game.ecs.component.projectile_manifold;
+import mo_yanxi.game.ecs.component.projectile.manifold;
 import mo_yanxi.game.ecs.component.chamber;
 
 
@@ -30,18 +30,19 @@ namespace mo_yanxi::game::ecs{
 	}
 
 
-	bool chamber_collider::try_override_collide_by(
-		const collision_object& sbj, const collision_object& obj, const intersection& intersection) noexcept{
+	collision_result chamber_collider::try_collide_to(
+		const collision_object& projectile, const collision_object& chamber_grid,
+		const intersection& intersection) noexcept{
 
 		// return true;
 
-		auto chambers = obj.id->try_get<chamber::chamber_manifold>();
-		if(!chambers)return false;
+		auto chambers = chamber_grid.id->try_get<chamber::chamber_manifold>();
+		if(!chambers)return collision_result::passed;
 		// std::println(std::cerr, "{}", "On Check");
 
-		auto& dmg = sbj.id->at<projectile_manifold>();
-		auto rst = getCollidedTileWith(sbj, obj, intersection, *chambers);
-		if(rst.empty())return true;
+		auto& dmg = projectile.id->at<projectile_manifold>();
+		auto rst = getCollidedTileWith(projectile, chamber_grid, intersection, *chambers);
+		if(rst.empty())return collision_result::none;
 
 		bool any{false};
 
@@ -55,26 +56,15 @@ namespace mo_yanxi::game::ecs{
 				break;
 			case chamber::damage_consume_result::damage_exhaust:
 				if(!any){
-					erase_if(sbj.manifold->confirmed_collision, [&](const collision_confirmed& d){
-						return d.get_other_id() == obj.id;
-					});
-					return true;
+					return collision_result::none;
 				}
 			case chamber::damage_consume_result::hitpoint_exhaust:
-				// if(!any){
-				// 	erase_if(sbj.manifold->confirmed_collision, [&](const collision_confirmed& d){
-				// 		return d.get_other_id() == obj.id;
-				// 	});
-				// 	return true;
-				// }
+				any = true;
+				break;
 			default: break;
 			}
 		}
 
-		erase_if(sbj.manifold->confirmed_collision, [&](const collision_confirmed& d){
-			return d.get_other_id() == obj.id;
-		});
-
-		return !any;
+		return any ? collision_result::obj_passed : collision_result::none;
 	}
 }

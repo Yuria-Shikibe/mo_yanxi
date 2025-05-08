@@ -3,6 +3,8 @@ export module mo_yanxi.meta_programming;
 import std;
 
 namespace mo_yanxi{
+
+
 	export
 	template <typename From, typename To>
 	struct copy_const : std::type_identity<To>{
@@ -910,6 +912,41 @@ namespace mo_yanxi{
 		auto operator<=>(const type_to_index&) const noexcept = default;
 	};
 
+
+	template <std::size_t Idx, typename ArgsTuple>
+	constexpr bool contained_in_exclusive = [] <std::size_t ...I> (std::index_sequence<I...>){
+		return ([]<std::size_t Cur>(){
+			return Idx != Cur && std::same_as<std::tuple_element_t<Idx, ArgsTuple>, std::tuple_element_t<Cur, ArgsTuple>>;
+		}.template operator()<I>() || ...);
+	}(std::make_index_sequence<std::tuple_size_v<ArgsTuple>>());
+
+
+
+
+	template <typename T, typename... Ts>
+	constexpr bool is_in_pack = (std::is_same_v<T, Ts> || ...);
+
+	template <typename Tuple>
+	constexpr bool has_duplicate_types_impl = []<typename... Ts>(std::type_identity<std::tuple<Ts...>>){
+		return [&]<std::size_t... Is>(std::index_sequence<Is...>){
+			return ((contained_in_exclusive<Is, Tuple>) || ...);
+		}(std::make_index_sequence<sizeof...(Ts) - 1>{});
+	}(std::type_identity<Tuple>{});
+
+	export
+	template <typename Tuple>
+	constexpr bool tuple_has_duplicate_types_v = []{
+		if constexpr(std::tuple_size_v<Tuple> == 0){
+			return false;
+		} else{
+			return has_duplicate_types_impl<Tuple>;
+		}
+	}();
+
 	constexpr auto t = type_to_index<std::tuple<int, float, double>>::index_of<float>;
 	static_assert(t == 1);
+
+	constexpr bool b = tuple_has_duplicate_types_v<std::tuple<int, float, int>>;
+
+
 }

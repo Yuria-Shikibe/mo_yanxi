@@ -207,7 +207,7 @@ namespace mo_yanxi::game{
 			: ccd_hitbox(std::vector{comps}, transform){
 		}
 
-		constexpr auto& operator[](const std::size_t index) const noexcept{
+		constexpr const hitbox_comp& operator[](const std::size_t index) const noexcept{
 			return components[index];
 		}
 
@@ -276,15 +276,15 @@ namespace mo_yanxi::game{
 			return wrap_bound_.diagonal_len2() * 0.35f;
 		}
 
-		[[nodiscard]] constexpr auto max_wrap_bound() const noexcept{
+		[[nodiscard]] constexpr math::frect max_wrap_bound() const noexcept{
 			return wrap_bound_ccd_.get_bound();
 		}
 
-		[[nodiscard]] constexpr auto min_wrap_bound() const noexcept{
+		[[nodiscard]] constexpr math::frect min_wrap_bound() const noexcept{
 			return wrap_bound_;
 		}
 
-		[[nodiscard]] constexpr auto& ccd_wrap_box() const noexcept{
+		[[nodiscard]] constexpr const rect_comp& ccd_wrap_box() const noexcept{
 			return wrap_bound_ccd_;
 		}
 

@@ -7,6 +7,8 @@ export module mo_yanxi.shared_stack;
 import std;
 
 namespace mo_yanxi{
+
+
 	//TODO safe destructon on throw
 
 	// using T = int;
@@ -52,6 +54,7 @@ namespace mo_yanxi{
 	private:
 		std::atomic_size_t top{};
 
+
 	public:
 		[[nodiscard]] shared_stack() = default;
 
@@ -59,9 +62,20 @@ namespace mo_yanxi{
 			shared_array_stack_base<T, Alloc>{size, alloc}
 		{}
 
+
+		void release_on_write() noexcept{
+			top.fetch_add(0, std::memory_order_release);
+		}
+
+		[[nodiscard]] T* try_push_uninitialized() noexcept{
+			const auto index = top.fetch_add(1, std::memory_order_relaxed);
+			if(index >= this->cap)return nullptr;
+			return this->data + index;
+		}
+
 		[[nodiscard]] T* push_uninitialized() noexcept{
-			const auto index = top.fetch_add(1, std::memory_order_release);
-			assert(index <= this->cap);
+			const auto index = top.fetch_add(1, std::memory_order_relaxed);
+			assert(index < this->cap);
 			return this->data + index;
 		}
 
@@ -70,24 +84,35 @@ namespace mo_yanxi{
 		T& emplace(Args&& ...args) noexcept(std::construct_at(nullptr, std::forward<Args>(args)...)){
 			auto where = push_uninitialized();
 
-			return *std::construct_at(where, std::forward<Args>(args)...);
+			auto& rst = *std::construct_at(where, std::forward<Args>(args)...);
+
+			release_on_write();
+
+			return rst;
 		}
 
 		T& push(T&& val) noexcept(std::is_nothrow_move_constructible_v<T>) requires (std::is_nothrow_move_constructible_v<T>){
 			auto where = push_uninitialized();
 
-			return *std::construct_at(where, std::move(val));
+			auto& rst = *std::construct_at(where, std::move(val));
+
+			release_on_write();
+
+			return rst;
 		}
 
 		T& push(const T& val) noexcept(std::is_nothrow_copy_constructible_v<T>) requires (std::is_nothrow_copy_constructible_v<T>){
 			auto where = push_uninitialized();
 
-			return *std::construct_at(where, val);
+			auto& rst = *std::construct_at(where, val);
+
+			release_on_write();
+
+			return rst;
 		}
 
-
 		[[nodiscard]] std::size_t size(std::memory_order memory_order = std::memory_order_relaxed) const noexcept{
-			return top.load(memory_order);
+			return std::min<std::size_t>(top.load(memory_order), this->cap);
 		}
 
 		[[nodiscard]] T* begin() noexcept{
@@ -95,7 +120,7 @@ namespace mo_yanxi{
 		}
 
 		[[nodiscard]] T* end() noexcept{
-			return this->data + size();
+			return this->data + size(std::memory_order_acquire);
 		}
 
 		[[nodiscard]] const T* begin() const noexcept{

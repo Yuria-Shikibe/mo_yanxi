@@ -1,6 +1,7 @@
 module;
 
 #include <gch/small_vector.hpp>
+#include "../src/ext/enum_operator_gen.hpp"
 
 export module mo_yanxi.game.ecs.component.manifold;
 
@@ -15,6 +16,15 @@ import std;
 namespace mo_yanxi::game::ecs{
 	export
 	struct manifold;
+
+	export enum struct collision_result{
+		none = 0,
+		sbj_passed = 1 << 0,
+		obj_passed = 1 << 1,
+		passed = sbj_passed | obj_passed
+	};
+
+	BITMASK_OPS(export, collision_result);
 
 	export
 	struct collision_object{
@@ -58,12 +68,12 @@ namespace mo_yanxi::game::ecs{
 
 	export
 	struct default_collider{
-		static constexpr bool try_override_collide_by(
+		static constexpr collision_result try_collide_to(
 			const collision_object& sbj,
 			const collision_object& obj,
 			const intersection& intersection
-			) noexcept {
-			return false;
+		) noexcept {
+			return collision_result::passed;
 		}
 
 		static constexpr bool try_override_collide_to(
@@ -77,9 +87,9 @@ namespace mo_yanxi::game::ecs{
 
 	export
 	struct chamber_collider : default_collider{
-		bool try_override_collide_by(
-			const collision_object& sbj,
-			const collision_object& obj,
+		collision_result try_collide_to(
+			const collision_object& projectile,
+			const collision_object& chamber_grid,
 			const intersection& intersection
 		) noexcept;
 
@@ -92,11 +102,11 @@ namespace mo_yanxi::game::ecs{
 		// }
 	};
 
-
 	using colliders = std::variant<
 		default_collider,
 		chamber_collider
 	>;
+
 
 	struct manifold{
 		[[nodiscard]] manifold() = default;
@@ -120,13 +130,21 @@ namespace mo_yanxi::game::ecs{
 			return !possible_collision.empty();
 		}
 
-		static bool try_override_collide_by(
+
+		/**
+		 * @brief
+		 * @param sbj
+		 * @param obj
+		 * @param intersection
+		 * @return
+		 */
+		static collision_result try_collide_to(
 			const collision_object& sbj,
 			const collision_object& obj,
 			const intersection& intersection
 		){
-			return std::visit<bool>([&] <std::derived_from<default_collider> T> (T& c){
-				return c.try_override_collide_by(sbj, obj, intersection);
+			return std::visit<collision_result>([&] <std::derived_from<default_collider> T> (T& c){
+				return c.try_collide_to(sbj, obj, intersection);
 			}, sbj.manifold->colliders);
 		}
 

@@ -1,6 +1,6 @@
-//
-// Created by Matrix on 2025/4/14.
-//
+module;
+
+#include <gch/small_vector.hpp>
 
 export module mo_yanxi.game.ecs.system.motion_system;
 
@@ -9,7 +9,7 @@ export import mo_yanxi.game.ecs.component.physical_property;
 
 import std;
 
-namespace mo_yanxi::game::ecs{
+namespace mo_yanxi::game::ecs::system{
 	export
 	struct motion_system{
 		void run(component_manager& manager){

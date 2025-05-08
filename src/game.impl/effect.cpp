@@ -7,6 +7,7 @@ module mo_yanxi.game.graphic.effect;
 import mo_yanxi.graphic.renderer.world;
 import mo_yanxi.graphic.draw;
 import mo_yanxi.graphic.draw.func;
+import mo_yanxi.graphic.draw.trail;
 
 namespace mo_yanxi::game{
 	namespace draw = graphic::draw;
@@ -21,6 +22,23 @@ namespace mo_yanxi::game{
 		return graphic::draw::white_region;
 	}
 
+
+	void fx::trail_effect::operator()(const effect& e, const effect_draw_context& ctx) const noexcept{
+		const auto c1 = color.in[e.duration.get()];
+		const auto c2 = color.out[e.duration.get()];
+
+		auto acquire = get_acquirer(e, ctx);
+
+		if(c1 == c2){
+			draw::fancy::trail(acquire, trail, e.trans.rot, c1, e.duration.get_inv());
+		}else{
+			draw::fancy::trail(acquire, trail, e.trans.rot, c1, c2, e.duration.get_inv());
+		}
+	}
+
+	math::frect fx::trail_effect::get_clip_region(const effect& e, float) const noexcept{
+		return trail.get_bound().expand(e.trans.rot);
+	}
 
 	void fx::shape_rect_ortho::operator()(const effect& e, const effect_draw_context& ctx) const noexcept{
 		const float prog = e.duration.get();

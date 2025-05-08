@@ -34,6 +34,7 @@ namespace mo_yanxi::game::ecs{
 			hitpoint_exhaust,
 
 		};
+
 		export
 		struct building_data;
 
@@ -95,6 +96,9 @@ namespace mo_yanxi::game::ecs{
 			tile_status& operator[](const tile& tile) noexcept;
 			const tile_status& operator[](const tile& tile) const noexcept;
 
+			[[nodiscard]] float get_tile_individual_max_hitpoint() const noexcept{
+				return hit_point.max / region_.area() * 8;
+			}
 
 			template <std::integral T>
 			[[nodiscard]] std::size_t local_to_index(math::vector2<T> coord) const noexcept{
@@ -146,8 +150,9 @@ namespace mo_yanxi::game::ecs{
 				return region_.as<float>().scl(tile_size, tile_size);
 			}
 		};
-
 	}
+
+
 }
 
 

@@ -73,7 +73,7 @@ namespace mo_yanxi::graphic{
 				vk::vertices::vertex_world_info.get_default_attr_desc()
 			);
 			pipeline_template.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::overwrite);
-			pipeline_template.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::overwrite);
+			pipeline_template.push_color_attachment_format(VK_FORMAT_R16G16B16A16_SFLOAT, vk::blending::overwrite);
 			// if(MultiSampleTimes > 0)pipeline_template.set_multisample(SampleCount, 1.f, true);
 			pipeline_template.set_depth_format(VK_FORMAT_D32_SFLOAT);
 			pipeline_template.set_depth_state(true, enable_depth_write);
@@ -126,13 +126,13 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] world_batch_attachments(vk::context& context, VkSampleCountFlagBits samples) :
 				color_base(
 				  context.get_allocator(), context.get_extent(),
-				  get_usage(samples), samples
+				  get_usage(samples), VK_FORMAT_R8G8B8A8_UNORM, samples
 			  ), color_light(
 				  context.get_allocator(), context.get_extent(),
-				  get_usage(samples), samples
+				  get_usage(samples), VK_FORMAT_R16G16B16A16_SFLOAT, samples
 			  ), color_normal(
 				  context.get_allocator(), context.get_extent(),
-				  get_usage(samples), samples
+				  get_usage(samples), VK_FORMAT_R8G8B8A8_UNORM, samples
 			  ){
 		}
 
@@ -531,7 +531,7 @@ namespace mo_yanxi::graphic{
 				VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
 				assets::graphic::shaders::comp::world_merge.get_create_info()),
 			merge_command(context.get_compute_command_pool().obtain()){
-			bloom.set_strength(1.1f, 0.95f);
+			bloom.set_strength(1.05f, 0.95f);
 			init_layout(context.get_transient_compute_command_buffer());
 
 
@@ -551,7 +551,7 @@ namespace mo_yanxi::graphic{
 			}
 
 			ssao.set_scale(camera.map_scale(0.15f, 2.5f) * 1.5f);
-			bloom.set_scale(camera.map_scale(0.195f, 1.75f));
+			bloom.set_scale(camera.map_scale(0.9f, 1.5f));
 			batch.frag_data.current.camera_scale = camera.get_scale();
 		}
 

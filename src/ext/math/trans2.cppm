@@ -12,7 +12,7 @@ import mo_yanxi.concepts;
 import std;
 
 export namespace mo_yanxi::math{
-	template <typename AngTy>
+	template <std::regular AngTy>
 	struct transform2 {
 		using angle_t = AngTy;
 		using vec_t = vec2;
@@ -43,7 +43,8 @@ export namespace mo_yanxi::math{
 			return *this;
 		}
 
-		FORCE_INLINE constexpr transform2& apply(const transform2 rebaseTarget) noexcept{
+		template <typename Ang>
+		FORCE_INLINE constexpr transform2& apply(const transform2<Ang>& rebaseTarget) noexcept{
 			vec.rotate_rad(static_cast<float>(rebaseTarget.rot)).add(rebaseTarget.vec);
 			rot += rebaseTarget.rot;
 
@@ -66,7 +67,8 @@ export namespace mo_yanxi::math{
 			return target;
 		}
 
-		FORCE_INLINE constexpr transform2& operator|=(const transform2 parentRef) noexcept{
+		template <typename Ang>
+		FORCE_INLINE constexpr transform2& operator|=(const transform2<Ang>& parentRef) noexcept{
 			return transform2::apply(parentRef);
 		}
 
@@ -121,11 +123,12 @@ export namespace mo_yanxi::math{
 		 * @param parentRef Parent Frame Reference Trans
 		 * @return Transformed Translation
 		 */
-		[[nodiscard]] FORCE_INLINE constexpr friend transform2 operator|(transform2 self, const transform2 parentRef) noexcept{
+		template <typename L, typename R>
+		[[nodiscard]] FORCE_INLINE constexpr friend transform2<L> operator|(transform2<L> self, const transform2<R>& parentRef) noexcept{
 			return self |= parentRef;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr friend vec_t& operator|=(vec_t& vec, const transform2 transform) noexcept{
+		FORCE_INLINE constexpr friend vec_t& operator|=(vec_t& vec, const transform2 transform) noexcept{
 			return vec.rotate_rad(static_cast<float>(transform.rot)).add(transform.vec);
 		}
 

@@ -21,7 +21,7 @@ namespace mo_yanxi::math{
 		T backward;
 	};
 
-	/** @brief Uniformed Angle in [-180, 180] degree*/
+	/** @brief Uniformed Angle in [-pi, pi) radians*/
 	export
 	template <std::floating_point T>
 	struct uniformed_angle{
@@ -160,13 +160,11 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		FORCE_INLINE constexpr friend uniformed_angle operator
-		+(uniformed_angle lhs, const uniformed_angle rhs) noexcept{
+		FORCE_INLINE constexpr friend uniformed_angle operator+(uniformed_angle lhs, const uniformed_angle rhs) noexcept{
 			return lhs += rhs;
 		}
 
-		FORCE_INLINE constexpr friend uniformed_angle operator
-		-(uniformed_angle lhs, const uniformed_angle rhs) noexcept{
+		FORCE_INLINE constexpr friend uniformed_angle operator-(uniformed_angle lhs, const uniformed_angle rhs) noexcept{
 			return lhs -= rhs;
 		}
 

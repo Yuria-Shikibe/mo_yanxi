@@ -269,7 +269,7 @@ namespace mo_yanxi::graphic::draw{
 	export
 	using ui_acquirer = auto_batch_acquirer<vk::vertices::vertex_ui, uniformed_rect_uv, mode_bit_proj>;
 
-	export inline rect_region white_region{};
+	export inline image_rect_region white_region{};
 
 	export
 	template <typename Acq>

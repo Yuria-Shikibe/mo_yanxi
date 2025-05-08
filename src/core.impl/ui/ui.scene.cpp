@@ -289,21 +289,21 @@ void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 		if(elem.belowScene){
 			elem.element->try_draw(clipSpace);
 			renderer->batch->consume_all();
-			renderer->batch.blit(to_uint_bound(elem.element->get_bound()));
+			renderer->batch.blit_viewport(elem.element->get_bound());
 		}
 	}
 
 	for (auto& elem : root->get_children()){
 		elem->try_draw(clipSpace);
 		renderer->batch->consume_all();
-		renderer->batch.blit(to_uint_bound(elem->get_bound()));
+		renderer->batch.blit_viewport(elem->get_bound());
 	}
 
 	for (auto&& elem : tooltip_manager.get_draw_sequence()){
 		if(!elem.belowScene){
 			elem.element->try_draw(clipSpace);
 			renderer->batch->consume_all();
-			renderer->batch.blit(to_uint_bound(elem.element->get_bound()));
+			renderer->batch.blit_viewport(elem.element->get_bound());
 		}
 	}
 

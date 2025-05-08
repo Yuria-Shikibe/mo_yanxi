@@ -15,3 +15,11 @@
 #else
 	#define FORCE_INLINE inline
 #endif
+
+#ifdef _MSC_VER
+#define RESTRICT __restrict
+#else
+#define RESTRICT
+#endif
+
+#define PURE_FUNCTION

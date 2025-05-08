@@ -571,6 +571,31 @@ namespace mo_yanxi::math::interp{
 		return std::invoke(lerpFn, range[next], range[prev], mod);
 	}
 
+
+	export
+	struct trivial_interp{
+		no_state_interp_func func{};
+
+		[[nodiscard]] constexpr trivial_interp() = default;
+
+		[[nodiscard]] constexpr explicit(false) trivial_interp(no_state_interp_func func)
+			: func(func){
+		}
+
+		[[nodiscard]] constexpr explicit(false) trivial_interp(const std::convertible_to<no_state_interp_func> auto& func)
+			: func(func){
+		}
+
+		constexpr float operator()(float prog) const noexcept{
+			if(!func)return prog;
+			return func(prog);
+		}
+
+		explicit constexpr operator bool() const noexcept{
+			return func != nullptr;
+		}
+	};
+
 	// constexpr float f = rangeLerp_reversed(std::vector{0.f, 1.f}, 0.5f, [](float a, float b, float p){
 	// 	return math::lerp(a, b, p);
 	// });

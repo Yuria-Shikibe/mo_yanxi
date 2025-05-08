@@ -9,9 +9,11 @@ export import mo_yanxi.game.ecs.component.chamber;
 export import mo_yanxi.game.ecs.component.physical_property;
 export import mo_yanxi.game.world.graphic;
 
+import mo_yanxi.math;
+
 import std;
 
-namespace mo_yanxi::game::ecs{
+namespace mo_yanxi::game::ecs::system{
 	export
 	struct grid_system{
 		void run(component_manager& manager, world::graphic_context& graphic){
@@ -44,7 +46,13 @@ namespace mo_yanxi::game::ecs{
 							.duration = {60}
 						});
 					}
+
 					data.clear_hit_events();
+
+					auto hp = data.get_tile_individual_max_hitpoint();
+					for (auto & tile_state : data.tile_states){
+						math::approach_inplace(tile_state.valid_hit_point, hp, .05 * manager.get_update_delta());
+					}
 				});
 			});
 		}

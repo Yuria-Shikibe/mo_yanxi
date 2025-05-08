@@ -6,7 +6,7 @@ layout (local_size_x = 16, local_size_y = 16) in;
 layout (set = 0, binding = 0) uniform sampler2D input_image;
 layout (set = 0, binding = 1) uniform sampler2D down_mipmap_sample;
 layout (set = 0, binding = 2) uniform sampler2D up_mipmap_sample;
-layout (set = 0, binding = 3, rgba32f) restrict uniform /**writeonly*/ image2D target;
+layout (set = 0, binding = 3, rgba16f) restrict uniform /**writeonly*/ image2D target;
 
 
 layout (set = 0, binding = 4) uniform Kernal{
@@ -73,27 +73,27 @@ vec4 blur(const vec2 where, const vec2 size_inv, const float scale, const uint r
 vec4 screen(vec4 src, vec4 dst) {
     vec3 color = 1.0 - (1.0 - src.rgb) * (1.0 - dst.rgb);
     vec4 scr = vec4(color, (src.a + dst.a) * .65f);
-    return mix(src + dst, scr, 0.5f);
+    return mix(src + dst, scr, 0.65f);
 }
 
 void main() {
-    int current_index = int(ubo.mip_index & ~INDEX_MASK);
-    int div = 1 << (current_index + int(current_index < ubo.total_layer) - 1);
+    const int current_index = int(ubo.mip_index & ~INDEX_MASK);
+    const int div = 1 << (current_index + int(current_index < ubo.total_layer) - 1);
 
-    vec2 size_inv = vec2(1) / vec2(imageSize(target));
+    const vec2 size_inv = vec2(1) / vec2(imageSize(target));
 
-    ivec2 mipPos = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = (vec2(mipPos) + vec2(0.5f, 0.5f)) * size_inv;
+    const ivec2 mipPos = ivec2(gl_GlobalInvocationID.xy);
+    const vec2 uv = (vec2(mipPos) + vec2(0.5f, 0.5f)) * size_inv;
 
-    bool upSacling = up_sampling(ubo.mip_index);
+    const bool upSacling = up_sampling(ubo.mip_index);
 
-    float approach = (current_index + 1) / ubo.total_layer;
-    float lastMix = 0.35f * (0.5f + 0.5f * approach);
+    const float approach = (current_index + 1) / ubo.total_layer;
+    const float lastMix = 0.25f * (0.5f + 0.5f * approach);
 
     if(upSacling){
         vec4 colorSrc;
 
-        vec4 colorDst = blur(uv, size_inv / 2, ubo.scale, current_index);
+        const vec4 colorDst = blur(uv, size_inv / 2, ubo.scale, current_index);
         if(current_index == ubo.total_layer - 1){
             colorSrc = textureLod(down_mipmap_sample, uv, ubo.total_layer - 1);
         }else{
@@ -104,8 +104,8 @@ void main() {
         vec4 src = screen(vec4(colorSrc.rgb * ubo.strength_src, colorSrc.a), vec4(colorDst.rgb * ubo.strength_dst, colorDst.a));
         imageStore(target, mipPos, mix(src, last, lastMix));
     }else{
-        vec4 last = imageLoad(target, mipPos);
-        vec4 src = blur(uv, size_inv * 2, ubo.scale, ubo.mip_index);
+        const vec4 last = imageLoad(target, mipPos);
+        const vec4 src = blur(uv, size_inv * 2, ubo.scale, ubo.mip_index);
 
         imageStore(target, mipPos, mix(src, last, lastMix));
     }

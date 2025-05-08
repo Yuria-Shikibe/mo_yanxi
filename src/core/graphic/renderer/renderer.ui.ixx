@@ -227,7 +227,7 @@ namespace mo_yanxi::graphic{
 		batch_layer_data<ui_blit_info> blit_data{};
 
 		// math::mat3 current_proj{math::mat3_idt};
-		math::mat3 current_transform{math::mat3_idt};
+		math::mat3 current_viewport_transform{math::mat3_idt};
 
 		std::vector<math::mat3> projections{};
 
@@ -314,12 +314,22 @@ namespace mo_yanxi::graphic{
 			on_resize(extent);
 		}
 
-		void blit(const math::urect region){
-			auto clamped = region.intersection_with({tags::unchecked,
-				static_cast<std::uint32_t>(this->region.offset.x),
-				static_cast<std::uint32_t>(this->region.offset.y),
-				this->region.extent.width,
-				this->region.extent.height});
+		void blit_viewport(math::frect region){
+			const auto v0 = region.get_src();
+			const auto v1 = region.get_end();
+			math::frect transed_region{current_viewport_transform * v0, current_viewport_transform * v1};
+
+			blit(transed_region.round<int>());
+		}
+
+	private:
+		void blit(const math::irect region){
+			const auto clamped = region.intersection_with({tags::unchecked,
+				(this->region.offset.x),
+				(this->region.offset.y),
+				static_cast<int>(this->region.extent.width),
+				static_cast<int>(this->region.extent.height)
+			}).as<std::uint32_t>();
 
 			blit_data.current.offset = clamped.src;
 			blit_dispatcher.set(clamped.size());
@@ -334,21 +344,7 @@ namespace mo_yanxi::graphic{
 
 			current_blit_chunk_index = (current_blit_chunk_index + 1) % blit_command_chunk.size();
 		}
-
-		void blit(){
-			blit_data.current.offset.set(region.offset.x, region.offset.y);
-			blit_dispatcher.set({region.extent.width, region.extent.height});
-
-
-			auto& cur = blit_command_chunk[current_blit_chunk_index];
-			cur.wait(context().get_device());
-
-			blit_data.update<true>(current_blit_chunk_index);
-			blit_dispatcher.update(current_blit_chunk_index);
-			cur.submit(context().compute_queue(), VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
-
-			current_blit_chunk_index = (current_blit_chunk_index + 1) % blit_command_chunk.size();
-		}
+	public:
 
 		void push_scissor(scissor_raw scissor){
 			auto back = scissors.back();
@@ -382,8 +378,9 @@ namespace mo_yanxi::graphic{
 
 		[[nodiscard]] math::mat3 get_cur_proj() const{
 			assert(!projections.empty());
-			return current_transform * projections.back();
+			return current_viewport_transform * projections.back();
 		}
+
 		[[nodiscard]] const scissor_raw& get_cur_scissor() const{
 			assert(!scissors.empty());
 			return scissors.back();
@@ -412,9 +409,9 @@ namespace mo_yanxi::graphic{
 			transform.set_translation(scale - math::vec2{1, 1} + viewport.src / last_viewport.size() * 2);
 
 			if(viewports.empty()){
-				current_transform = transform;
+				current_viewport_transform = transform;
 			}else{
-				current_transform *= transform;
+				current_viewport_transform *= transform;
 			}
 
 			viewports.push_back(viewport);
@@ -430,14 +427,14 @@ namespace mo_yanxi::graphic{
 			math::frect last_viewport = get_last_viewport();
 
 			math::mat3 transform;
-			auto scale = viewport.size() / last_viewport.size();
+			const auto scale = viewport.size() / last_viewport.size();
 			transform.from_scaling(scale);
 			transform.set_translation(scale - math::vec2{1, 1} + viewport.src / last_viewport.size() * 2);
 
 			if(viewports.empty()){
-				current_transform = transform;
+				current_viewport_transform = transform;
 			}else{
-				current_transform *= transform.inv();
+				current_viewport_transform *= transform.inv();
 			}
 
 		}
@@ -535,7 +532,7 @@ namespace mo_yanxi::graphic{
 			assert(!projections.empty());
 
 			const auto currentProj = projections.back();
-			math::mat3 proj = current_transform * currentProj;
+			math::mat3 proj = current_viewport_transform * currentProj;
 			return proj;
 		}
 
@@ -544,7 +541,7 @@ namespace mo_yanxi::graphic{
 			assert(!viewports.empty());
 
 			const auto currentProj = projections.back();
-			math::mat3 proj = current_transform * currentProj;
+			math::mat3 proj = current_viewport_transform * currentProj;
 			vert_data.current.view = proj;
 			vert_data.update<true>(index);
 

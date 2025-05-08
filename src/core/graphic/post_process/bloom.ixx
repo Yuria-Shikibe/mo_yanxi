@@ -206,12 +206,14 @@ namespace mo_yanxi::graphic{
 			mipmap_tree{
 				context.get_allocator(),
 				{size.x / 2, size.y / 2},
-				get_real_mip_level()
+				get_real_mip_level(),
+				VK_FORMAT_R16G16B16A16_SFLOAT
 			},
 			output_image(
 				context.get_allocator(),
 				size_to_extent_2d(size),
-				get_real_mip_level()
+				get_real_mip_level(),
+				VK_FORMAT_R16G16B16A16_SFLOAT
 			){
 			descriptor_layout = vk::descriptor_layout(context.get_device(), [](vk::descriptor_layout_builder& builder){
 				builder.push_seq(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT);
@@ -312,7 +314,7 @@ namespace mo_yanxi::graphic{
 						.flags = 0,
 						.image = mipmap_tree.get_image(),
 						.viewType = VK_IMAGE_VIEW_TYPE_2D,
-						.format = VK_FORMAT_R8G8B8A8_UNORM,
+						.format = VK_FORMAT_R16G16B16A16_SFLOAT,
 						.components = {},
 						.subresourceRange = VkImageSubresourceRange{
 							VK_IMAGE_ASPECT_COLOR_BIT, static_cast<std::uint32_t>(idx), 1, 0, 1
@@ -329,7 +331,7 @@ namespace mo_yanxi::graphic{
 						.flags = 0,
 						.image = output_image.get_image(),
 						.viewType = VK_IMAGE_VIEW_TYPE_2D,
-						.format = VK_FORMAT_R8G8B8A8_UNORM,
+						.format = VK_FORMAT_R16G16B16A16_SFLOAT,
 						.components = {},
 						.subresourceRange = VkImageSubresourceRange{
 							VK_IMAGE_ASPECT_COLOR_BIT, static_cast<std::uint32_t>(idx), 1, 0, 1
