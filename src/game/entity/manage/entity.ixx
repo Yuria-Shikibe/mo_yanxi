@@ -1,6 +1,7 @@
 module;
 
 #include <cassert>
+#include <tuple>
 
 #if DEBUG_CHECK
 #define CHECKED_STATIC_CAST(type) dynamic_cast<type>
@@ -115,7 +116,7 @@ namespace mo_yanxi::game::ecs{
 
 		[[nodiscard]] virtual bool has_type(std::type_index type) const = 0;
 
-		virtual void set_expired(entity_id entity_id);
+		// virtual void set_expired(entity_id entity_id);
 
 		template <typename T>
 		[[nodiscard]] bool has_type() const noexcept{
@@ -188,25 +189,31 @@ namespace mo_yanxi::game::ecs{
 			return chunk_index_;
 		}
 
+
+
 		/**
 		 * @brief Only valid when an entity has its data, i.e. an entity has been truly added.
 		 */
 		explicit operator bool() const noexcept{
-			return chunk_index() != invalid_chunk_idx;
+			return is_valid();
 		}
 
 		[[nodiscard]] constexpr bool is_expired() const noexcept{
 			return get_archetype() == nullptr;
 		}
 
+		[[nodiscard]] constexpr bool is_valid() const noexcept{
+			return chunk_index() != invalid_chunk_idx;
+		}
+
 		[[nodiscard]] constexpr archetype_base* get_archetype() const noexcept{
 			return archetype_;
 		}
 
-		void set_expired() const noexcept{
-			assert(!is_expired());
-
-		}
+		// void set_expired() const noexcept{
+		// 	assert(!is_expired());
+		//
+		// }
 
 		template <typename T>
 		[[nodiscard]] T* try_get() const noexcept{
@@ -400,6 +407,10 @@ namespace mo_yanxi::game::ecs{
 		static void on_init(const chunk_meta& meta, value_type& comp) = delete;
 		static void on_terminate(const chunk_meta& meta, value_type& comp) = delete;
 		static void on_relocate(const chunk_meta& meta, value_type& comp) = delete;
+
+		static void on_init(const chunk_meta& meta, const value_type& comp) = delete;
+		static void on_terminate(const chunk_meta& meta, const value_type& comp) = delete;
+		static void on_relocate(const chunk_meta& meta, const value_type& comp) = delete;
 	};
 
 	export
@@ -439,29 +450,38 @@ namespace mo_yanxi::game::ecs{
 	template <typename T>
 	struct component_custom_behavior : component_custom_behavior_base<T>{};
 
-	//TODO derive check
+	template <typename T>
+	using unwrap_type = typename T::type;
 
-	//TODO archetype trait
+	template <typename T>
+	struct get_base_types{
+		using direct_parent = typename decltype([]{
+			if constexpr (requires{
+				typename component_custom_behavior<T>::base_types;
+			}){
+				if constexpr (is_tuple_v<typename component_custom_behavior<T>::base_types>){
+					return std::type_identity<typename component_custom_behavior<T>::base_types>{};
+				}else{
+					return std::type_identity<std::tuple<typename component_custom_behavior<T>::base_types>>{};
+				}
+			}else{
+				return std::type_identity<std::tuple<>>{};
+			}
+		}())::type;
+
+		using type = tuple_cat_t<
+			std::tuple<T>,
+			all_apply_to<tuple_cat_t,
+				unary_apply_to_tuple_t<unwrap_type,
+					unary_apply_to_tuple_t<get_base_types, direct_parent>>>>;
+	};
 
 	template <typename T>
 	struct component_trait{
 		using value_type = typename component_custom_behavior<T>::value_type;
 		static_assert(std::same_as<T, value_type>);
 
-		using base_types = typename decltype([]{
-			if constexpr (requires{
-				typename component_custom_behavior<T>::base_types;
-			}){
-				if constexpr (is_tuple_v<typename component_custom_behavior<T>::base_types>){
-					return std::type_identity<tuple_cat_t<typename component_custom_behavior<T>::base_types, std::tuple<value_type>>>{};
-				}else{
-					return std::type_identity<std::tuple<typename component_custom_behavior<T>::base_types, value_type>>{};
-				}
-
-			}else{
-				return std::type_identity<std::tuple<value_type>>{};
-			}
-		}())::type;
+		using base_types = typename get_base_types<value_type>::type;
 
 		static constexpr bool is_polymorphic = !requires{
 			typename component_custom_behavior<T>::base_types;
@@ -667,7 +687,6 @@ namespace mo_yanxi::game::ecs{
 
 
 			archetype_base::erase(e);
-			e->id()->chunk_index_ = invalid_chunk_idx;
 		}
 
 		[[nodiscard]] bool has_type(std::type_index type) const override{
@@ -855,12 +874,13 @@ namespace mo_yanxi::game::ecs{
 	}
 
 	void archetype_base::erase(const entity_id entity){
+		entity->chunk_index_ = invalid_chunk_idx;
 		entity->archetype_ = nullptr;
 	}
 
-	void archetype_base::set_expired(entity_id entity_id){
-		entity_id->archetype_ = nullptr;
-	}
+	// void archetype_base::set_expired(entity_id entity_id){
+	// 	entity_id->archetype_ = nullptr;
+	// }
 
 
 	template <typename T>

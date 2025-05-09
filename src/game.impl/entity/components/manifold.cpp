@@ -34,20 +34,15 @@ namespace mo_yanxi::game::ecs{
 		const collision_object& projectile, const collision_object& chamber_grid,
 		const intersection& intersection) noexcept{
 
-		// return true;
-
 		auto chambers = chamber_grid.id->try_get<chamber::chamber_manifold>();
 		if(!chambers)return collision_result::passed;
-		// std::println(std::cerr, "{}", "On Check");
 
 		auto& dmg = projectile.id->at<projectile_manifold>();
 		auto rst = getCollidedTileWith(projectile, chamber_grid, intersection, *chambers);
 		if(rst.empty())return collision_result::none;
 
 		bool any{false};
-
-		using gch::erase_if;
-
+		
 		for (auto && under_hit : rst){
 			auto& data = under_hit.building.data();
 			switch(data.consume_damage(under_hit.tile_pos, dmg.damage_group)){

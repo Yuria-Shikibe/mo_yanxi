@@ -13,6 +13,9 @@ export import mo_yanxi.game.ecs.component.damage;
 export import mo_yanxi.game.ecs.component.hit_point;
 export import mo_yanxi.referenced_ptr;
 
+export import mo_yanxi.game.ecs.component.ui.builder;
+
+
 import std;
 
 namespace mo_yanxi::game::ecs{
@@ -46,15 +49,20 @@ namespace mo_yanxi::game::ecs{
 		};
 
 		export
-		struct building{
+		struct building : ui_builder{
 			friend building_data;
 			friend game::ecs::component_custom_behavior<chamber::building_data>;
+			friend game::ecs::component_custom_behavior<chamber::building>;
 
 		private:
 			building_data* data{};
 
 		public:
-			virtual ~building() = default;
+			~building() override = default;
+
+			virtual void update(const chunk_meta& meta, float delta_in_tick){
+
+			}
 		};
 
 		struct tile_status{
@@ -152,6 +160,16 @@ namespace mo_yanxi::game::ecs{
 		};
 	}
 
+
+	export
+	template <>
+	struct component_custom_behavior<chamber::building> : component_custom_behavior_base<chamber::building>{
+		using base_types = ui_builder;
+
+		static void on_relocate(const chunk_meta& meta, value_type& comp){
+			comp.data = std::addressof(meta.id()->at<chamber::building_data>());
+		}
+	};
 
 }
 

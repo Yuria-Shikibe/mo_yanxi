@@ -3,6 +3,17 @@ export module mo_yanxi.meta_programming;
 import std;
 
 namespace mo_yanxi{
+	export
+	template <typename T>
+	struct is_tuple : std::false_type{};
+
+	template <typename... Ts>
+	struct is_tuple<std::tuple<Ts...>> : std::true_type{};
+
+	export
+	template <typename T>
+	constexpr bool is_tuple_v = is_tuple<T>::value;
+
 
 
 	export
@@ -88,6 +99,7 @@ namespace mo_yanxi{
 
 	export
 	template <template <typename...> typename W, typename T>
+		requires (is_tuple_v<T>)
 	using all_apply_to = typename decltype(push_all_to<W, T>())::type;
 
 
@@ -724,17 +736,6 @@ export namespace mo_yanxi{
 
 //flatten_tuple
 namespace mo_yanxi{
-	export
-	template <typename T>
-	struct is_tuple : std::false_type{};
-
-	template <typename... Ts>
-	struct is_tuple<std::tuple<Ts...>> : std::true_type{};
-
-	export
-	template <typename T>
-	constexpr bool is_tuple_v = is_tuple<T>::value;
-
 
 	template <std::size_t idx, typename Ts>
 	struct flatten_tuple_impl{

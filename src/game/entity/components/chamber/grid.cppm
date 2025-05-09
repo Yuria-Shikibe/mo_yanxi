@@ -43,20 +43,6 @@ namespace mo_yanxi::game{
 	};
 
 
-	namespace ecs{
-		
-		export
-		template <>
-		struct component_custom_behavior<chamber::building_data> : component_custom_behavior_base<chamber::building_data>{
-			static void on_init(const chunk_meta& meta, chamber::building_data& comp);
-
-			static void on_terminate(const chunk_meta& meta, const value_type& comp);
-
-			static void on_relocate(const chunk_meta& meta, value_type& comp){
-				// comp.building().data = &comp;
-			}
-		};
-	}
 	
 
 }
@@ -441,16 +427,18 @@ namespace mo_yanxi::game::ecs::chamber{
 }
 
 namespace mo_yanxi::game::ecs{
-
 	using namespace chamber;
 
-	void component_custom_behavior<building_data>::on_init(const chunk_meta& meta, value_type& comp){
-		comp.tile_states.resize(comp.region().area());
-		comp.grid()->local_grid.insert(meta.id());
-	}
+	export
+	template <>
+	struct component_custom_behavior<chamber::building_data> : component_custom_behavior_base<chamber::building_data>{
+		static void on_init(const chunk_meta& meta, value_type& comp){
+			comp.tile_states.resize(comp.region().area());
+			comp.grid()->local_grid.insert(meta.id());
+		}
 
-	void component_custom_behavior<building_data>::on_terminate(const chunk_meta& meta,
-		const value_type& comp){
-		comp.grid()->local_grid.erase(meta.id());
-	}
+		static void on_terminate(const chunk_meta& meta, const value_type& comp){
+			comp.grid()->local_grid.erase(meta.id());
+		}
+	};
 }

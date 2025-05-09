@@ -7,6 +7,7 @@ export module mo_yanxi.game.ecs.component.ui.builder;
 import mo_yanxi.ui.table;
 
 namespace mo_yanxi::game::ecs{
+	export
 	struct ui_builder{
 		using table_handle = ui::create_handle<ui::table, ui::table_cell_adaptor::cell_type>;
 

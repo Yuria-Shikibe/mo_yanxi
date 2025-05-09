@@ -67,8 +67,7 @@ export namespace mo_yanxi::math{
 			return target;
 		}
 
-		template <typename Ang>
-		FORCE_INLINE constexpr transform2& operator|=(const transform2<Ang>& parentRef) noexcept{
+		FORCE_INLINE constexpr transform2& operator|=(const transform2& parentRef) noexcept{
 			return transform2::apply(parentRef);
 		}
 

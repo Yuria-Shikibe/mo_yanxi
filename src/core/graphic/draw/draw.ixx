@@ -229,7 +229,7 @@ namespace mo_yanxi::graphic::draw{
 
 		batch_draw_param<Vtx, UV, Proj> operator[](const std::ptrdiff_t group_count){
 			auto offed = current.index + group_count;
-			assert(offed < sentinel.index);
+			assert(std::cmp_less(offed, sentinel.index));
 			return batch_draw_param<Vtx, UV, Proj>{current[group_count].data(), this->region.uv, rng.get_image_index(offed), this->proj};
 		}
 
