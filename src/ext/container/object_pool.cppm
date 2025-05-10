@@ -274,7 +274,7 @@ namespace mo_yanxi{
 				return nullptr;
 			}
 
-			T* p = valid_pointers.top();
+			T* p = valid_pointers.back();
 			valid_pointers.pop();
 
 			return p;

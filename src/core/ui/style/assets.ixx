@@ -7,12 +7,13 @@ export import mo_yanxi.ui.style;
 export import mo_yanxi.graphic.image_multi_region;
 import std;
 
-namespace mo_yanxi::ui::assets{
+namespace mo_yanxi::ui::theme{
 	namespace colors{
 		using graphic::color;
 		export using namespace graphic::colors;
 
 		export constexpr inline color accent = color::from_rgba8888(0XF0D456FF);
+		export constexpr inline color theme = colors::aqua;
 	}
 	
 	namespace pal{

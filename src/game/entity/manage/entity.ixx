@@ -4,6 +4,10 @@ module;
 #include <tuple>
 
 #if DEBUG_CHECK
+#define COMP_AT_CHECK
+#endif
+
+#if DEBUG_CHECK
 #define CHECKED_STATIC_CAST(type) dynamic_cast<type>
 #else
 #define CHECKED_STATIC_CAST(type) static_cast<type>
@@ -16,6 +20,8 @@ export module mo_yanxi.game.ecs.entity;
 export import mo_yanxi.strided_span;
 export import mo_yanxi.meta_programming;
 export import mo_yanxi.seq_chunk;
+
+import mo_yanxi.algo.hash;
 import std;
 
 namespace mo_yanxi::game::ecs{
@@ -223,16 +229,21 @@ namespace mo_yanxi::game::ecs{
 
 		template <typename T>
 		[[nodiscard]] T& at() const noexcept{
+#ifdef COMP_AT_CHECK
 			if(!archetype_){
 				std::println(std::cerr, "[FATAL ERROR] Illegal Access To Chunk<{}> on entity<{}> on empty archetype", typeid(T).name(), type().name());
 				std::terminate();
 			}
+#endif
 
 			T* ptr = archetype_->try_get_comp<T>(chunk_index_);
+
+#ifdef COMP_AT_CHECK
 			if(!ptr){
 				std::println(std::cerr, "[FATAL ERROR] Illegal Access To Chunk<{}> on entity<{}> at[{}]", typeid(T).name(), type().name(), chunk_index());
 				std::terminate();
 			}
+#endif
 
 			return *ptr;
 		}
@@ -249,6 +260,16 @@ namespace mo_yanxi::game::ecs{
 
 		template <typename Tuple>
 		[[nodiscard]] tuple_to_comp_t<Tuple>* get() const noexcept;
+
+		template <typename C, typename T>
+		constexpr T& operator->*(T C::* mptr) const noexcept{
+			return at<T>().*mptr;
+		}
+
+		template <typename C, typename T>
+		constexpr decltype(auto) operator->*(T (C::*  mfptr)()) const noexcept{
+			return std::invoke(mfptr, at<T>());
+		}
 	};
 
 
@@ -257,14 +278,15 @@ namespace mo_yanxi::game::ecs{
 		entity_id id_{};
 
 		void try_incr_ref() const noexcept{
-			if(id_ && *id_){
+			if(id_ && !id_->is_expired()){
 				id_->referenced_count.fetch_add(1, std::memory_order_relaxed);
 			}
 		}
 
 		void try_drop_ref() const noexcept{
-			if(id_ && *id_){
-				id_->referenced_count.fetch_sub(1, std::memory_order_relaxed);
+			if(id_){
+				auto rst = id_->referenced_count.fetch_sub(1, std::memory_order_relaxed);
+				assert(rst != 0);
 			}
 		}
 	public:
@@ -299,6 +321,20 @@ namespace mo_yanxi::game::ecs{
 			return *this;
 		}
 
+		entity_ref& operator=(entity_id other) noexcept{
+			if(id_ == other) return *this;
+			try_drop_ref();
+			id_ = other;
+			try_incr_ref();
+			return *this;
+		}
+
+		entity_ref& operator=(std::nullptr_t other) noexcept{
+			try_drop_ref();
+			id_ = nullptr;
+			return *this;
+		}
+
 		entity_ref& operator=(entity_ref&& other) noexcept{
 			if(this == &other) return *this;
 			try_drop_ref();
@@ -328,11 +364,23 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		explicit constexpr operator bool() const noexcept{
-			return id_;
+			return id_ && *id_;
 		}
 
 		[[nodiscard]] entity_id id() const noexcept{
 			return id_;
+		}
+
+		template <typename C, typename T>
+		constexpr T& operator->*(T C::* mptr) const noexcept{
+			assert(id_);
+			return id_->operator->*<C, T>(mptr);
+		}
+
+
+		template <typename C, typename T>
+		constexpr decltype(auto) operator->*(T (C::*  mfptr)()) const noexcept{
+			return id_->operator->*<C, T>(mfptr);
 		}
 
 		constexpr explicit(false) operator entity&() const noexcept{
@@ -347,10 +395,12 @@ namespace mo_yanxi::game::ecs{
 		/**
 		 * @brief drop the referenced entity if it is already erased
 		 */
-		constexpr void drop_if_expired() noexcept{
+		constexpr bool drop_if_expired() noexcept{
 			if(id_ && id_->is_expired()){
-				this->operator=({});
+				this->operator=(nullptr);
+				return true;
 			}
+			return false;
 		}
 
 		[[nodiscard]] constexpr bool is_expired() const noexcept{
@@ -376,9 +426,11 @@ namespace mo_yanxi::game::ecs{
 		requires contained_in<std::remove_cvref_t<ChunkPartial>, ChunkTy>;
 		}
 	constexpr [[nodiscard]] decltype(auto) chunk_neighbour_of(ChunkPartial& value) noexcept{
+#if DEBUG_CHECK
 		auto get_meta = [&]<typename C>() -> const chunk_meta& {
 			return mo_yanxi::neighbour_of<chunk_meta, C, ChunkPartial>(value);
 		};
+#endif
 
 		if constexpr (std::same_as<std::tuple_element_t<0, ChunkTy>, chunk_meta>){
 			static_assert(!contained_in<chunk_meta, ChunkTy>, "chunk meta should always at the first position");
@@ -548,6 +600,39 @@ namespace mo_yanxi::game::ecs{
 		using second_type = R;
 	};
 
+	struct type_comp_convert{
+		using converter = std::add_pointer_t<void*(void*) noexcept>;
+		converter comp_converter;
+
+		[[nodiscard]] constexpr type_comp_convert() = default;
+
+		template <typename Ty, typename MostDerivedTy, typename ChunkSeqTy>
+		[[nodiscard]] constexpr type_comp_convert(std::in_place_type_t<Ty>, std::in_place_type_t<MostDerivedTy>, std::in_place_type_t<ChunkSeqTy>)
+			noexcept :  comp_converter(+[](void* c) noexcept -> void*{
+				auto& chunk = *static_cast<ChunkSeqTy*>(c);
+				auto& most_derived_comp = chunk.template get<MostDerivedTy>();
+				return static_cast<void*>(static_cast<Ty*>(std::addressof(most_derived_comp)));
+			})  {}
+
+		constexpr explicit operator bool() const noexcept{
+			return comp_converter != nullptr;
+		}
+
+
+		template <typename T>
+		[[nodiscard]] void* get(T& chunk) const noexcept{
+			return comp_converter(std::addressof(chunk));
+		}
+	};
+
+
+	struct empty_state{};
+
+	struct type_index_to_convertor{
+		std::type_index type{typeid(empty_state)};
+		type_comp_convert convertor{};
+	};
+
 	template <typename T>
 	using derive_map_of_trait = typename decltype([]{
 		// if constexpr (!component_trait<T>::is_polymorphic){
@@ -572,11 +657,34 @@ namespace mo_yanxi::game::ecs{
 		// using raw_tuple = std::tuple<int>;
 		using appended_tuple = tuple_cat_t<std::tuple<chunk_meta>, raw_tuple>;
 		using components = tuple_to_seq_chunk_t<appended_tuple>;
-		static constexpr std::size_t chunk_size = std::tuple_size_v<appended_tuple>;
+		static constexpr std::size_t chunk_comp_count = std::tuple_size_v<appended_tuple>;
 
 		static constexpr std::size_t single_chunk_size = sizeof(components);
 
-		using derive_map = all_apply_to<tuple_cat_t, unary_apply_to_tuple_t<derive_map_of_trait, raw_tuple>>;
+		using base_to_derive_map = all_apply_to<tuple_cat_t, unary_apply_to_tuple_t<derive_map_of_trait, appended_tuple>>;
+		static constexpr std::size_t type_hash_map_size = std::tuple_size_v<base_to_derive_map>;
+
+
+		//believe that this is faster than static
+		const std::array<type_index_to_convertor, type_hash_map_size * 2> type_convertor_hash_map = []{
+			std::array<type_index_to_convertor, type_hash_map_size * 2> hash_array{};
+
+			std::array<type_index_to_convertor, type_hash_map_size> temp{};
+			[&] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+				((temp[Idx] = type_index_to_convertor{
+					typeid(typename std::tuple_element_t<Idx, base_to_derive_map>::first_type),
+					type_comp_convert{
+					std::in_place_type<typename std::tuple_element_t<Idx, base_to_derive_map>::first_type>,
+					std::in_place_type<typename std::tuple_element_t<Idx, base_to_derive_map>::second_type>,
+					std::in_place_type<components>
+				}}), ...);
+			}(std::make_index_sequence<type_hash_map_size>{});
+
+			algo::make_hash(hash_array, temp, &type_index_to_convertor::type);
+
+			return hash_array;
+		}();
+
 	private:
 		std::vector<components> chunks{};
 
@@ -689,37 +797,20 @@ namespace mo_yanxi::game::ecs{
 			archetype_base::erase(e);
 		}
 
-		[[nodiscard]] bool has_type(std::type_index type) const override{
-			bool rst{};
-			[&, this] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-				([&, this]<std::size_t I>(){
-					if(rst)return;
-
-					using Ty = std::tuple_element_t<I, appended_tuple>;
-					if(std::type_index{typeid(Ty)} == type){
-						rst = true;
-					}
-				}.template operator()<Idx>(), ...);
-			}(std::make_index_sequence<std::tuple_size_v<appended_tuple>>{});
-			return rst;
+		[[nodiscard]] bool has_type(std::type_index type) const final{
+			return algo::access_hash(type_convertor_hash_map, type, &type_index_to_convertor::type, {}, [](const type_index_to_convertor& conv){
+				return !conv.convertor;
+			}) != type_convertor_hash_map.end();
 		}
 
 		void* get_chunk_ptr(std::type_index type, std::size_t idx) noexcept final {
-			if(idx >= chunks.size())return nullptr;
-			void* ptr{};
-			[&, this] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-				([&, this]<std::size_t I>(){
-					if(ptr)return;
-
-					using Ty = std::tuple_element_t<I, appended_tuple>;
-					if(std::type_index{typeid(Ty)} == type){
-						// auto chunk = reinterpret_cast<std::byte*>(chunks.data() + idx);
-						// constexpr auto off = chunk_tuple_offset_at_v<I, appended_tuple>;
-						ptr = &get<Ty>(chunks[idx]);
-					}
-				}.template operator()<Idx>(), ...);
-			}(std::make_index_sequence<std::tuple_size_v<appended_tuple>>{});
-			return ptr;
+			if(auto itr = algo::access_hash(type_convertor_hash_map, type, &type_index_to_convertor::type, {}, [](const type_index_to_convertor& conv){
+				return !conv.convertor;
+			}); itr != type_convertor_hash_map.end()){
+				return itr->convertor.get(chunks[idx]);
+			}else{
+				return nullptr;
+			}
 		}
 
 		[[nodiscard]] auto& at(entity_data_chunk_index idx) const noexcept{
@@ -813,22 +904,13 @@ namespace mo_yanxi::game::ecs{
 	public:
 		template <typename T>
 		[[nodiscard]] strided_span<T> slice() noexcept{
-			constexpr auto idx = tuple_match_first_v<find_if_first_equal, derive_map, T>;
-			if constexpr (idx != std::tuple_size_v<derive_map>){
+			constexpr auto idx = tuple_match_first_v<find_if_first_equal, base_to_derive_map, T>;
+			if constexpr (idx != std::tuple_size_v<base_to_derive_map>){
 				if(chunks.empty()){
 					return {nullptr, 0, single_chunk_size};
 				}else{
 					return strided_span<T>{
-						static_cast<T*>(std::addressof(get<typename std::tuple_element_t<idx, derive_map>::second_type>(chunks.front()))),
-						chunks.size(), single_chunk_size
-					};
-				}
-			}else if constexpr (contained_in<T, appended_tuple>){
-				if(chunks.empty()){
-					return {nullptr, 0, single_chunk_size};
-				}else{
-					return strided_span<T>{
-						std::addressof(get<T>(chunks.front())),
+						static_cast<T*>(std::addressof(get<typename std::tuple_element_t<idx, base_to_derive_map>::second_type>(chunks.front()))),
 						chunks.size(), single_chunk_size
 					};
 				}
@@ -839,22 +921,13 @@ namespace mo_yanxi::game::ecs{
 
 		template <typename T>
 		[[nodiscard]] strided_span<const T> slice() const noexcept{
-			constexpr auto idx = tuple_match_first_v<find_if_first_equal, derive_map, T>;
-			if constexpr (idx != std::tuple_size_v<derive_map>){
+			constexpr auto idx = tuple_match_first_v<find_if_first_equal, base_to_derive_map, T>;
+			if constexpr (idx != std::tuple_size_v<base_to_derive_map>){
 				if(chunks.empty()){
 					return {nullptr, 0, single_chunk_size};
 				}else{
 					return strided_span<const T>{
-						static_cast<const T*>(std::addressof(get<typename std::tuple_element_t<idx, derive_map>::second_type>(chunks.front()))),
-						chunks.size(), single_chunk_size
-					};
-				}
-			}else if constexpr (contained_in<T, appended_tuple>){
-				if(chunks.empty()){
-					return {nullptr, 0, single_chunk_size};
-				}else{
-					return strided_span<const T>{
-						std::addressof(get<T>(chunks.front())),
+						static_cast<const T*>(std::addressof(get<typename std::tuple_element_t<idx, base_to_derive_map>::second_type>(chunks.front()))),
 						chunks.size(), single_chunk_size
 					};
 				}
@@ -920,3 +993,11 @@ namespace mo_yanxi::game::ecs{
 }
 
 // NOLINTEND(*-misplaced-const)
+
+template <>
+struct std::hash<mo_yanxi::game::ecs::entity_ref>{
+	static std::size_t operator()(const mo_yanxi::game::ecs::entity_ref& ref) noexcept{
+		static constexpr std::hash<const void*> hasher{};
+		return hasher(ref.id());
+	}
+};

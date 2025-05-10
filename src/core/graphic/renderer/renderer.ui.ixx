@@ -648,16 +648,19 @@ namespace mo_yanxi::graphic{
 				context.get_device(), merge_pipeline_layout,
 				VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
 				assets::graphic::shaders::comp::ui_merge.get_create_info()),
-			merge_command(context.get_compute_command_pool().obtain()){
+			clean_command(context.get_compute_command_pool().obtain()){
 
-			bloom.set_strength(.725f, .725f);
+			bloom.set_strength(.8f, .8f);
 
 			init_layout(context.get_transient_compute_command_buffer());
-			create_merge_commands();
+			create_clear_commands();
 			set_merger_state();
 			set_bloom_state();
 
-			set_export(merge_result);
+
+			set_export(batch.blit_base);
+			set_export(batch.blit_light, "light");
+			set_export(bloom.get_output(), "bloom");
 		}
 
 		void resize(const VkExtent2D extent){
@@ -675,20 +678,30 @@ namespace mo_yanxi::graphic{
 				init_layout(cmd);
 			}
 
-			create_merge_commands();
+			create_clear_commands();
 			set_merger_state();
 			set_bloom_state();
 
-			set_export(merge_result);
+			set_export(batch.blit_base);
+			set_export(batch.blit_light, "light");
+			set_export(bloom.get_output(), "bloom");
 		}
 
 		void post_process() const{
 			vk::cmd::submit_command(
 				context().compute_queue(),
 				std::array{
-					// batch.blit_command.get(),
 					bloom.get_main_command_buffer(),
-					merge_command.get()
+					// clean_command.get()
+				});
+		}
+
+		void clear(){
+			vk::cmd::submit_command(
+				context().compute_queue(),
+				std::array{
+					clean_command.get(),
+					// clean_command.get()
 				});
 		}
 
@@ -701,7 +714,7 @@ namespace mo_yanxi::graphic{
 		vk::descriptor_buffer merge_descriptor_buffer{};
 		vk::pipeline_layout merge_pipeline_layout{};
 		vk::pipeline merge_pipeline{};
-		vk::command_buffer merge_command{};
+		vk::command_buffer clean_command{};
 
 		void set_bloom_state(){
 			bloom.set_input({
@@ -722,23 +735,10 @@ namespace mo_yanxi::graphic{
 				.set_storage_image(3, bloom.get_output().view);
 		}
 
-		void create_merge_commands(){
+		void create_clear_commands(){
 			std::array attachments{&batch.blit_base, &batch.blit_light};
 
-			vk::scoped_recorder scoped_recorder{merge_command, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
-
-			vk::cmd::dependency_gen dependency{};
-
-			dependency.apply(scoped_recorder);
-
-			merge_pipeline.bind(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE);
-			merge_descriptor_buffer.bind_to(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE, merge_pipeline_layout, 0);
-
-			auto group = post_processor::get_work_group_size(std::bit_cast<math::u32size2>(merge_result.get_image().get_extent2()));
-			vkCmdDispatch(scoped_recorder, group.x, group.y, 1);
-
-
-			dependency.apply(scoped_recorder);
+			vk::scoped_recorder scoped_recorder{clean_command, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
 			for (const auto & attachment : attachments){
 				vk::cmd::clear_color(

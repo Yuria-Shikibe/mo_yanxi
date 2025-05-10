@@ -319,7 +319,7 @@ namespace mo_yanxi::ui{
 		}
 	};
 
-	export struct elem_datas{
+	export struct elem_fields{
 
 		elem_prop property{};
 		cursor_states cursor_state{};
@@ -356,16 +356,16 @@ namespace mo_yanxi::ui{
 		interactivity interactivity{interactivity::enabled};
 
 	protected:
-		[[nodiscard]] explicit elem_datas(const std::string_view tyName)
+		[[nodiscard]] explicit elem_fields(const std::string_view tyName)
 			: property(tyName){
 		}
 
-		[[nodiscard]] elem_datas() = default;
+		[[nodiscard]] elem_fields() = default;
 	};
 
 	export struct elem :
 
-	elem_datas,
+	elem_fields,
 	stated_tooltip_owner<elem>,
 	spreadable_event_handler<elem,
 	                         events::collapser_state_changed,
@@ -385,7 +385,7 @@ namespace mo_yanxi::ui{
 			scene* scene,
 			group* group,
 			const std::string_view tyName = "")
-			: elem_datas{tyName}{
+			: elem_fields{tyName}{
 			elem::set_scene(scene);
 			elem::set_parent(group);
 
@@ -401,13 +401,13 @@ namespace mo_yanxi::ui{
 
 		elem& operator=(const elem& other) = delete;
 
-		elem(elem&& other) noexcept: elem_datas{std::move(other)}{
+		elem(elem&& other) noexcept: elem_fields{std::move(other)}{
 			event_slots.set_context(*this);
 		}
 
 		elem& operator=(elem&& other) noexcept{
 			if(this == &other) return *this;
-			elem_datas::operator =(std::move(other));
+			elem_fields::operator =(std::move(other));
 			event_slots.set_context(*this);
 			return *this;
 		}
@@ -571,6 +571,7 @@ namespace mo_yanxi::ui{
 			return property.absolute_src + property.content_src_offset();
 		}
 
+		//TODO should it return bool?
 		void remove_self_from_parent() noexcept;
 		// void remove_self_from_parent_instantly();
 		// void notify_remove();

@@ -12,7 +12,7 @@ import mo_yanxi.concepts;
 import std;
 
 export namespace mo_yanxi::math{
-	template <std::regular AngTy>
+	template <typename /*std::regular*/ AngTy>
 	struct transform2 {
 		using angle_t = AngTy;
 		using vec_t = vec2;
@@ -122,8 +122,8 @@ export namespace mo_yanxi::math{
 		 * @param parentRef Parent Frame Reference Trans
 		 * @return Transformed Translation
 		 */
-		template <typename L, typename R>
-		[[nodiscard]] FORCE_INLINE constexpr friend transform2<L> operator|(transform2<L> self, const transform2<R>& parentRef) noexcept{
+		template <typename R>
+		[[nodiscard]] FORCE_INLINE constexpr friend transform2 operator|(transform2 self, const transform2<R>& parentRef) noexcept{
 			return self |= parentRef;
 		}
 
@@ -131,16 +131,19 @@ export namespace mo_yanxi::math{
 			return vec.rotate_rad(static_cast<float>(transform.rot)).add(transform.vec);
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr friend vec_t operator|(vec_t vec, const transform2 transform) noexcept{
-			return vec |= transform;
-		}
 
 		friend bool operator==(const transform2& lhs, const transform2& rhs) noexcept = default;
 
-		[[nodiscard]] constexpr math::cos_sin_result rot_cos_sin() const noexcept{
+		[[nodiscard]] constexpr cos_sin_result rot_cos_sin() const noexcept{
 			return math::cos_sin(rot);
 		}
 	};
+
+
+	template <typename T>
+	[[nodiscard]] FORCE_INLINE constexpr vec2 operator|(vec2 vec, const transform2<T>& transform) noexcept{
+		return vec |= transform;
+	}
 
 	using trans2 = transform2<float>;
 	using uniform_trans2 = transform2<angle>;

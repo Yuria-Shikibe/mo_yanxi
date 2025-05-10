@@ -81,23 +81,23 @@ namespace mo_yanxi::game::ecs{
 	struct component_manager{
 		template <typename T>
 		using small_vector_of = gch::small_vector<T>;
-		// using archetype_map_type = type_fixed_hash_map<std::unique_ptr<archetype_base>>;
-		using archetype_map_type = std::unordered_map<std::type_index, std::unique_ptr<archetype_base>>;
+		using archetype_map_type = type_fixed_hash_map<std::unique_ptr<archetype_base>>;
+		// using archetype_map_type = std::unordered_map<std::type_index, std::unique_ptr<archetype_base>>;
 
 	private:
 		//manager should always moved thread safely
-		no_propagation_mutex to_destroy_mutex{};
+		no_propagation_mutex to_expire_mutex{};
 		no_propagation_mutex entity_mutex{};
 		no_propagation_mutex archetype_mutex{};
 
-		pointer_hash_map<entity_id, int> to_destroy{};
+		pointer_hash_map<entity_id, int> to_expire{};
 		std::vector<entity_id> expired{};
 
 		plf::hive<entity> entities{};
 		archetype_map_type archetypes{};
 
-		// type_fixed_hash_map<std::vector<archetype_slice>> type_to_archetype{};
-		std::unordered_map<std::type_index, std::vector<archetype_slice>> type_to_archetype{};
+		type_fixed_hash_map<std::vector<archetype_slice>> type_to_archetype{};
+		// std::unordered_map<std::type_index, std::vector<archetype_slice>> type_to_archetype{};
 
 	public:
 		float update_delta;
@@ -126,7 +126,7 @@ namespace mo_yanxi::game::ecs{
 			}else{
 				archetype<Tuple>* atype;
 				{
-					std::lock_guard _{entity_mutex};
+					std::lock_guard _{archetype_mutex};
 					atype = &add_archetype<Tuple>();
 				}
 
@@ -182,8 +182,8 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		bool mark_expired(entity_id entity){
-			std::lock_guard _{entity_mutex};
-			return to_destroy.try_emplace(entity).second;
+			std::lock_guard _{to_expire_mutex};
+			return to_expire.try_emplace(entity).second;
 		}
 
 		void do_deferred(){
@@ -210,7 +210,7 @@ namespace mo_yanxi::game::ecs{
 			});
 
 			//TODO destroy expiration notify/check
-			for (auto&& e : to_destroy | std::views::keys){
+			for (auto&& e : to_expire | std::views::keys){
 				e->get_archetype()->erase(e);
 
 				if(e->get_ref_count() > 0){
@@ -220,13 +220,13 @@ namespace mo_yanxi::game::ecs{
 					if(itr != entities.end())entities.erase(itr);
 				}
 			}
-			to_destroy.clear();
+			to_expire.clear();
 		}
 
 		void deferred_destroy_no_reference_entities(){
 			for (auto& entity : entities){
 				if(entity.get_ref_count() == 0){
-					to_destroy.try_emplace(entity.id());
+					to_expire.try_emplace(entity.id());
 				}
 			}
 		}
@@ -510,8 +510,9 @@ namespace mo_yanxi::game::ecs{
 					}
 				};
 
-				auto it = std::ranges::lower_bound(vector, elem);
-				vector.insert(it, std::move(elem));
+				if(const auto it = std::ranges::lower_bound(vector, elem); it == vector.end() || it->identity() != elem.identity()){
+					vector.insert(it, std::move(elem));
+				}
 			};
 
 			insert.template operator()<chunk_meta>();
@@ -521,8 +522,8 @@ namespace mo_yanxi::game::ecs{
 			// }(std::make_index_sequence<std::tuple_size_v<appended>>{});
 
 			[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
-				(insert.template operator()<typename std::tuple_element_t<Idx, typename archetype_t::derive_map>::first_type>(), ...);
-			}(std::make_index_sequence<std::tuple_size_v<typename archetype_t::derive_map>>{});
+				(insert.template operator()<typename std::tuple_element_t<Idx, typename archetype_t::base_to_derive_map>::first_type>(), ...);
+			}(std::make_index_sequence<std::tuple_size_v<typename archetype_t::base_to_derive_map>>{});
 		}
 
 

@@ -22,8 +22,8 @@ namespace mo_yanxi::assets::ctrl{
 	float cameraMoveSpeed = baseCameraMoveSpeed;
 
 	mo_yanxi::graphic::camera2& get_camera(){
-		if(core::global::ui::root->focus->has_camera_focus()){
-			return *core::global::ui::root->focus->focused_camera;
+		if(core::global::ui::root->get_current_focus().has_camera_focus()){
+			return *core::global::ui::root->get_current_focus().focused_camera;
 		}else{
 			return core::global::graphic::world.camera;
 		}
@@ -70,7 +70,7 @@ namespace mo_yanxi::assets::ctrl{
 		});
 
 		core::global::input.scroll_listeners.emplace_back([](const float x, const float y) -> void {
-			if(!core::global::ui::root->focusIdle()){
+			if(!core::global::ui::root->scrollIdle()){
 				core::global::ui::root->input_scroll(x, y);
 			}else{
 				core::global::graphic::world.camera.set_target_scale(core::global::graphic::world.camera.get_target_scale() + y * 0.05f);

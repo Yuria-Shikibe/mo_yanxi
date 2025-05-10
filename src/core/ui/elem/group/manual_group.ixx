@@ -9,7 +9,7 @@ import std;
 namespace mo_yanxi::ui{
 	using passive_cell_adaptor = cell_adaptor<scaled_cell>;
 
-	export struct manual_table final : celled_group<passive_cell_adaptor>{
+	export struct manual_table : celled_group<passive_cell_adaptor>{
 		[[nodiscard]] manual_table(scene* scene, group* group)
 			: universal_group(scene, group, "manual_group"){
 		}

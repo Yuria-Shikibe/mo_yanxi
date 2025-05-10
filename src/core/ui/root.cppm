@@ -27,17 +27,48 @@ namespace mo_yanxi::ui{
 			focus = &scenes.insert_or_assign(std::move(name), std::move(scene)).first->second;
 		}
 
+	private:
 		string_hash_map<scene> scenes{};
-
 		scene* focus{};
 
-		void add_scene(scene&& scene, bool focusIt = false){
+	public:
+
+		scene* switch_scene_to(std::string_view name) noexcept{
+			if(auto scene = scenes.try_find(name)){
+				return std::exchange(focus, scene);
+			}
+			return nullptr;
+		}
+
+		scene& get_current_focus() noexcept{
+			return *focus;
+		}
+
+		scene& add_scene(scene&& scene, bool focusIt = false){
 			auto name = std::string(scene.name);
 
 			auto itr = scenes.insert_or_assign(std::move(name), std::move(scene));
 			if(focusIt){
 				focus = std::addressof(itr.first->second);
 			}
+
+			return itr.first->second;
+		}
+
+		bool erase_scene(std::string_view name) /*noexcept*/ {
+			if(auto itr = scenes.find(name); itr != scenes.end()){
+				if(std::addressof(itr->second) == focus){
+					if(name == SceneName::Main){
+						throw std::runtime_error{"erase main while focusing it"};
+					}
+					focus = &scenes.at(SceneName::Main);
+				}
+
+				scenes.erase(itr);
+
+				return true;
+			}
+			return false;
 		}
 
 		void draw() const{
@@ -85,7 +116,7 @@ namespace mo_yanxi::ui{
 		}
 
 		template <typename T>
-		T& root_of(const std::string_view sceneName){
+		[[nodiscard]] T& root_of(const std::string_view sceneName){
 			if(const auto rst = scenes.try_find(sceneName)){
 				return dynamic_cast<T&>(*rst->root);
 			}
@@ -97,6 +128,12 @@ namespace mo_yanxi::ui{
 		void resize(const math::frect region, const std::string_view name = SceneName::Main){
 			if(const auto rst = scenes.try_find(name)){
 				rst->resize(region);
+			}
+		}
+
+		void resize_all(const math::frect region){
+			for (auto & scene : scenes | std::views::values){
+				scene.resize(region);
 			}
 		}
 

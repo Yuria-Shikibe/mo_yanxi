@@ -4,17 +4,44 @@
 
 export module mo_yanxi.game.ecs.component.ui.builder;
 
-import mo_yanxi.ui.table;
+export import mo_yanxi.game.ecs.entity;
+export import mo_yanxi.ui.table;
+import mo_yanxi.ui.action.generic;
+
+import std;
 
 namespace mo_yanxi::game::ecs{
+	export struct entity_info_table : ui::table{
+	private:
+		entity_ref ref{};
+
+	public:
+
+		[[nodiscard]] entity_info_table(ui::scene* scene, group* group)
+			: table(scene, group){
+		}
+
+		[[nodiscard]] entity_info_table(ui::scene* scene, group* group, entity_ref ref)
+			: table(scene, group), ref(std::move(ref)){
+		}
+
+		void update(float delta_in_ticks) override{
+			if(ref.drop_if_expired()){
+				push_action<ui::action::alpha_action>(15, 0);
+				push_action<ui::action::remove_action>();
+			}
+			table::update(delta_in_ticks);
+		}
+	};
+
 	export
 	struct ui_builder{
-		using table_handle = ui::create_handle<ui::table, ui::table_cell_adaptor::cell_type>;
-
 		virtual ~ui_builder() = default;
 
-		virtual void build_hud(table_handle hdl) const {
-
+		/**
+		 * @return hdl if no table is build, or empty handle if hdl is used
+		 */
+		virtual void build_hud(ui::table& where, const entity_ref& eref) const {
 		}
 	};
 }

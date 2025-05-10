@@ -3,6 +3,8 @@ export module mo_yanxi.array_stack;
 import std;
 
 export namespace mo_yanxi{
+	//TODO these are truly shits...
+
 	//OPTM replace with inplace vector
 
 	/**
@@ -67,19 +69,25 @@ export namespace mo_yanxi{
 			items[sz++] = std::move(val);
 		}
 
-		[[nodiscard]] constexpr decltype(auto) top() noexcept(noexcept(checkUnderFlow())){
+		[[nodiscard]] constexpr decltype(auto) back() noexcept(noexcept(checkUnderFlow())){
 			checkUnderFlow();
 
 			return items[sz - 1];
 		}
 
-		[[nodiscard]] constexpr decltype(auto) top() const noexcept(noexcept(checkUnderFlow())){
+		[[nodiscard]] constexpr decltype(auto) back() const noexcept(noexcept(checkUnderFlow())){
 			checkUnderFlow();
 
 			return items[sz - 1];
 		}
 
-		[[nodiscard]] constexpr decltype(auto) bottom() const noexcept(noexcept(checkUnderFlow())){
+		[[nodiscard]] constexpr decltype(auto) front() const noexcept(noexcept(checkUnderFlow())){
+			checkUnderFlow();
+
+			return items[0];
+		}
+
+		[[nodiscard]] constexpr decltype(auto) front() noexcept(noexcept(checkUnderFlow())){
 			checkUnderFlow();
 
 			return items[0];

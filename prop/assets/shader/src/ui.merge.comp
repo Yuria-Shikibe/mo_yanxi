@@ -20,9 +20,13 @@ float smooth_min(float a, float b, float k) {
     return -log(exp(-k * (a - m)) + exp(-k * (b - m))) / k + m;
 }
 
+vec3 screen(vec3 src, vec3 dst) {
+    return 1.0 - (1.0 - src.rgb) * (1.0 - dst.rgb);
+}
+
 vec4 screen(vec4 src, vec4 dst) {
     vec3 color = 1.0 - (1.0 - src.rgb) * (1.0 - dst.rgb);
-    return vec4(color, src.a + dst.a/*smooth_max(src.a, dst.a, 15.f)*/);
+    return vec4(screen(src.rgb, dst.rgb), src.a + dst.a);
 }
 
 float lumRGB(vec4 v) {
@@ -37,10 +41,11 @@ void main() {
     vec4 color_light_src = imageLoad(tex_light_src, pos);
     vec4 color_light_bloom = imageLoad(tex_light_bloom, pos);
 
-    vec4 total_emissive = screen(vec4(color_light_src.rgb * .35f, color_light_src.a), color_light_bloom * 1.05f);
+    vec4 total_emissive = screen(vec4(color_light_src.rgb * .75f, color_light_src.a), color_light_bloom * 1.05f);
 
-    vec4 hdr_result = screen(color_base, total_emissive);
+    vec4 hdr_result = vec4(screen(color_base.rgb, total_emissive.rgb), max(color_base.a, total_emissive.a));
+
 
     imageStore(target, pos, hdr_result);
-//    imageStore(target, pos, color_base);
+    //imageStore(target, pos, color_base);
 }

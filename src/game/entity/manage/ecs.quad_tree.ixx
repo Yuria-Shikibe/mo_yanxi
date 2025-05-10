@@ -836,23 +836,24 @@ namespace mo_yanxi::game{
 	export
 	template <typename ItemTy, number T = float>
 	struct quad_tree{
-	private:
-		using node = quad_tree_node<ItemTy, T>;
-		typename node::pool_type pool{};
+		using node_type = quad_tree_node<ItemTy, T>;
 
-		node* root{};
+	private:
+		typename node_type::pool_type pool{};
+
+		node_type* root{};
 	public:
 		[[nodiscard]] quad_tree() = default;
 
-		[[nodiscard]] explicit quad_tree(typename node::rect_type boundary)
+		[[nodiscard]] explicit quad_tree(typename node_type::rect_type boundary)
 			: root(&pool.emplace(&pool, std::array{boundary, boundary, boundary, boundary})->at(0))
 		{}
 
-		constexpr node* operator->() noexcept{
+		constexpr node_type* operator->() noexcept{
 			return root;
 		}
 
-		constexpr const node* operator->() const noexcept{
+		constexpr const node_type* operator->() const noexcept{
 			return root;
 		}
 

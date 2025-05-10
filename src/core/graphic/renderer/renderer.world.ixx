@@ -217,8 +217,8 @@ namespace mo_yanxi::graphic{
 
 		[[nodiscard]] explicit world_batch_proxy(vk::context& context) :
 			batch_proxy(vk::batch{
-					context, assets::graphic::buffers::indices_buffer, assets::graphic::samplers::texture_sampler, 6,
-					sizeof(vk::vertices::vertex_world), 1024
+					context, assets::graphic::buffers::indices_buffer, assets::graphic::samplers::texture_sampler, 4,
+					sizeof(vk::vertices::vertex_world), 2048
 				}),
 			draw_attachments{context, VK_SAMPLE_COUNT_1_BIT},
 			mid_attachments{context, VK_SAMPLE_COUNT_1_BIT},

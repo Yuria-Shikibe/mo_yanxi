@@ -5,7 +5,7 @@ module;
 module mo_yanxi.ui.basic;
 
 import mo_yanxi.ui.action;
-import mo_yanxi.ui.action.graphic;
+import mo_yanxi.ui.action.generic;
 import align;
 import mo_yanxi.algo;
 

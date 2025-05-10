@@ -1,10 +1,11 @@
-export module mo_yanxi.ui.action.graphic;
+export module mo_yanxi.ui.action.generic;
 
 import mo_yanxi.ui.basic;
 export import mo_yanxi.ui.action;
 import mo_yanxi.graphic.color;
 
-export namespace mo_yanxi::ui::action{
+namespace mo_yanxi::ui::action{
+	export
 	struct color_action final : action<elem>{
 	private:
 		graphic::color initialColor{};
@@ -34,6 +35,7 @@ export namespace mo_yanxi::ui::action{
 		}
 	};
 
+	export
 	struct alpha_action final : action<elem>{
 	private:
 		float initialAlpha{};
@@ -62,12 +64,13 @@ export namespace mo_yanxi::ui::action{
 		}
 	};
 
-	// struct RemoveAction : action<elem>{
-	// 	RemoveAction() = default;
-	//
-	// 	void begin(elem& elem) override{
-	// 		elem.remove_self_from_parent();
-	// 	}
-	// };
+	export
+	struct remove_action : action<elem>{
+		remove_action() = default;
+
+		void begin(elem& elem) override{
+			elem.remove_self_from_parent();
+		}
+	};
 }
 

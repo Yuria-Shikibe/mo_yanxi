@@ -4,6 +4,7 @@
 
 export module mo_yanxi.ui.layout.cell;
 
+export import mo_yanxi.ui.basic;
 export import mo_yanxi.ui.layout.policies;
 
 export import mo_yanxi.math.rect_ortho;

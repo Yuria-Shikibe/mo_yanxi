@@ -4,7 +4,7 @@ import mo_yanxi.graphic.image_manage;
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.assets.directories;
 
-mo_yanxi::ui::assets::icons::icon_raw_present load_svg(
+mo_yanxi::ui::theme::icons::icon_raw_present load_svg(
 	mo_yanxi::graphic::image_page& ui_page,
 	const std::filesystem::path& dir,
 	std::string_view name,
@@ -23,12 +23,12 @@ mo_yanxi::ui::assets::icons::icon_raw_present load_svg(
 		}).first;
 
 	ui_page.mark_protected(name);
-	return static_cast<mo_yanxi::ui::assets::icons::icon_raw_present>(rst);
+	return static_cast<mo_yanxi::ui::theme::icons::icon_raw_present>(rst);
 }
 
 void load_icons(mo_yanxi::graphic::image_page& ui_page){
 	using namespace mo_yanxi;
-	namespace icons = ui::assets::icons;
+	namespace icons = ui::theme::icons;
 
 	auto dir = assets::dir::svg / "ui";
 
@@ -57,7 +57,7 @@ void load_icons(mo_yanxi::graphic::image_page& ui_page){
 #undef NAMED_LOAD
 }
 
-void mo_yanxi::ui::assets::load(void* erased_image_atlas){
+void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 	graphic::image_atlas& atlas = *static_cast<graphic::image_atlas*>(erased_image_atlas);
 	auto& page = atlas.create_image_page("ui");
 
@@ -95,13 +95,13 @@ void mo_yanxi::ui::assets::load(void* erased_image_atlas){
 			"base"s,
 			graphic::sdf_load{
 				graphic::msdf::msdf_generator{graphic::msdf::create_solid_boarder(12.f), 8.},
-				math::usize2{160, 160}, 5
+				math::usize2{96, 96}, 5
 			}
 		).first;
 
 		shapes::base = {
 				base,
-				align::padding<std::uint32_t>{}.set(16).expand(graphic::msdf::sdf_image_boarder),
+				align::padding<std::uint32_t>{}.set(24).expand(graphic::msdf::sdf_image_boarder),
 				graphic::msdf::sdf_image_boarder
 			};
 		// shapes::base = shapes::edge;

@@ -6,7 +6,7 @@ export module mo_yanxi.ui.assets:icons;
 
 export import mo_yanxi.graphic.image_region;
 
-namespace mo_yanxi::ui::assets{
+namespace mo_yanxi::ui::theme{
 	namespace icons{
 		export using icon_raw_present = graphic::combined_image_region<graphic::size_awared_uv<graphic::uniformed_rect_uv>>;
 

@@ -59,7 +59,7 @@ namespace mo_yanxi::ui{
 					auto img = table.emplace<button<image_frame>>();
 					img.cell().set_pad({.left = 4, .right = 4}).set_size(96);
 
-					img->set_style(assets::styles::no_edge);
+					img->set_style(theme::styles::no_edge);
 					img->set_drawable<drawable_ref>(drawable.drawable.get());
 					img->set_button_callback(button_tags::general, [&owner, idx](elem& elem){
 						owner.current_frame_index = idx;

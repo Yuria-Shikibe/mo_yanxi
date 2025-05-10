@@ -141,7 +141,7 @@ namespace mo_yanxi::ui{
 
 					if(range.dst.pos.y > 0){
 						auto& lastLine = layout[range.dst.pos.y - 1];
-						if(lastLine.isFakeLine() && !layout[range.dst.pos.y].has_valid_before(range.dst.pos.x)){
+						if(lastLine.is_truncated_line() && !layout[range.dst.pos.y].has_valid_before(range.dst.pos.x)){
 							mergeTo(layout, lastLine.size() - 1, range.dst.pos.y - 1, false);
 						}
 					}
@@ -170,7 +170,7 @@ namespace mo_yanxi::ui{
 
 				if(range.dst.pos.y > 0){
 					auto& lastLine = layout[range.dst.pos.y - 1];
-					if(lastLine.isFakeLine() && !layout[range.dst.pos.y].has_valid_before(range.dst.pos.x)){
+					if(lastLine.is_truncated_line() && !layout[range.dst.pos.y].has_valid_before(range.dst.pos.x)){
 						mergeTo(layout, static_cast<int>(lastLine.size()) - 1, range.dst.pos.y - 1, false);
 						advance(layout, 1, false);
 					}else{
@@ -312,7 +312,7 @@ namespace mo_yanxi::ui{
 			if(layout.rows().empty())return;
 
 			auto line = layout.rows().begin() + range.dst.pos.y;
-			while(line != layout.rows().end() && line->isFakeLine()){
+			while(line != layout.rows().end() && line->is_truncated_line()){
 				++line;
 				if(line == layout.rows().end()){
 					--line;
@@ -325,7 +325,7 @@ namespace mo_yanxi::ui{
 
 		void toLineBegin(const Layout& layout, const bool append){
 			auto line = layout.rows().begin() + range.dst.pos.y;
-			while(line->isAppendLine() && line != layout.rows().begin()){
+			while(line->is_append_line() && line != layout.rows().begin()){
 				--line;
 			}
 

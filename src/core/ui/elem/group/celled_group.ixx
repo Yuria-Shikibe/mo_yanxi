@@ -66,6 +66,10 @@ namespace mo_yanxi::ui{
 			hdl->resume();
 		}
 
+		explicit operator bool() const noexcept{
+			return static_cast<bool>(hdl.handle);
+		}
+
 		[[nodiscard]] bool done() const noexcept{
 			return hdl->done();
 		}
@@ -95,6 +99,11 @@ namespace mo_yanxi::ui{
 				hdl->destroy();
 			}
 		}
+
+		create_handle(const create_handle& other) = delete;
+		create_handle(create_handle&& other) noexcept = default;
+		create_handle& operator=(const create_handle& other) = delete;
+		create_handle& operator=(create_handle&& other) noexcept = default;
 
 	private:
 		exclusive_handle_member<handle> hdl{};

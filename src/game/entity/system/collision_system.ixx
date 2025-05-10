@@ -344,6 +344,10 @@ namespace mo_yanxi::game::ecs::system{
 		}
 
 	public:
+		[[nodiscard]] decltype(tree)::node_type& quad_tree() noexcept{
+			return *tree.operator->();
+		}
+
 		void insert_all(component_manager& component_manager) noexcept{
 			tree->reserved_clear();
 
@@ -407,7 +411,8 @@ namespace mo_yanxi::game::ecs::system{
 			});
 		}
 
-		void run_collision_test_post(component_manager& component_manager){
+		void run_collision_test(component_manager& component_manager){
+			insert_all(component_manager);
 			run_collision_test_pre(component_manager);
 
 			auto rng = passed_entites.locked_range();

@@ -97,6 +97,7 @@ import mo_yanxi.ui.assets;
 
 import mo_yanxi.game.graphic.effect;
 import mo_yanxi.game.world.graphic;
+import mo_yanxi.game.world.hud;
 
 import mo_yanxi.game.ecs.component.manager;
 import mo_yanxi.game.ecs.task_graph;
@@ -116,6 +117,7 @@ import mo_yanxi.game.ecs.system.renderer;
 import mo_yanxi.game.ecs.system.projectile;
 
 import mo_yanxi.game.ecs.entitiy_decleration;
+
 
 import mo_yanxi.game.ui.hitbox_editor;
 
@@ -174,7 +176,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 				return s.get_current_main_select().has_value();
 			}, [](const creation::file_selector& s, const ui::elem&){
 				return true;
-			}});
+			}, true});
 			selector.set_cared_suffix({".png"});
 		});
 		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.1f, 1.f}};
@@ -351,7 +353,21 @@ void main_loop(){
 	core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()});
 	init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
 
+	game::world::hud hud{};
+	// hud.focus_hud();
+
 	game::ecs::component_manager component_manager{};
+
+
+	game::ecs::system::collision_system collision_system{};
+	game::ecs::system::motion_system motion_system{};
+	game::ecs::system::renderer ecs_renderer{};
+
+	hud.bind_context({
+		.component_manager = &component_manager,
+		.collision_system = &collision_system,
+		.graphic_context = &graphic_context
+	});
 
 	auto& wgfx_input =
 		core::global::input.register_sub_input<
@@ -363,7 +379,7 @@ void main_loop(){
 
 	{
 		context.register_post_resize("test", [&](window_instance::resize_event event){
-		   core::global::ui::root->resize(
+		   core::global::ui::root->resize_all(
 			   math::frect{math::vector2{event.size.width, event.size.height}.as<float>()});
 
 		   renderer_world.resize(event.size);
@@ -403,10 +419,6 @@ void main_loop(){
 	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
 	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
 
-
-	game::ecs::system::collision_system collision_system{};
-	game::ecs::system::motion_system motion_system{};
-	game::ecs::system::renderer ecs_renderer{};
 
 	using grided_entity_desc = game::ecs::decl::grided_entity_desc;
 
@@ -525,7 +537,7 @@ void main_loop(){
 		graphic_context.update(core::global::timer.global_delta_tick(), core::global::timer.is_paused());
 		renderer_ui.set_time(core::global::timer.global_time());
 
-		wgfx_input.set_context(core::global::ui::root->focus->cursor_pos);
+		wgfx_input.set_context(core::global::ui::root->get_current_focus().get_cursor_pos());
 
 
 		core::global::ui::root->update(core::global::timer.global_delta_tick());
@@ -536,7 +548,7 @@ void main_loop(){
 		graphic::draw::world_acquirer acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
 		math::rect_box_posed rect2{math::vec2{200, 40}};
 
-		auto cursor_in_world = renderer_world.camera.get_screen_to_world(core::global::ui::root->focus->cursor_pos, {}, true);
+		auto cursor_in_world = renderer_world.camera.get_screen_to_world(core::global::ui::root->get_current_focus().get_cursor_pos(), {}, true);
 
 		auto dst = cursor_in_world - renderer_world.camera.get_viewport_center();
 
@@ -701,8 +713,7 @@ void main_loop(){
 				});
 
 			if(!core::global::timer.is_paused()){
-				collision_system.insert_all(component_manager);
-				collision_system.run_collision_test_post(component_manager);
+				collision_system.run_collision_test(component_manager);
 				motion_system.run(component_manager);
 				game::ecs::system::grid_system{}.run(component_manager, graphic_context);
 				game::ecs::system::projectile{}.run(component_manager, graphic_context);
@@ -724,13 +735,13 @@ void main_loop(){
 		renderer_ui.post_process();
 
 		merger.submit();
+		renderer_ui.clear();
 
 		context.flush();
 	}
 
 	context.wait_on_device();
 
-	core::global::ui::dispose();
 
 }
 
@@ -772,11 +783,12 @@ int main(){
 	core::glfw::init();
 	core::global::graphic::init_vk();
 	core::global::assets::init(&core::global::graphic::context);
-	core::global::ui::init();
 	assets::graphic::load(core::global::graphic::context);
+	core::global::ui::init();
 
 	main_loop();
 
+	core::global::ui::dispose();
 	assets::graphic::dispose();
 	core::global::assets::dispose();
 	core::global::graphic::dispose();
@@ -826,7 +838,7 @@ void foo2(){
 	using entity_tuple_3 = std::tuple<B, math::vec2>;
 
 	using A = ecs::archetype<entity_tuple_1>;
-	using M = A::derive_map;
+	using M = A::base_to_derive_map;
 	constexpr auto idx = tuple_match_first_v<ecs::find_if_first_equal, M, comp_interface>;
 
 	struct T{

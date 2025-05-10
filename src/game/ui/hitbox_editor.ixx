@@ -432,7 +432,7 @@ namespace mo_yanxi::game{
 			}
 
 			if(main_selected){
-				draw::line::quad(acquirer, main_selected->edit.temp.crop(), editor_line_width, ui::assets::colors::accent);
+				draw::line::quad(acquirer, main_selected->edit.temp.crop(), editor_line_width, ui::theme::colors::accent);
 			}
 
 		}
@@ -999,7 +999,7 @@ namespace mo_yanxi::game{
 
 				[[nodiscard]] editor_viewport(scene* scene, group* group)
 					: elem(scene, group, "hitbox_viewport"){
-					set_style(ui::assets::styles::general_static);
+					set_style(ui::theme::styles::general_static);
 
 					register_event([](ui::events::focus_begin e, editor_viewport& self){
 						self.get_scene()->set_camera_focus(&self.camera);
@@ -1133,10 +1133,10 @@ namespace mo_yanxi::game{
 
 				auto box = menu->end_line().emplace<ui::check_box>();
 				box.cell().set_height(60);
-				box->set_style(ui::assets::styles::no_edge);
-				box->set_drawable<ui::icon_drawable>(0, ui::assets::icons::blender_icon_pivot_individual);
-				box->set_drawable<ui::icon_drawable>(1, ui::assets::icons::blender_icon_pivot_median);
-				box->set_drawable<ui::icon_drawable>(2, ui::assets::icons::blender_icon_pivot_active);
+				box->set_style(ui::theme::styles::no_edge);
+				box->set_drawable<ui::icon_drawable>(0, ui::theme::icons::blender_icon_pivot_individual);
+				box->set_drawable<ui::icon_drawable>(1, ui::theme::icons::blender_icon_pivot_median);
+				box->set_drawable<ui::icon_drawable>(2, ui::theme::icons::blender_icon_pivot_active);
 				box->add_multi_select_tooltip({
 						.follow = tooltip_follow::owner,
 						.align_owner = align::pos::top_right,
@@ -1149,7 +1149,7 @@ namespace mo_yanxi::game{
 				{
 					auto b = menu->end_line().emplace<ui::button<ui::basic_text_elem>>();
 
-					b->set_style(ui::assets::styles::no_edge);
+					b->set_style(ui::theme::styles::no_edge);
 					b->set_scale(.6f);
 					b->set_text("save");
 					b->set_button_callback(ui::button_tags::general, [this]{
@@ -1172,7 +1172,7 @@ namespace mo_yanxi::game{
 				{
 					auto b = menu->end_line().emplace<ui::button<ui::basic_text_elem>>();
 
-					b->set_style(ui::assets::styles::no_edge);
+					b->set_style(ui::theme::styles::no_edge);
 					b->set_scale(.6f);
 					b->set_text("load");
 					b->set_button_callback(ui::button_tags::general, [this]{
@@ -1190,7 +1190,7 @@ namespace mo_yanxi::game{
 				{
 					auto b = menu->end_line().emplace<ui::button<ui::basic_text_elem>>();
 
-					b->set_style(ui::assets::styles::no_edge);
+					b->set_style(ui::theme::styles::no_edge);
 					b->set_scale(.6f);
 					b->set_text("set ref");
 					b->set_button_callback(ui::button_tags::general, [this]{
@@ -1220,7 +1220,7 @@ namespace mo_yanxi::game{
 
 				auto vp = editor_region->emplace<editor_viewport>();
 				vp.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 1.f}};
-				vp->set_style(ui::assets::styles::general_static);
+				vp->set_style(ui::theme::styles::general_static);
 				// vp->prop().fill_parent.set(true);
 				viewport = std::to_address(vp);
 

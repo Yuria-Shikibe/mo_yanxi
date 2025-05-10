@@ -135,7 +135,7 @@ namespace mo_yanxi::font::typesetting{
 		}
 	};
 
-	export struct glyph_line{
+	export struct layout_rect{
 		float width;
 		float ascender;
 		float descender;
@@ -150,6 +150,11 @@ namespace mo_yanxi::font::typesetting{
 
 		[[nodiscard]] constexpr math::frect to_region(math::vec2 src) const noexcept{
 			return {tags::from_extent, src.add_y(descender), width, -height()};
+		}
+
+		constexpr void max_height(layout_rect region) noexcept{
+			ascender = math::max(ascender, region.ascender);
+			descender = math::max(descender, region.descender);
 		}
 	};
 
@@ -212,7 +217,7 @@ namespace mo_yanxi::font::typesetting{
 		};
 
 		// private:
-		std::uint32_t rows{};
+		// std::uint32_t rows{};
 
 		/**
 		 * @brief String Normalize to NFC Format
@@ -338,7 +343,7 @@ namespace mo_yanxi::font::typesetting{
 					escapingNext = false;
 				}
 
-				if(charCode == '\n') rows++;
+				// if(charCode == '\n') rows++;
 
 				off += codeSize - 1;
 			}
@@ -353,7 +358,7 @@ namespace mo_yanxi::font::typesetting{
 
 			if(codes.empty() || !codes.back().code == U'\0'){
 				codes.push_back({U'\0', static_cast<code_point_index>(string.size())});
-				rows++;
+				// rows++;
 			}
 
 
@@ -366,30 +371,25 @@ namespace mo_yanxi::font::typesetting{
 
 		glyph_size_type default_size{64, 0};
 
-		optional_stack<math::vec2> offsetHistory{};
+		optional_stack<math::vec2> offset_history{};
 		optional_stack<glyph_size_type> size_history{};
 
 	public:
 		optional_stack<font_face*> font_history{};
-		optional_stack<graphic::color> colorHistory{};
+		optional_stack<graphic::color> color_history{};
 
-		// math::vec2 captured_size{};
-
-		//TODO replace this
-		math::vec2 pen_pos{};
-
-		glyph_line line_rect{};
+		float row_pen_pos{};
+		layout_index_t current_row{};
 
 	private:
 		float throughout_scale{1.f};
 		math::vec2 currentOffset{};
-		float minimumLineHeight{50.f};
-		float minimum_line_spacing{12.f};
+		float minimum_line_spacing{100.f};
 
 	public:
 		void reset_context(){
-			colorHistory.stack = {};
-			offsetHistory.stack = {};
+			color_history.stack = {};
+			offset_history.stack = {};
 			size_history.stack = {};
 			font_history.stack = {};
 		}
@@ -427,10 +427,6 @@ namespace mo_yanxi::font::typesetting{
 			return throughout_scale;
 		}
 
-		[[nodiscard]] float get_min_line_height() const noexcept{
-			return minimumLineHeight * throughout_scale;
-		}
-
 		[[nodiscard]] float get_line_spacing() const noexcept{
 			const auto sz = get_current_size();
 			const auto spacing = get_face().get_line_spacing(sz);
@@ -447,11 +443,11 @@ namespace mo_yanxi::font::typesetting{
 		}
 
 		[[nodiscard]] graphic::color get_color() const noexcept{
-			return colorHistory.top(graphic::colors::white);
+			return color_history.top(graphic::colors::white);
 		}
 
 		void push_offset(const math::vec2 off){
-			offsetHistory.push(off);
+			offset_history.push(off);
 			currentOffset += off;
 		}
 
@@ -465,12 +461,12 @@ namespace mo_yanxi::font::typesetting{
 			if(off.y == 0) off.y = off.x;
 
 			const auto offset = off.as<float>() * offScale;
-			offsetHistory.push(offset);
+			offset_history.push(offset);
 			currentOffset += offset;
 		}
 
 		math::vec2 pop_offset(){
-			const math::vec2 offset = offsetHistory.pop_and_get().value_or({});
+			const math::vec2 offset = offset_history.pop_and_get().value_or({});
 			currentOffset -= offset;
 			return offset;
 		}
@@ -495,7 +491,9 @@ namespace mo_yanxi::font::typesetting{
 		 * @brief try layout all character within given direction clamp length with auto feed-line
 		 * if not set, character beyond clamp size are either reserved or clipped
 		 */
-		auto_feed_line = 1 << 0,
+		auto_feed_line = 0 * 1 << 0,
+
+		truncate = 1 << 0,
 
 		block_line_feed = 1 << 1,
 
@@ -526,7 +524,7 @@ namespace mo_yanxi::font::typesetting{
 			using row_type = std::vector<glyph_elem>;
 			// float baselineHeight{};
 			math::vec2 src{};
-			glyph_line bound{};
+			layout_rect bound{};
 			row_type glyphs{};
 
 			[[nodiscard]] math::frect getRectBound() const noexcept{
@@ -553,11 +551,11 @@ namespace mo_yanxi::font::typesetting{
 				return glyphs[row];
 			}
 
-			[[nodiscard]] bool isFakeLine() const noexcept{
+			[[nodiscard]] bool is_truncated_line() const noexcept{
 				return glyphs.empty() || glyphs.back().code.code != U'\n';
 			}
 
-			[[nodiscard]] bool isAppendLine() const noexcept{
+			[[nodiscard]] bool is_append_line() const noexcept{
 				return !glyphs.empty() && glyphs.front().code.code == U'\0';
 			}
 
@@ -926,10 +924,10 @@ namespace mo_yanxi::font::typesetting{
 		void push_color(parse_context& context, std::string_view arg){
 
 			if(arg.empty()){
-				context.colorHistory.pop();
+				context.color_history.pop();
 			} else{
 				const auto color = graphic::color::from_string(arg);
-				context.colorHistory.push(color);
+				context.color_history.push(color);
 			}
 		}
 
@@ -1019,297 +1017,79 @@ namespace mo_yanxi::font::typesetting{
 			return tokens.end();
 		}
 
-		struct append_result{
-			glyph_line extend;
-			bool success;
+	}
 
-			constexpr explicit operator bool() const noexcept{
-				return success;
-			}
+	struct layout_unit{
 
-			constexpr void update_context(parse_context& context) const noexcept{
-				context.line_rect.ascender = math::max(context.line_rect.ascender, extend.ascender);
-				context.line_rect.descender = math::max(context.line_rect.descender, extend.descender);
-				context.pen_pos.x += extend.width;
-			}
-		};
+		std::vector<glyph_elem> buffer{};
+		layout_rect bound{};
+		float pen_advance{};
 
-		append_result append_glyph_horizontal(
-			glyph_layout& layout,
-			parse_context& context,
+		void push_glyph(
+			const parse_context& context,
 			const code_point code,
-			const unsigned layoutIndex,
-			const layout_index_t rowIndex,
-			const bool no_clip = false,
-			const bool use_zero = false
+			const unsigned layout_global_index,
+			const std::optional<char_code> real_code = std::nullopt
 		){
-			auto& line = layout.get_row(rowIndex);
-
-			const auto linePos = line.glyphs.size();
-			auto& current = line.glyphs.emplace_back(
-				use_zero ? code_point{U'\0', code.unit_index} : code,
-				layout_abs_pos{{static_cast<layout_index_t>(linePos), rowIndex}, layoutIndex},
+			const layout_index_t column_index = buffer.size();
+			auto& current = buffer.emplace_back(
+				code_point{real_code.value_or(code.code), code.unit_index},
+				layout_abs_pos{{column_index, 0}, layout_global_index},
 				context.get_glyph(code.code)
 			);
 
 			const auto font_region_scale = context.get_current_correction_scale();
 			float advance = current.glyph.metrics().advance.x * font_region_scale.x;
-			if(code.code == U'\0' || code.code == U'\n'){
-				advance = math::min(advance, layout.get_clamp_size().x - context.pen_pos.x);
+			if(code.code == real_code && (code.code == U'\0' || code.code == U'\n')){
+				advance = 0;
 			}
 
-
-			const auto off = context.get_current_offset();
-			const auto localPenPos = context.pen_pos - line.src;
-			const auto placementPos = localPenPos + off;
+			const auto placementPos = context.get_current_offset().add_x(pen_advance);
 
 			current.region = current.glyph.metrics().place_to(placementPos, font_region_scale);
 			current.correct_scale = font_region_scale;
 			if(current.region.get_src_x() < 0){
+				//Fetch for italic line head
 				advance -= current.region.get_src_x();
 				current.region.src.x = 0;
 			}
-
-			append_result result{
-				.extend = {
-					.width = advance,
-					.ascender = placementPos.y - current.region.get_src_y(),
-					.descender = current.region.get_end_y() - placementPos.y
-				},
-			};
-
-			if(
-				(layout.policy() & layout_policy::reserve) == layout_policy{} ||
-				(layout.policy() & layout_policy::auto_feed_line) != layout_policy{}
-			){
-				if(!no_clip && context.pen_pos.x + advance > layout.get_clamp_size().x){
-					return result;
-				}
-			}
-
 			current.color = context.get_color();
-			result.success = true;
 
-			return result;
+
+			bound.max_height({
+				.width = 0,
+				.ascender = placementPos.y - current.region.get_src_y(),
+				.descender = current.region.get_end_y() - placementPos.y
+			});
+			bound.width = std::max(bound.width, current.region.get_end_x());
+			pen_advance += advance;
 		}
 
-		void redirect(
-			const std::span<glyph_elem> elems,
-			const math::vec2 src,
-			const math::vec2 dst,
-			const layout_abs_pos src_layout_pos,
-			const layout_abs_pos dst_layout_pos
-			){
-			for (auto && elem : elems){
-				elem.region.src += dst - src;
-				elem.layout_pos.index += dst_layout_pos.index - src_layout_pos.index;
-				elem.layout_pos.pos += dst_layout_pos.pos - src_layout_pos.pos;
-			}
+		void clear(){
+			buffer.clear();
+			bound = {};
+			pen_advance = 0;
 		}
-
-	}
-
+	};
 
 	struct parser : parser_base{
 	private:
-		static bool end_line(
+		static bool try_append(
+			parse_context& context,
+			glyph_layout& layout,
+			layout_unit& layout_unit,
+			const bool end_line,
+			const bool terminate = false
+		);
+		static void end_parse(
 			glyph_layout& layout,
 			parse_context& context,
-			const bool append,
-			const bool no_clip = false
-			){
-			if(layout.empty())return false;
+			const code_point code,
+			const layout_index_t idx);
 
-			auto& line = layout.rows().back();
-			const auto defualt_height = context.get_line_spacing();
-
-			if(layout.row_size() == 1){
-				const float f1 = std::max(defualt_height, context.line_rect.descender + context.line_rect.ascender) - context.line_rect.descender;
-				const float f2 = std::max(defualt_height, context.line_rect.ascender);
-				line.src.y = math::lerp(f1, f2, 0.35f);
-			}else{
-				auto& lastLine = std::next(layout.rows().crbegin()).operator*();
-
-				line.src.y = lastLine.src.y + std::max(defualt_height, lastLine.bound.descender + context.line_rect.ascender);
-			}
-
-			const float max_height = line.src.y + context.line_rect.descender;
-
-			//TODO clip
-			if((layout.policy() & layout_policy::reserve) == layout_policy{}){
-				if(!no_clip && max_height > layout.get_clamp_size().y + 0.005f){
-					//discard line
-					layout.pop_line();
-					return false;
-				}
-			}
-
-
-			//TODO duplicated captured size
-			layout.captured_size.y = max_height;
-			layout.captured_size.max_x(context.pen_pos.x);
-			layout.captured_size.min(layout.get_clamp_size());
-
-			context.line_rect.width = context.pen_pos.x;
-			line.bound = context.line_rect;
-
-			context.line_rect = {};
-			context.pen_pos = {};
-
-
-			if(append)layout.append_line();
-
-			return true;
-		}
-
-		std::vector<code_point>::difference_type parse(glyph_layout& layout, parse_context& context, const tokenized_text& formatted_text) const {
-
-			std::uint32_t currentRowIndex{};
-			tokenized_text::token_iterator lastTokenItr = formatted_text.tokens.begin();
-
-			bool requires_context_redo{false};
-
-			auto view = formatted_text.codes | std::views::enumerate;
-			auto itr = view.begin();
-
-			auto end_idx = [&](){
-				return itr - view.begin();
-			};
-
-			for(; itr != view.end(); ++itr){
-				auto [layout_index, code] = *itr;
-
-				if(requires_context_redo){
-					tokenized_text::token_iterator token_itr = formatted_text.tokens.begin();
-
-					for(decltype(layout_index) i = 0; i < layout_index; ++i){
-						token_itr = func::exec_tokens(layout, context, *this, token_itr, formatted_text, i);
-
-					}
-					requires_context_redo = false;
-				}
-
-				lastTokenItr = func::exec_tokens(layout, context, *this, lastTokenItr, formatted_text, layout_index);
-
-				//TODO
-				if(auto append_result = func::append_glyph_horizontal(layout, context, code, layout_index, currentRowIndex)){
-					append_result.update_context(context);
-				}else{
-					if((layout.policy() & layout_policy::auto_feed_line) != layout_policy{}){
-						if(append_result.extend.width > layout.get_clamp_size().x){
-							layout.clip = true;
-							return end_idx();
-						}
-
-						{//roll back to last seperator
-							auto& line = layout.get_row(currentRowIndex);
-
-							while(true){
-								line.glyphs.pop_back();
-
-								if(itr == view.begin()){
-									layout.clip = true;
-									return end_idx();
-								}
-
-								const auto c = (--itr).base()->code;
-
-								if(c == U'\n' || c == U'\0'){
-									layout.clip = true;
-									return end_idx();
-								}
-								if((layout.policy() & layout_policy::block_line_feed) == layout_policy{} || is_unicode_separator(c))break;
-							}
-
-							if(!line.glyphs.empty() && line.glyphs.back().code.code == U'\0'){
-								layout.elements.resize(currentRowIndex);
-								layout.clip = true;
-								return end_idx();
-							}
-						}
-
-						if(!end_line(layout, context, true)){
-							layout.clip = true;
-							return end_idx();
-						}
-						currentRowIndex++;
-
-						if(auto result =
-							func::append_glyph_horizontal(
-								layout, context,
-								{line_feed_character, code.unit_index}, itr - view.begin() + 1, currentRowIndex, false, true)
-						){
-							result.update_context(context);
-						}else{
-							layout.get_row(currentRowIndex).glyphs.pop_back();
-
-							layout.clip = true;
-							return end_idx();
-						}
-
-						if((layout.policy() & layout_policy::block_line_feed) != layout_policy{})requires_context_redo = true;
-						continue;
-					}else if((layout.policy() & layout_policy::reserve) != layout_policy{}){
-
-					}else{
-						auto& line = layout.get_row(currentRowIndex);
-						line.glyphs.pop_back();
-						while(itr != view.end()){
-							if(itr++.base()->code == U'\0'){
-								--itr;
-								break;
-							}
-							if(itr++.base()->code == U'\n')break;
-						}
-
-						if(itr == view.end())break;
-
-						if(!end_line(layout, context, true)){
-							return end_idx();
-						}
-						currentRowIndex++;
-
-						requires_context_redo = true;
-						continue;
-					}
-				}
-
-				if(code.code == U'\n'){
-					if(!end_line(layout, context, true)){
-						return end_idx();
-					}
-					currentRowIndex++;
-				}
-			}
-
-			return end_idx();
-
-		}
-
-		void end_parse(glyph_layout& layout, parse_context& context, const tokenized_text& formatted_text, layout_index_t idx) const {
-			if(layout.row_size() > 0 && layout.rows().back().size() > 0 && layout.rows().back().glyphs.back().code.code == '\0'){
-				if(!end_line(layout, context, false)){
-					end_line(layout, context, false);
-				}
-			}else{
-				auto& line = layout.get_row(0);
-				func::append_glyph_horizontal(layout, context, formatted_text.codes.back(), idx, layout.row_size() - 1, true)
-					.update_context(context);
-				if(!end_line(layout, context, false)){
-					end_line(layout, context, false);
-				}
-			}
-		}
 	public:
-		void operator()(glyph_layout& layout, float scale = 1.f) const{
-			layout.elements.clear();
-			parse_context context{};
-			context.set_throughout_scale(scale);
-			tokenized_text formatted_text{layout.get_text(), {.reserve = reserve_tokens}};
-
-			auto idx = parse(layout, context, formatted_text);
-			end_parse(layout, context, formatted_text, idx + 1);
-		}
+		void operator()(glyph_layout& layout, parse_context context, const tokenized_text& formatted_text) const;
+		void operator()(glyph_layout& layout, float scale = 1.f) const;
 
 		glyph_layout operator()(
 			std::string_view str,
@@ -1368,7 +1148,7 @@ namespace mo_yanxi::font::typesetting{
 			std::string_view arg = token.get_first_arg();
 
 			if(arg.empty()){
-				context.colorHistory.pop();
+				context.color_history.pop();
 				return;
 			}
 
@@ -1449,13 +1229,11 @@ namespace mo_yanxi::font::typesetting{
 		parser p;
 		apd_default_modifiers(p);
 		return p;
-	}()
-	};
+	}()};
 	export inline const parser global_empty_parser{[]{
 		parser p;
 		apd_default_modifiers(p);
 		p.reserve_tokens = true;
 		return p;
-	}()
-	};
+	}()};
 }

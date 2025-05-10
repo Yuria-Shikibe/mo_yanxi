@@ -10,6 +10,7 @@ export import mo_yanxi.game.ecs.component.projectile.manifold;
 export import mo_yanxi.game.ecs.component.hitbox;
 
 export import mo_yanxi.game.ecs.component.projectile.drawer;
+export import mo_yanxi.game.ecs.component.projectile.ui_builder;
 export import mo_yanxi.game.ecs.component.drawer;
 
 import std;
@@ -17,19 +18,23 @@ import std;
 namespace mo_yanxi::game::ecs{
 	namespace decl{
 		export using grided_entity_desc = std::tuple<
-		mech_motion,
-		manifold,
-		physical_rigid,
-		chamber::chamber_manifold
-	>;
+			mech_motion,
+			manifold,
+			physical_rigid,
+			chamber::chamber_manifold
+		>;
 
 		export using projectile_entity_desc = std::tuple<
 			mech_motion,
 			manifold,
 			physical_rigid,
 			projectile_manifold,
-			projectile_drawer
+			projectile_drawer,
+			projectile_ui_builder
 		>;
+
+		using View = tuple_to_comp_t<projectile_entity_desc>;
+
 	}
 
 	export

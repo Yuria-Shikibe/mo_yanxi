@@ -23,6 +23,6 @@ namespace test{
 	using namespace mo_yanxi;
 
 	export void load_tex(graphic::image_atlas& atlas){
-		ui::assets::load(&atlas);
+		ui::theme::load(&atlas);
 	}
 }

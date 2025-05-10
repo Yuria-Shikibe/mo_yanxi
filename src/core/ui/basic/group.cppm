@@ -43,7 +43,7 @@ namespace mo_yanxi::ui{
 
 		void draw_content(const rect clipSpace) const override{
 			const auto space = property.content_bound_absolute().intersection_with(clipSpace);
-			drawChildren(space);
+			draw_children(space);
 		}
 
 		bool try_layout() override{
@@ -63,7 +63,7 @@ namespace mo_yanxi::ui{
 		}
 
 	protected:
-		/*virtual*/ void drawChildren(const rect clipSpace) const{
+		/*virtual*/ void draw_children(const rect clipSpace) const{
 			for(const auto& element : get_children()){
 				element->draw(clipSpace);
 			}

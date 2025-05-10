@@ -134,7 +134,7 @@ namespace mo_yanxi::ui{
 		disabled,
 		children_only,
 		enabled,
-		intercepted
+		intercepted,
 	};
 
 	export enum struct esc_flag{

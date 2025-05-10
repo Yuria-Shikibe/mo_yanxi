@@ -33,13 +33,16 @@ namespace mo_yanxi{
 		}
 	}
 
+	template <typename T>
+	using chunk_partial = T;//std::conditional_t<std::is_fundamental_v<T>, raw_wrap<T>, T>;
+
 	export
 	template <typename... T>
-	struct seq_chunk final : private std::conditional_t<std::is_fundamental_v<T>, raw_wrap<T>, T>...{
+	struct seq_chunk final : private chunk_partial<T>...{
 
 		template <typename Ty>
 			requires (contained_within<std::remove_cvref_t<Ty>, T...>)
-		static copy_qualifier_t<Ty, seq_chunk>* cast_from(Ty* p) noexcept{
+		constexpr static copy_qualifier_t<Ty, seq_chunk>* chunk_cast(Ty* p) noexcept{
 			return static_cast<copy_qualifier_t<Ty, seq_chunk>*>(p);
 		}
 
@@ -50,13 +53,14 @@ namespace mo_yanxi{
 		template <typename ...Args>
 			requires (sizeof...(Args) == sizeof...(T))
 		[[nodiscard]] constexpr explicit(false) seq_chunk(Args&& ...args)
-		: std::conditional_t<std::is_fundamental_v<T>, raw_wrap<T>, T>{std::forward<Args>(args)} ...{
+		: chunk_partial<T>{std::forward<Args>(args)} ...{
 
 		}
+
 		template <typename Tuple>
 			requires (is_tuple_v<Tuple>)
 		[[nodiscard]] constexpr explicit(false) seq_chunk(Tuple&& args)
-		: std::conditional_t<std::is_fundamental_v<T>, raw_wrap<T>, T>{mo_yanxi::try_get<T>(args)} ...{
+		: chunk_partial<T>{mo_yanxi::try_get<T>(args)} ...{
 
 		}
 
@@ -105,7 +109,7 @@ namespace mo_yanxi{
 	export
 	template <typename Ty, spec_of<seq_chunk> Chunk>
 	constexpr copy_qualifier_t<Ty, Chunk>* seq_chunk_cast(Ty* p) noexcept{
-		return Chunk::cast_from(p);
+		return Chunk::chunk_cast(p);
 	}
 
 	export
@@ -116,7 +120,7 @@ namespace mo_yanxi{
 		}
 	constexpr [[nodiscard]] decltype(auto) neighbour_of(ChunkPartial& value) noexcept{
 		using CTy = copy_qualifier_t<ChunkPartial, std::remove_cvref_t<ChunkTy>>;
-		CTy* chunk = CTy::cast_from(std::addressof(value));
+		CTy* chunk = CTy::chunk_cast(std::addressof(value));
 		return chunk->template get<Tgt>();//std::forward_like<ChunkPartial>();
 	}
 
@@ -128,7 +132,7 @@ namespace mo_yanxi{
 		}
 	constexpr [[nodiscard]] decltype(auto) neighbour_of(ChunkPartial& value) noexcept{
 		using CTy = copy_qualifier_t<ChunkPartial, tuple_to_seq_chunk_t<std::remove_cvref_t<ChunkTy>>>;
-		CTy* chunk = CTy::cast_from(std::addressof(value));
+		CTy* chunk = CTy::chunk_cast(std::addressof(value));
 		return chunk->template get<Tgt>();//std::forward_like<ChunkPartial>();
 	}
 

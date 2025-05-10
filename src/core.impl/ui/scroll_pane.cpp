@@ -30,14 +30,14 @@ void mo_yanxi::ui::scroll_pane::draw_post(const rect clipSpace) const{
 		auto rect = get_hori_bar_rect().shrink(2).move_y(prop().boarder.bottom * -.25f - shrink);
 		rect.add_height(-shrink);
 
-		draw::nine_patch(param, assets::shapes::base, rect, colors::gray);
+		draw::nine_patch(param, theme::shapes::base, rect, colors::gray);
 	}
 
 	if(enableVert){
 		float shrink = scroll_bar_stroke_ * .25f;
 		auto rect = get_vert_bar_rect().shrink(2).move_x(prop().boarder.right * .25f + shrink);
 		rect.add_width(-shrink);
-		draw::nine_patch(param, assets::shapes::base, rect, colors::gray);
+		draw::nine_patch(param, theme::shapes::base, rect, colors::gray);
 	}
 
 	elem::draw_post(clipSpace);

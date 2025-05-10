@@ -10,6 +10,7 @@ export import mo_yanxi.vk.command_buffer;
 export import mo_yanxi.vk.uniform_buffer;
 export import mo_yanxi.vk.descriptor_buffer;
 export import mo_yanxi.vk.pipeline.layout;
+export import mo_yanxi.vk.image_derives;
 export import mo_yanxi.vk.pipeline;
 export import mo_yanxi.vk.util.cmd.render;
 export import mo_yanxi.vk.util;
@@ -38,6 +39,10 @@ namespace mo_yanxi::graphic{
 		VkImageView view;
 		VkImageLayout layout;
 		std::uint32_t queue_family_index;
+
+		explicit(false) operator vk::image_handle() const noexcept{
+			return {image, view};
+		}
 	};
 
 	export

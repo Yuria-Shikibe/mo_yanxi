@@ -8,14 +8,29 @@ layout (local_size_x = 16, local_size_y = 16) in;
 layout (set = 0, binding = 0, rgba32f) restrict uniform writeonly image2D target;
 layout (set = 0, binding = 1, rgba32f) restrict uniform readonly image2D tex_world;
 layout (set = 0, binding = 2, rgba32f) restrict uniform readonly image2D tex_ui;
+layout (set = 0, binding = 3, rgba32f) restrict uniform readonly image2D tex_ui_light;
+layout (set = 0, binding = 4, rgba32f) restrict uniform readonly image2D tex_ui_bloom;
 
+vec3 screen(vec3 src, vec3 dst) {
+    return 1.0 - (1.0 - src.rgb) * (1.0 - dst.rgb);
+}
+
+vec4 screen(vec4 src, vec4 dst) {
+    vec3 color = 1.0 - (1.0 - src.rgb) * (1.0 - dst.rgb);
+    return vec4(screen(src.rgb, dst.rgb), src.a + dst.a);
+}
 
 void main() {
     const ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
 
-    vec4 color_world = imageLoad(tex_world, pos);
-    vec4 color_ui = imageLoad(tex_ui, pos);
+    const vec4 color_world = imageLoad(tex_world, pos);
+    const vec4 color_ui = imageLoad(tex_ui, pos);
+    const vec4 color_ui_light = imageLoad(tex_ui_light, pos);
+    const vec4 color_ui_bloom = imageLoad(tex_ui_bloom, pos);
 
-    imageStore(target, pos, blend(color_ui, color_world));
-//    imageStore(target, pos, color_world);
+    vec4 base = blend(color_ui, color_world);
+    base = screen(color_ui_bloom, base);
+    base = screen(vec4(color_ui_light.rgb * .75f, color_ui_light.a), base);
+
+    imageStore(target, pos, base);
 }

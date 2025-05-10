@@ -37,6 +37,10 @@ namespace mo_yanxi::graphic{
 			export_->results.insert_or_assign(name, handle);
 		}
 
+		void set_export(vk::image_handle handle, std::string_view suffix) const{
+			export_->results.insert_or_assign(std::format("{}.{}", name, suffix), handle);
+		}
+
 	public:
 
 		[[nodiscard]] renderer() = default;

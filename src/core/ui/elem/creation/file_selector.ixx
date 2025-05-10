@@ -685,15 +685,15 @@ namespace mo_yanxi::ui::creation{
 				if(is_root){
 
 				}else if(is_dir){
-					set_style(assets::styles::whisper);
+					set_style(theme::styles::whisper);
 				}else{
-					set_style(assets::styles::humble);
+					set_style(theme::styles::humble);
 				}
 
 				template_cell.set_pad(align::spacing{}.set(8));
 
 				{
-					auto hdl = this->emplace<icon_frame>(is_dir ? assets::icons::folder_general : assets::icons::file_general);
+					auto hdl = this->emplace<icon_frame>(is_dir ? theme::icons::folder_general : theme::icons::file_general);
 					hdl->prop().set_empty_drawer();
 					hdl->prop().boarder.set(4);
 					hdl.cell().set_size(60);
@@ -780,6 +780,7 @@ namespace mo_yanxi::ui::creation{
 
 
 		void popVisitedAndResume(){
+			history.to_prev();
 			history.truncate();
 			if(const auto back = history.pop_and_get()){
 				visit_directory(std::move(*back));
@@ -850,8 +851,8 @@ namespace mo_yanxi::ui::creation{
 			menu = &m.elem();
 
 			{
-				auto b = m->end_line().emplace<button<icon_frame>>(assets::icons::left);
-				b->set_style(assets::styles::no_edge);
+				auto b = m->end_line().emplace<button<icon_frame>>(theme::icons::left);
+				b->set_style(theme::styles::no_edge);
 				b->set_button_callback(button_tags::general, [this]{
 					undo();
 				});
@@ -861,8 +862,8 @@ namespace mo_yanxi::ui::creation{
 			}
 
 			{
-				auto b = m->end_line().emplace<button<icon_frame>>(assets::icons::right);
-				b->set_style(assets::styles::no_edge);
+				auto b = m->end_line().emplace<button<icon_frame>>(theme::icons::right);
+				b->set_style(theme::styles::no_edge);
 				b->set_button_callback(button_tags::general, [this]{
 					redo();
 				});
@@ -1019,7 +1020,7 @@ namespace mo_yanxi::ui::creation{
 		}
 
 		void add_file_create_button(){
-			auto b = menu->end_line().emplace<button<icon_frame>>(assets::icons::plus);
+			auto b = menu->end_line().emplace<button<icon_frame>>(theme::icons::plus);
 			b->set_tooltip_state(tooltip_create_info{
 				.layout_info = {
 					.follow = tooltip_follow::owner,
@@ -1031,15 +1032,15 @@ namespace mo_yanxi::ui::creation{
 				.min_hover_time = tooltip_create_info::disable_auto_tooltip
 			}, [this](ui::table& table){
 
-				auto cb = table.emplace<button<icon_frame>>(assets::icons::check);
-				cb->set_style(assets::styles::no_edge);
+				auto cb = table.emplace<button<icon_frame>>(theme::icons::check);
+				cb->set_style(theme::styles::no_edge);
 				cb.cell().set_width(60);
 				cb.cell().pad.right = 8;
 
 
 				auto area = table.emplace<text_input_area>();
 				area->set_scale(.75f);
-				area->set_style(assets::styles::no_edge);
+				area->set_style(theme::styles::no_edge);
 
 				area->add_file_banned_characters();
 				area.cell().set_external();
@@ -1056,7 +1057,7 @@ namespace mo_yanxi::ui::creation{
 
 			});
 
-			b->set_style(assets::styles::no_edge);
+			b->set_style(theme::styles::no_edge);
 			b->set_button_callback(button_tags::general, [](elem& elem){
 				if(!elem.has_tooltip()){
 					elem.build_tooltip();
@@ -1087,14 +1088,14 @@ namespace mo_yanxi::ui::creation{
 			[[nodiscard]] selector(scene* scene, group* group, file_selector_create_info<T, Checker, Yielder>& create_info)
 				: file_selector(scene, group), owner(&create_info.requester), checker(std::forward<Checker>(create_info.checker)), yielder(std::forward<Yielder>(create_info.yielder)){
 
-				auto close_b = menu->end_line().emplace<button<icon_frame>>(assets::icons::close);
-				close_b->set_style(assets::styles::no_edge);
+				auto close_b = menu->end_line().emplace<button<icon_frame>>(theme::icons::close);
+				close_b->set_style(theme::styles::no_edge);
 				close_b->set_button_callback(button_tags::general, [this]{
 					remove_self_from_parent();
 				});
 
-				auto confirm_b = menu->end_line().emplace<button<icon_frame>>(assets::icons::check);
-				confirm_b->set_style(assets::styles::no_edge);
+				auto confirm_b = menu->end_line().emplace<button<icon_frame>>(theme::icons::check);
+				confirm_b->set_style(theme::styles::no_edge);
 				confirm_b->set_button_callback(button_tags::general, [this]{
 					yield_path();
 				});

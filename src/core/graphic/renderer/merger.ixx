@@ -39,6 +39,8 @@ namespace mo_yanxi::graphic{
 			builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 			builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 			builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+			builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+			builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 		}},
 		descriptor_buffer{context.get_allocator(), descriptor_layout, descriptor_layout.binding_count()},
 		pipeline_layout{context.get_device(), 0, {descriptor_layout}},
@@ -72,11 +74,16 @@ namespace mo_yanxi::graphic{
 
 			const auto img_world = imports->find("renderer.world");
 			const auto img_ui = imports->find("renderer.ui");
+			const auto img_ui_light = imports->find("renderer.ui.light");
+			const auto img_ui_bloom = imports->find("renderer.ui.bloom");
 
 			vk::descriptor_mapper{descriptor_buffer}
 				.set_storage_image(0, merge_result.get_image_view())
 				.set_storage_image(1, img_world.image_view)
-				.set_storage_image(2, img_ui.image_view);
+				.set_storage_image(2, img_ui.image_view)
+				.set_storage_image(3, img_ui_light.image_view)
+				.set_storage_image(4, img_ui_bloom.image_view)
+			;
 
 			create_command(ext);
 		}
