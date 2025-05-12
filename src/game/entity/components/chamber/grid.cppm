@@ -12,7 +12,8 @@ export import mo_yanxi.open_addr_hash_map;
 export import mo_yanxi.math.trans2;
 export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.quad;
-export import mo_yanxi.game.ecs.quad_tree;
+export import mo_yanxi.game.quad_tree;
+export import mo_yanxi.game.aiming;
 
 import mo_yanxi.concepts;
 
@@ -329,6 +330,54 @@ namespace mo_yanxi::game::ecs::chamber{
 			return inViewports;
 		}
 
+		[[nodiscard]] std::vector<tile> get_dst_sorted_tiles(
+			this const chamber_grid& grid,
+			const math::frect_box& hitter_box_in_global,
+			math::vec2 basepoint_in_global,
+			math::nor_vec2 normal_in_global
+		){
+			const auto localBox = grid.box_to_local(hitter_box_in_global);
+
+			const auto trans = grid.get_transform();
+			math::vec2 pos{trans.apply_inv_to(basepoint_in_global)};
+			const math::vec2 vel{normal_in_global.rotate_rad(-static_cast<float>(trans.rot))};
+
+			std::vector<tile> under_hit;
+			grid.local_grid.quad_tree()->intersect_then(
+				localBox,
+				box_tile_collider{},
+				[&](const math::frect_box& box, const tile& tile){
+					auto dot = (tile.get_real_pos() - pos).dot(vel);
+					if(dot < 0.0f){
+						pos += vel * dot;
+					}
+					under_hit.push_back(tile);
+				});
+
+			std::ranges::sort(under_hit, pierce_comp{pos, vel}, &tile::get_real_pos);
+			return under_hit;
+		}
+
+
+		chamber_grid(chamber_grid&& other) noexcept = default;
+		chamber_grid& operator=(chamber_grid&& other) noexcept = default;
+	};
+
+
+	export
+	struct chamber_manifold : public chamber_grid{
+	protected:
+
+		bool targeting_requested{};
+
+	public:
+		targeting_queue targets{};
+
+
+
+		[[nodiscard]] chamber_manifold() = default;
+		// std::vector<chamber::tile> under_hit{};
+
 		template <tuple_spec Tuple>
 		void add_building_type(){
 			if constexpr (std::same_as<building_data, std::tuple_element_t<0, Tuple>>){
@@ -359,41 +408,10 @@ namespace mo_yanxi::game::ecs::chamber{
 
 
 
-		[[nodiscard]] std::vector<tile> get_dst_sorted_tiles(
-			this const chamber_grid& grid,
-			const math::frect_box& hitter_box_in_global,
-			math::vec2 basepoint_in_global,
-			math::nor_vec2 normal_in_global
-		){
-			const auto localBox = grid.box_to_local(hitter_box_in_global);
+		chamber_manifold(const chamber_manifold& other) = delete;
 
-			const auto trans = grid.get_transform();
-			math::vec2 pos{trans.apply_inv_to(basepoint_in_global)};
-			const math::vec2 vel{normal_in_global.rotate_rad(-static_cast<float>(trans.rot))};
-
-			std::vector<tile> under_hit;
-			grid.local_grid.quad_tree()->intersect_then(
-				localBox,
-				box_tile_collider{},
-				[&](const math::frect_box& box, const tile& tile){
-					auto dot = (tile.get_real_pos() - pos).dot(vel);
-					if(dot < 0.0f){
-						pos += vel * dot;
-					}
-					under_hit.push_back(tile);
-				});
-
-			std::ranges::sort(under_hit, pierce_comp{pos, vel}, &tile::get_real_pos);
-			return under_hit;
-		}
-
-
-		chamber_grid(chamber_grid&& other) noexcept
-			: manager{(other.manager.do_deferred(), std::move(other.manager))},
-			  local_grid{std::move(other.local_grid)},
-			  transform{std::move(other.transform)},
-			  wrapper{std::move(other.wrapper)},
-			  inViewports{std::move(other.inViewports)}{
+		chamber_manifold(chamber_manifold&& other) noexcept
+			: chamber_grid{std::move(other)}{
 
 			manager.do_deferred();
 			manager.sliced_each([this](building_data& data){
@@ -401,44 +419,17 @@ namespace mo_yanxi::game::ecs::chamber{
 			});
 		}
 
-		chamber_grid& operator=(chamber_grid&& other) noexcept{
+		chamber_manifold& operator=(const chamber_manifold& other) = delete;
+
+		chamber_manifold& operator=(chamber_manifold&& other) noexcept{
 			if(this == &other) return *this;
-			other.manager.do_deferred();
+			chamber_grid::operator =(std::move(other));
 
-			manager = std::move(other.manager);
-			local_grid = std::move(other.local_grid);
-			transform = std::move(other.transform);
-			wrapper = std::move(other.wrapper);
-			inViewports = std::move(other.inViewports);
-
+			manager.do_deferred();
 			manager.sliced_each([this](building_data& data){
 				data.grid_ = this;
 			});
 			return *this;
-		}
-	};
-
-
-	export
-	struct chamber_manifold : chamber_grid{
-		[[nodiscard]] chamber_manifold() = default;
-		// std::vector<chamber::tile> under_hit{};
-	};
-}
-
-namespace mo_yanxi::game::ecs{
-	using namespace chamber;
-
-	export
-	template <>
-	struct component_custom_behavior<chamber::building_data> : component_custom_behavior_base<chamber::building_data>{
-		static void on_init(const chunk_meta& meta, value_type& comp){
-			comp.tile_states.resize(comp.region().area());
-			comp.grid()->local_grid.insert(meta.id());
-		}
-
-		static void on_terminate(const chunk_meta& meta, const value_type& comp){
-			comp.grid()->local_grid.erase(meta.id());
 		}
 	};
 }

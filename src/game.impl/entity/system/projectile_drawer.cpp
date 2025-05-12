@@ -16,7 +16,7 @@ namespace mo_yanxi::game::ecs{
 		drawer.draw(draw_ctx, drawer_trs);
 
 		drawer::draw_acquirer acquirer{draw_ctx.renderer().batch, graphic::draw::white_region};
-		acquirer.proj.depth = trail_trans.z_offset + drawer_trs.z_offset;
-		graphic::draw::fancy::trail(acquirer, trail, trail_radius, trail_color.from, trail_color.to);
+		acquirer.proj.depth = trail_style.trans.z_offset + drawer_trs.z_offset;
+		graphic::draw::fancy::trail(acquirer, trail, trail_style.radius, trail_style.color.from, trail_style.color.to);
 	}
 }

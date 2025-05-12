@@ -30,7 +30,7 @@ void mo_yanxi::ui::progress_bar_drawer::draw(const progress_bar& elem) const{
 }
 
 mo_yanxi::ui::rect mo_yanxi::ui::progress_bar_drawer::get_region(const progress_bar& elem) noexcept{
-	return rect{tags::from_extent, elem.content_src_pos(), elem.getBarSize()};
+	return rect{tags::from_extent, elem.content_src_pos(), elem.get_bar_size()};
 }
 
 void mo_yanxi::ui::progress_bar::draw_content(const rect clipSpace) const{

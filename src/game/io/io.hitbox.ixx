@@ -9,6 +9,6 @@ export import mo_yanxi.game.ecs.component.hitbox;
 import std;
 
 namespace mo_yanxi::game::io{
-	bool write_hitbox_meta(std::ostream& stream, const hitbox_meta& meta);
-	bool load_hitbox_meta(std::istream& stream, hitbox_meta& meta);
+	bool write_hitbox_meta(std::ostream& stream, const meta::hitbox& meta);
+	bool load_hitbox_meta(std::istream& stream, meta::hitbox& meta);
 }

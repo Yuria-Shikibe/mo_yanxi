@@ -9,7 +9,7 @@ import std;
 
 namespace mo_yanxi::ui{
 
-	[[nodiscard]] static math::vec2 get_expected_size(const drawable& drawable, const image_display_style& style, const math::vec2 bound) noexcept{
+	[[nodiscard]] math::vec2 get_expected_size(const drawable& drawable, const image_display_style& style, const math::vec2 bound) noexcept{
 		if(const auto sz = drawable.get_default_size()){
 			return align::embedTo(style.scaling, *sz, bound);
 		}
@@ -85,28 +85,36 @@ namespace mo_yanxi::ui{
 	};
 
 	export
-	struct icon_frame : public elem{
-		image_display_style icon_style{};
+	template <std::derived_from<drawable> T>
+	struct single_image_frame : public elem{
+		image_display_style style{};
 
 	protected:
-		icon_drawable drawable_;
+		T drawable_{};
 
 	public:
-		[[nodiscard]] icon_frame(scene* scene, group* group, const icon_drawable::icon_type& icon = {}, const image_display_style& style = {})
-			: elem(scene, group, "image_frame"), icon_style(style), drawable_(icon){
+		[[nodiscard]] single_image_frame(scene* scene, group* group, T drawable = {}, const image_display_style& style = {})
+			: elem(scene, group, "image_frame"), style(style), drawable_(std::move(drawable)){
 		}
 
-		void set_drawable(const icon_drawable::icon_type& icon) noexcept {
-			drawable_ = icon;
+		void set_drawable(T icon) noexcept {
+			drawable_ = std::move(icon);
 		}
 
 	protected:
 		void draw_content(const rect clipSpace) const override{
-			if(!drawable_.image.view)return;
+			// if(!static_cast<bool>(drawable_))return;
 
-			auto sz = get_expected_size(drawable_, icon_style, content_size());
-			auto off = align::get_offset_of(icon_style.align, sz, property.content_bound_absolute());
-			drawable_.draw(*this, rect{tags::from_extent, off, sz}, (icon_style.palette.on_instance(*this) * gprop().style_color_scl).mul_a(gprop().get_opacity()));
+			auto sz = ui::get_expected_size(drawable_, style, content_size());
+			auto off = align::get_offset_of(style.align, sz, property.content_bound_absolute());
+			drawable_.draw(*this, rect{tags::from_extent, off, sz}, (style.palette.on_instance(*this) * gprop().style_color_scl).mul_a(gprop().get_opacity()));
+		}
+	};
+
+	export
+	struct icon_frame : single_image_frame<icon_drawable>{
+		[[nodiscard]] icon_frame(scene* scene, group* group, const icon_drawable::icon_type& icon = {}, const image_display_style& style = {})
+			: single_image_frame<icon_drawable>(scene, group, icon_drawable{icon}, style){
 		}
 	};
 

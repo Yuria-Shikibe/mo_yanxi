@@ -4,6 +4,7 @@
 
 export module mo_yanxi.game.ecs.component.projectile.manifold;
 
+export import mo_yanxi.game.ecs.entity;
 export import mo_yanxi.game.ecs.component.damage;
 
 import mo_yanxi.graphic.trail;
@@ -13,8 +14,13 @@ import mo_yanxi.math;
 
 namespace mo_yanxi::game::ecs{
 	export struct projectile_manifold{
-		damage_group damage_group;
+		entity_id owner;
+		damage_group current_damage_group;
+		damage_group max_damage_group;
 
+		void set_damage(const damage_group& dmg){
+			max_damage_group = current_damage_group = dmg;
+		}
 	};
 }
 

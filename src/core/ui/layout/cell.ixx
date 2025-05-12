@@ -13,6 +13,25 @@ import std;
 
 namespace mo_yanxi::ui{
 	export
+	template <typename Elem, typename Cell>
+	struct cell_create_result{
+		Elem& elem;
+		Cell& cell;
+	};
+
+	export
+	template <typename Elem>
+	struct cell_creator_base{
+		using elem_type = Elem;
+	};
+
+	export
+	template <typename Create>
+	concept cell_creator = requires{
+		typename Create::elem_type;
+	};
+
+	export
 	struct basic_cell{
 		align::pos align{align::pos::center};
 
@@ -30,7 +49,7 @@ namespace mo_yanxi::ui{
 
 		template <std::derived_from<basic_cell> T>
 		constexpr math::vec2 get_relative_src(this const T& self) noexcept{
-			return self.margin.top_rit() + self.allocated_region.get_src();
+			return self.margin.top_lft() + self.allocated_region.get_src();
 		}
 
 		void apply_to_base(struct group& group, struct elem& elem, stated_extent real_cell_extent) const;
@@ -56,6 +75,9 @@ namespace mo_yanxi::ui{
 		stated_extent stated_extent{};
 		align::spacing pad{};
 
+		/**
+		 * @brief indicate the cell to grow to the whole line space
+		 */
 		bool saturate{};
 
 		constexpr auto& set_size(math::vec2 sz) noexcept {

@@ -2,10 +2,10 @@ module;
 
 #include "../src/ext/enum_operator_gen.hpp"
 #include "../src/ext/adapted_attributes.hpp"
-#include <freetype/freetype.h>
 
 export module mo_yanxi.font.typesetting;
 
+export import mo_yanxi.font;
 export import mo_yanxi.font.manager;
 export import mo_yanxi.graphic.color;
 export import mo_yanxi.heterogeneous.open_addr_hash;
@@ -191,12 +191,16 @@ namespace mo_yanxi::font::typesetting{
 		}
 	};
 
+	export struct parser;
 
 	/**
+	 *
 	 * @warning If any tokens are used, the lifetime of @link tokenized_text @endlink should not longer than the source string
 	 */
 	export
 	struct tokenized_text{
+		friend parser;
+
 		static constexpr char token_split_char = '|';
 
 		struct token_sentinel{
@@ -216,16 +220,14 @@ namespace mo_yanxi::font::typesetting{
 			}
 		};
 
-		// private:
-		// std::uint32_t rows{};
-
+	private:
 		/**
 		 * @brief String Normalize to NFC Format
 		 */
 		std::vector<code_point> codes{};
 
 		std::vector<posed_token_argument> tokens{};
-		// public:
+	public:
 
 		using pos_t = decltype(codes)::size_type;
 		using token_iterator = decltype(tokens)::const_iterator;
@@ -244,132 +246,16 @@ namespace mo_yanxi::font::typesetting{
 
 		[[nodiscard]] tokenized_text() = default;
 
-		[[nodiscard]] explicit(false) tokenized_text(const std::string_view string, const token_sentinel sentinel = {}){
-			static constexpr auto InvalidPos = std::string_view::npos;
-			const auto size = string.size();
-
-			codes.reserve(size + 1);
-
-			enum struct TokenState{
-				normal,
-				endWaiting,
-				signaled
-			};
-
-			bool escapingNext{};
-			TokenState recordingToken{};
-			decltype(string)::size_type tokenRegionBegin{InvalidPos};
-			posed_token_argument* currentToken{};
-
-			decltype(string)::size_type off = 0;
-
-		scan:
-			for(; off < size; ++off){
-				const char codeByte = string[off];
-				char_code charCode{std::bit_cast<std::uint8_t>(codeByte)};
-
-				if(charCode == '\r') continue;
-
-				if(charCode == '\\' && recordingToken != TokenState::signaled){
-					if(!escapingNext){
-						escapingNext = true;
-						continue;
-					} else{
-						escapingNext = false;
-					}
-				}
-
-				if(!escapingNext){
-					if(codeByte == sentinel.signal && tokenRegionBegin == InvalidPos){
-						if(recordingToken != TokenState::signaled){
-							recordingToken = TokenState::signaled;
-						} else{
-							recordingToken = TokenState::normal;
-						}
-
-						if(recordingToken == TokenState::signaled){
-							currentToken = &tokens.emplace_back(
-								posed_token_argument{static_cast<std::uint32_t>(codes.size())});
-
-							if(!sentinel.reserve) continue;
-						}
-					}
-
-					if(recordingToken == TokenState::endWaiting){
-						if(codeByte == sentinel.begin){
-							recordingToken = TokenState::signaled;
-							currentToken = &tokens.emplace_back(
-								posed_token_argument{static_cast<std::uint32_t>(codes.size())});
-						} else{
-							recordingToken = TokenState::normal;
-						}
-					}
-
-					if(recordingToken == TokenState::signaled){
-						if(codeByte == sentinel.begin && tokenRegionBegin == InvalidPos){
-							tokenRegionBegin = off + 1;
-						}
-
-						if(codeByte == sentinel.end){
-							if(!currentToken || tokenRegionBegin == InvalidPos){
-								tokenRegionBegin = InvalidPos;
-								currentToken = nullptr;
-								recordingToken = TokenState::normal;
-								if(sentinel.reserve)goto record;
-								else continue;
-							}
-
-							currentToken->data = string.substr(tokenRegionBegin, off - tokenRegionBegin);
-							tokenRegionBegin = InvalidPos;
-							currentToken = nullptr;
-							recordingToken = TokenState::endWaiting;
-						}
-
-						if(!sentinel.reserve) continue;
-					}
-				}
-
-				record:
-
-				const auto codeSize = encode::getUnicodeLength<>(reinterpret_cast<const char&>(charCode));
-
-				if(!escapingNext){
-					if(codeSize > 1 && off + codeSize <= size){
-						charCode = encode::utf_8_to_32(string.data() + off, codeSize);
-					}
-
-					codes.push_back({charCode, static_cast<code_point_index>(off)});
-				} else{
-					escapingNext = false;
-				}
-
-				// if(charCode == '\n') rows++;
-
-				off += codeSize - 1;
-			}
-
-			if(!sentinel.reserve && recordingToken == TokenState::signaled){
-				tokens.pop_back();
-
-				recordingToken = TokenState::normal;
-				off = tokenRegionBegin;
-				goto scan;
-			}
-
-			if(codes.empty() || !codes.back().code == U'\0'){
-				codes.push_back({U'\0', static_cast<code_point_index>(string.size())});
-				// rows++;
-			}
-
-
-			codes.shrink_to_fit();
-		}
+		[[nodiscard]] explicit(false) tokenized_text(const std::string_view string, const token_sentinel sentinel = {});
 	};
 
 	export struct parse_context{
+		friend parser;
 	private:
 
 		glyph_size_type default_size{64, 0};
+
+		float throughout_scale{1.f};
 
 		optional_stack<math::vec2> offset_history{};
 		optional_stack<glyph_size_type> size_history{};
@@ -377,16 +263,21 @@ namespace mo_yanxi::font::typesetting{
 	public:
 		optional_stack<font_face*> font_history{};
 		optional_stack<graphic::color> color_history{};
+	private:
 
 		float row_pen_pos{};
 		layout_index_t current_row{};
 
-	private:
-		float throughout_scale{1.f};
 		math::vec2 currentOffset{};
 		float minimum_line_spacing{100.f};
 
 	public:
+		[[nodiscard]] parse_context() = default;
+
+		[[nodiscard]] explicit parse_context(float throughout_scale)
+			: throughout_scale(throughout_scale){
+		}
+
 		void reset_context(){
 			color_history.stack = {};
 			offset_history.stack = {};
@@ -408,6 +299,10 @@ namespace mo_yanxi::font::typesetting{
 			return currentOffset * throughout_scale;
 		}
 
+		[[nodiscard]] layout_index_t get_current_row() const noexcept{
+			return current_row;
+		}
+
 		void push_size(glyph_size_type sz){
 			if(sz.x == 0 && sz.y == 0){
 				sz = default_size;
@@ -415,13 +310,13 @@ namespace mo_yanxi::font::typesetting{
 			size_history.push(sz);
 		}
 
-		void pop_size(){
+		void pop_size() noexcept{
 			size_history.pop();
 		}
 
-		void set_throughout_scale(const float scl) noexcept{
+		/*void set_throughout_scale(const float scl) noexcept{
 			throughout_scale = scl;
-		}
+		}*/
 
 		[[nodiscard]] float get_throughout_scale() const noexcept{
 			return throughout_scale;
@@ -465,7 +360,7 @@ namespace mo_yanxi::font::typesetting{
 			currentOffset += offset;
 		}
 
-		math::vec2 pop_offset(){
+		math::vec2 pop_offset() noexcept{
 			const math::vec2 offset = offset_history.pop_and_get().value_or({});
 			currentOffset -= offset;
 			return offset;
@@ -515,7 +410,6 @@ namespace mo_yanxi::font::typesetting{
 
 	BITMASK_OPS(export, layout_policy)
 
-	export struct parser;
 
 	export struct glyph_layout{
 		friend parser;
@@ -1030,40 +924,7 @@ namespace mo_yanxi::font::typesetting{
 			const code_point code,
 			const unsigned layout_global_index,
 			const std::optional<char_code> real_code = std::nullopt
-		){
-			const layout_index_t column_index = buffer.size();
-			auto& current = buffer.emplace_back(
-				code_point{real_code.value_or(code.code), code.unit_index},
-				layout_abs_pos{{column_index, 0}, layout_global_index},
-				context.get_glyph(code.code)
-			);
-
-			const auto font_region_scale = context.get_current_correction_scale();
-			float advance = current.glyph.metrics().advance.x * font_region_scale.x;
-			if(code.code == real_code && (code.code == U'\0' || code.code == U'\n')){
-				advance = 0;
-			}
-
-			const auto placementPos = context.get_current_offset().add_x(pen_advance);
-
-			current.region = current.glyph.metrics().place_to(placementPos, font_region_scale);
-			current.correct_scale = font_region_scale;
-			if(current.region.get_src_x() < 0){
-				//Fetch for italic line head
-				advance -= current.region.get_src_x();
-				current.region.src.x = 0;
-			}
-			current.color = context.get_color();
-
-
-			bound.max_height({
-				.width = 0,
-				.ascender = placementPos.y - current.region.get_src_y(),
-				.descender = current.region.get_end_y() - placementPos.y
-			});
-			bound.width = std::max(bound.width, current.region.get_end_x());
-			pen_advance += advance;
-		}
+		);
 
 		void clear(){
 			buffer.clear();
@@ -1074,7 +935,7 @@ namespace mo_yanxi::font::typesetting{
 
 	struct parser : parser_base{
 	private:
-		static bool try_append(
+		static bool flush(
 			parse_context& context,
 			glyph_layout& layout,
 			layout_unit& layout_unit,

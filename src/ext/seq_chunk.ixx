@@ -34,12 +34,11 @@ namespace mo_yanxi{
 	}
 
 	template <typename T>
-	using chunk_partial = T;//std::conditional_t<std::is_fundamental_v<T>, raw_wrap<T>, T>;
+	using chunk_partial = std::conditional_t<std::is_fundamental_v<T>, raw_wrap<T>, T>;
 
 	export
 	template <typename... T>
-	struct seq_chunk final : private chunk_partial<T>...{
-
+	struct seq_chunk final : public chunk_partial<T>...{
 		template <typename Ty>
 			requires (contained_within<std::remove_cvref_t<Ty>, T...>)
 		constexpr static copy_qualifier_t<Ty, seq_chunk>* chunk_cast(Ty* p) noexcept{
@@ -71,17 +70,39 @@ namespace mo_yanxi{
 
 		}
 
+		template <typename S, typename C, typename Ty>
+		constexpr Ty& operator->*(this S&& self, Ty C::* mptr) noexcept{
+			return static_cast<copy_qualifier_t<S&&, C>>(std::forward<S>(self)).*mptr;
+		}
+
+		template <typename S, typename Fn>
+			requires std::is_member_function_pointer_v<Fn>
+		constexpr auto operator->*(this S&& self, Fn mfptr) noexcept{
+			using trait = mptr_info<Fn>;
+			using class_type = typename trait::class_type;
+
+			return [&]<std::size_t ...Idx>(std::index_sequence<Idx...>){
+				return [mfptr, &self](std::tuple_element_t<Idx, typename trait::func_args> ...args) -> decltype(auto) {
+					return std::invoke(mfptr, static_cast<copy_qualifier_t<S&&, class_type>>(self), std::forward<decltype(args)>(args)...);
+				};
+			}(std::make_index_sequence<std::tuple_size_v<typename trait::func_args>>{});
+		}
+
+		template <typename S, typename Fn, typename ...Args>
+			requires std::invocable<Fn, S, Args...>
+		constexpr decltype(auto) invoke(this S&& self, Fn fn, Args&& ...args) noexcept(std::is_nothrow_invocable_v<Fn, S, Args...>){
+			return std::invoke(fn, std::forward<S>(self), std::forward<Args>(args)...);
+		}
+
 		template <typename Ty, typename S>
-		constexpr decltype(auto) get(this S&& self) noexcept{
-			return std::forward_like<S>(
-				static_cast<std::conditional_t<std::is_const_v<std::remove_reference_t<S>>, const Ty&, Ty&>>(self));
+		constexpr decltype(std::forward_like<S>(std::declval<Ty&>())) get(this S&& self) noexcept{
+			return std::forward_like<S>(self);
 		}
 
 		template <std::size_t Idx, typename S>
 		constexpr decltype(auto) get(this S&& self) noexcept{
 			return std::forward<S>(self).template get<std::tuple_element_t<Idx, tuple_type>>();
 		}
-
 
 		template <typename Ty, typename Chunk>
 		friend constexpr decltype(auto) get(Chunk&& chunk) noexcept{
@@ -92,6 +113,7 @@ namespace mo_yanxi{
 		friend constexpr decltype(auto) get(Chunk&& chunk) noexcept{
 			return chunk.template get<Idx>();
 		}
+
 	};
 
 	template <typename T>
@@ -107,7 +129,7 @@ namespace mo_yanxi{
 
 
 	export
-	template <typename Ty, spec_of<seq_chunk> Chunk>
+	template <spec_of<seq_chunk> Chunk, typename Ty>
 	constexpr copy_qualifier_t<Ty, Chunk>* seq_chunk_cast(Ty* p) noexcept{
 		return Chunk::chunk_cast(p);
 	}
@@ -170,6 +192,7 @@ namespace mo_yanxi{
 	constexpr decltype(auto) get(Chunk&& chunk) noexcept{
 		return chunk.template get<Idx>();
 	}
+
 }
 
 

@@ -3,6 +3,25 @@ export module mo_yanxi.meta_programming;
 import std;
 
 namespace mo_yanxi{
+
+
+	export
+	struct pred_always{
+		template <typename ...Args>
+		constexpr static bool operator()(Args&&... args) noexcept{
+			return (void)(((void)args), ...), true;
+		}
+	};
+
+	export
+	struct pred_never{
+		template <typename ...Args>
+		constexpr static bool operator()(Args&&... args) noexcept{
+			return (void)(((void)args), ...), false;
+		}
+	};
+
+
 	export
 	template <typename T>
 	struct is_tuple : std::false_type{};
@@ -594,26 +613,37 @@ export namespace mo_yanxi{
 		using value_type = T;
 	};
 
+
 	template <typename C, typename T, typename... Args>
 	struct mptr_info<T (C::*)(Args...)>{
 		using class_type = C;
 		using value_type = T;
 		using func_args = std::tuple<Args...>;
 	};
+	//
+	template <typename C, typename T, typename... Args>
+	struct mptr_info<T (C::*)(Args...) const> : mptr_info<T (C::*)(Args...)>{};
 
-	template <typename C, typename T>
-	struct mptr_info<T C::* const> : mptr_info<T C::*>{};
+	template <typename C, typename T, typename... Args>
+	struct mptr_info<T (C::*)(Args...) &> : mptr_info<T (C::*)(Args...)>{};
 
-	template <typename C, typename T>
-	struct mptr_info<T C::* &> : mptr_info<T C::*>{};
+	template <typename C, typename T, typename... Args>
+	struct mptr_info<T (C::*)(Args...) &&> : mptr_info<T (C::*)(Args...)>{};
 
-	template <typename C, typename T>
-	struct mptr_info<T C::* &&> : mptr_info<T C::*>{};
+	template <typename C, typename T, typename... Args>
+	struct mptr_info<T (C::*)(Args...) const&> : mptr_info<T (C::*)(Args...)>{};
 
-	template <typename C, typename T>
-	struct mptr_info<T C::* const&> : mptr_info<T C::*>{};
+	template <typename C, typename T, typename... Args>
+	struct mptr_info<T (C::*)(Args...) const noexcept> : mptr_info<T (C::*)(Args...)>{};
 
+	template <typename C, typename T, typename... Args>
+	struct mptr_info<T (C::*)(Args...) & noexcept> : mptr_info<T (C::*)(Args...)>{};
 
+	template <typename C, typename T, typename... Args>
+	struct mptr_info<T (C::*)(Args...) && noexcept> : mptr_info<T (C::*)(Args...)>{};
+
+	template <typename C, typename T, typename... Args>
+	struct mptr_info<T (C::*)(Args...) const & noexcept> : mptr_info<T (C::*)(Args...)>{};
 
 	template <typename T>
 	concept default_hashable = requires(const T& t){

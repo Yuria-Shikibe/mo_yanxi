@@ -4,6 +4,7 @@ import mo_yanxi.ui.basic;
 
 void mo_yanxi::ui::basic_cell::apply_to_base(group& group, elem& elem, stated_extent real_cell_extent) const{
 	elem.property.relative_src = get_relative_src();
+
 	elem.update_abs_src(group.content_src_pos());
 
 	//TODO scaling and offset depending on the align

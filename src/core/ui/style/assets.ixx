@@ -16,7 +16,7 @@ namespace mo_yanxi::ui::theme{
 		export constexpr inline color theme = colors::aqua;
 	}
 	
-	namespace pal{
+	namespace style_pal{
 		constexpr auto lighten_focus = [](const graphic::color& color) constexpr {
 			return color.create_lerp(colors::white, 0.3f);
 		};
@@ -35,15 +35,14 @@ namespace mo_yanxi::ui::theme{
 			};
 		};
 
-		export inline
-		constexpr style::palette clear{};
+		export inline constexpr style::palette clear{};
 
-		export inline
-		constexpr style::palette front{generic_from_color(colors::aqua)};
-		constexpr style::palette front_whisper{generic_from_color(colors::gray)};
-		constexpr style::palette front_accent{generic_from_color(colors::accent)};
-		constexpr style::palette front_valid{generic_from_color(colors::pale_green)};
-		constexpr style::palette front_invalid{generic_from_color(colors::red_dusted)};
+		export inline constexpr style::palette front{generic_from_color(colors::aqua)};
+		export inline constexpr style::palette front_white{generic_from_color(colors::white)};
+		export inline constexpr style::palette front_whisper{generic_from_color(colors::gray)};
+		export inline constexpr style::palette front_accent{generic_from_color(colors::accent)};
+		export inline constexpr style::palette front_valid{generic_from_color(colors::pale_green)};
+		export inline constexpr style::palette front_invalid{generic_from_color(colors::red_dusted)};
 
 		export inline
 		constexpr style::palette front_clear{[]{
@@ -86,6 +85,10 @@ namespace mo_yanxi::ui::theme{
 		export inline graphic::image_nine_region edge{};
 		export inline graphic::image_nine_region edge_thin{};
 		export inline graphic::image_nine_region base{};
+
+
+		export inline graphic::image_caped_region line{};
+
 	}
 
 	namespace styles{

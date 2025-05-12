@@ -1,21 +1,17 @@
-//
-// Created by Matrix on 2025/5/5.
-//
-
-export module mo_yanxi.game.component.hitbox_meta;
+export module mo_yanxi.game.meta.hitbox;
 
 export import mo_yanxi.math.quad;
 import std;
 
-export namespace mo_yanxi::game{
+export namespace mo_yanxi::game::meta{
 
-	struct hitbox_meta{
-		struct meta{
+	struct hitbox{
+		struct comp{
 			math::rect_box_identity<float> box;
 			math::trans2 trans;
 		};
 
-		std::vector<meta> components{};
+		std::vector<comp> components{};
 
 		constexpr decltype(auto) operator[](this auto&& self, const std::size_t index) noexcept{
 			return self.components[index];

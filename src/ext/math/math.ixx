@@ -1010,6 +1010,22 @@ namespace mo_yanxi::math {
 		T from;
 		T to;
 
+		MATH_ATTR constexpr bool within_closed(const T& value) const noexcept requires std::totally_ordered<T>{
+			return value >= from && value <= to;
+		}
+
+		MATH_ATTR constexpr bool within_open(const T& value) const noexcept requires std::totally_ordered<T>{
+			return value > from && value < to;
+		}
+
+		MATH_ATTR constexpr bool within_lo_rc(const T& value) const noexcept requires std::totally_ordered<T>{
+			return value > from && value <= to;
+		}
+
+		MATH_ATTR constexpr bool within_lc_ro(const T& value) const noexcept requires std::totally_ordered<T>{
+			return value >= from && value < to;
+		}
+
 		MATH_ATTR constexpr section to_ordered() const noexcept{
 			const auto [min, max] = std::minmax(from, to);
 			return {min, max};

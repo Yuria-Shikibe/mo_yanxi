@@ -11,8 +11,8 @@ export import mo_yanxi.ui.manual_table;
 export import mo_yanxi.ui.elem.text_elem;
 export import mo_yanxi.ui.creation.file_selector;
 
-export import mo_yanxi.game.ecs.quad_tree;
-export import mo_yanxi.game.component.hitbox_meta;
+export import mo_yanxi.game.quad_tree;
+export import mo_yanxi.game.meta.hitbox;
 
 import mo_yanxi.graphic.camera;
 import mo_yanxi.graphic.image_manage;
@@ -30,7 +30,7 @@ import mo_yanxi.history_stack;
 import std;
 
 namespace mo_yanxi::game{
-	using editor_box_meta = hitbox_meta::meta;
+	using editor_box_meta = meta::hitbox::comp;
 
 	struct editor_scalable_box_meta : editor_box_meta{
 		math::vec2 scale{1, 1};
@@ -437,8 +437,8 @@ namespace mo_yanxi::game{
 
 		}
 
-		void add_comp(const hitbox_meta& meta, const bool add_selected = false){
-			add_comp(meta.components | std::views::transform([](const hitbox_meta::meta& a){
+		void add_comp(const meta::hitbox& meta, const bool add_selected = false){
+			add_comp(meta.components | std::views::transform([](const meta::hitbox::comp& a){
 				return box_wrapper{{a}};
 			}), false);
 		}
@@ -524,8 +524,8 @@ namespace mo_yanxi::game{
 			push_history();
 		}
 
-		hitbox_meta export_to_meta() const{
-			hitbox_meta rst{};
+		meta::hitbox export_to_meta() const{
+			meta::hitbox rst{};
 			rst.components = {
 					std::from_range, comps | std::views::transform([](const box_wrapper& wrap){
 						return static_cast<editor_box_meta>(wrap.base);
@@ -1124,7 +1124,7 @@ namespace mo_yanxi::game{
 			table* menu{};
 			editor_viewport* viewport{};
 
-			basic_text_elem* cmd_text{};
+			label* cmd_text{};
 			check_box* checkbox{};
 
 			void build_menu(){
@@ -1147,7 +1147,7 @@ namespace mo_yanxi::game{
 
 
 				{
-					auto b = menu->end_line().emplace<ui::button<ui::basic_text_elem>>();
+					auto b = menu->end_line().emplace<ui::button<ui::label>>();
 
 					b->set_style(ui::theme::styles::no_edge);
 					b->set_scale(.6f);
@@ -1170,7 +1170,7 @@ namespace mo_yanxi::game{
 
 
 				{
-					auto b = menu->end_line().emplace<ui::button<ui::basic_text_elem>>();
+					auto b = menu->end_line().emplace<ui::button<ui::label>>();
 
 					b->set_style(ui::theme::styles::no_edge);
 					b->set_scale(.6f);
@@ -1188,7 +1188,7 @@ namespace mo_yanxi::game{
 				}
 
 				{
-					auto b = menu->end_line().emplace<ui::button<ui::basic_text_elem>>();
+					auto b = menu->end_line().emplace<ui::button<ui::label>>();
 
 					b->set_style(ui::theme::styles::no_edge);
 					b->set_scale(.6f);
@@ -1224,7 +1224,7 @@ namespace mo_yanxi::game{
 				// vp->prop().fill_parent.set(true);
 				viewport = std::to_address(vp);
 
-				auto hint = editor_region->emplace<basic_text_elem>();
+				auto hint = editor_region->emplace<label>();
 				hint.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 0.2f}};
 				hint.cell().align = align::pos::top_left;
 				hint.cell().margin.set(20);

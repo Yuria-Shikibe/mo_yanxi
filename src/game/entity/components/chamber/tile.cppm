@@ -27,6 +27,7 @@ namespace mo_yanxi::game::ecs{
 		export struct tile;
 		export class tile_grid;
 		export class chamber_grid;
+		export struct chamber_manifold;
 
 		export using tile_coord = math::point2;
 		export using tile_region = math::irect;
@@ -55,12 +56,16 @@ namespace mo_yanxi::game::ecs{
 			friend game::ecs::component_custom_behavior<chamber::building>;
 
 		private:
-			building_data* data{};
+			building_data* data_{};
 
 		public:
+			[[nodiscard]] building_data& data() const noexcept{
+				return *data_;
+			}
+
 			~building() override = default;
 
-			virtual void update(const chunk_meta& meta, float delta_in_tick){
+			virtual void update(chamber_manifold& grid, const chunk_meta& meta, float delta_in_tick){
 
 			}
 		};
@@ -79,10 +84,11 @@ namespace mo_yanxi::game::ecs{
 
 		struct building_data{
 			friend chamber_grid;
+			friend chamber_manifold;
 
 		private:
 			tile_region region_{};
-			chamber_grid* grid_{};
+			chamber_manifold* grid_{};
 
 		public:
 			std::vector<tile_damage_event> damage_events{};
@@ -97,7 +103,7 @@ namespace mo_yanxi::game::ecs{
 				return region_;
 			}
 
-			[[nodiscard]] chamber_grid* grid() const noexcept{
+			[[nodiscard]] chamber_manifold* grid() const noexcept{
 				return grid_;
 			}
 
@@ -146,7 +152,7 @@ namespace mo_yanxi::game::ecs{
 			[[nodiscard]] building_data() = default;
 
 			[[nodiscard]] building_data(
-				const tile_region& region, chamber_grid* grid)
+				const tile_region& region, chamber_manifold* grid)
 				: region_(region),
 				  grid_(grid){
 				if (region.area() == 0){
@@ -157,6 +163,8 @@ namespace mo_yanxi::game::ecs{
 			[[nodiscard]] constexpr math::frect get_bound() const noexcept{
 				return region_.as<float>().scl(tile_size, tile_size);
 			}
+
+			math::trans2 get_trans() const noexcept;
 		};
 	}
 
@@ -167,7 +175,7 @@ namespace mo_yanxi::game::ecs{
 		using base_types = ui_builder;
 
 		static void on_relocate(const chunk_meta& meta, value_type& comp){
-			comp.data = std::addressof(meta.id()->at<chamber::building_data>());
+			comp.data_ = std::addressof(meta.id()->at<chamber::building_data>());
 		}
 	};
 
@@ -248,4 +256,5 @@ namespace mo_yanxi::game::ecs::chamber{
 	const tile_status& building_data::operator[](const tile& tile) const noexcept{
 		return tile_states[local_to_index(tile.tile_pos - region_.src)];
 	}
+
 }

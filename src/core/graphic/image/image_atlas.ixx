@@ -621,36 +621,22 @@ namespace mo_yanxi::graphic{
 			return {itr->second, rst};
 		}
 
-		template <typename T>
-			requires std::constructible_from<image_load_description, T>
+		template <typename Str, typename T>
+			requires (std::constructible_from<image_load_description, T> && std::constructible_from<std::string_view, Str>)
 		std::pair<allocated_image_region&, bool> register_named_region(
-			std::string&& name,
-			T&& desc){
-			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
+			Str&& name,
+			T&& desc,
+			const bool is_protected = false){
+
+			std::string_view sv{name};
+			if(auto itr = named_image_regions.find(sv); itr != named_image_regions.end()){
 				return {itr->second, false};
 			}
 			auto [itr, rst] = named_image_regions.try_emplace(std::move(name), this->async_allocate(image_load_description{std::forward<T>(desc)}));
-			return {itr->second, rst};
-		}
-
-		template <typename T>
-			requires std::constructible_from<image_load_description, T>
-		std::pair<allocated_image_region&, bool> register_named_region(
-			const std::string_view name,
-			T&& desc){
-			if(auto itr = named_image_regions.find(name); itr != named_image_regions.end()){
-				return {itr->second, false};
+			if(is_protected){
+				mark_protected(sv);
 			}
-			auto [itr, rst] = named_image_regions.try_emplace(std::move(name), this->async_allocate(image_load_description{std::forward<T>(desc)}));
 			return {itr->second, rst};
-		}
-
-		template <typename T>
-			requires std::constructible_from<image_load_description, T>
-		std::pair<allocated_image_region&, bool> register_named_region(
-			const char* name,
-			T&& desc){
-			return this->register_named_region(std::string_view(name), std::forward<T>(desc));
 		}
 
 		std::pair<allocated_image_region&, bool> register_named_region(

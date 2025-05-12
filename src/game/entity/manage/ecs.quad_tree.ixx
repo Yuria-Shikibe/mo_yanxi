@@ -3,7 +3,7 @@ module;
 #include <plf_hive.h>
 #include <gch/small_vector.hpp>
 
-export module mo_yanxi.game.ecs.quad_tree;
+export module mo_yanxi.game.quad_tree;
 
 export import mo_yanxi.game.ecs.quad_tree_interface;
 
@@ -687,7 +687,6 @@ namespace mo_yanxi::game{
 			std::predicate<const Region&, const rect_type&> Pred,
 			std::invocable<const Region&, const value_type&> Func
 		>
-			// requires !std::same_as<Region, rect_type>
 		void intersect_then(
 			const Region& region,
 			Pred boundCheck,

@@ -12,7 +12,6 @@ namespace mo_yanxi::graphic::draw{
 		draw::ui_acquirer acquirer,
 		const font::typesetting::glyph_layout& layout,
 		const math::vec2 offset,
-		bool toLight,
 		float opacityScl = 1.f){
 		using namespace mo_yanxi;
 		using namespace mo_yanxi::graphic;
@@ -55,7 +54,7 @@ namespace mo_yanxi::graphic::draw{
 					region.vert_10(),
 					region.vert_11(),
 					region.vert_01(),
-					tempColor.to_light_color_copy(toLight)
+					tempColor
 				);
 
 			}
@@ -71,10 +70,10 @@ namespace mo_yanxi::graphic::draw{
 				region.vert_10(),
 				region.vert_11(),
 				region.vert_01(),
-				last_elem->color.copy().mul_a(opacityScl).to_light_color_copy(toLight),
+				last_elem->color.copy().mul_a(opacityScl),
 				{},
 				{},
-				last_elem->color.copy().mul_a(opacityScl).to_light_color_copy(toLight)
+				last_elem->color.copy().mul_a(opacityScl)
 			);
 		}
 

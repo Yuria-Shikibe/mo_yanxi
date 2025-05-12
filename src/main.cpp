@@ -354,7 +354,7 @@ void main_loop(){
 	init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
 
 	game::world::hud hud{};
-	// hud.focus_hud();
+	hud.focus_hud();
 
 	game::ecs::component_manager component_manager{};
 
@@ -730,8 +730,6 @@ void main_loop(){
 		renderer_world.batch.batch.consume_all();
 		renderer_world.post_process();
 
-		// renderer_ui.batch.batch.consume_all();
-		// renderer_ui.batch.blit();
 		renderer_ui.post_process();
 
 		merger.submit();

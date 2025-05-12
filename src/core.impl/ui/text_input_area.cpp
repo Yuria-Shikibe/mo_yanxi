@@ -64,6 +64,6 @@ void mo_yanxi::ui::text_input_area::draw_content(const rect clipSpace) const{
 
 	drawBase:
 	
-	basic_text_elem::draw_content(clipSpace);
+	label::draw_content(clipSpace);
 	
 }

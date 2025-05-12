@@ -11,10 +11,10 @@ module;
 #include <freetype/freetype.h>
 
 //TODO hide msdf impl
-extern "C++"{
-	#include <msdfgen/msdfgen.h>
-	#include <msdfgen/msdfgen-ext.h>
-}
+// extern "C++"{
+	// #include <msdfgen/msdfgen.h>
+#include <msdfgen/msdfgen-ext.h>
+// }
 
 export module mo_yanxi.font;
 import std;
@@ -286,7 +286,7 @@ namespace mo_yanxi::font{
 		return to_pixmap(shot->bitmap);
 	}
 
-	export struct glyph_wrap : referenced_object<false>{
+	export struct glyph_wrap/* : referenced_object<false>*/{
 		char_code code{};
 		font_face_handle* face{};
 
@@ -335,7 +335,7 @@ namespace mo_yanxi::font{
 	export struct font_face{
 
 	private:
-		font_face_handle face{};
+		font_face_handle face_{};
 
 	public:
 		//TODO english char replacement ?
@@ -345,30 +345,19 @@ namespace mo_yanxi::font{
 		[[nodiscard]] font_face() = default;
 
 		[[nodiscard]] explicit font_face(const char* fontPath)
-			: face{fontPath}{}
+			: face_{fontPath}{}
 
 		[[nodiscard]] explicit font_face(const std::string_view fontPath)
-			: face{fontPath.data()}{}
+			: face_{fontPath.data()}{}
 
 		[[nodiscard]] glyph_wrap obtain(const char_code code, const glyph_size_type size) noexcept {
 			assert((size.x != 0 || size.y != 0) && "must at least one none zero");
 
-			face.set_size(size.x, size.y);
-			if(const auto shot = face.load_and_get(code, FT_LOAD_DEFAULT)){
+			face_.set_size(size.x, size.y);
+			if(const auto shot = face_.load_and_get(code, FT_LOAD_DEFAULT)){
 				if(shot.value()->bitmap.width * shot.value()->bitmap.rows != 0){
-					// graphic::bitmap bitmap =
-					// 	graphic::msdf::load_glyph(
-					// 		face.msdfHdl, code,
-					// 		shot.value()->bitmap.width, shot.value()->bitmap.rows,
-					// 		shot.value()->face->size->metrics.x_ppem, shot.value()->face->size->metrics.y_ppem,
-					// 		get_snapped_range(std::hypot(shot.value()->face->size->metrics.x_ppem, shot.value()->face->size->metrics.y_ppem))
-					// 	);
-
-					// auto map = render_sdf(shot.value());
-					return glyph_wrap{code, face};
+					return glyph_wrap{code, face_};
 				}
-
-
 			}
 
 			if(fallback){
@@ -376,12 +365,12 @@ namespace mo_yanxi::font{
 				return fallback->obtain(code, size);
 			}
 
-			return glyph_wrap{code, face};
+			return glyph_wrap{code, face_};
 		}
 
 		float get_line_spacing(const math::usize2 sz) const{
-			face.set_size(sz);
-			return normalize_len(face->size->metrics.height);
+			face_.set_size(sz);
+			return normalize_len(face_->size->metrics.height);
 		}
 
 		[[nodiscard]] glyph_wrap obtain(const char_code code, const glyph_size_type::value_type size) noexcept {
@@ -393,7 +382,12 @@ namespace mo_yanxi::font{
 		}
 
 		[[nodiscard]] std::string format(const char_code code, const glyph_size_type size) const{
-			return std::format("{}.{}.U{:#0X}[{},{}]", face.get_family_name(), face.get_style_name(), reinterpret_cast<const int&>(code), size.x, size.y);
+			return std::format("{}.{}.{:#0X}|{},{}", face_.get_family_name(), face_.get_style_name(), std::bit_cast<int>(code), size.x, size.y);
+		}
+
+
+		[[nodiscard]] const font_face_handle& face() const noexcept{
+			return face_;
 		}
 
 		// [[nodiscard]] auto dump_names(){

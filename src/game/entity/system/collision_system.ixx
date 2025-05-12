@@ -10,7 +10,7 @@ export import mo_yanxi.game.ecs.component.manager;
 export import mo_yanxi.game.ecs.component.manifold;
 export import mo_yanxi.game.ecs.component.physical_property;
 export import mo_yanxi.game.ecs.component.chamber;
-export import mo_yanxi.game.ecs.quad_tree;
+export import mo_yanxi.game.quad_tree;
 export import mo_yanxi.shared_stack;
 export import mo_yanxi.math.intersection;
 
@@ -202,7 +202,9 @@ namespace mo_yanxi::game::ecs::system{
 			if(std::abs(sbj.motion->depth - obj.motion->depth) > sbj.manifold->thickness + obj.manifold->thickness) return
 				false;
 
-			return sbj.manifold->hitbox.collide_with_rough(obj.manifold->hitbox);
+			if(!manifold::is_collideable_between(sbj, obj))return false;
+
+			return true;
 		}
 
 		FORCE_INLINE static bool check_pre_collision(manifold& manifold, mech_motion& motion) noexcept{
@@ -419,7 +421,7 @@ namespace mo_yanxi::game::ecs::system{
 
 			//TODO make it resversed: object with high priority firstly try collision, if passed, remove both collision test from itself and the target
 			std::ranges::sort(rng, std::ranges::greater{}, [](const collision_test_tuple_store& tlp){
-				return std::get<manifold*>(tlp)->colliders.index();
+				return std::get<manifold*>(tlp)->collider.index();
 			});
 
 			for (auto [meta, mf, motion, rigid] : rng){

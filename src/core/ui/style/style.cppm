@@ -25,6 +25,10 @@ namespace mo_yanxi::ui{
 			graphic::color disabled{};
 			graphic::color activated{};
 
+			[[nodiscard]] constexpr palette copy() const noexcept{
+				return *this;
+			}
+
 			constexpr palette& mul_alpha(const float alpha) noexcept{
 				general.mul_a(alpha);
 				on_focus.mul_a(alpha);

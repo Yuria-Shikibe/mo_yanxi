@@ -342,18 +342,18 @@ namespace mo_yanxi::math{
 			return v.x >= src.x && v.y >= src.y && v.x < get_end_x() && v.y < get_end_y();
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool overlap_exclusive(const rect_ortho& r) const noexcept{
-			if (std::is_constant_evaluated()){
+		[[nodiscard]] FORCE_INLINE constexpr bool overlap_exclusive(this const rect_ortho& l, const rect_ortho& r) noexcept{
+			if consteval{
 				return
-					get_src_x() < r.get_end_x() &&
-					get_end_x() > r.get_src_x() &&
-					get_src_y() < r.get_end_y() &&
-					get_end_y() > r.get_src_y();
+					l.get_src_x() < r.get_end_x() &&
+					l.get_end_x() > r.get_src_x() &&
+					l.get_src_y() < r.get_end_y() &&
+					l.get_end_y() > r.get_src_y();
 			}else{
-				const float a_src_x = get_src_x();
-				const float a_end_x = get_end_x();
-				const float a_src_y = get_src_y();
-				const float a_end_y = get_end_y();
+				const float a_src_x = l.get_src_x();
+				const float a_end_x = l.get_end_x();
+				const float a_src_y = l.get_src_y();
+				const float a_end_y = l.get_end_y();
 
 				// 提取矩形r的坐标
 				const float b_src_x = r.get_src_x();
@@ -378,18 +378,18 @@ namespace mo_yanxi::math{
 			}
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool overlap_inclusive(const rect_ortho& r) const noexcept{
-			if (std::is_constant_evaluated()){
+		[[nodiscard]] FORCE_INLINE constexpr bool overlap_inclusive(this const rect_ortho& l, const rect_ortho& r) noexcept{
+			if consteval{
 				return
 				get_src_x() <= r.get_end_x() &&
 				get_end_x() >= r.get_src_x() &&
 				get_src_y() <= r.get_end_y() &&
 				get_end_y() >= r.get_src_y();
 			}else{
-				const float a_src_x = get_src_x();
-				const float a_end_x = get_end_x();
-				const float a_src_y = get_src_y();
-				const float a_end_y = get_end_y();
+				const float a_src_x = l.get_src_x();
+				const float a_end_x = l.get_end_x();
+				const float a_src_y = l.get_src_y();
+				const float a_end_y = l.get_end_y();
 
 				// 提取矩形r的坐标
 				const float b_src_x = r.get_src_x();

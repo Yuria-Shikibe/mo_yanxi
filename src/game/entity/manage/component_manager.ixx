@@ -112,7 +112,7 @@ namespace mo_yanxi::game::ecs{
 		 */
 		template <typename Tuple, typename... Args>
 			requires (is_tuple_v<Tuple> && (contained_in<std::decay_t<Args>, Tuple> && ...))
-		entity_ref create_entity_deferred(Args&& ...args){
+		entity_id create_entity_deferred(Args&& ...args){
 			//TODO add lock?
 			std::type_index idx = typeid(Tuple);
 			entity* ent;
@@ -133,6 +133,34 @@ namespace mo_yanxi::game::ecs{
 				atype->push_staging(ent->id(), std::forward<Args>(args) ...);
 			}
 
+			return ent;
+		}
+
+		/**
+		 * @brief deferred add entity, whose archtype must have been created
+		 * @return entity handle
+		 */
+		template <typename Tuple>
+		entity_id create_entity_deferred(tuple_to_comp_t<Tuple>&& comps){
+			//TODO add lock?
+			std::type_index idx = typeid(Tuple);
+			entity* ent;
+			{
+				std::lock_guard _{entity_mutex};
+				ent = std::to_address(entities.emplace(idx));
+			}
+
+			if(auto itr = archetypes.find(idx); itr != archetypes.end()){
+				static_cast<archetype<Tuple>&>(*itr->second).push_staging(ent->id(), std::move(comps));
+			}else{
+				archetype<Tuple>* atype;
+				{
+					std::lock_guard _{archetype_mutex};
+					atype = &add_archetype<Tuple>();
+				}
+
+				atype->push_staging(ent->id(), std::move(comps));
+			}
 
 			return ent;
 		}

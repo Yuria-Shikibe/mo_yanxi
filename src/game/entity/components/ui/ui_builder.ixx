@@ -12,7 +12,7 @@ import std;
 
 namespace mo_yanxi::game::ecs{
 	export struct entity_info_table : ui::table{
-	private:
+	protected:
 		entity_ref ref{};
 
 	public:

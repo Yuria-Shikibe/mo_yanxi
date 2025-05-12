@@ -17,7 +17,7 @@ namespace mo_yanxi::ui{
 	};
 
 	export
-	struct basic_text_elem : elem{
+	struct label : elem{
 	protected:
 		const font::typesetting::parser* parser{&font::typesetting::global_parser};
 		font::typesetting::glyph_layout glyph_layout{};
@@ -27,7 +27,7 @@ namespace mo_yanxi::ui{
 	public:
 		align::pos text_entire_align{align::pos::top_left};
 
-		[[nodiscard]] basic_text_elem(scene* scene, group* group, const std::string_view tyName = "basic_text_elem")
+		[[nodiscard]] label(scene* scene, group* group, const std::string_view tyName = "basic_text_elem")
 			: elem(scene, group, tyName){
 		}
 
@@ -130,8 +130,13 @@ namespace mo_yanxi::ui{
 			}else{
 				if(glyph_layout.get_clamp_size() != bound){
 					glyph_layout.set_clamp_size(bound);
-					glyph_layout.clear();
-					parser->operator()(glyph_layout, scale);
+					if(!glyph_layout.extent().equals(bound)){
+						glyph_layout.clear();
+					}
+					if(glyph_layout.empty()){
+						parser->operator()(glyph_layout, scale);
+					}
+
 				}
 			}
 

@@ -25,6 +25,10 @@ namespace mo_yanxi::ui{
 
 		virtual ~drawable() = default;
 
+		virtual explicit operator bool() const noexcept{
+			return false;
+		}
+
 		virtual void draw(const elem& elem, math::frect region, graphic::color color_scl) const = 0;
 
 		[[nodiscard]] virtual std::optional<math::vec2> get_default_size() const{
@@ -66,6 +70,10 @@ namespace mo_yanxi::ui{
 			: moded_drawable(flags), image(image_region){
 		}
 
+		explicit operator bool() const noexcept override{
+			return image->view != nullptr;
+		}
+
 		void draw(const elem& elem, math::frect region, graphic::color color_scl) const override;
 
 		[[nodiscard]] std::optional<math::vec2> get_default_size() const override {
@@ -81,6 +89,10 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] explicit(false) icon_drawable(const icon_type& image_region)
 			: moded_drawable(vk::vertices::mode_flag_bits::sdf), image(image_region){
+		}
+
+		explicit operator bool() const noexcept override{
+			return image.view != nullptr;
 		}
 
 		void draw(const elem& elem, math::frect region, graphic::color color_scl) const override;
@@ -99,6 +111,10 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] explicit(false) drawable_ref(const drawable* ref)
 			: ref(ref){
+		}
+
+		explicit operator bool() const noexcept override{
+			return ref && *ref;
 		}
 
 		void draw(const elem& elem, math::frect region, graphic::color color_scl) const override{

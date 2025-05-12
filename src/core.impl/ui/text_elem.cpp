@@ -5,7 +5,7 @@ import mo_yanxi.ui.graphic;
 import mo_yanxi.font.typesetting.draw;
 
 
-std::optional<mo_yanxi::font::typesetting::layout_pos_t> mo_yanxi::ui::basic_text_elem::get_layout_pos(
+std::optional<mo_yanxi::font::typesetting::layout_pos_t> mo_yanxi::ui::label::get_layout_pos(
 	math::vec2 globalPos) const{
 	if(glyph_layout.empty() || !contains(globalPos)){
 		return std::nullopt;
@@ -40,9 +40,9 @@ std::optional<mo_yanxi::font::typesetting::layout_pos_t> mo_yanxi::ui::basic_tex
 	};
 }
 
-void mo_yanxi::ui::basic_text_elem::draw_content(const rect clipSpace) const{
+void mo_yanxi::ui::label::draw_content(const rect clipSpace) const{
 	// elem::draw_content(clipSpace, redirect);
 
 	draw_acquirer acquirer{get_renderer().batch, {}};
-	graphic::draw::glyph_layout(acquirer, glyph_layout, get_glyph_abs_src(), false, property.graphic_data.get_opacity());
+	graphic::draw::glyph_layout(acquirer, glyph_layout, get_glyph_abs_src(), property.graphic_data.get_opacity());
 }

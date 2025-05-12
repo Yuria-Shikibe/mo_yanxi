@@ -315,11 +315,11 @@ export namespace mo_yanxi::dim2{
 		}
 
 		[[nodiscard]] constexpr std::span<std::byte> to_byte_span() noexcept requires (std::is_trivially_copyable_v<value_type>){
-			return {reinterpret_cast<std::byte*>(data()), size() * sizeof(value_type)};
+			return std::as_writable_bytes(to_span());
 		}
 
 		[[nodiscard]] constexpr std::span<const std::byte> to_byte_span() const noexcept requires (std::is_trivially_copyable_v<value_type>){
-			return {reinterpret_cast<const std::byte*>(data()), size() * sizeof(value_type)};
+			return std::as_bytes(to_span());
 		}
 
 		[[nodiscard]] constexpr std::span<const value_type> row_at(const size_type rowIndex) const noexcept{

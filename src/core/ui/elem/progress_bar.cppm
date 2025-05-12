@@ -90,6 +90,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] progress_bar(scene* scene, group* group)
 			: elem(scene, group, "progress_bar"){
+			interactivity = interactivity::disabled;
 		}
 
 		template <std::invocable<> Func>
@@ -145,7 +146,7 @@ namespace mo_yanxi::ui{
 
 		void update(float delta_in_ticks) override{
 			elem::update(delta_in_ticks);
-			if(progressProv)lastProgress.approach(progressProv(*this), reach_speed, delta_in_ticks);
+			if(progressProv)update_progress(progressProv(*this), delta_in_ticks);
 			if(color_prov_){
 				auto next = color_prov_(*this);
 				if(reach_speed >= 1.f){
@@ -159,7 +160,15 @@ namespace mo_yanxi::ui{
 		}
 
 	public:
-		[[nodiscard]] constexpr math::vec2 getBarSize() const noexcept{
+		void update_progress(progress_bar_progress prog, float delta_in_ticks){
+			prog.current = math::clamp(prog.current);
+			if(!std::isfinite(prog.current)){
+				prog.current = 0;
+			}
+			lastProgress.approach(prog, reach_speed, delta_in_ticks);
+		}
+
+		[[nodiscard]] constexpr math::vec2 get_bar_size() const noexcept{
 			return lastProgress.get_size(content_size());
 		}
 

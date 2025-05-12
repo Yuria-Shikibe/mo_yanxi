@@ -12,7 +12,7 @@ export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.matrix3;
 export import mo_yanxi.math;
 
-export import mo_yanxi.game.component.hitbox_meta;
+export import mo_yanxi.game.meta.hitbox;
 
 import std;
 import mo_yanxi.array_stack;
@@ -150,7 +150,7 @@ namespace mo_yanxi::game{
 			: components(std::ranges::begin(comps), std::ranges::end(comps)){
 		}
 
-		[[nodiscard]] explicit(false) hitbox_identity(const hitbox_meta& comps)
+		[[nodiscard]] explicit(false) hitbox_identity(const meta::hitbox& comps)
 			: components(comps.size()){
 			for(const auto& [idx, meta] : comps | std::views::enumerate){
 				components[idx] = hitbox_comp{meta.box, meta.trans};

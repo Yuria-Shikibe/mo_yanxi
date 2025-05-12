@@ -496,9 +496,9 @@ namespace mo_yanxi::ui{
 	};
 
 	export
-	struct text_input_area : basic_text_elem{
+	struct text_input_area : label{
 		[[nodiscard]] text_input_area(scene* scene, group* group)
-			: basic_text_elem(scene, group, "input_area"){
+			: label(scene, group, "input_area"){
 			/*events().on<events::click>([](const events::click& event, elem& e){
 				auto& self = static_cast<text_input_area&>(e);
 
@@ -551,7 +551,7 @@ namespace mo_yanxi::ui{
 		std::u32string buffer{};
 
 		void update(const float delta_in_ticks) override{
-			basic_text_elem::update(delta_in_ticks);
+			label::update(delta_in_ticks);
 
 			if(failedHintDuration > 0.f){
 				failedHintDuration -= delta_in_ticks;
@@ -590,7 +590,7 @@ namespace mo_yanxi::ui{
 		}
 
 		void layout() override{
-			basic_text_elem::layout();
+			label::layout();
 			if(caret_)caret_->checkIndex(glyph_layout);
 
 		}
@@ -818,7 +818,7 @@ namespace mo_yanxi::ui{
 				return std::string_view{};
 			}
 
-			return basic_text_elem::get_text();
+			return label::get_text();
 		}
 
 		[[nodiscard]] bool on_hint() const noexcept{

@@ -1,4 +1,4 @@
-module;
+/*module;
 
 export module mo_yanxi.small_vector;
 
@@ -20,4 +20,4 @@ export namespace mo_yanxi{
 	using gch::rend;
 	using gch::crbegin;
 	using gch::crend;
-}
+}*/

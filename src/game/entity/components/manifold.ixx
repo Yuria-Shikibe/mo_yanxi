@@ -76,35 +76,37 @@ namespace mo_yanxi::game::ecs{
 			return collision_result::passed;
 		}
 
-		static constexpr bool try_override_collide_to(
+		static constexpr bool collide_able_to(
 			const collision_object& sbj,
-			const collision_object& obj,
-			const intersection& intersection
-			) noexcept {
-			return false;
+			const collision_object& obj
+		) noexcept {
+			return true;
+		}
+
+		static entity_id get_group_identity(entity_id self, const manifold& manifold){
+			return self;
 		}
 	};
 
 	export
-	struct chamber_collider : default_collider{
+	struct projectile_collider : default_collider{
 		collision_result try_collide_to(
 			const collision_object& projectile,
 			const collision_object& chamber_grid,
 			const intersection& intersection
 		) noexcept;
 
-		// bool try_override_collide_to(
-		// 	const collision_object& sbj,
-		// 	const collision_object& obj,
-		// 	const intersection& intersection
-		// ) noexcept{
-		//
-		// }
+		static bool collide_able_to(
+			const collision_object& sbj,
+			const collision_object& obj
+		) noexcept;
+
+		static entity_id get_group_identity(entity_id self, const manifold& manifold);
 	};
 
 	using colliders = std::variant<
 		default_collider,
-		chamber_collider
+		projectile_collider
 	>;
 
 
@@ -113,7 +115,7 @@ namespace mo_yanxi::game::ecs{
 
 		float thickness{0.05f};
 		hitbox hitbox{};
-		colliders colliders{};
+		colliders collider{};
 		bool no_backtrace_correction{false};
 
 
@@ -121,15 +123,36 @@ namespace mo_yanxi::game::ecs{
 		math::trans2 collision_vel_trans_sum{};
 		math::vec2 collision_correction_vec{};
 
-		gch::small_vector<entity_ref, 2> last_collided{};
-		gch::small_vector<collision_possible, 2> possible_collision{};
-		gch::small_vector<collision_confirmed, 2> confirmed_collision{};
+		gch::small_vector<entity_ref, 1> last_collided{};
+		gch::small_vector<collision_possible, 1> possible_collision{};
+		gch::small_vector<collision_confirmed, 1> confirmed_collision{};
 
 
 		[[nodiscard]] bool collided() const noexcept{
 			return !possible_collision.empty();
 		}
 
+		[[nodiscard]] entity_id get_hit_group_id(entity_id self) const noexcept{
+			return std::visit<entity_id>([&, this] <std::derived_from<default_collider> T> (T& c){
+				return c.get_group_identity(self, *this);
+			}, collider);
+		}
+
+		static bool is_collideable_between(
+			const collision_object& lhs,
+			const collision_object& rhs){
+			if(lhs.manifold->collider.index() == rhs.manifold->collider.index()){
+				return std::visit([&] <std::derived_from<default_collider> T> (T& c){
+					return c.collide_able_to(lhs, rhs);
+				}, lhs.manifold->collider);
+			}else{
+				return std::visit([&] <std::derived_from<default_collider> T> (T& c){
+					return c.collide_able_to(lhs, rhs);
+				}, lhs.manifold->collider) || std::visit([&] <std::derived_from<default_collider> T> (T& c){
+					return c.collide_able_to(lhs, rhs);
+				}, rhs.manifold->collider);
+			}
+		}
 
 		/**
 		 * @brief
@@ -145,17 +168,7 @@ namespace mo_yanxi::game::ecs{
 		){
 			return std::visit<collision_result>([&] <std::derived_from<default_collider> T> (T& c){
 				return c.try_collide_to(sbj, obj, intersection);
-			}, sbj.manifold->colliders);
-		}
-
-		static bool try_override_collide_to(
-			const collision_object& sbj,
-			const collision_object& obj,
-			const intersection& intersection
-		){
-			return std::visit<bool>([&] <std::derived_from<default_collider> T> (T& c){
-				return c.try_override_collide_to(sbj, obj, intersection);
-			}, sbj.manifold->colliders);
+			}, sbj.manifold->collider);
 		}
 
 		bool filter() noexcept{

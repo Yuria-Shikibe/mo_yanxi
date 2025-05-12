@@ -7,6 +7,8 @@ export module mo_yanxi.game.aiming;
 
 export import mo_yanxi.game.ecs.entity;
 export import mo_yanxi.game.ecs.component.physical_property;
+export import mo_yanxi.game.ecs.component.manifold;
+export import mo_yanxi.game.quad_tree;
 export import mo_yanxi.math;
 export import mo_yanxi.math.trans2;
 export import mo_yanxi.array_stack;
@@ -14,6 +16,118 @@ export import mo_yanxi.array_stack;
 import std;
 
 namespace mo_yanxi::game{
+
+	export
+	struct targeting_queue{
+		struct weighted_entity{
+			float distance{};
+			float preference{};
+			ecs::entity_ref ref{};
+		};
+	private:
+		std::vector<weighted_entity> candidates{};
+
+	public:
+		[[nodiscard]] std::span<const weighted_entity> get_candidates() const noexcept{
+			return candidates;
+		}
+
+		[[nodiscard]] ecs::entity_id get_optimal() noexcept{
+			if(candidates.empty())return nullptr;
+
+			auto itr = candidates.begin();
+			while(itr != candidates.end()){
+				if(itr->ref.is_expired()){
+					++itr;
+				}else{
+					auto eid = itr->ref.id();
+					candidates.erase(candidates.begin(), itr);
+					return eid;
+				}
+			}
+
+			candidates.clear();
+			return nullptr;
+		}
+
+		[[nodiscard]] ecs::entity_id get_optimal() const noexcept{
+			if(const auto itr = std::ranges::find_if_not(candidates, &ecs::entity_ref::is_expired, &weighted_entity::ref); itr != candidates.end()){
+				return itr->ref.id();
+			}
+
+			return nullptr;
+		}
+
+		void clear() noexcept{
+			candidates.clear();
+		}
+
+		auto size() const noexcept{
+			return candidates.size();
+		}
+
+		template <
+			std::predicate<const ecs::collision_object&> Filter = pred_always,
+			std::strict_weak_order<float, float> Pred = std::ranges::less>
+		void index_candidates_by_distance(
+			const quad_tree<ecs::collision_object>& quad_tree,
+			const math::vec2 position,
+			const math::range valid_distance,
+			Filter filter = {},
+			Pred pred = {}){
+
+			candidates.clear();
+			const math::frect max_bound{position, valid_distance.to};
+			quad_tree->intersect_then(max_bound, [](const math::frect& lhs, const math::frect& rhs){
+				return lhs.overlap_exclusive(rhs);
+			}, [&](const math::frect& lhs, const ecs::collision_object& obj){
+				const auto obj_trs = obj.motion->pos();
+				const auto dst = obj_trs.dst(position);
+				if(!valid_distance.within_closed(dst))return;
+				if(!std::invoke(filter, obj))return;
+
+				candidates.push_back(weighted_entity{
+					dst, 0.f, obj.id
+				});
+			});
+
+			std::ranges::sort(candidates, std::move(pred), &weighted_entity::distance);
+		}
+
+		template <
+			std::predicate<const ecs::collision_object&> Filter = pred_always,
+			std::invocable<const weighted_entity&> PredProj = decltype(&weighted_entity::preference),
+			std::strict_weak_order<std::invoke_result_t<PredProj, const weighted_entity&>, std::invoke_result_t<PredProj, const weighted_entity&>> Pred = std::ranges::less,
+			std::invocable<const ecs::collision_object&> PrefProj
+		>
+			requires (std::convertible_to<std::invoke_result_t<PrefProj, const ecs::collision_object&>, float>)
+		void index_candidates_by_distance(
+			const quad_tree<ecs::collision_object>& quad_tree,
+			const math::vec2 position,
+			const math::range valid_distance,
+			Filter filter = {},
+			Pred pred, PrefProj preference_proj, PredProj pred_proj = &weighted_entity::preference){
+
+			candidates.clear();
+			const math::frect max_bound{position, valid_distance.to};
+			quad_tree->intersect_then(max_bound, [](const math::frect& lhs, const math::frect& rhs){
+				return lhs.overlap_exclusive(rhs);
+			}, [&](const math::frect& lhs, const ecs::collision_object& obj){
+				const auto obj_trs = obj.motion->pos();
+				const auto dst = obj_trs.dst(position);
+				if(!valid_distance.within_closed(dst))return;
+				if(!std::invoke(filter, obj))return;
+
+				candidates.push_back(weighted_entity{
+					dst, std::invoke_r<float>(preference_proj, obj), obj.id
+				});
+			});
+
+			std::ranges::sort(candidates, std::move(pred), pred_proj);
+		}
+
+	};
+
 	namespace vel_model{
 		export struct constant{};
 
@@ -44,25 +158,29 @@ namespace mo_yanxi::game{
 
 	struct trivial_optional_float{
 		float value;
-		bool valid;
 
 		explicit(false) operator float() const noexcept{
 			return value;
 		}
 
 		explicit operator bool() const noexcept{
-			return valid;
+			return std::isfinite(value);
 		}
 	};
 
 	FORCE_INLINE trivial_optional_float resolve(const float a, const float b, const float c) noexcept{
+		static constexpr auto INF = std::numeric_limits<float>::infinity();
 		if(std::fabs(a) < std::numeric_limits<decltype(a)>::epsilon()){
 			const auto val = -c / b;
-			return {val, std::fabs(b) > std::numeric_limits<decltype(a)>::epsilon() && val >= 0};
+			return {
+					std::fabs(b) > std::numeric_limits<decltype(a)>::epsilon() && val >= 0
+						? val
+						: INF
+				};
 		}else{
 			const auto delta = b * b - 4 * a * c;
 			if(delta < 0){
-				return {{}, false};
+				return {INF};
 			}
 
 			const auto sqrt_delta = std::sqrt(delta);
@@ -71,14 +189,14 @@ namespace mo_yanxi::game{
 
 			const auto [min, max] = math::minmax(t1, t2);
 			if(min > 0){
-				return {min, true};
+				return {min};
 			}
 
 			if(max > 0){
-				return {max, true};
+				return {max};
 			}
 
-			return {{}, false};
+			return {INF};
 		}
 	}
 
@@ -125,47 +243,24 @@ namespace mo_yanxi::game{
 			return !entity.is_expired();
 		}
 
-		template <typename T, typename C>
-			requires std::convertible_to<T, math::trans2>
-		math::vec2 operator|(T C::* p) const noexcept{
-			assert(*this);
-			return local_pos | entity.operator->*(p);
-		}
+		bool update(math::trans2 self_transform) noexcept{
+			if(entity.is_expired()){
+				entity.reset();
+				return false;
+			}
 
-		template <typename T, typename C>
-			requires std::convertible_to<T, math::trans2>
-		math::vec2 operator|(T (C::* p)()) const noexcept{
-			assert(*this);
-			return local_pos | entity.operator->*(p);
-		}
-
-		math::vec2 operator|(math::trans2 trs) const noexcept{
-			assert(*this);
-			return local_pos | trs;
+			local_pos = self_transform.apply_inv_to((entity->*&ecs::mech_motion::pos)());
+			return true;
 		}
 	};
 
 	export
 	struct traced_target : target{
-	private:
-		math::vec2 last{math::vectors::constant2<float>::SNaN};
+		math::vec2 last{};
 
-	public:
-		[[nodiscard]] std::optional<math::vec2> get_last() const noexcept{
-			if(last.is_NaN()){
-				return std::nullopt;
-			}
-			return std::optional{last};
-		}
-
-		template <typename T = math::trans2>
-		[[nodiscard]] math::vec2 get_displacement(const T trs) const noexcept{
-			return last.is_NaN() ? math::vec2{} : (this->operator|(trs) - last);
-		}
-
-		template <typename T = math::trans2>
-		void update_last(const T trs) noexcept{
-			last = this->operator|(trs);
+		bool update(math::trans2 self_transform) noexcept{
+			last = local_pos;
+			return target::update(self_transform);
 		}
 	};
 }

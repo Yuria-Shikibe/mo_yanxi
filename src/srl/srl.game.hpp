@@ -9,7 +9,7 @@ import mo_yanxi.game.ecs.component.hitbox;
 
 namespace mo_yanxi::io{
 	template <>
-	struct loader_impl<game::hitbox_meta::meta> : loader_base<pb::game::hitbox_comp, game::hitbox_meta::meta>{
+	struct loader_impl<game::meta::hitbox::comp> : loader_base<pb::game::hitbox_comp, game::meta::hitbox::comp>{
 		static void store(buffer_type& buf, const value_type& data){
 			io::store(buf.mutable_box(), data.box);
 			io::store(buf.mutable_trans(), data.trans);
@@ -22,9 +22,9 @@ namespace mo_yanxi::io{
 	};
 
 	template <>
-	struct loader_impl<game::hitbox_meta> : loader_base<pb::game::hitbox_meta, game::hitbox_meta>{
+	struct loader_impl<game::meta::hitbox> : loader_base<pb::game::hitbox_meta, game::meta::hitbox>{
 		static void store(buffer_type& buf, const value_type& data){
-			auto transformer = data | std::views::transform([](const value_type::meta& meta){
+			auto transformer = data | std::views::transform([](const value_type::comp& meta){
 				return io::pack(meta);
 			});
 
@@ -35,7 +35,7 @@ namespace mo_yanxi::io{
 			data.components.clear();
 			data.components.reserve(buf.comps_size());
 			for (const auto & comp : buf.comps()){
-				data.components.push_back(io::extract<value_type::meta>(comp));
+				data.components.push_back(io::extract<value_type::comp>(comp));
 			}
 		}
 	};

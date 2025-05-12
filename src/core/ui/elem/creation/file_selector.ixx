@@ -701,7 +701,7 @@ namespace mo_yanxi::ui::creation{
 				}
 
 				{
-					auto hdl = this->emplace<basic_text_elem>();
+					auto hdl = this->emplace<label>();
 					hdl->prop().set_empty_drawer();
 					hdl->prop().boarder.set(4);
 					hdl->text_entire_align = align::pos::center_left;
@@ -744,7 +744,7 @@ namespace mo_yanxi::ui::creation{
 
 		table* menu{};
 		table* entries{};
-		basic_text_elem* current_entry_bar{};
+		label* current_entry_bar{};
 
 		path current{};
 		history_stack<path> history{};
@@ -877,7 +877,7 @@ namespace mo_yanxi::ui::creation{
 			auto rtable = this->emplace<table>();
 			rtable->set_style();
 
-			auto return_to_parent_button = rtable->emplace<button<basic_text_elem>>();
+			auto return_to_parent_button = rtable->emplace<button<label>>();
 			return_to_parent_button->set_scale(.65f);
 			return_to_parent_button->prop().boarder.set_vert(12);
 			return_to_parent_button->set_text(std::format("..< | {:?}", current.string()));

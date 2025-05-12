@@ -11,19 +11,13 @@ export import mo_yanxi.handle_wrapper;
 import std;
 
 namespace mo_yanxi::ui{
-	export
-	template <typename Elem, typename Cell>
-	struct create_result{
-		Elem& elem;
-		Cell& cell;
-	};
 
 	export
 	template <typename Elem, typename Cell>
 	struct create_handle{
 		struct promise_type;
 		using handle = std::coroutine_handle<promise_type>;
-		using value_type = create_result<Elem, Cell>;
+		using value_type = cell_create_result<Elem, Cell>;
 
 		[[nodiscard]] create_handle() = default;
 
@@ -208,6 +202,23 @@ namespace mo_yanxi::ui{
 			auto [result, adaptor] = self.template add<typename elem_init_func_trait<Fn>::elem_type>(elem_ptr{self.get_scene(), &self, init});
 			auto addr = self.cells.data();
 
+
+			co_yield result;
+			static_cast<universal_group&>(self).add_adaptor(addr, &result.elem, adaptor);
+		}
+
+		template <cell_creator Creator, std::derived_from<universal_group> G>
+		create_handle<typename Creator::elem_type, cell_type> create(this G& self, Creator init){
+			auto [result, adaptor] =
+				self.template add<typename Creator::elem_type>(elem_ptr{self.get_scene(), &self, std::in_place_type<typename Creator::elem_type>});
+
+			init(result.elem);
+
+			if constexpr (std::invocable<Creator, decltype(result)>){
+				std::invoke(init, result);
+			}
+
+			auto addr = self.cells.data();
 			co_yield result;
 			static_cast<universal_group&>(self).add_adaptor(addr, &result.elem, adaptor);
 		}
@@ -238,9 +249,9 @@ namespace mo_yanxi::ui{
 
 	private:
 		template <std::derived_from<elem> E = elem, std::derived_from<universal_group> G>
-		std::pair<create_result<E, CellTy>, adaptor_type&> add(this G& self, elem_ptr&& ptr){
+		std::pair<cell_create_result<E, CellTy>, adaptor_type&> add(this G& self, elem_ptr&& ptr){
 			auto& adaptor = self.cells.emplace_back(&self.add_children(std::move(ptr)), self.template_cell);
-			return {create_result{static_cast<E&>(*adaptor.element), adaptor.cell}, adaptor};
+			return {cell_create_result{static_cast<E&>(*adaptor.element), adaptor.cell}, adaptor};
 		}
 
 	};

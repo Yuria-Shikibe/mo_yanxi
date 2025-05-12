@@ -1,7 +1,8 @@
 module;
 
 #include <cassert>
-#include <tuple>
+
+#include "ext/adapted_attributes.hpp"
 
 #if DEBUG_CHECK
 #define COMP_AT_CHECK
@@ -118,7 +119,7 @@ namespace mo_yanxi::game::ecs{
 
 		virtual void erase(const entity_id entity);
 
-		virtual void* get_chunk_ptr(std::type_index type, std::size_t idx) noexcept = 0;
+		virtual void* get_chunk_partial_ptr(std::type_index type, std::size_t idx) noexcept = 0;
 
 		[[nodiscard]] virtual bool has_type(std::type_index type) const = 0;
 
@@ -132,9 +133,10 @@ namespace mo_yanxi::game::ecs{
 				return has_type(typeid(T));
 			}
 		}
+
 		template <typename T>
 		[[nodiscard]] T* try_get_comp(const std::size_t idx) noexcept{
-			return static_cast<T*>(get_chunk_ptr(typeid(T), idx));
+			return static_cast<T*>(get_chunk_partial_ptr(typeid(T), idx));
 		}
 
 		template <typename T>
@@ -262,13 +264,21 @@ namespace mo_yanxi::game::ecs{
 		[[nodiscard]] tuple_to_comp_t<Tuple>* get() const noexcept;
 
 		template <typename C, typename T>
-		constexpr T& operator->*(T C::* mptr) const noexcept{
-			return at<T>().*mptr;
+		FORCE_INLINE constexpr T& operator->*(T C::* mptr) const noexcept{
+			return at<C>().*mptr;
 		}
 
-		template <typename C, typename T>
-		constexpr decltype(auto) operator->*(T (C::*  mfptr)()) const noexcept{
-			return std::invoke(mfptr, at<T>());
+		template <typename T>
+			requires std::is_member_function_pointer_v<T>
+		FORCE_INLINE constexpr auto operator->*(T mfptr) const noexcept{
+			using trait = mptr_info<T>;
+			using class_type = typename trait::class_type;
+
+			return [&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>){
+				return [mfptr, &object = this->at<class_type>()](std::tuple_element_t<Idx, typename trait::func_args> ...args) -> decltype(auto) {
+					return std::invoke(mfptr, object, std::forward<decltype(args)>(args)...);
+				};
+			}(std::make_index_sequence<std::tuple_size_v<typename trait::func_args>>{});
 		}
 	};
 
@@ -355,7 +365,7 @@ namespace mo_yanxi::game::ecs{
 			return *id_;
 		}
 
-		void reset(const entity_id entity_id) noexcept{
+		void reset(const entity_id entity_id = nullptr) noexcept{
 			this->operator=(entity_id);
 		}
 
@@ -372,15 +382,17 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		template <typename C, typename T>
-		constexpr T& operator->*(T C::* mptr) const noexcept{
+		FORCE_INLINE constexpr T& operator->*(T C::* mptr) const noexcept{
 			assert(id_);
 			return id_->operator->*<C, T>(mptr);
 		}
 
 
-		template <typename C, typename T>
-		constexpr decltype(auto) operator->*(T (C::*  mfptr)()) const noexcept{
-			return id_->operator->*<C, T>(mfptr);
+		template <typename T>
+			requires (std::is_member_function_pointer_v<T>)
+		FORCE_INLINE constexpr decltype(auto) operator->*(T mfptr) const noexcept{
+			assert(id_);
+			return id_->operator->*(mfptr);
 		}
 
 		constexpr explicit(false) operator entity&() const noexcept{
@@ -419,36 +431,46 @@ namespace mo_yanxi::game::ecs{
 
 
 	export
-	template <typename Tgt, typename ChunkTy, typename ChunkPartial>
+	template <typename Tgt, typename EntityChunkDesc, typename ChunkPartial>
 		requires requires{
-		requires is_tuple_v<ChunkTy>;
-		requires contained_in<Tgt, ChunkTy>;
-		requires contained_in<std::remove_cvref_t<ChunkPartial>, ChunkTy>;
+		requires is_tuple_v<EntityChunkDesc>;
+		requires contained_in<Tgt, EntityChunkDesc>;
+		requires contained_in<std::remove_cvref_t<ChunkPartial>, EntityChunkDesc>;
 		}
 	constexpr [[nodiscard]] decltype(auto) chunk_neighbour_of(ChunkPartial& value) noexcept{
+
+
+		using Tup = tuple_cat_t<std::tuple<chunk_meta>, EntityChunkDesc>;
+		decltype(auto) rst = mo_yanxi::neighbour_of<Tgt, Tup, ChunkPartial>(value);
 #if DEBUG_CHECK
 		auto get_meta = [&]<typename C>() -> const chunk_meta& {
 			return mo_yanxi::neighbour_of<chunk_meta, C, ChunkPartial>(value);
 		};
-#endif
 
-		if constexpr (std::same_as<std::tuple_element_t<0, ChunkTy>, chunk_meta>){
-			static_assert(!contained_in<chunk_meta, ChunkTy>, "chunk meta should always at the first position");
-			decltype(auto) rst = mo_yanxi::neighbour_of<Tgt, ChunkTy, ChunkPartial>(value);
-#if DEBUG_CHECK
-			const entity_id eid = get_meta.template operator()<ChunkTy>().id();
-			assert(std::addressof(eid->at<Tgt>()) == std::addressof(rst));
+		const entity_id eid = get_meta.template operator()<Tup>().id();
+		assert(std::addressof(eid->at<Tgt>()) == std::addressof(rst));
 #endif
-			return rst;
-		}else{
-			using Tup = tuple_cat_t<std::tuple<chunk_meta>, ChunkTy>;
-			decltype(auto) rst = mo_yanxi::neighbour_of<Tgt, Tup, ChunkPartial>(value);
-#if DEBUG_CHECK
-			const entity_id eid = get_meta.template operator()<Tup>().id();
-			assert(std::addressof(eid->at<Tgt>()) == std::addressof(rst));
-#endif
-			return rst;
+		return rst;
+	}
+
+	export
+	template <typename EntityChunkDesc, typename ChunkPartial>
+		requires requires{
+		requires is_tuple_v<EntityChunkDesc>;
+		requires contained_in<std::remove_cvref_t<ChunkPartial>, EntityChunkDesc>;
 		}
+	constexpr [[nodiscard]] decltype(auto) chunk_of(ChunkPartial& value) noexcept{
+		using Tup = tuple_to_comp_t<tuple_cat_t<std::tuple<chunk_meta>, EntityChunkDesc>>;
+		decltype(auto) rst = mo_yanxi::seq_chunk_cast<Tup>(&value);
+#if DEBUG_CHECK
+		auto get_meta = [&]<typename C>() -> const chunk_meta& {
+			return mo_yanxi::neighbour_of<chunk_meta, C, ChunkPartial>(value);
+		};
+
+		const entity_id eid = get_meta.template operator()<Tup>().id();
+		assert(eid->get<EntityChunkDesc>() == rst);
+#endif
+		return *rst;
 	}
 
 	export
@@ -803,7 +825,7 @@ namespace mo_yanxi::game::ecs{
 			}) != type_convertor_hash_map.end();
 		}
 
-		void* get_chunk_ptr(std::type_index type, std::size_t idx) noexcept final {
+		void* get_chunk_partial_ptr(std::type_index type, std::size_t idx) noexcept final {
 			if(auto itr = algo::access_hash(type_convertor_hash_map, type, &type_index_to_convertor::type, {}, [](const type_index_to_convertor& conv){
 				return !conv.convertor;
 			}); itr != type_convertor_hash_map.end()){
@@ -843,8 +865,8 @@ namespace mo_yanxi::game::ecs{
 			e->id()->archetype_ = this;
 
 			std::lock_guard _{staging_mutex_};
-			[&] <std::size_t ...Idx>(std::index_sequence<Idx...>) -> auto& {
-				return staging.emplace_back(e, [&] <std::size_t I> (){
+			[&] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+				staging.emplace_back(e, [&] <std::size_t I> (){
 					using cur_type = std::tuple_element_t<I, raw_tuple>;
 					constexpr std::size_t mapped_cur_idx = tuple_index_v<cur_type, in_tuple>;
 
@@ -856,25 +878,16 @@ namespace mo_yanxi::game::ecs{
 					}
 				}.template operator()<Idx>() ...);
 			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>{});
+		}
 
-			/*
-			* components comp = [&] <std::size_t ...Idx>(std::index_sequence<Idx...>) -> auto {
-				return components{e, [&] <std::size_t I> (){
-					using cur_type = std::tuple_element_t<I, raw_tuple>;
-					constexpr std::size_t mapped_cur_idx = tuple_index_v<cur_type, in_tuple>;
-
-					if constexpr (mapped_cur_idx == in_tuple_size){
-						return cur_type{};
-					}else{
-						using param_type = std::tuple_element_t<mapped_cur_idx, raw_tuple_type>;
-						return cur_type{std::forward<param_type>(std::get<mapped_cur_idx>(ref_tuple))};
-					}
-				}.template operator()<Idx>() ...};
-			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>{});
+		void push_staging(const entity_id e, components&& comp) noexcept {
+			assert(e);
+			e->id()->archetype_ = this;
+			chunk_meta& meta = get<chunk_meta>(comp);
+			meta.eid_ = e;
 
 			std::lock_guard _{staging_mutex_};
 			staging.push_back(std::move(comp));
-			 */
 		}
 
 		void dump_staging() final {

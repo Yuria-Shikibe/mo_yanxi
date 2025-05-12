@@ -8,7 +8,7 @@ import std;
 import mo_yanxi.meta_programming;
 
 export namespace mo_yanxi::transparent{
-	template <typename T, typename Proj, typename Comp = std::less<std::invoke_result_t<Proj, const T&>>>
+	/*template <typename T, typename Proj, typename Comp = std::less<std::invoke_result_t<Proj, const T&>>>
 		requires requires(T a, T b, Proj proj, Comp comp){
 			{ std::invoke(comp, std::invoke(proj, a), std::invoke(proj, b)) } -> std::convertible_to<bool>;
 		}
@@ -51,6 +51,7 @@ export namespace mo_yanxi::transparent{
 	template <typename T>
 		requires (std::is_member_pointer_v<T> || std::is_member_pointer_v<T>)
 	projection_comp(T) -> projection_comp<typename mptr_info<T>::class_type, T, std::less<typename mptr_info<T>::value_type>>;
+	*/
 
 	struct string_equal_to{
 		using is_transparent = void;
@@ -166,11 +167,13 @@ export namespace mo_yanxi::transparent{
 
 namespace mo_yanxi{
 
+	/*
 	export
 	template <typename T, typename Cont = std::vector<typename mptr_info<T>::class_type>, typename Comp = std::less<>>
 		requires (std::is_member_pointer_v<T> || std::is_member_pointer_v<T>)
 	using projection_priority_queue =
 		std::priority_queue<typename mptr_info<T>::class_type, Cont, transparent::projection_comp<typename mptr_info<T>::class_type, T, Comp>>;
+		*/
 
 
 	template <typename T, auto T::* ptr>

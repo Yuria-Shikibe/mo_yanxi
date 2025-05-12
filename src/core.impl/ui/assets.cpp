@@ -68,56 +68,64 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 			"edge"s,
 			graphic::sdf_load{
 				graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f, 2.5f), 8.}, math::usize2{96, 96}, 2
-			}
+			}, true
 		).first;
 
 		graphic::allocated_image_region& boarder_thin = page.register_named_region(
 			"edge_thin"s,
 			graphic::sdf_load{
 				graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f, 1.85f), 8.}, math::usize2{96, 96}, 2
-			}
+			},
+			true
 		).first;
 
-
-		shapes::edge = {
-				boarder,
-				align::padding<std::uint32_t>{}.set(24).expand(graphic::msdf::sdf_image_boarder),
-				graphic::msdf::sdf_image_boarder
-			};
-
-		shapes::edge_thin = {
-				boarder_thin,
-				align::padding<std::uint32_t>{}.set(24).expand(graphic::msdf::sdf_image_boarder),
-				graphic::msdf::sdf_image_boarder
-			};
 
 		graphic::allocated_image_region& base = page.register_named_region(
 			"base"s,
 			graphic::sdf_load{
 				graphic::msdf::msdf_generator{graphic::msdf::create_solid_boarder(12.f), 8.},
 				math::usize2{96, 96}, 5
-			}
+			},
+			true
 		).first;
+
+		graphic::allocated_image_region& line = page.register_named_region(
+			"line"s,
+			graphic::sdf_load{
+				graphic::msdf::msdf_generator{graphic::msdf::svg_to_shape((assets::dir::svg.path() / "ui/line.svg").string().data())},
+				{40u, 24u}
+			},
+			true).first;
+
+		shapes::edge = {
+				boarder,
+				align::padding<std::uint32_t>{}.set(12).expand(graphic::msdf::sdf_image_boarder),
+				graphic::msdf::sdf_image_boarder
+			};
+
+		shapes::edge_thin = {
+				boarder_thin,
+				align::padding<std::uint32_t>{}.set(12).expand(graphic::msdf::sdf_image_boarder),
+				graphic::msdf::sdf_image_boarder
+			};
 
 		shapes::base = {
 				base,
-				align::padding<std::uint32_t>{}.set(24).expand(graphic::msdf::sdf_image_boarder),
+				align::padding<std::uint32_t>{}.set(12).expand(graphic::msdf::sdf_image_boarder),
 				graphic::msdf::sdf_image_boarder
 			};
-		// shapes::base = shapes::edge;
 
-		page.mark_protected("base");
-		page.mark_protected("edge");
-		page.mark_protected("edge_thin");
+		shapes::line = graphic::image_caped_region{line, line.get_region(), 12, 12, graphic::msdf::sdf_image_boarder};
+
 
 		using namespace styles;
 
-		general.edge = style::palette_with{shapes::edge, pal::front};
-		general.base = style::palette_with{shapes::base, pal::base};
-		general.back = style::palette_with{shapes::base, pal::back_black};
+		general.edge = style::palette_with{shapes::edge, style_pal::front};
+		general.base = style::palette_with{shapes::base, style_pal::base};
+		general.back = style::palette_with{shapes::base, style_pal::back_black};
 
 		whisper = general;
-		whisper.edge.pal = pal::front_whisper;
+		whisper.edge.pal = style_pal::front_whisper;
 
 		humble = whisper;
 		humble.edge = shapes::edge_thin;
@@ -127,18 +135,18 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 		humble.base.pal.activated = whisper.base.pal.activated;
 
 		accent = general;
-		accent.edge.pal = pal::front_accent;
+		accent.edge.pal = style_pal::front_accent;
 
 		hint_valid = general;
-		hint_valid.edge.pal = pal::front_valid;
+		hint_valid.edge.pal = style_pal::front_valid;
 
 		hint_invalid = general;
-		hint_invalid.edge.pal = pal::front_invalid;
+		hint_invalid.edge.pal = style_pal::front_invalid;
 
-		no_edge.edge = style::palette_with{shapes::edge, pal::front_clear};
+		no_edge.edge = style::palette_with{shapes::edge, style_pal::front_clear};
 		no_edge.edge.pal.on_focus = {};
 
-		no_edge.base = style::palette_with{shapes::base, style::palette{pal::front_clear}.mul_alpha(0.25f)};
+		no_edge.base = style::palette_with{shapes::base, style::palette{style_pal::front_clear}.mul_alpha(0.25f)};
 		no_edge.base.pal.activated.set_a(.075f);
 
 		general_static = general;

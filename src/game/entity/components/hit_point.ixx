@@ -4,6 +4,8 @@
 
 export module mo_yanxi.game.ecs.component.hit_point;
 
+
+
 namespace mo_yanxi::game::ecs{
 	export
 	struct hit_point{

@@ -2,8 +2,8 @@
 
 * [ ] Render Graph / Render Resource Reuse
 --- 
-* [ ] 字体渲染 WIP
-* [ ] 带引用计数的各项资产管理
+* [X] 字体渲染 (Partial) (是否引入ICU?)
+* [ ] 带引用计数的各项资产管理 (Partial Done)
 * [x] 异步图像加载
 * [x] Task Graph
 * [ ] MSAA，或者其它效果接近MSAA的抗锯齿
@@ -45,6 +45,6 @@
 * [ ] 子网格 / WIP
 
 # Editor
-* [ ] 碰撞箱编辑器
+* [x] 碰撞箱编辑器 (Partial) 
 * [ ] 子网格形状编辑器
 * [ ] 子网格建筑编辑器

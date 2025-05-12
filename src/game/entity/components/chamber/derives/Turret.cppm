@@ -1,3 +1,64 @@
+module;
+
+#include <gch/small_vector.hpp>
+
+
+export module mo_yanxi.game.ecs.component.chamber.turret;
+
+export import mo_yanxi.game.ecs.component.chamber;
+export import mo_yanxi.game.meta.projectile;
+import mo_yanxi.math;
+
+namespace mo_yanxi::game::ecs{
+	namespace chamber{
+		struct shoot_mode{
+			float reload_duration{};
+			unsigned burst_count{};
+			float burst_spacing{};
+			float inaccuracy{};
+
+			meta::projectile* projectile_type{};
+		};
+		struct turret_metadata{
+			math::range range{};
+			float rotation_speed{};
+			float default_angle{};
+			float shooting_field_angle{};
+			float shoot_cone_tolerance{};
+
+			shoot_mode mode{};
+		};
+
+		struct turret_build : building{
+			turret_metadata meta{};
+
+			math::uniform_trans2 turret_center_local_trans{};
+			float reload{};
+			unsigned shoot_counter{};
+			traced_target target{};
+
+			[[nodiscard]] bool validate_target(const math::vec2 target_local_trs) const noexcept{
+				return meta.range.within_open(target_local_trs.length());
+			}
+
+			void update(chamber_manifold& grid, const chunk_meta& meta, float delta_in_tick) override{
+
+				if(!target.update(turret_center_local_trans | data().get_trans())){
+					return;
+				}
+
+				auto& motion = target.entity->at<mech_motion>();
+				auto target_trs = turret_center_local_trans.apply_inv_to(motion.trans);
+				if(!validate_target(target_trs.vec)){
+					target.entity.reset(nullptr);
+				}
+			}
+		};
+	}
+
+
+}
+
 /*
 //
 // Created by Matrix on 2024/11/30.
@@ -203,15 +264,15 @@ namespace Game::Chamber{
 			[[nodiscard]] bool isReloading() const noexcept{
 				return !data.shootState.shooting && data.shootState.reload < trait->reloadInterval;
 			}
-			
+
 			[[nodiscard]] bool isShooting() const noexcept{
 				return data.shootState.shooting;
 			}
-			
+
 			[[nodiscard]] float reloadProgress() const noexcept{
 				return data.shootState.reload / trait->reloadInterval;
 			}
-			
+
 			[[nodiscard]] float shootTimeProgress() const noexcept{
 				return data.shootState.shootTimer / trait->shoot.shootDuration();
 			}
