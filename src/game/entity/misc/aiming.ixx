@@ -1,5 +1,6 @@
 module;
 
+#include <gch/small_vector.hpp>
 #include <cassert>
 #include "../src/ext/adapted_attributes.hpp"
 
@@ -105,7 +106,7 @@ namespace mo_yanxi::game{
 			const quad_tree<ecs::collision_object>& quad_tree,
 			const math::vec2 position,
 			const math::range valid_distance,
-			Filter filter = {},
+			Filter filter,
 			Pred pred, PrefProj preference_proj, PredProj pred_proj = &weighted_entity::preference){
 
 			candidates.clear();

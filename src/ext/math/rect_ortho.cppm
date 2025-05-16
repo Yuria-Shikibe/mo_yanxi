@@ -381,10 +381,10 @@ namespace mo_yanxi::math{
 		[[nodiscard]] FORCE_INLINE constexpr bool overlap_inclusive(this const rect_ortho& l, const rect_ortho& r) noexcept{
 			if consteval{
 				return
-				get_src_x() <= r.get_end_x() &&
-				get_end_x() >= r.get_src_x() &&
-				get_src_y() <= r.get_end_y() &&
-				get_end_y() >= r.get_src_y();
+				l.get_src_x() <= r.get_end_x() &&
+				l.get_end_x() >= r.get_src_x() &&
+				l.get_src_y() <= r.get_end_y() &&
+				l.get_end_y() >= r.get_src_y();
 			}else{
 				const float a_src_x = l.get_src_x();
 				const float a_end_x = l.get_end_x();

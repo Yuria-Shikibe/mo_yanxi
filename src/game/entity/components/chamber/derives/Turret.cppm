@@ -2,7 +2,6 @@ module;
 
 #include <gch/small_vector.hpp>
 
-
 export module mo_yanxi.game.ecs.component.chamber.turret;
 
 export import mo_yanxi.game.ecs.component.chamber;
