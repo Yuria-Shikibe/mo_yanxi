@@ -203,5 +203,9 @@ namespace mo_yanxi::game::ecs::drawer{
 		virtual void draw(const world::graphic_context& draw_ctx) const{
 
 		}
+
+		virtual void post_effect(const world::graphic_context& draw_ctx) const{
+
+		}
 	};
 }

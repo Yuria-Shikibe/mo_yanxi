@@ -373,7 +373,7 @@ namespace mo_yanxi::ui{
 
 		auto deleteRange(Layout& layout) const{
 			math::section rng{layout.at(range.src.pos).code.unit_index, layout.at(range.dst.pos).code.unit_index};
-			rng = rng.to_ordered();
+			rng = rng.get_ordered();
 			const auto len = rng.length();
 			if(len){
 				layout.text.erase(layout.text.begin() + rng.from, layout.text.begin() + rng.to);

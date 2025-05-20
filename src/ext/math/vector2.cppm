@@ -806,7 +806,7 @@ export namespace mo_yanxi::math{
 		}
 
 		template <typename N>
-		FORCE_INLINE vector2<N> round_with(typename vector2<N>::const_pass_t other) const noexcept{
+		FORCE_INLINE vector2<N> round_with(vector2<N>::const_pass_t other) const noexcept{
 			vector2<N> tgt = as<N>();
 			tgt.x = math::round<N>(static_cast<N>(x), other.x);
 			tgt.y = math::round<N>(static_cast<N>(y), other.y);
@@ -991,16 +991,12 @@ export namespace mo_yanxi::math{
 		[[nodiscard]] FORCE_INLINE constexpr T slope() const noexcept{
 			return y / x;
 		}
-		/**
-		 * @brief
-		 * @return y / x
-		 */
+
 		[[nodiscard]] FORCE_INLINE constexpr vector2& uniform() noexcept{
 			x = x * 2 - 1;
 			y = y * 2 - 1;
 			return *this;
 		}
-
 
 		/**
 		 * @brief
@@ -1030,7 +1026,7 @@ export namespace mo_yanxi::math{
 		}
 
 		template <typename N>
-		[[nodiscard]] FORCE_INLINE constexpr bool axis_less(typename vector2<N>::const_pass_t other) const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr bool axis_less(vector2<N>::const_pass_t other) const noexcept{
 			return this->axis_less(other.x, other.y);
 		}
 
@@ -1046,7 +1042,7 @@ export namespace mo_yanxi::math{
 		}
 
 		template <typename N>
-		[[nodiscard]] FORCE_INLINE constexpr bool axis_greater(typename vector2<N>::const_pass_t other) const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr bool axis_greater(vector2<N>::const_pass_t other) const noexcept{
 			return this->axis_greater(other.x, other.y);
 		}
 	};
@@ -1120,7 +1116,7 @@ export namespace mo_yanxi::math{
 
 template <typename T>
 struct std::hash<mo_yanxi::math::vector2<T>>{
-	constexpr std::size_t operator()(typename mo_yanxi::math::vector2<T>::const_pass_t v) const noexcept{
+	constexpr std::size_t operator()(mo_yanxi::math::vector2<T>::const_pass_t v) const noexcept{
 		return v.hash_value();
 	}
 };
@@ -1209,7 +1205,7 @@ struct formatter_base{
 	}
 
 	template <typename OutputIt, typename CharT>
-	auto format(typename mo_yanxi::math::vector2<T>::const_pass_t p, std::basic_format_context<OutputIt, CharT>& context) const{
+	auto format(mo_yanxi::math::vector2<T>::const_pass_t p, std::basic_format_context<OutputIt, CharT>& context) const{
 		if(wrapperIndex != wrapper.size())std::format_to(context.out(), "{}", wrapper[wrapperIndex].first);
 		formatter.format(p.x, context);
 		std::format_to(context.out(), ", ");

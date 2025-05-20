@@ -13,8 +13,17 @@ export import mo_yanxi.game.ecs.component.drawer;
 import std;
 
 namespace mo_yanxi::game::meta{
+	export struct palette{
+		graphic::color primary;
+		graphic::color secondary;
+
+		[[nodiscard]] constexpr graphic::color operator[](float lerpT) const noexcept{
+			return primary.create_lerp(secondary, lerpT);
+		}
+	};
+
 	export struct trail_style{
-		float radius{10};
+		float radius{};
 		math::section<graphic::color> color{};
 		ecs::drawer::part_pos_transform trans{};
 

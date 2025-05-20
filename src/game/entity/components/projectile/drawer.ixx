@@ -13,7 +13,7 @@ import mo_yanxi.math;
 
 namespace mo_yanxi::game::ecs{
 	export struct projectile_drawer : drawer::entity_drawer{
-		graphic::uniformed_trail trail{50};
+		graphic::uniformed_trail trail{};
 
 		meta::trail_style trail_style{};
 

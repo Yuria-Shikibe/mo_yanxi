@@ -279,6 +279,13 @@ namespace mo_yanxi::game::fx{
 	using effect_id_type = std::size_t;
 
 	export
+	struct effect_meta{
+		styles style{};
+		float duration{};
+		float min_clip_radius{50};
+	};
+
+	export
 	struct effect_data{
 		styles style{};
 

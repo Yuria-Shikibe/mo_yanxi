@@ -15,7 +15,6 @@ namespace mo_yanxi::game::ecs{
 
 	export
 	template <>
-	struct component_custom_behavior<projectile_ui_builder> : component_custom_behavior_base<projectile_ui_builder>{
-		using base_types = ui_builder;
+	struct component_custom_behavior<projectile_ui_builder> : component_custom_behavior_base<projectile_ui_builder>, ui_builder_behavior_base{
 	};
 }

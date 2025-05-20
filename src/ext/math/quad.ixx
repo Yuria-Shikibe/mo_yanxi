@@ -174,6 +174,11 @@ namespace mo_yanxi::math{
 			return self.get_bound().overlap_inclusive(other);
 		}
 
+		template <typename S, typename O>
+		[[nodiscard]] FORCE_INLINE constexpr bool overlap(this const S& self, const O& other) noexcept{
+			return self.overlap_rough(other) && self.overlap_exact(other);
+		}
+
 		constexpr vec_t expand(const T length) noexcept{
 			auto center = avg();
 
@@ -206,48 +211,38 @@ namespace mo_yanxi::math{
 			return overlap_max - overlap_min;
 		}
 
-		template <any_derived_from<quad> S, typename O>
+		template <typename S, typename O>
 		[[nodiscard]] FORCE_INLINE constexpr bool axis_proj_overlaps(this const S& sbj, const O& obj, const vec_t axis) noexcept{
 			if constexpr (std::same_as<value_type, float> && any_derived_from<O, quad>){
-				if (!std::is_constant_evaluated()){
-					// struct alignas(32) IDXS{
-					// 	std::int32_t PERMUTE_IDX[8] {0, 2, 4, 6, 1, 3, 5, 7};
-					// };
-					// constexpr IDXS PERMUTE_IDX{};
+				if !consteval{
 
-					 alignas(32) constexpr std::int32_t PERMUTE_IDX[8] {0, 2, 4, 6, 1, 3, 5, 7};
+					alignas(32) constexpr std::int32_t PERMUTE_IDX[8] {0, 2, 4, 6, 1, 3, 5, 7};
 
-					// 加载并重组数据
 					const __m256i idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(PERMUTE_IDX));
 
-					// 同时加载sbj和obj数据
 					const __m256 sbj_data = _mm256_loadu_ps(reinterpret_cast<const float*>(&sbj));
 					const __m256 obj_data = _mm256_loadu_ps(reinterpret_cast<const float*>(&obj));
 
-					// 构造axis向量
 					const __m256 axis_xy = _mm256_set_m128(
-						_mm_set1_ps(axis.y),  // 高128位: yyyyyyyy
-						_mm_set1_ps(axis.x)   // 低128位: xxxxxxxx
+						_mm_set1_ps(axis.y),
+						_mm_set1_ps(axis.x)
 					);
 
-					// 重组并计算点积
-					auto compute_proj = [&](__m256 data) -> __m128 {
+					auto compute_dot_proj = [&](__m256 data) -> __m128 {
 						const __m256 permuted = _mm256_permutexvar_ps(idx, data);
 						const __m256 products = _mm256_mul_ps(permuted, axis_xy);
 						return _mm_add_ps(_mm256_extractf128_ps(products, 0),
 										 _mm256_extractf128_ps(products, 1));
 					};
 
-					// 并行计算两个对象的投影
-					const __m128 sbj_dots = compute_proj(sbj_data);
-					const __m128 obj_dots = compute_proj(obj_data);
+					const __m128 sbj_dots = compute_dot_proj(sbj_data);
+					const __m128 obj_dots = compute_dot_proj(obj_data);
 
-					// 快速极值计算
 					const float min1 = horizontal_extreme<true>(sbj_dots);
 					const float max1 = horizontal_extreme<false>(sbj_dots);
 					const float min2 = horizontal_extreme<true>(obj_dots);
 					const float max2 = horizontal_extreme<false>(obj_dots);
-					// 检查重叠
+
 					return (max1 >= min2) && (max2 >= min1);
 				}
 			}
@@ -291,6 +286,8 @@ namespace mo_yanxi::math{
 
 			std::size_t index{std::numeric_limits<std::size_t>::max()};
 			value_type value{std::numeric_limits<value_type>::max()};
+
+
 
 			auto update = [&](const value_type dst, const std::size_t Idx){
 				if(dst > 0 && dst < value){
@@ -565,6 +562,7 @@ namespace mo_yanxi::math{
 		using base::move;
 		using base::overlap_rough;
 		using base::overlap_exact;
+		using base::overlap;
 		using base::depart_vector_to;
 		using base::depart_vector_to_on;
 		using base::depart_vector_to_on_vel;

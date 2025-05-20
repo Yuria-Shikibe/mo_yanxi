@@ -25,6 +25,11 @@ namespace mo_yanxi::game::world{
 			return fx_manager.obtain();
 		}
 
+		[[nodiscard]] math::frect viewport() const noexcept{
+			assert(renderer_);
+			return renderer_->camera.get_viewport();
+		}
+
 		[[nodiscard]] graphic::renderer_world& renderer() const noexcept{
 			assert(renderer_);
 			return *renderer_;

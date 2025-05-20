@@ -18,7 +18,10 @@ namespace mo_yanxi::game{
 
 		graphic::color color{};
 		graphic::borrowed_image_region icon{};
-		
+
+		[[nodiscard]] bool is_hostile_to(faction_id o) const noexcept{
+			return o != id;
+		}
 	};
 
 	export const inline faction faction_0{0};
@@ -29,6 +32,7 @@ namespace mo_yanxi::game{
 	private:
 		const faction* meta_{};
 		faction_id id_{};
+
 	public:
 		[[nodiscard]] constexpr faction_ref() = default;
 
@@ -57,7 +61,9 @@ namespace mo_yanxi::game{
 			return *meta_;
 		}
 
-
+		explicit operator bool() const noexcept{
+			return meta_ != nullptr;
+		}
 
 		[[nodiscard]] constexpr faction_id get_id() const noexcept{
 			return id_;

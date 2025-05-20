@@ -7,6 +7,13 @@ set_policy("build.ccache", true)
 set_toolchains("msvc")
 add_cxflags("/diagnostics:column")
 
+if is_mode("debug") then
+    set_runtimes("MDd")
+else
+    set_runtimes("MD")
+end
+
+
 set_warnings("all")
 
 add_requires("glfw")
@@ -56,6 +63,7 @@ target("mo_yanxi")
     add_defines("_MSVC_STL_HARDENING=1")
     add_defines("_MSVC_STL_DESTRUCTOR_TOMBSTONES=1")
 
+    add_cxflags("/Zc:__cplusplus")
     add_cxflags("/FC")
     add_cxflags("/arch:AVX")
     add_cxflags("/arch:AVX2")

@@ -1,6 +1,5 @@
 module;
 
-#include <gch/small_vector.hpp>
 #include <cassert>
 #include "../src/ext/adapted_attributes.hpp"
 
@@ -69,22 +68,26 @@ namespace mo_yanxi::game{
 
 		template <
 			std::predicate<const ecs::collision_object&> Filter = pred_always,
-			std::strict_weak_order<float, float> Pred = std::ranges::less>
+			std::strict_weak_order<float, float> SortPred = std::ranges::less>
 		void index_candidates_by_distance(
-			const quad_tree<ecs::collision_object>& quad_tree,
+			const game::quad_tree<ecs::collision_object>& quad_tree,
+			const ecs::entity_id self,
 			const math::vec2 position,
 			const math::range valid_distance,
 			Filter filter = {},
-			Pred pred = {}){
+			SortPred sort_pred = {}){
 
 			candidates.clear();
-			const math::frect max_bound{position, valid_distance.to};
+			const math::frect max_bound{position, valid_distance.to * 2};
 			quad_tree->intersect_then(max_bound, [](const math::frect& lhs, const math::frect& rhs){
 				return lhs.overlap_exclusive(rhs);
 			}, [&](const math::frect& lhs, const ecs::collision_object& obj){
+				if(obj.id == self)return;
 				const auto obj_trs = obj.motion->pos();
 				const auto dst = obj_trs.dst(position);
-				if(!valid_distance.within_closed(dst))return;
+
+				auto rng = valid_distance;
+				if(!rng.expand(std::sqrt(obj.manifold->hitbox.estimate_max_length2()) / 2).within_closed(dst))return;
 				if(!std::invoke(filter, obj))return;
 
 				candidates.push_back(weighted_entity{
@@ -92,31 +95,36 @@ namespace mo_yanxi::game{
 				});
 			});
 
-			std::ranges::sort(candidates, std::move(pred), &weighted_entity::distance);
+			std::ranges::sort(candidates, std::move(sort_pred), &weighted_entity::distance);
 		}
 
 		template <
 			std::predicate<const ecs::collision_object&> Filter = pred_always,
-			std::invocable<const weighted_entity&> PredProj = decltype(&weighted_entity::preference),
-			std::strict_weak_order<std::invoke_result_t<PredProj, const weighted_entity&>, std::invoke_result_t<PredProj, const weighted_entity&>> Pred = std::ranges::less,
+			std::invocable<const weighted_entity&> SortPredProj = decltype(&weighted_entity::preference),
+			std::strict_weak_order<std::invoke_result_t<SortPredProj, const weighted_entity&>, std::invoke_result_t<SortPredProj, const weighted_entity&>> SortPred = std::ranges::less,
 			std::invocable<const ecs::collision_object&> PrefProj
 		>
 			requires (std::convertible_to<std::invoke_result_t<PrefProj, const ecs::collision_object&>, float>)
 		void index_candidates_by_distance(
-			const quad_tree<ecs::collision_object>& quad_tree,
+			const game::quad_tree<ecs::collision_object>& quad_tree,
+			const ecs::entity_id self,
 			const math::vec2 position,
 			const math::range valid_distance,
 			Filter filter,
-			Pred pred, PrefProj preference_proj, PredProj pred_proj = &weighted_entity::preference){
+			SortPred sort_pred, PrefProj preference_proj, SortPredProj sort_pred_proj = &weighted_entity::preference){
 
 			candidates.clear();
-			const math::frect max_bound{position, valid_distance.to};
+			const math::frect max_bound{position, valid_distance.to * 2};
 			quad_tree->intersect_then(max_bound, [](const math::frect& lhs, const math::frect& rhs){
 				return lhs.overlap_exclusive(rhs);
 			}, [&](const math::frect& lhs, const ecs::collision_object& obj){
+				if(obj.id == self)return;
+
 				const auto obj_trs = obj.motion->pos();
 				const auto dst = obj_trs.dst(position);
-				if(!valid_distance.within_closed(dst))return;
+
+				auto rng = valid_distance;
+				if(!rng.expand(std::sqrt(obj.manifold->hitbox.estimate_max_length2()) / 2).within_closed(dst))return;
 				if(!std::invoke(filter, obj))return;
 
 				candidates.push_back(weighted_entity{
@@ -124,7 +132,7 @@ namespace mo_yanxi::game{
 				});
 			});
 
-			std::ranges::sort(candidates, std::move(pred), pred_proj);
+			std::ranges::sort(candidates, std::move(sort_pred), std::move(sort_pred_proj));
 		}
 
 	};
@@ -202,11 +210,14 @@ namespace mo_yanxi::game{
 	}
 
 	export
-	FORCE_INLINE trivial_optional_float estimate_shoot_hit_delay(
+	[[nodiscard]] FORCE_INLINE trivial_optional_float estimate_shoot_hit_delay(
 		const math::vec2 shoot_pos,
 		const math::vec2 target,
 		const math::vec2 target_vel,
 		const float bullet_speed) noexcept{
+		if(std::isinf(bullet_speed)){
+			return {bullet_speed > 0 ? 0 : std::numeric_limits<float>::infinity()};
+		}
 
 		const auto local = target - shoot_pos;
 
@@ -218,12 +229,15 @@ namespace mo_yanxi::game{
 	}
 
 	export
-	FORCE_INLINE trivial_optional_float estimate_shoot_hit_delay(
+	[[nodiscard]] FORCE_INLINE trivial_optional_float estimate_shoot_hit_delay(
 		const math::vec2 shoot_pos,
 		const math::vec2 target,
 		const math::vec2 target_vel,
 		const float bullet_speed,
 		const float bullet_initial_displacement) noexcept{
+		if(std::isinf(bullet_speed)){
+			return {bullet_speed > 0 ? 0 : std::numeric_limits<float>::infinity()};
+		}
 
 		const auto local = target - shoot_pos;
 
@@ -240,9 +254,15 @@ namespace mo_yanxi::game{
 		ecs::entity_ref entity{};
 		math::vec2 local_pos{};
 
-		explicit operator bool() const noexcept{
-			return !entity.is_expired();
+		template <typename T>
+		auto& operator=(this T& self, const ecs::entity_id eid) noexcept{
+			return self.operator=(T{ecs::entity_ref{eid}});
 		}
+
+		explicit operator bool() const noexcept{
+			return static_cast<bool>(entity);
+		}
+
 
 		bool update(math::trans2 self_transform) noexcept{
 			if(entity.is_expired()){
@@ -258,6 +278,8 @@ namespace mo_yanxi::game{
 	export
 	struct traced_target : target{
 		math::vec2 last{};
+
+		using target::operator=;
 
 		bool update(math::trans2 self_transform) noexcept{
 			last = local_pos;

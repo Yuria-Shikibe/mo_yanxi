@@ -683,7 +683,9 @@ namespace mo_yanxi::graphic{
 		constexpr color dark_gray{color::from_rgba8888(0x3f3f3fff)};
 		constexpr color black{0, 0, 0, 1};
 		constexpr color clear{0, 0, 0, 0};
-		// constexpr color clear_light{10, 10, 10, 10};
+		constexpr color black_clear{0, 0, 0, 0};
+		constexpr color white_clear{1, 1, 1, 0};
+		constexpr color clear_light{white.to_light().set_a(0)};
 
 		constexpr color BLUE{0, 0, 1, 1};
 		constexpr color NAVY{0, 0, 0.5f, 1};

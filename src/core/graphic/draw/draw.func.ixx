@@ -534,8 +534,8 @@ namespace mo_yanxi::graphic::draw{
 				const int sides,
 				const float radius,
 				const float ratio,
-				const col color = colors::white,
-				const float stroke = 2.f
+				const float stroke = 2.f,
+				const col color = colors::white
 			){
 				const auto fSides = static_cast<float>(sides);
 
@@ -605,18 +605,19 @@ namespace mo_yanxi::graphic::draw{
 			math::trans2 trans,
 			const int sides,
 			const float radius,
+			const float stroke = 2.f,
 			const col color_inner = colors::white,
-			const col color_outer = colors::white,
-			const float stroke = 2.f){
-			const float space = math::pi_2 / static_cast<float>(sides);
-			float h_step = stroke / 2.0f / math::cos(space / 2.0f);
-			const float r1 = radius - h_step;
-			const float r2 = radius + h_step;
+			const col color_outer = colors::white){
+
+			const auto space = math::pi_2 / static_cast<float>(sides);
+			const auto h_step = stroke / 2.0f / math::cos(space / 2.0f);
+			const auto r1 = radius - h_step;
+			const auto r2 = radius + h_step;
 
 			static constexpr std::size_t MaxReserve = 64;
 
 			if(sides <= MaxReserve){
-				acquirer_guard _{auto_param, MaxReserve};
+				acquirer_guard _{auto_param, static_cast<std::size_t>(sides)};
 				for(int i = 0; i < sides; i++){
 					const float a = space * static_cast<float>(i) + trans.rot;
 					auto [cos1, sin1] = math::cos_sin(a);
@@ -653,11 +654,11 @@ namespace mo_yanxi::graphic::draw{
 			M& auto_param,
 			vec pos,
 			const float radius,
+			const float stroke = 2.f,
 			const col color_inner = colors::white,
-			const col color_outer = colors::white,
-			const float stroke = 2.f
+			const col color_outer = colors::white
 		){
-			line::poly(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, color_inner, color_outer, stroke);
+			line::poly(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, stroke, color_inner, color_outer);
 		}
 
 		export
@@ -667,10 +668,10 @@ namespace mo_yanxi::graphic::draw{
 			math::trans2 trans,
 			const float radius,
 			const float ratio = 1.f,
-			const col color = colors::white,
-			const float stroke = 2.f
+			const float stroke = 2.f,
+			const col color = colors::white
 		){
-			line::poly_partial(auto_param, trans, getCircleVertices(radius), radius, ratio, color, stroke);
+			line::poly_partial(auto_param, trans, getCircleVertices(radius), radius, ratio, stroke, color);
 		}
 	}
 
@@ -682,13 +683,13 @@ namespace mo_yanxi::graphic::draw{
 			const math::trans2 trans,
 			int sides,
 			const float radius,
+			const float outline_stroke = 2.f,
 			const col edge_inner_color = colors::white,
 			const col edge_outer_color = colors::white,
 			const col inner_center_color = colors::white,
-			const col inner_edge_color = colors::white,
-			const float outline_stroke = 2.f
+			const col inner_edge_color = colors::white
 		){
-			line::poly(auto_param, trans, sides, radius + outline_stroke / 2.f, edge_inner_color, edge_outer_color, outline_stroke);
+			line::poly(auto_param, trans, sides, radius + outline_stroke / 2.f, outline_stroke, edge_inner_color, edge_outer_color);
 			fill::poly(auto_param, trans, sides, radius, inner_center_color, inner_edge_color);
 		}
 
@@ -698,17 +699,121 @@ namespace mo_yanxi::graphic::draw{
 			M& auto_param,
 			const vec pos,
 			const float radius,
+			const float outline_stroke = 2.f,
 			const col edge_inner_color = colors::white,
 			const col edge_outer_color = colors::white,
 			const col inner_center_color = colors::white,
-			const col inner_edge_color = colors::white,
-			const float outline_stroke = 2.f
+			const col inner_edge_color = colors::white
 		){
-			fancy::poly_outlined(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, edge_inner_color,
+			fancy::poly_outlined(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius,
+						outline_stroke,
+						edge_inner_color,
 			           edge_outer_color,
 			           inner_center_color,
-			           inner_edge_color,
-			            outline_stroke);
+			           inner_edge_color);
 		}
+
+		export
+		template <typename M>
+		FORCE_INLINE void  select_rect(
+			M& auto_param,
+			const math::frect rect,
+			const float stroke = 2,
+			const col color = colors::white,
+			const float cornerSize = 2,
+			const bool align = true,
+			const float offset = 0.5f
+		){
+				math::frect inner{};
+				math::frect outer{};
+				inner = rect;
+				outer = rect;
+
+				inner.expand(-offset * stroke);
+				outer.expand((1 - offset) * stroke);
+
+				acquirer_guard _{auto_param, 8};
+				if(!align){
+					fill::quad(auto_param[0],
+						outer.vert_00(), inner.vert_00(),
+						inner.vert_00().add(0, cornerSize), outer.vert_00().add(0, cornerSize), color
+					);
+					fill::quad(auto_param[1],
+						outer.vert_00(), inner.vert_00(),
+						inner.vert_00().add(cornerSize, 0), outer.vert_00().add(cornerSize, 0), color
+					);
+
+					fill::quad(auto_param[2],
+						outer.vert_10(), inner.vert_10(),
+						inner.vert_10().add(0, cornerSize), outer.vert_10().add(0, cornerSize), color
+					);
+					fill::quad(auto_param[3],
+						outer.vert_10(), inner.vert_10(),
+						inner.vert_10().add(-cornerSize, 0), outer.vert_10().add(-cornerSize, 0), color
+					);
+
+					fill::quad(auto_param[4],
+						outer.vert_01(), inner.vert_01(),
+						inner.vert_01().add(0, -cornerSize), outer.vert_01().add(0, -cornerSize), color
+					);
+					fill::quad(auto_param[5],
+						outer.vert_01(), inner.vert_01(),
+						inner.vert_01().add(cornerSize, 0), outer.vert_01().add(cornerSize, 0), color
+					);
+
+					fill::quad(auto_param[6],
+						outer.vert_11(), inner.vert_11(),
+						inner.vert_11().add(0, -cornerSize), outer.vert_11().add(0, -cornerSize), color
+					);
+					fill::quad(auto_param[7],
+						outer.vert_11(), inner.vert_11(),
+						inner.vert_11().add(-cornerSize, 0), outer.vert_11().add(-cornerSize, 0), color
+					);
+				} else{
+					fill::quad(auto_param[0],
+						outer.vert_00(), inner.vert_00(),
+						vec{inner.vert_00().x, rect.vert_00().y + cornerSize},
+						vec{outer.vert_00().x, rect.vert_00().y + cornerSize}, color
+					);
+					fill::quad(auto_param[1],
+						outer.vert_00(), inner.vert_00(),
+						vec{rect.vert_00().x + cornerSize, inner.vert_00().y},
+						vec{rect.vert_00().x + cornerSize, outer.vert_00().y}, color
+					);
+
+					fill::quad(auto_param[2],
+						outer.vert_10(), inner.vert_10(),
+						vec{inner.vert_10().x, rect.vert_10().y + cornerSize},
+						vec{outer.vert_10().x, rect.vert_10().y + cornerSize}, color
+					);
+					fill::quad(auto_param[3],
+						outer.vert_10(), inner.vert_10(),
+						vec{rect.vert_10().x - cornerSize, inner.vert_10().y},
+						vec{rect.vert_10().x - cornerSize, outer.vert_10().y}, color
+					);
+
+					fill::quad(auto_param[4],
+						outer.vert_01(), inner.vert_01(),
+						vec{inner.vert_01().x, rect.vert_01().y - cornerSize},
+						vec{outer.vert_01().x, rect.vert_01().y - cornerSize}, color
+					);
+					fill::quad(auto_param[5],
+						outer.vert_01(), inner.vert_01(),
+						vec{rect.vert_01().x + cornerSize, inner.vert_01().y},
+						vec{rect.vert_01().x + cornerSize, outer.vert_01().y}, color
+					);
+
+					fill::quad(auto_param[6],
+						outer.vert_11(), inner.vert_11(),
+						vec{inner.vert_11().x, rect.vert_11().y - cornerSize},
+						vec{outer.vert_11().x, rect.vert_11().y - cornerSize}, color
+					);
+					fill::quad(auto_param[7],
+						outer.vert_11(), inner.vert_11(),
+						vec{rect.vert_11().x - cornerSize, inner.vert_11().y},
+						vec{rect.vert_11().x - cornerSize, outer.vert_11().y}, color
+					);
+				}
+			}
 	}
 }

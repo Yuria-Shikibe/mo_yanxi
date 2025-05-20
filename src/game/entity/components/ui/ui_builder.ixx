@@ -44,4 +44,8 @@ namespace mo_yanxi::game::ecs{
 		virtual void build_hud(ui::table& where, const entity_ref& eref) const {
 		}
 	};
+
+	export struct ui_builder_behavior_base{
+		using base_types = ui_builder;
+	};
 }

@@ -1,7 +1,6 @@
 module;
 
 #include "../src/srl/srl.game.hpp"
-#include <gch/small_vector.hpp>
 
 module mo_yanxi.game.ui.hitbox_editor;
 

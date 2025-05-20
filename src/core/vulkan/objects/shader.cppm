@@ -123,7 +123,7 @@ export namespace mo_yanxi::vk{
 				throw unqualified_error{"Shader File Not Fount"};
 			}
 
-			createShaderModule(io::read_bytes<std::uint32_t>(file.c_str()).value());
+			createShaderModule(io::read_bytes<std::uint32_t>(file).value());
 		}
 	};
 

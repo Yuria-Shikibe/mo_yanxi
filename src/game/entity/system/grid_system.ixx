@@ -1,6 +1,5 @@
 module;
 
-#include <gch/small_vector.hpp>
 
 export module mo_yanxi.game.ecs.system.grid_system;
 
@@ -22,6 +21,7 @@ namespace mo_yanxi::game::ecs::system{
 				chamber::chamber_manifold& grid
 			){
 				grid.update_transform(motion.trans);
+
 				grid.manager.sliced_each([&](
 					chamber::building_data& data,
 					chamber::building& building

@@ -1,5 +1,8 @@
 module;
 
+#define MSDFGEN_USE_CPP11
+#include <msdfgen/msdfgen.h>
+#include <msdfgen/msdfgen-ext.h>
 
 export module mo_yanxi.graphic.msdf;
 
@@ -9,8 +12,7 @@ import mo_yanxi.math;
 import std;
 
 //
-import <msdfgen/msdfgen.h>;
-import <msdfgen/msdfgen-ext.h>;
+
 
 namespace mo_yanxi::graphic::msdf{
 	export constexpr inline int sdf_image_boarder = 4;
@@ -89,7 +91,7 @@ namespace mo_yanxi::graphic::msdf{
 		[[nodiscard]] msdf_generator(const char* path, double range = sdf_image_range, int boarder = sdf_image_boarder);
 
 		graphic::bitmap operator ()(const unsigned w, const unsigned h, const unsigned mip_lv) const {
-			auto scl = 1 << mip_lv;
+			auto scl = 1u << mip_lv;
 			auto b = boarder / scl;
 			if(b * 2 >= w || b * 2 >= h){
 				b = 0;

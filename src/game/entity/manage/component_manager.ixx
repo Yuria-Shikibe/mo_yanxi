@@ -3,7 +3,6 @@ module;
 #include <plf_hive.h>
 #include <cassert>
 #include <gch/small_vector.hpp>
-
 #include "../src/ext/adapted_attributes.hpp"
 
 export module mo_yanxi.game.ecs.component.manager;

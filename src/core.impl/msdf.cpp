@@ -1,9 +1,10 @@
 module;
 
+#include <nanosvg/nanosvg.h>
+
 #define MSDFGEN_USE_CPP11
 #include <msdfgen/msdfgen.h>
 #include <msdfgen/msdfgen-ext.h>
-#include <nanosvg/nanosvg.h>
 
 module mo_yanxi.graphic.msdf;
 

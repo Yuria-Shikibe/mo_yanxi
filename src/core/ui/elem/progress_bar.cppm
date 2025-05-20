@@ -76,13 +76,9 @@ namespace mo_yanxi::ui{
 	export
 	struct progress_bar : elem{
 	protected:
-		using ColorToProv = progress_bar_color;
 
 		progress_bar_progress lastProgress{};
-		ColorToProv color{};
-		std::move_only_function<progress_bar_progress(progress_bar&)> progressProv{};
-
-		std::move_only_function<ColorToProv(progress_bar&)> color_prov_{};
+		progress_bar_color color{graphic::colors::light_gray};
 		const progress_bar_drawer* drawer{&DefaultProgressBarDrawer};
 
 	public:
@@ -91,6 +87,65 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] progress_bar(scene* scene, group* group)
 			: elem(scene, group, "progress_bar"){
 			interactivity = interactivity::disabled;
+		}
+
+
+		void set_initial_progress(const progress_bar_progress progress) noexcept{
+			this->lastProgress = progress;
+		}
+
+		[[nodiscard]] const progress_bar_progress& get_progress() const noexcept{
+			return lastProgress;
+		}
+
+		[[nodiscard]] const progress_bar_color& get_color() const noexcept{
+			return color;
+		}
+
+	protected:
+		void draw_content(const rect clipSpace) const override;
+
+		void update(float delta_in_ticks) override{
+			elem::update(delta_in_ticks);
+		}
+
+	public:
+		void update_progress(progress_bar_progress prog, float delta_in_ticks){
+			prog.current = math::clamp(prog.current);
+			if(!std::isfinite(prog.current)){
+				prog.current = 0;
+			}
+			lastProgress.approach(prog, reach_speed, delta_in_ticks);
+		}
+
+		void update_color(const progress_bar_color& color, float delta_in_ticks){
+			if(reach_speed >= 1.f){
+				this->color = color;
+			}else{
+				this->color.lerp(color, reach_speed * delta_in_ticks);
+			}
+		}
+
+		void update_progress(float prog, float delta_in_ticks){
+			this->update_progress(progress_bar_progress{prog}, delta_in_ticks);
+		}
+
+		[[nodiscard]] constexpr math::vec2 get_bar_size() const noexcept{
+			return lastProgress.get_size(content_size());
+		}
+	};
+
+	export
+	struct dynamic_progress_bar : progress_bar{
+	protected:
+
+		std::move_only_function<progress_bar_progress(progress_bar&)> progressProv{};
+		std::move_only_function<progress_bar_color(progress_bar&)> color_prov_{};
+
+	public:
+
+		[[nodiscard]] dynamic_progress_bar(scene* scene, group* group)
+			: progress_bar(scene, group){
 		}
 
 		template <std::invocable<> Func>
@@ -112,7 +167,7 @@ namespace mo_yanxi::ui{
 		}
 
 		template <std::invocable<> Func>
-			requires (std::is_invocable_r_v<ColorToProv, Func>)
+			requires (std::is_invocable_r_v<progress_bar_color, Func>)
 		void set_color_prov(Func&& func){
 			color_prov_ = [p = std::forward<Func>(func)](progress_bar&){
 				return p();
@@ -120,7 +175,7 @@ namespace mo_yanxi::ui{
 		}
 
 		template <std::invocable<progress_bar&> Func>
-			requires (std::is_invocable_r_v<ColorToProv, Func>)
+			requires (std::is_invocable_r_v<progress_bar_color, Func>)
 		void set_color_prov(Func&& func){
 			color_prov_ = std::forward<Func>(func);
 		}
@@ -129,49 +184,14 @@ namespace mo_yanxi::ui{
 			color_prov_ = std::move(func);
 		}
 
-		void set_initial_progress(const progress_bar_progress progress) noexcept{
-			this->lastProgress = progress;
-		}
-
-		[[nodiscard]] const progress_bar_progress& get_progress() const noexcept{
-			return lastProgress;
-		}
-
-		[[nodiscard]] const ColorToProv& getColor() const noexcept{
-			return color;
-		}
-
 	protected:
-		void draw_content(const rect clipSpace) const override;
-
 		void update(float delta_in_ticks) override{
 			elem::update(delta_in_ticks);
 			if(progressProv)update_progress(progressProv(*this), delta_in_ticks);
 			if(color_prov_){
-				auto next = color_prov_(*this);
-				if(reach_speed >= 1.f){
-					color = next;
-				}else{
-					color.lerp(color_prov_(*this), reach_speed * delta_in_ticks);
-				}
-			}else{
-				color = graphic::colors::light_gray;
+				update_color(color_prov_(*this), delta_in_ticks);
 			}
 		}
-
-	public:
-		void update_progress(progress_bar_progress prog, float delta_in_ticks){
-			prog.current = math::clamp(prog.current);
-			if(!std::isfinite(prog.current)){
-				prog.current = 0;
-			}
-			lastProgress.approach(prog, reach_speed, delta_in_ticks);
-		}
-
-		[[nodiscard]] constexpr math::vec2 get_bar_size() const noexcept{
-			return lastProgress.get_size(content_size());
-		}
-
 	};
 }
 

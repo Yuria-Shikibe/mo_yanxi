@@ -10,13 +10,16 @@ export import mo_yanxi.game.ecs.component.damage;
 import mo_yanxi.graphic.trail;
 import mo_yanxi.graphic.color;
 import mo_yanxi.math;
+import mo_yanxi.math.timed;
 
 
 namespace mo_yanxi::game::ecs{
 	export struct projectile_manifold{
-		entity_id owner;
-		damage_group current_damage_group;
-		damage_group max_damage_group;
+		entity_id owner{};
+		damage_group current_damage_group{};
+		damage_group max_damage_group{};
+
+		math::timed duration{};
 
 		void set_damage(const damage_group& dmg){
 			max_damage_group = current_damage_group = dmg;

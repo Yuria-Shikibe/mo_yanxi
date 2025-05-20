@@ -11,6 +11,11 @@ export import mo_yanxi.graphic.draw.multi_region;
 
 namespace mo_yanxi::ui{
 	export using draw_acquirer = graphic::draw::ui_acquirer;
+
+	export [[nodiscard]] draw_acquirer get_draw_acquirer(graphic::renderer_ui& renderer) noexcept{
+		return draw_acquirer{renderer.batch, graphic::draw::white_region};
+	}
+
 	export enum struct draw_layers : unsigned char{
 		def = 0,
 

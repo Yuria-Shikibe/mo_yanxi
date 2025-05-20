@@ -1,7 +1,7 @@
 module;
 
-#include "../src/ext/adapted_attributes.hpp"
 #include <gch/small_vector.hpp>
+#include "../src/ext/adapted_attributes.hpp"
 
 export module mo_yanxi.game.ecs.component.hitbox;
 
@@ -135,7 +135,7 @@ namespace mo_yanxi::game{
 		}
 	};
 
-	using small_vector_of_hitbox_comp = gch::small_vector<hitbox_comp, 4>; 
+	using small_vector_of_hitbox_comp = gch::small_vector<hitbox_comp, 4>;
 
 
 	export
@@ -177,6 +177,15 @@ namespace mo_yanxi::game{
 			return components.size();
 		}
 
+		[[nodiscard]] float get_wrap_radius() const noexcept{
+			float max{};
+			for(const auto& comp : components){
+				math::rect_box_posed box{comp.box.get_identity(), comp.trans};
+				max = std::ranges::max({box[0].length2(), box[1].length2(), box[2].length2(), box[3].length2()});
+			}
+			return std::sqrt(max);
+		}
+
 	};
 
 	export
@@ -193,6 +202,7 @@ namespace mo_yanxi::game{
 		constexpr ccd_hitbox() = default;
 
 		using hitbox_identity::size;
+		using hitbox_identity::get_wrap_radius;
 
 		[[nodiscard]] explicit(false) ccd_hitbox(const hitbox_identity& identity)
 			: hitbox_identity(identity){

@@ -148,8 +148,8 @@ namespace mo_yanxi::game::ecs{
 			}else{
 				return std::visit([&] <std::derived_from<default_collider> T> (T& c){
 					return c.collide_able_to(lhs, rhs);
-				}, lhs.manifold->collider) || std::visit([&] <std::derived_from<default_collider> T> (T& c){
-					return c.collide_able_to(lhs, rhs);
+				}, lhs.manifold->collider) && std::visit([&] <std::derived_from<default_collider> T> (T& c){
+					return c.collide_able_to(rhs, lhs);
 				}, rhs.manifold->collider);
 			}
 		}

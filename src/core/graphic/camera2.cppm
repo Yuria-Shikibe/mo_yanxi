@@ -64,7 +64,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		void set_scale_range(const math::range range = {DefMinimumScale, DefMaximumScale}) noexcept{
-			auto [min, max] = range.to_ordered();
+			auto [min, max] = range.get_ordered();
 			minScale = std::log(min);
 			maxScale = std::log(max);
 		}

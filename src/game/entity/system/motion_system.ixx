@@ -1,7 +1,5 @@
 module;
 
-#include <gch/small_vector.hpp>
-
 export module mo_yanxi.game.ecs.system.motion_system;
 
 export import mo_yanxi.game.ecs.component.manager;

@@ -1,15 +1,17 @@
 module;
 
-#include <gch/small_vector.hpp>
 
 export module mo_yanxi.game.meta.instancing;
 
 export import mo_yanxi.game.ecs.component.manager;
-export import mo_yanxi.game.ecs.entitiy_decleration;
 export import mo_yanxi.game.meta.projectile;
 
+import mo_yanxi.game.ecs.entitiy_decleration;
+
+import std;
+
 namespace mo_yanxi::game::meta{
-	template <typename Meta, typename EntityDesc>
+	template <typename Derive, typename Meta, typename EntityDesc>
 	struct entity_create_handle{
 		struct promise_type;
 		using component_chunk_type = ecs::tuple_to_comp_t<EntityDesc>;
@@ -36,8 +38,8 @@ namespace mo_yanxi::game::meta{
 
 			}
 
-			entity_create_handle get_return_object() noexcept{
-				return entity_create_handle{handle::from_promise(*this)};
+			Derive get_return_object() noexcept{
+				return Derive{entity_create_handle{handle::from_promise(*this)}};
 			}
 
 			[[nodiscard]] static auto initial_suspend() noexcept{ return std::suspend_never{}; }
@@ -98,7 +100,7 @@ namespace mo_yanxi::game::meta{
 		}
 
 		[[nodiscard]] const meta_info& get_meta() const noexcept{
-			return *hdl.promise().meta;
+			return hdl.promise().meta;
 		}
 
 		[[nodiscard]] ecs::entity_id get_result_entity() const noexcept{
@@ -119,20 +121,41 @@ namespace mo_yanxi::game::meta{
 	};
 
 
-	struct projectile_create_handle : entity_create_handle<meta::projectile, ecs::decl::projectile_entity_desc>{
-		void set_initial_motion(math::trans2 where) const noexcept{
+	struct projectile_create_handle : entity_create_handle<projectile_create_handle, meta::projectile, ecs::decl::projectile_entity_desc>{
+		// using entity_create_handle::entity_create_handle;
+
+		// [[nodiscard]] explicit projectile_create_handle(handle&& hdl)
+		// 	: entity_create_handle(std::move(hdl)){
+		// }
+		//
+		// [[nodiscard]] projectile_create_handle() = default;
+
+		void set_initial_trans(math::trans2 where) const noexcept{
 			get_components().get<ecs::mech_motion>().trans = where;
 		}
 
-		void set_initial_vel(float direction_angle_rad, const float vel_override) const noexcept{
-			get_components().get<ecs::mech_motion>().vel.vec.set_polar_rad(direction_angle_rad, vel_override);
+		void set_initial_vel(float direction_angle_rad, const float vel_override, const float angular_override) const noexcept{
+			get_components().get<ecs::mech_motion>().vel = {math::vec2::from_polar_rad(direction_angle_rad, vel_override), angular_override};
 		}
 
-		void set_initial_vel(const float direction_angle_rad) const noexcept{
-			set_initial_vel(direction_angle_rad, get_meta().initial_speed.value());
+		void set_initial_vel(const math::uniform_trans2& vel) const noexcept{
+			get_components().get<ecs::mech_motion>().vel = vel;
+		}
+
+		void set_initial_vel(const float direction_angle_rad, const float angular_override = 0) const noexcept{
+			set_initial_vel(direction_angle_rad, get_meta().initial_speed.value(), angular_override);
+		}
+
+		void set_faction(const faction_ref faction) const noexcept{
+			get_components().faction = faction;
+		}
+
+		void set_owner(const ecs::entity_id owner) const noexcept{
+			get_components().owner = owner;
 		}
 	};
 
+	export
 	inline projectile_create_handle create(ecs::component_manager& manager, const meta::projectile& metainfo){
 		using ret_t = projectile_create_handle;
 		using comp_t = ret_t::component_chunk_type;
@@ -143,8 +166,11 @@ namespace mo_yanxi::game::meta{
 		comp.set_trail_style(metainfo.trail_style);
 		comp.drawer = metainfo.drawer;
 		comp.set_damage(metainfo.damage);
+		comp.duration.set(metainfo.lifetime);
 
 		co_yield comp;
+
+		//TODO support cancel maybe
 
 		co_return manager.create_entity_deferred<ecs::decl::projectile_entity_desc>(std::move(comp));
 	}

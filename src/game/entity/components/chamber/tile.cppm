@@ -3,6 +3,10 @@
 //
 
 // ReSharper disable CppDFAUnreachableCode
+module;
+
+#include <cassert>
+
 export module mo_yanxi.game.ecs.component.chamber:tile;
 
 export import mo_yanxi.math.rect_ortho;
@@ -11,10 +15,11 @@ export import mo_yanxi.game.ecs.quad_tree_interface;
 export import mo_yanxi.game.ecs.entity;
 export import mo_yanxi.game.ecs.component.damage;
 export import mo_yanxi.game.ecs.component.hit_point;
-export import mo_yanxi.referenced_ptr;
 
-export import mo_yanxi.game.ecs.component.ui.builder;
+import mo_yanxi.referenced_ptr;
+import mo_yanxi.game.ecs.component.ui.builder;
 
+export import mo_yanxi.game.ecs.world.top;
 
 import std;
 
@@ -39,6 +44,13 @@ namespace mo_yanxi::game::ecs{
 
 		};
 
+		struct building_meta{
+			math::vector2<unsigned short> size;
+
+
+			//hitpoint
+		};
+
 		export
 		struct building_data;
 
@@ -58,60 +70,119 @@ namespace mo_yanxi::game::ecs{
 		private:
 			building_data* data_{};
 
+		protected:
+			[[nodiscard]] float get_update_delta() const noexcept;
+
+			[[nodiscard]] math::vec2 get_local_to_global(math::vec2 p) const noexcept;
+			[[nodiscard]] math::trans2 get_local_to_global_trans(math::vec2 p) const noexcept;
+			[[nodiscard]] math::trans2 get_local_to_global_trans(math::trans2 p) const noexcept;
+
 		public:
 			[[nodiscard]] building_data& data() const noexcept{
+				assert(data_ != nullptr);
 				return *data_;
 			}
 
 			~building() override = default;
 
-			virtual void update(chamber_manifold& grid, const chunk_meta& meta, float delta_in_tick){
+			virtual void draw_hud(graphic::renderer_ui& renderer) const{
+
+			}
+
+			virtual void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world){
 
 			}
 		};
 
-		struct tile_status{
-			float valid_hit_point{50};
+		export
+		template <typename ...Bases>
+		struct building_trait_base{
+			using base_types = std::tuple<building, ui_builder, Bases ...>;
+		};
 
-			constexpr float take_damage(float damage) noexcept{
-				if(damage >= valid_hit_point){
-					return std::exchange(valid_hit_point, 0);
+		struct tile_damage{
+			float building_damage;
+			float structural_damage;
+
+			float sum() const noexcept{
+				return building_damage + structural_damage;
+			}
+		};
+
+		struct tile_status{
+			float valid_hit_point{};
+			float valid_structure_hit_point{};
+
+			constexpr tile_damage take_damage(float damage, float tile_max) noexcept{
+				float structure_damage_threshold = tile_max / 8;
+
+				float struct_consumes{};
+				if(valid_hit_point < structure_damage_threshold && valid_structure_hit_point > structure_damage_threshold){
+					float factor = 1 - valid_hit_point / structure_damage_threshold;
+					struct_consumes = factor * std::min(damage, valid_structure_hit_point);
+					valid_structure_hit_point -= struct_consumes;
 				}
+
+				damage -= struct_consumes;
+				damage = std::min(damage, tile_max);
+
+				if(damage >= valid_hit_point){
+					return  {std::exchange(valid_hit_point, 0), struct_consumes};
+				}
+
 				valid_hit_point -= damage;
-				return damage;
+				return {damage, struct_consumes};
 			}
 		};
 
 		struct building_data{
 			friend chamber_grid;
 			friend chamber_manifold;
+			friend ecs::component_custom_behavior<building_data>;
 
 		private:
 			tile_region region_{};
+			const chunk_meta* component_head_{};
 			chamber_manifold* grid_{};
 
 		public:
-			std::vector<tile_damage_event> damage_events{};
-			std::vector<tile_status> tile_states{};
 			hit_point hit_point{};
 
+			std::vector<tile_damage_event> damage_events{};
+
+			//TODO should this be public?
+			std::vector<tile_status> tile_states{};
+			float building_damage_take{};
+			float structural_damage_take{};
+
 		private:
-			float critical_damage_take{};
 
 		public:
 			[[nodiscard]] tile_region region() const noexcept{
 				return region_;
 			}
 
-			[[nodiscard]] chamber_manifold* grid() const noexcept{
-				return grid_;
+			[[nodiscard]] chamber_manifold& grid() const noexcept{
+				return *grid_;
+			}
+
+			[[nodiscard]] const chunk_meta* get_component_head() const noexcept{
+				return component_head_;
+			}
+
+			[[nodiscard]] const entity& entity() const noexcept{
+				return *component_head_->id();
+			}
+
+			[[nodiscard]] entity_id get_id() const noexcept{
+				return component_head_->id();
 			}
 
 			tile_status& operator[](const tile& tile) noexcept;
 			const tile_status& operator[](const tile& tile) const noexcept;
 
 			[[nodiscard]] float get_tile_individual_max_hitpoint() const noexcept{
-				return hit_point.max / region_.area() * 8;
+				return hit_point.max / region_.area() * 2;
 			}
 
 			template <std::integral T>
@@ -121,11 +192,12 @@ namespace mo_yanxi::game::ecs{
 
 			void clear_hit_events() noexcept{
 				damage_events.clear();
-				critical_damage_take = 0;
+				structural_damage_take = building_damage_take = 0;
 			}
 
+
 			damage_consume_result consume_damage(tile_coord coord, damage_group& total_damage){
-				if(critical_damage_take > hit_point.cur)return damage_consume_result::hitpoint_exhaust;
+				// if(critical_damage_take > hit_point.cur)return damage_consume_result::hitpoint_exhaust;
 				auto sum = total_damage.sum();
 
 				if(sum <= 0.f){
@@ -133,12 +205,13 @@ namespace mo_yanxi::game::ecs{
 				}
 
 				auto local = (coord - region_.src);
-				sum = tile_states[local_to_index(local)].take_damage(std::min(sum, 30.f));
+				auto dmg = tile_states[local_to_index(local)].take_damage(sum, get_tile_individual_max_hitpoint());
 
-				if(sum > 0.){
-					critical_damage_take += sum;
+				if(dmg.sum() > 0.){
+					building_damage_take += dmg.building_damage;
+					structural_damage_take += dmg.structural_damage;
 					damage_events.emplace_back(local.as<unsigned short>(), sum);
-					total_damage.material_damage.direct -= sum;
+					total_damage.material_damage.direct -= dmg.sum();
 					return damage_consume_result::success;
 				}else{
 					return damage_consume_result::hitpoint_exhaust;
@@ -169,15 +242,15 @@ namespace mo_yanxi::game::ecs{
 	}
 
 
-	export
-	template <>
-	struct component_custom_behavior<chamber::building> : component_custom_behavior_base<chamber::building>{
-		using base_types = ui_builder;
-
-		static void on_relocate(const chunk_meta& meta, value_type& comp){
-			comp.data_ = std::addressof(meta.id()->at<chamber::building_data>());
-		}
-	};
+	// export
+	// template <>
+	// struct component_custom_behavior<chamber::building> : component_custom_behavior_base<chamber::building>{
+	// 	using base_types = ui_builder;
+	//
+	// 	static void on_relocate(const chunk_meta& meta, value_type& comp){
+	// 		comp.data_ = std::addressof(meta.id()->at<chamber::building_data>());
+	// 	}
+	// };
 
 }
 

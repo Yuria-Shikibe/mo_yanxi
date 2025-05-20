@@ -9,10 +9,10 @@ export import mo_yanxi.game.ecs.component.manager;
 
 export import mo_yanxi.game.ecs.component.manifold;
 export import mo_yanxi.game.ecs.component.physical_property;
-export import mo_yanxi.game.ecs.component.chamber;
 export import mo_yanxi.game.quad_tree;
-export import mo_yanxi.shared_stack;
 export import mo_yanxi.math.intersection;
+
+import mo_yanxi.shared_stack;
 
 import std;
 
@@ -346,8 +346,8 @@ namespace mo_yanxi::game::ecs::system{
 		}
 
 	public:
-		[[nodiscard]] decltype(tree)::node_type& quad_tree() noexcept{
-			return *tree.operator->();
+		[[nodiscard]] decltype(tree)& quad_tree() noexcept{
+			return tree;
 		}
 
 		void insert_all(component_manager& component_manager) noexcept{
@@ -414,6 +414,13 @@ namespace mo_yanxi::game::ecs::system{
 		}
 
 		void run_collision_test(component_manager& component_manager){
+			component_manager.sliced_each([&](
+			   manifold& manifold,
+			   const mech_motion& motion
+			){
+				manifold.hitbox.update_hitbox_with_ccd(motion.trans);
+			});
+
 			insert_all(component_manager);
 			run_collision_test_pre(component_manager);
 

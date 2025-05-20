@@ -1,7 +1,5 @@
 module;
 
-#include <gch/small_vector.hpp>
-
 module mo_yanxi.game.world.hud;
 
 import mo_yanxi.core.global.ui;
@@ -13,7 +11,9 @@ import mo_yanxi.ui.creation.file_selector;
 import mo_yanxi.ui.graphic;
 import mo_yanxi.ui.assets;
 
+import mo_yanxi.game.ecs.component.chamber;
 import mo_yanxi.game.ecs.component.manifold;
+import mo_yanxi.game.ecs.component.ui.builder;
 
 void mo_yanxi::game::world::hud::hud_viewport::build_hud(){
 	auto& bed = *this;
@@ -40,16 +40,22 @@ void mo_yanxi::game::world::hud::hud_viewport::build_entity_info(){
 
 void mo_yanxi::game::world::hud::hud_viewport::draw_content(const ui::rect clipSpace) const{
 	using namespace graphic;
-	ui::draw_acquirer draw_acquirer{get_renderer().batch, draw::white_region};
+	auto draw_acquirer = ui::get_draw_acquirer(get_renderer());
 
 	draw::line::square(draw_acquirer, {get_scene()->get_cursor_pos(), 45.f * math::deg_to_rad}, 32, 2, ui::theme::colors::theme);
 
 	get_renderer().batch.push_projection(context.graphic_context->renderer().camera.get_world_to_uniformed());
 
 	if(main_selected){
+
+		if(auto building = main_selected->try_get<ecs::chamber::chamber_manifold>()){
+			building->draw_hud(get_renderer());
+		}
+
 		if(auto manifold = main_selected->try_get<ecs::manifold>()){
 			draw::line::rect_ortho(draw_acquirer, manifold->hitbox.max_wrap_bound(), 4, ui::theme::colors::theme);
 		}
+
 	}
 
 	get_renderer().batch.pop_projection();
@@ -66,7 +72,7 @@ mo_yanxi::ui::events::click_result mo_yanxi::game::world::hud::hud_viewport::on_
 		auto transed = context.graphic_context->renderer().camera.get_screen_to_world(click_event.pos, {}, true);
 
 		ecs::entity_id hit{};
-		context.collision_system->quad_tree().intersect_then(transed, [&, this](math::vec2 pos, const ecs::collision_object& obj){
+		context.collision_system->quad_tree()->intersect_then(transed, [&, this](math::vec2 pos, const ecs::collision_object& obj){
 			hit = obj.id;
 		});
 

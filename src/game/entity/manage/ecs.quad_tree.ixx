@@ -1,6 +1,9 @@
 module;
 
+extern "C++"{
 #include <plf_hive.h>
+}
+
 #include <gch/small_vector.hpp>
 
 export module mo_yanxi.game.quad_tree;
@@ -9,11 +12,12 @@ export import mo_yanxi.game.ecs.quad_tree_interface;
 
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.math.rect_ortho;
-import std;
 import mo_yanxi.basic_util;
 import mo_yanxi.concepts;
 import mo_yanxi.handle_wrapper;
 import mo_yanxi.math;
+
+import std;
 
 
 namespace mo_yanxi::game{
@@ -38,10 +42,10 @@ namespace mo_yanxi::game{
 	template <typename ItemTy, number T>
 	struct quad_tree_trait{
 		using adaptor_type = quad_tree_trait_adaptor<ItemTy>;
-		using vec_t = typename adaptor_type::vector_type;
-		using rect_type = typename adaptor_type::rect_type;
+		using vec_t = adaptor_type::vector_type;
+		using rect_type = adaptor_type::rect_type;
 
-		[[nodiscard]] static bool equals(typename adaptor_type::const_reference lhs, typename adaptor_type::const_reference rhs) noexcept{
+		[[nodiscard]] static bool equals(adaptor_type::const_reference lhs, adaptor_type::const_reference rhs) noexcept{
 			static_assert(requires{
 				{ adaptor_type::equals(lhs, rhs) } -> std::convertible_to<bool>;
 			});
@@ -57,7 +61,7 @@ namespace mo_yanxi::game{
 			{ adaptor_type::contains(value, p) } -> std::convertible_to<bool>;
 		};
 
-		static rect_type bound_of(typename adaptor_type::const_reference value) noexcept{
+		static rect_type bound_of(adaptor_type::const_reference value) noexcept{
 			static_assert(requires{
 				{ adaptor_type::get_bound(value) } -> std::convertible_to<rect_type>;
 			}, "QuadTree Requires ValueType impl at `Rect getBound()` member function");
@@ -66,8 +70,8 @@ namespace mo_yanxi::game{
 		}
 
 		static bool intersects(
-			typename adaptor_type::const_reference subject,
-			typename adaptor_type::const_reference object
+			adaptor_type::const_reference subject,
+			adaptor_type::const_reference object
 		) noexcept{
 			if(quad_tree_trait::equals(subject, object))return false;
 
@@ -80,7 +84,7 @@ namespace mo_yanxi::game{
 			return intersected;
 		}
 
-		static bool contains(typename adaptor_type::const_reference object, typename vec_t::const_pass_t point) noexcept requires (has_point_intersect){
+		static bool contains(adaptor_type::const_reference object, vec_t::const_pass_t point) noexcept requires (has_point_intersect){
 			return quad_tree_trait::bound_of(object).contains_loose(point) && adaptor_type::contains(object, point);
 		}
 	};

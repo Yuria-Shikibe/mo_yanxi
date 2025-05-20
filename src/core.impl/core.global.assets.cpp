@@ -11,7 +11,7 @@ void mo_yanxi::core::global::assets::init(void* vk_context_ptr){
 	font_manager.set_page(atlas.create_image_page("font"));
 
 
-	{
+	{ //TODO using relative path
 		auto p = font_manager.page().register_named_region(
 			std::string_view{"white"}, graphic::path_load{
 				R"(D:\projects\mo_yanxi\prop\assets\texture\white.png)"

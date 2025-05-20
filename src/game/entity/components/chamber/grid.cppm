@@ -1,7 +1,6 @@
 module;
 
 #include <cassert>
-#include <gch/small_vector.hpp>
 
 export module mo_yanxi.game.ecs.component.chamber:grid;
 
@@ -47,6 +46,7 @@ namespace mo_yanxi::game{
 	
 
 }
+
 
 namespace mo_yanxi::game::ecs::chamber{
 
@@ -280,7 +280,16 @@ namespace mo_yanxi::game::ecs::chamber{
 		math::rect_box<float> wrapper{};
 
 		in_viewports inViewports{};
+
+	protected:
+
+		bool targeting_requested{};
+
 	public:
+		hit_point hit_point{};
+		targeting_queue targets_primary{};
+		targeting_queue targets_secondary{};
+
 
 		template <math::quad_like T>
 		[[nodiscard]] constexpr T box_to_local (const T& brief) const noexcept{
@@ -366,13 +375,6 @@ namespace mo_yanxi::game::ecs::chamber{
 
 	export
 	struct chamber_manifold : public chamber_grid{
-	protected:
-
-		bool targeting_requested{};
-
-	public:
-		targeting_queue targets{};
-
 
 
 		[[nodiscard]] chamber_manifold() = default;
@@ -406,14 +408,19 @@ namespace mo_yanxi::game::ecs::chamber{
 			}
 		}
 
+		void draw_hud(graphic::renderer_ui& renderer){
+			manager.sliced_each([&](const building& building){
+				building.draw_hud(renderer);
+			});
+		}
 
 
 		chamber_manifold(const chamber_manifold& other) = delete;
 
 		chamber_manifold(chamber_manifold&& other) noexcept
-			: chamber_grid{std::move(other)}{
+			: chamber_grid{(other.manager.do_deferred(), std::move(other))}{
 
-			manager.do_deferred();
+
 			manager.sliced_each([this](building_data& data){
 				data.grid_ = this;
 			});
@@ -423,13 +430,67 @@ namespace mo_yanxi::game::ecs::chamber{
 
 		chamber_manifold& operator=(chamber_manifold&& other) noexcept{
 			if(this == &other) return *this;
+			other.manager.do_deferred();
 			chamber_grid::operator =(std::move(other));
 
-			manager.do_deferred();
 			manager.sliced_each([this](building_data& data){
 				data.grid_ = this;
 			});
 			return *this;
 		}
 	};
+}
+
+
+
+namespace mo_yanxi::game::ecs{
+	using namespace chamber;
+
+	export
+	template <>
+	struct component_custom_behavior<chamber::building_data> : component_custom_behavior_base<chamber::building_data>{
+		static void on_init(const chunk_meta& meta, value_type& comp){
+			comp.tile_states.resize(comp.region().area(), tile_status{
+				comp.get_tile_individual_max_hitpoint(),
+				comp.get_tile_individual_max_hitpoint()
+			});
+			comp.grid().local_grid.insert(meta.id());
+
+			on_relocate(meta, comp);
+		}
+
+		static void on_terminate(const chunk_meta& meta, const value_type& comp){
+			comp.grid().local_grid.erase(meta.id());
+		}
+
+		static void on_relocate(const chunk_meta& meta, value_type& comp){
+			comp.component_head_ = std::addressof(meta);
+			meta.id()->at<building>().data_ = std::addressof(comp);
+		}
+	};
+
+
+	namespace chamber{
+		float building::get_update_delta() const noexcept{
+			return data().grid().manager.get_update_delta();
+		}
+
+		math::vec2 building::get_local_to_global(math::vec2 p) const noexcept{
+			return p | data().get_trans();
+		}
+
+		math::trans2 building::get_local_to_global_trans(math::vec2 p) const noexcept{
+			auto trs = data().get_trans();
+			return {p | trs, trs.rot};
+		}
+
+		math::trans2 building::get_local_to_global_trans(math::trans2 trans2) const noexcept{
+			return trans2 | data().get_trans();
+		}
+
+		math::trans2 building_data::get_trans() const noexcept{
+			auto trs = grid_->get_transform();
+			return {region().get_src().mul(tile_size_integral).as<float>() | trs, trs.rot};
+		}
+	}
 }

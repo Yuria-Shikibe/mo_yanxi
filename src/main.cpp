@@ -8,11 +8,6 @@
 #include "../src/srl/srl.hpp"
 #include "../src/srl/srl.game.hpp"
 
-
-#include <gch/small_vector.hpp>
-
-
-
 import mo_yanxi.graphic.bitmap;
 
 import mo_yanxi.math;
@@ -64,6 +59,7 @@ import mo_yanxi.graphic.renderer;
 import mo_yanxi.graphic.renderer.world;
 import mo_yanxi.graphic.renderer.ui;
 import mo_yanxi.graphic.renderer.merger;
+import mo_yanxi.graphic.msdf;
 import mo_yanxi.graphic.draw;
 import mo_yanxi.graphic.draw.func;
 import mo_yanxi.graphic.draw.multi_region;
@@ -98,6 +94,7 @@ import mo_yanxi.ui.assets;
 import mo_yanxi.game.graphic.effect;
 import mo_yanxi.game.world.graphic;
 import mo_yanxi.game.world.hud;
+import mo_yanxi.game.ecs.world.top;
 
 import mo_yanxi.game.ecs.component.manager;
 import mo_yanxi.game.ecs.task_graph;
@@ -115,8 +112,14 @@ import mo_yanxi.game.ecs.system.motion_system;
 import mo_yanxi.game.ecs.system.grid_system;
 import mo_yanxi.game.ecs.system.renderer;
 import mo_yanxi.game.ecs.system.projectile;
+import mo_yanxi.game.ecs.system.chamber;
 
 import mo_yanxi.game.ecs.entitiy_decleration;
+
+import mo_yanxi.game.ecs.component.chamber.radar;
+import mo_yanxi.game.ecs.component.chamber.turret;
+
+import mo_yanxi.game.meta.instancing;
 
 
 import mo_yanxi.game.ui.hitbox_editor;
@@ -322,6 +325,29 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	}*/
 }
 
+auto projectile_meta = [](){
+	using namespace mo_yanxi;
+
+	return game::meta::projectile{
+			.hitbox = {{game::meta::hitbox::comp{.box = {math::vec2{80, 10} * -0.5f, {80, 10}}}}},
+			.rigid = {
+				.drag = 0.001f
+			},
+			.damage = {.material_damage = 1000},
+			.lifetime = 75,
+			.initial_speed = 250,
+
+			.trail_style = {
+				game::meta::trail_style{
+					.radius = 7,
+					.color = {graphic::colors::aqua.to_light(), graphic::colors::aqua.to_light()},
+					.trans = {-40}
+				},
+				50
+			}
+		};
+}();
+
 void main_loop(){
 	using namespace mo_yanxi;
 
@@ -347,8 +373,6 @@ void main_loop(){
 	g.data.current.main_line_color = graphic::colors::pale_green.copy().mul_rgb(.66f);
 	g.data.current.line_color = graphic::colors::dark_gray;
 
-	game::world::graphic_context graphic_context{renderer_world};
-
 	core::global::ui::root->add_scene(ui::scene{"main", new ui::loose_group{nullptr, nullptr}, &renderer_ui}, true);
 	core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()});
 	init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
@@ -356,17 +380,16 @@ void main_loop(){
 	game::world::hud hud{};
 	hud.focus_hud();
 
-	game::ecs::component_manager component_manager{};
 
-
-	game::ecs::system::collision_system collision_system{};
 	game::ecs::system::motion_system motion_system{};
 	game::ecs::system::renderer ecs_renderer{};
 
+	game::world::entity_top_world world{renderer_world};
+
 	hud.bind_context({
-		.component_manager = &component_manager,
-		.collision_system = &collision_system,
-		.graphic_context = &graphic_context
+		.component_manager = &world.component_manager,
+		.collision_system = &world.collision_system,
+		.graphic_context = &world.graphic_context
 	});
 
 	auto& wgfx_input =
@@ -375,7 +398,7 @@ void main_loop(){
 			game::world::graphic_context&,
 			game::ecs::component_manager&
 				>("gfx");
-	wgfx_input.set_context(math::vec2{}, std::ref(graphic_context), std::ref(component_manager));
+	wgfx_input.set_context(math::vec2{}, std::ref(world.graphic_context), std::ref(world.component_manager));
 
 	{
 		context.register_post_resize("test", [&](window_instance::resize_event event){
@@ -426,6 +449,8 @@ void main_loop(){
 
 	{
 
+
+
 		{
 			math::rand rand{};
 			for(int i = 0; i < 10; ++i){
@@ -435,70 +460,65 @@ void main_loop(){
 				math::trans2 trs = {{rand(4000.f), rand(2000.f)}, rand(180.f)};
 				mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 17, chamber::tile_size * 17}}}};
 
+				faction_data faction_data{};
+				if(i & 1){
+					faction_data.faction = game::faction_0;
+				}else{
+					faction_data.faction = game::faction_1;
+				}
 
-				using build_tuple = std::tuple<game::ecs::chamber::building>;
+				using build_tuple = std::tuple<chamber::building>;
 
-				game::ecs::chamber::chamber_manifold grid{};
-				grid.add_building<build_tuple>({chamber::tile_coord{}, 17});
-				// grid.add_building<build_tuple>({3, 8, 2, 4});
+				chamber::chamber_manifold grid{};
+				grid.add_building<std::tuple<chamber::turret_build>>(
+					{tags::from_extent, chamber::tile_coord{-8, -8}, 4, 17},
+					chamber::turret_build{chamber::turret_meta{
+						.range = {0, 3000},
+						// .rotation_speed = ,
+						// .default_angle = ,
+						// .shooting_field_angle = ,
+						// .shoot_cone_tolerance = ,
+						.mode = {
+							.reload_duration = 200,
+							.burst_count = 3,
+							.burst_spacing = 15,
+							.inaccuracy = 6 * math::deg_to_rad,
+							.projectile_type = &projectile_meta
+						}
+					}});
+				grid.add_building<std::tuple<chamber::radar_build>>(
+					{tags::from_extent, chamber::tile_coord{5, -8}, 4, 17}, chamber::radar_build{chamber::radar_meta{
+						.local_center = {20, 20},
+						.targeting_range = {400, 2000},
+						.reload_duration = 120
+					}});
 
-				component_manager.create_entity_deferred<grided_entity_desc>(mech_motion{.trans = trs}, std::move(mf), std::move(grid), physical_rigid{
+				world.component_manager.create_entity_deferred<grided_entity_desc>(mech_motion{.trans = trs},
+					std::move(mf),
+					std::move(grid),
+					std::move(faction_data),
+					physical_rigid{
 					.inertial_mass = 500000
 				});
 			}
 		}
 
-		wgfx_input.register_bind(core::ctrl::key::F, core::ctrl::act::press, +[](core::ctrl::packed_key_t, math::vec2 pos, game::world::graphic_context& ctx, game::ecs::component_manager& component_manager){
-			using namespace game::ecs;
-
-			math::rand rand{};
-
-			auto dir =
-				(pos.scl(1, -1).add_y(ctx.renderer().camera.get_screen_size().y) - ctx.renderer().camera.get_screen_center())
-				.set_length(rand(40, 50));
-			manifold mf{};
-			math::trans2 trs = {ctx.renderer().camera.get_stable_center(), dir.angle_rad()};
-			mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{160, 20}}}};
-			component_manager.create_entity_deferred<projectile_entity_desc>(mech_motion{.trans = trs, .vel = dir}, std::move(mf));
-
-			ctx.create_efx().set_data({
-				.style = game::fx::line_splash{
-					.count = 45,
-					.distribute_angle = 15 * math::deg_to_rad,
-					.range = {260, 820},
-					.stroke = {{2, 0}, {6, 0}},
-					.length = {{30, 20}, {30, 480}},
-
-					.palette = {
-						{
-							graphic::colors::white.create_lerp(graphic::colors::ORANGE, .65f).to_light().set_a(.5),
-							graphic::colors::white.to_light().set_a(0),
-							math::interp::linear_map<0., .55f>
-						}, {
-							graphic::colors::aqua.to_light().set_a(0.95f),
-							graphic::colors::white.to_light().set_a(0),
-							math::interp::pow3In | math::interp::reverse
-						}
-					}
-				},
-				.trans = trs,
-				.depth = 0,
-				.duration = {30}
-				});
-		});
-
 		wgfx_input.register_bind(core::ctrl::key::Q, core::ctrl::act::press, +[](core::ctrl::packed_key_t, math::vec2 pos, game::world::graphic_context& ctx, game::ecs::component_manager& component_manager){
 			using namespace game::ecs;
 
-			math::rand rand{};
 
+
+			auto hdl = game::meta::create(component_manager, projectile_meta);
+
+			math::rand rand{};
 			auto dir =
 				(pos.scl(1, -1).add_y(ctx.renderer().camera.get_screen_size().y) - ctx.renderer().camera.get_screen_center())
 				.set_length(rand(200, 400));
-			manifold mf{};
 			math::trans2 trs = {ctx.renderer().camera.get_stable_center(), dir.angle_rad()};
-			mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{160, 20}}}};
-			component_manager.create_entity_deferred<projectile_entity_desc>(mech_motion{.trans = trs, .vel = dir}, std::move(mf));
+
+			hdl.set_initial_trans(trs);
+			hdl.set_initial_vel({dir, 1});
+			hdl.resume();
 
 			ctx.create_efx().set_data({
 				.style = game::fx::line_splash{
@@ -533,8 +553,8 @@ void main_loop(){
 		core::global::timer.fetch_time();
 		core::global::input.update(core::global::timer.global_delta_tick());
 
-		component_manager.update_delta = core::global::timer.update_delta_tick();
-		graphic_context.update(core::global::timer.global_delta_tick(), core::global::timer.is_paused());
+		world.component_manager.update_delta = core::global::timer.update_delta_tick();
+		world.graphic_context.update(core::global::timer.global_delta_tick(), core::global::timer.is_paused());
 		renderer_ui.set_time(core::global::timer.global_time());
 
 		wgfx_input.set_context(core::global::ui::root->get_current_focus().get_cursor_pos());
@@ -638,13 +658,11 @@ void main_loop(){
 		{
 			auto viewport = renderer_world.camera.get_viewport();
 
-			component_manager.sliced_each([&](
+			world.component_manager.sliced_each([&](
 				const game::ecs::chunk_meta& meta,
 			   game::ecs::manifold& manifold,
 			   game::ecs::mech_motion& motion
 			){
-			   manifold.hitbox.update_hitbox_with_ccd(motion.trans);
-
 			   if(!viewport.overlap_exclusive(manifold.hitbox.max_wrap_bound()))return;
 
 			   using namespace graphic;
@@ -655,14 +673,10 @@ void main_loop(){
 			   draw::line::quad(acquirer, manifold.hitbox.ccd_wrap_box(), 1, colors::pale_green);
 		   });
 
-			component_manager.sliced_each([&](
+			world.component_manager.sliced_each([&](
 				game::ecs::chamber::chamber_manifold& grid,
 				const game::ecs::mech_motion& motion
 			){
-					grid.update_transform(motion.trans);
-					grid.manager.do_deferred();
-
-
 
 					if(!grid.get_wrap_bound().overlap_rough(viewport) || !grid.get_wrap_bound().overlap_exact(viewport))return;
 
@@ -681,7 +695,7 @@ void main_loop(){
 
 						draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
 						draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-						                       colors::pale_green.to_light(1.5f).set_a(
+						                       (colors::red_dusted.create_lerp(colors::pale_green, tile.building.data().hit_point.get_functionality_factor())).to_light(1.5f).set_a(
 							                       tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
 					});
 
@@ -713,19 +727,19 @@ void main_loop(){
 				});
 
 			if(!core::global::timer.is_paused()){
-				collision_system.run_collision_test(component_manager);
-				motion_system.run(component_manager);
-				game::ecs::system::grid_system{}.run(component_manager, graphic_context);
-				game::ecs::system::projectile{}.run(component_manager, graphic_context);
+				game::ecs::system::chamber{}.run(world);
+				motion_system.run(world.component_manager);
+				game::ecs::system::projectile{}.run(world.component_manager, world.graphic_context);
+				world.collision_system.run_collision_test(world.component_manager);
 			}
 
-			ecs_renderer.filter_screen_space(component_manager, renderer_world.camera.get_viewport());
-			ecs_renderer.draw(graphic_context);
+			ecs_renderer.filter_screen_space(world.component_manager, renderer_world.camera.get_viewport());
+			ecs_renderer.draw(world.graphic_context);
 
-			component_manager.do_deferred();
+			world.component_manager.do_deferred();
 		}
 
-		graphic_context.render_efx();
+		world.graphic_context.render_efx();
 
 		renderer_world.batch.batch.consume_all();
 		renderer_world.post_process();
@@ -742,8 +756,6 @@ void main_loop(){
 
 
 }
-
-void foo2();
 
 int main(){
 	using namespace mo_yanxi;
@@ -791,78 +803,4 @@ int main(){
 	core::global::assets::dispose();
 	core::global::graphic::dispose();
 	core::glfw::terminate();
-}
-
-struct comp_interface{
-	virtual ~comp_interface() = default;
-	virtual void foo() = 0;
-};
-
-struct A : public comp_interface{
-	void foo() override{
-		std::println("A");
-	}
-};
-
-struct B : public comp_interface{
-	void foo() override{
-		std::println("B");
-	}
-};
-
-namespace mo_yanxi::game::ecs{
-	template <>
-	struct component_custom_behavior<A> : component_custom_behavior_base<A>{
-		using base_types = comp_interface;
-	};
-
-	template <>
-	struct component_custom_behavior<B> : component_custom_behavior_base<B>{
-		using base_types = comp_interface;
-	};
-}
-
-
-void foo2(){
-	using namespace mo_yanxi;
-
-
-	using namespace mo_yanxi::game;
-
-	ecs::component_manager cpmg{};
-	// ecs::component_operation_task_graph task_graph{cpmg};
-
-	using entity_tuple_1 = std::tuple<A, math::trans2, math::vec2>;
-	using entity_tuple_3 = std::tuple<B, math::vec2>;
-
-	using A = ecs::archetype<entity_tuple_1>;
-	using M = A::base_to_derive_map;
-	constexpr auto idx = tuple_match_first_v<ecs::find_if_first_equal, M, comp_interface>;
-
-	struct T{
-		float * a;
-		math::trans2 b;
-		math::vec2 c;
-	};
-
-	cpmg.add_archetype<
-		entity_tuple_1,
-		entity_tuple_3
-	>();
-
-	cpmg.create_entity_deferred<entity_tuple_1>();
-	cpmg.create_entity_deferred<entity_tuple_1>();
-	cpmg.create_entity_deferred<entity_tuple_1>();
-	cpmg.create_entity_deferred<entity_tuple_3>();
-	cpmg.create_entity_deferred<entity_tuple_3>();
-
-	auto ent = cpmg.create_entity_deferred<entity_tuple_1>(math::vec2{2, 2});
-
-	cpmg.do_deferred();
-
-	cpmg.sliced_each([](comp_interface& vecs){
-		vecs.foo();
-	});
-
-	std::print("{} ", static_cast<math::vec2>(*ent->try_get<math::vec2>()));
 }

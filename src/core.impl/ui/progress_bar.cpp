@@ -13,7 +13,7 @@ void mo_yanxi::ui::progress_bar_drawer::draw(const progress_bar& elem) const{
 
 	float progress = elem.get_progress().current;
 	auto region = get_region(elem);
-	auto [from, to] = elem.getColor();
+	auto [from, to] = elem.get_color();
 
 	to.lerp(from, 1 - progress);
 	from.mul_a(elem.gprop().get_opacity());

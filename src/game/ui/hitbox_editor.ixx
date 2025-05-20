@@ -1,7 +1,5 @@
 module;
 
-#include <gch/small_vector.hpp>
-
 export module mo_yanxi.game.ui.hitbox_editor;
 
 export import mo_yanxi.ui.basic;

@@ -203,14 +203,14 @@ namespace mo_yanxi::game::ecs{
 		 * @brief Only valid when an entity has its data, i.e. an entity has been truly added.
 		 */
 		explicit operator bool() const noexcept{
-			return is_valid();
+			return is_inserted();
 		}
 
 		[[nodiscard]] constexpr bool is_expired() const noexcept{
 			return get_archetype() == nullptr;
 		}
 
-		[[nodiscard]] constexpr bool is_valid() const noexcept{
+		[[nodiscard]] constexpr bool is_inserted() const noexcept{
 			return chunk_index() != invalid_chunk_idx;
 		}
 
@@ -272,7 +272,7 @@ namespace mo_yanxi::game::ecs{
 			requires std::is_member_function_pointer_v<T>
 		FORCE_INLINE constexpr auto operator->*(T mfptr) const noexcept{
 			using trait = mptr_info<T>;
-			using class_type = typename trait::class_type;
+			using class_type = trait::class_type;
 
 			return [&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>){
 				return [mfptr, &object = this->at<class_type>()](std::tuple_element_t<Idx, typename trait::func_args> ...args) -> decltype(auto) {
@@ -299,6 +299,7 @@ namespace mo_yanxi::game::ecs{
 				assert(rst != 0);
 			}
 		}
+
 	public:
 		[[nodiscard]] constexpr entity_ref() noexcept = default;
 
@@ -419,6 +420,10 @@ namespace mo_yanxi::game::ecs{
 			return id_ && id_->is_expired();
 		}
 
+		[[nodiscard]] constexpr bool is_valid() const noexcept{
+			return id_ && !id_->is_expired();
+		}
+
 		constexpr friend bool operator==(const entity_ref& lhs, const entity_ref& rhs) noexcept = default;
 		constexpr friend bool operator==(const entity_ref& lhs, const entity_id eid) noexcept{
 			return lhs.id_ == eid;
@@ -525,11 +530,11 @@ namespace mo_yanxi::game::ecs{
 	struct component_custom_behavior : component_custom_behavior_base<T>{};
 
 	template <typename T>
-	using unwrap_type = typename T::type;
+	using unwrap_type = T::type;
 
 	template <typename T>
 	struct get_base_types{
-		using direct_parent = typename decltype([]{
+		using direct_parent = decltype([]{
 			if constexpr (requires{
 				typename component_custom_behavior<T>::base_types;
 			}){
@@ -552,10 +557,10 @@ namespace mo_yanxi::game::ecs{
 
 	template <typename T>
 	struct component_trait{
-		using value_type = typename component_custom_behavior<T>::value_type;
+		using value_type = component_custom_behavior<T>::value_type;
 		static_assert(std::same_as<T, value_type>);
 
-		using base_types = typename get_base_types<value_type>::type;
+		using base_types = get_base_types<value_type>::type;
 
 		static constexpr bool is_polymorphic = !requires{
 			typename component_custom_behavior<T>::base_types;
@@ -588,7 +593,7 @@ namespace mo_yanxi::game::ecs{
 
 	template <typename T>
 	struct archetype_trait{
-		using value_type = typename archetype_custom_behavior<T>::value_type;
+		using value_type = archetype_custom_behavior<T>::value_type;
 		static_assert(std::same_as<tuple_to_comp_t<T>, value_type>);
 
 		static void on_init(value_type& chunk) {
@@ -656,9 +661,9 @@ namespace mo_yanxi::game::ecs{
 	};
 
 	template <typename T>
-	using derive_map_of_trait = typename decltype([]{
+	using derive_map_of_trait = decltype([]{
 		// if constexpr (!component_trait<T>::is_polymorphic){
-			using bases = typename component_trait<T>::base_types;
+			using bases = component_trait<T>::base_types;
 			return []<std::size_t ...Idx>(std::index_sequence<Idx...>){
 				return std::type_identity<std::tuple<
 					type_pair<std::tuple_element_t<Idx, bases>, T> ...
@@ -694,7 +699,7 @@ namespace mo_yanxi::game::ecs{
 			std::array<type_index_to_convertor, type_hash_map_size> temp{};
 			[&] <std::size_t ...Idx>(std::index_sequence<Idx...>){
 				((temp[Idx] = type_index_to_convertor{
-					typeid(typename std::tuple_element_t<Idx, base_to_derive_map>::first_type),
+					typeid(std::tuple_element_t<Idx, base_to_derive_map>::first_type),
 					type_comp_convert{
 					std::in_place_type<typename std::tuple_element_t<Idx, base_to_derive_map>::first_type>,
 					std::in_place_type<typename std::tuple_element_t<Idx, base_to_derive_map>::second_type>,
@@ -746,6 +751,7 @@ namespace mo_yanxi::game::ecs{
 			}
 
 			eid->chunk_index_ = idx;
+			auto last_cap = chunks.capacity();
 			components& added_comp = chunks.emplace_back(std::move(comp));
 			if constexpr (set_archetype)archetype_base::insert(eid);
 
@@ -756,6 +762,14 @@ namespace mo_yanxi::game::ecs{
 			archetype_trait<raw_tuple>::on_init(added_comp);
 			this->init(added_comp);
 
+			if(last_cap != chunks.capacity()){
+				for(components& prev_comp : chunks | std::views::reverse | std::views::drop(1)){
+					[&] <std::size_t... I>(std::index_sequence<I...>){
+						(component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(prev_comp), get<I + 1>(prev_comp)), ...);
+					}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
+				}
+			}
+
 			return idx;
 		}
 	public:
@@ -763,24 +777,7 @@ namespace mo_yanxi::game::ecs{
 		std::size_t insert(const entity_id eid) final {
 			if(!eid)return 0;
 
-			auto idx = chunks.size();
-
-			if(eid->chunk_index() != invalid_chunk_idx || eid->get_archetype() != nullptr){
-				throw std::runtime_error{"Duplicated Insert"};
-			}
-
-			eid->chunk_index_ = idx;
-			components& added_comp = chunks.emplace_back(eid->id());
-			archetype_base::insert(eid);
-
-			[&] <std::size_t... I>(std::index_sequence<I...>){
-				(component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp)), ...);
-			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
-
-			archetype_trait<raw_tuple>::on_init(added_comp);
-			this->init(added_comp);
-
-			return idx;
+			return this->insert<true>(components{eid});
 		}
 
 		void erase(const entity_id e) final {

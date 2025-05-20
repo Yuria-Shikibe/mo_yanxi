@@ -517,8 +517,13 @@ namespace mo_yanxi {
         }
 
         std::optional<point_type> allocate(const math::usize2 extent) noexcept{
+            if(extent.area() == 0){
+                std::println(std::cerr, "try allocate region with zero area");
+                std::terminate();
+            }
+
             if(extent.beyond(extent_))return std::nullopt;
-            if(remain_area_ < extent.area())return std::nullopt;
+            if(remain_area_ < extent.as<std::uint64_t>().area())return std::nullopt;
 
             auto chamber_src = getValidNode(extent);
 
@@ -536,10 +541,9 @@ namespace mo_yanxi {
                     const auto extent = chamber->get_extent().area();
                     remain_area_ += extent;
                 }
-
             }else{
-                assert(false);
-                //TODO warning deallocate invalid handle?
+                std::println(std::cerr, "try deallocate region not belong to the allocator");
+                std::terminate();
             }
         }
     };

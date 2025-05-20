@@ -1,6 +1,5 @@
 module;
 
-#include <gch/small_vector.hpp>
 
 module mo_yanxi.game.ecs.component.manifold;
 

@@ -1,7 +1,5 @@
 module;
 
-#include <gch/small_vector.hpp>
-
 module mo_yanxi.game.ecs.component.projectile.ui_builder;
 
 import mo_yanxi.game.ecs.component.physical_property;
@@ -87,6 +85,7 @@ namespace mo_yanxi::game::ecs{
 			}, delta_in_ticks);
 		}
 	};
+
 	void projectile_ui_builder::build_hud(ui::table& where, const entity_ref& eref) const{
 		auto hdl = where.emplace<projectile_ui>(eref);
 

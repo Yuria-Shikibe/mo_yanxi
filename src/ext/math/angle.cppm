@@ -29,6 +29,13 @@ namespace mo_yanxi::math{
 	private:
 		static constexpr value_type DefMargin = 8 / static_cast<value_type>(std::numeric_limits<std::uint16_t>::max());
 		static constexpr value_type Pi = std::numbers::pi_v<value_type>;
+		static constexpr value_type Pi_mod = [](){
+			if constexpr (std::same_as<value_type, float>){
+				return std::bit_cast<float>(std::bit_cast<std::int32_t>(std::numbers::pi_v<float>) + 1);
+			}else{
+				return std::bit_cast<double>(std::bit_cast<std::int64_t>(std::numbers::pi_v<double>) + 1);
+			}
+		}();
 		// static constexpr value_type Bound = std::numbers::pi_v<value_type>;
 
 		static constexpr value_type half_cycles = std::numbers::pi_v<value_type>;
@@ -52,8 +59,7 @@ namespace mo_yanxi::math{
 		 * @return Angle in [-180, 180] degree
 		 */
 		MATH_ATTR static value_type getAngleInPi(value_type a) noexcept{
-			a = uniformed_angle::getAngleInPi2(a);
-			return a > half_cycles ? a - cycles : a;
+			return std::fmod(a, Pi_mod);
 		}
 
 		MATH_ATTR CONSTEXPR_26 void clampInternal() noexcept{
@@ -64,6 +70,7 @@ namespace mo_yanxi::math{
 			//val should between [-540 deg, 540 deg]
 			CHECKED_ASSUME(val >= -half_cycles * 3);
 			CHECKED_ASSUME(val <= half_cycles * 3);
+
 			if(val >= half_cycles){
 				return val - cycles;
 			}
@@ -215,7 +222,7 @@ namespace mo_yanxi::math{
 		 * @brief move or set to another angle
 		 * @return true if equals to the target angle after rotating
 		 */
-		MATH_ATTR /*constexpr*/ bool rotate_toward(
+		FORCE_INLINE /*constexpr*/ bool rotate_toward(
 			const uniformed_angle target,
 			const value_type speed
 		) noexcept{

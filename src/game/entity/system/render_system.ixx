@@ -1,6 +1,5 @@
 module;
 
-#include <gch/small_vector.hpp>
 
 export module mo_yanxi.game.ecs.system.renderer;
 export import mo_yanxi.shared_stack;
@@ -23,10 +22,12 @@ namespace mo_yanxi::game::ecs::system{
 		void draw(const world::graphic_context& graphic_context) const {
 			for (const auto & drawer : drawers.locked_range()){
 				drawer.drawer->draw(graphic_context);
+				drawer.drawer->post_effect(graphic_context);
 			}
 
 			for (const auto & drawer : overflow_drawers){
 				drawer.drawer->draw(graphic_context);
+				drawer.drawer->post_effect(graphic_context);
 			}
 		}
 

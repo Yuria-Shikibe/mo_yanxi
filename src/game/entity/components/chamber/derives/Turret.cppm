@@ -1,6 +1,5 @@
 module;
 
-#include <gch/small_vector.hpp>
 
 export module mo_yanxi.game.ecs.component.chamber.turret;
 
@@ -10,39 +9,144 @@ import mo_yanxi.math;
 
 namespace mo_yanxi::game::ecs{
 	namespace chamber{
+		export
 		struct shoot_mode{
 			float reload_duration{};
+
 			unsigned burst_count{};
 			float burst_spacing{};
+
 			float inaccuracy{};
 
 			meta::projectile* projectile_type{};
 		};
-		struct turret_metadata{
+
+		export
+		struct turret_meta{
 			math::range range{};
-			float rotation_speed{};
+			float rotate_speed{};
+
 			float default_angle{};
 			float shooting_field_angle{};
+
 			float shoot_cone_tolerance{};
+			math::vec2 shoot_offset{};
+
 
 			shoot_mode mode{};
 		};
 
+		struct turret_cache{
+			float projectile_speed{};
+		};
+
+		export
 		struct turret_build : building{
-			turret_metadata meta{};
+			turret_meta meta{};
 
 			math::uniform_trans2 turret_center_local_trans{};
 			float reload{};
-			unsigned shoot_counter{};
-			traced_target target{};
+
+			float rotate_back_reload{};
+
+			unsigned burst_progress{};
+			float burst_reload{};
+			target target{};
+
+		private:
+			turret_cache cache_{};
+
+		public:
+
+			[[nodiscard]] turret_build() = default;
+
+			[[nodiscard]] explicit turret_build(const turret_meta& meta)
+				: meta(meta){
+				if(meta.mode.projectile_type){
+					cache_.projectile_speed = meta.mode.projectile_type->initial_speed.value_or(0);
+				}
+			}
+
+			void build_hud(ui::table& where, const entity_ref& eref) const override;
+
+			void draw_hud(graphic::renderer_ui& renderer) const override;
 
 			[[nodiscard]] bool validate_target(const math::vec2 target_local_trs) const noexcept{
 				return meta.range.within_open(target_local_trs.length());
 			}
 
-			void update(chamber_manifold& grid, const chunk_meta& meta, float delta_in_tick) override{
+		private:
+			[[nodiscard]] bool is_shooting() const noexcept{
+				return burst_progress > 0;
+			}
 
-				if(!target.update(turret_center_local_trans | data().get_trans())){
+			void begin_shoot() noexcept{
+				burst_progress = 1;
+			}
+
+			void shoot(const chunk_meta& chunk_meta, world::entity_top_world& top_world) const;
+
+			void rotate(){
+				if(target){
+					auto& motion = target.entity->at<mech_motion>();
+
+					auto pos = get_local_to_global_trans(turret_center_local_trans.vec);
+
+					if(auto rst = estimate_shoot_hit_delay({}, target.local_pos, motion.vel.vec, cache_.projectile_speed, meta.shoot_offset.x)){
+						auto tgt = pos.apply_inv_to(motion.pos() + motion.vel.vec * rst);
+						auto ang = tgt.angle_rad();
+						turret_center_local_trans.rot.rotate_toward(ang, get_update_delta());
+					}
+				}
+			}
+
+			void reload_turret(const chunk_meta& chunk_meta, world::entity_top_world& top_world){
+				if(!is_shooting()){
+					if(const auto rst = math::forward_approach_then(reload, meta.mode.reload_duration, get_update_delta())){
+						reload = 0;
+						begin_shoot();
+					}else{
+						reload = rst;
+					}
+				}else{
+					if(const auto rst = math::forward_approach_then(burst_reload, meta.mode.burst_spacing, get_update_delta())){
+						burst_reload = 0;
+						if(burst_progress <= meta.mode.burst_count){
+							++burst_progress;
+							shoot(chunk_meta, top_world);
+						}else{
+							burst_progress = 0;
+						}
+					}else{
+						burst_reload = rst;
+					}
+				}
+			}
+
+		public:
+			void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world) override{
+				if(target){
+					target.update(turret_center_local_trans | data().get_trans());
+					if(!validate_target(target.local_pos)){
+						target = nullptr;
+					}else{
+						reload_turret(chunk_meta, top_world);
+					}
+				}else if(auto tgt = data().grid().targets_primary.get_optimal()){
+					if(validate_target((*tgt->*&mech_motion::pos)())){
+						target = tgt;
+					}else{
+						target = nullptr;
+					}
+
+				}else{
+					target = nullptr;
+				}
+
+
+				rotate();
+
+				/*if(target && !target.update(turret_center_local_trans | data().get_trans())){
 					return;
 				}
 
@@ -50,11 +154,15 @@ namespace mo_yanxi::game::ecs{
 				auto target_trs = turret_center_local_trans.apply_inv_to(motion.trans);
 				if(!validate_target(target_trs.vec)){
 					target.entity.reset(nullptr);
-				}
+				}*/
 			}
 		};
 	}
 
+	export
+	template <>
+	struct component_custom_behavior<chamber::turret_build> : component_custom_behavior_base<chamber::turret_build>, chamber::building_trait_base<>{
+	};
 
 }
 

@@ -98,9 +98,9 @@ namespace mo_yanxi::game{
 		const auto color_o = palette.out[prog];
 
 		if(is_circle()){
-			draw::line::circle(acquirer, e.trans.vec, radius[prog], color_i, color_o, stroke[prog]);
+			draw::line::circle(acquirer, e.trans.vec, radius[prog], stroke[prog], color_i, color_o);
 		}else{
-			draw::line::poly(acquirer, e.trans, sides, radius[prog], color_i, color_o, stroke[prog]);
+			draw::line::poly(acquirer, e.trans, sides, radius[prog], stroke[prog], color_i, color_o);
 		}
 	}
 
@@ -111,20 +111,20 @@ namespace mo_yanxi::game{
 
 		if(is_circle()){
 			draw::fancy::circle_outlined(
-				acquirer, e.trans.vec, radius[prog],
+			acquirer, e.trans.vec, radius[prog],
+			stroke[prog],
 				palette.edge_in[prog],
 				palette.edge_out[prog],
 				palette.center_in[prog],
-				palette.center_out[prog],
-				stroke[prog]);
+				palette.center_out[prog]);
 		} else{
 			draw::fancy::poly_outlined(
 				acquirer, e.trans, sides, radius[prog],
+				stroke[prog],
 				palette.edge_in[prog],
 				palette.edge_out[prog],
 				palette.center_in[prog],
-				palette.center_out[prog],
-				stroke[prog]);
+				palette.center_out[prog]);
 		}
 	}
 }

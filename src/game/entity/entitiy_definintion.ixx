@@ -1,11 +1,10 @@
 module;
 
-#include <gch/small_vector.hpp>
-
 export module mo_yanxi.game.ecs.entitiy_decleration;
 
 export import mo_yanxi.game.ecs.component.manifold;
 export import mo_yanxi.game.ecs.component.chamber;
+export import mo_yanxi.game.ecs.component.chamber.ui_builder;
 export import mo_yanxi.game.ecs.component.projectile.manifold;
 export import mo_yanxi.game.ecs.component.hitbox;
 export import mo_yanxi.game.ecs.component.faction;
@@ -23,7 +22,8 @@ namespace mo_yanxi::game::ecs{
 			manifold,
 			physical_rigid,
 			faction_data,
-			chamber::chamber_manifold
+			chamber::chamber_manifold,
+			chamber::chamber_ui_builder
 		>;
 
 		export using projectile_entity_desc = std::tuple<
@@ -47,6 +47,14 @@ namespace mo_yanxi::game::ecs{
 			auto [motion, mf] = get_unwrap_of<mech_motion, manifold>(comps);
 			mf.hitbox.set_trans_unchecked(motion.trans);
 			mf.hitbox.update(motion.trans);
+
+			comps.hit_point = {
+				.max = 10000,
+				.cur = 10000,
+				.functionality = {0, 5000}
+			};
+			// comps.faction = faction_0;
+
 		}
 	};
 
@@ -59,19 +67,21 @@ namespace mo_yanxi::game::ecs{
 			mf.hitbox.update(motion.trans);
 			mf.collider = projectile_collider{};
 
-			dmg.max_damage_group.material_damage.direct = 3000;
-			dmg.current_damage_group = dmg.max_damage_group;
+			// dmg.max_damage_group.material_damage.direct = 3000;
+			// dmg.current_damage_group = dmg.max_damage_group;
 
-			comps.faction = faction_1;
+			if(!comps.faction)comps.faction = faction_1;
 
 			auto [drawer] = get_unwrap_of<projectile_drawer>(comps);
-			drawer.trail_style.color.from = graphic::colors::aqua.to_light();
-			drawer.trail_style.color.to = graphic::colors::aqua.to_light().set_a(0);//.to_light();
-			drawer::rect_drawer d{
-				.extent = {mf.hitbox[0].box.get_identity().size},
-				.color_scl = graphic::colors::aqua.to_light(),
-			};
-			drawer.drawer = d;
+
+			if(drawer.drawer.drawer.index() == 0){
+				drawer::rect_drawer d{
+					.extent = {mf.hitbox[0].box.get_identity().size},
+					.color_scl = graphic::colors::aqua.to_light(),
+				};
+				drawer.drawer = d;
+			}
+
 		}
 	};
 }

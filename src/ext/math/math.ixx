@@ -525,11 +525,26 @@ namespace mo_yanxi::math {
 		from += math::clamp<std::remove_cvref_t<decltype(from)>>(to - from, -speed, speed);
 	}
 
+	/** Approaches a value at linear speed. */
+	export FORCE_INLINE constexpr auto approach_inplace_get_delta(auto& from, const auto to, const auto speed) noexcept {
+		auto delta = math::clamp<std::remove_cvref_t<decltype(from)>>(to - from, -speed, speed);
+		from += delta;
+		return delta;
+	}
+
 	export
 	template <typename T>
 	struct approach_result{
 		T rst;
 		bool reached;
+
+		FORCE_INLINE constexpr explicit operator bool() const noexcept{
+			return reached;
+		}
+
+		FORCE_INLINE constexpr explicit(false) operator const T&() const noexcept{
+			return rst;
+		}
 	};
 
 	export
@@ -1026,9 +1041,19 @@ namespace mo_yanxi::math {
 			return value >= from && value < to;
 		}
 
-		MATH_ATTR constexpr section to_ordered() const noexcept{
+		MATH_ATTR constexpr section get_ordered() const noexcept{
 			const auto [min, max] = std::minmax(from, to);
 			return {min, max};
+		}
+
+		MATH_ATTR constexpr section& expand(const T& value) noexcept{
+			from -= value;
+			to += value;
+			return *this;
+		}
+
+		MATH_ATTR constexpr T normalize(const T value) const noexcept requires (std::floating_point<T>){
+			return math::curve<T>(value, from, to);
 		}
 
 		MATH_ATTR constexpr T length() const noexcept{
