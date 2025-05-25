@@ -3,10 +3,10 @@ module;
 export module mo_yanxi.ui.basic:scene;
 
 import :pre_decl;
-import :pre_decl;
 import :elem;
 import :group;
 import :tooltip_manager;
+import :dialog_manager;
 //
 import mo_yanxi.math.vector2;
 import mo_yanxi.math.rect_ortho;
@@ -132,6 +132,7 @@ namespace mo_yanxi::ui{
 		graphic::camera2* focused_camera{};
 
 		tooltip_manager tooltip_manager{};
+		dialog_manager dialog_manager{};
 
 		[[nodiscard]] scene_base() = default;
 
@@ -184,7 +185,7 @@ namespace mo_yanxi::ui{
 
 		void notify_layout_update(elem* element);
 
-		[[nodiscard]] bool isMousePressed() const noexcept{
+		[[nodiscard]] bool is_mouse_pressed() const noexcept{
 			return std::ranges::any_of(mouseKeyStates, std::identity{}, &MouseState::pressed);
 		}
 
@@ -196,11 +197,13 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] core::ctrl::key_code_t get_input_mode() const noexcept;
 
-		void dropAllFocus(const elem* target);
+		void drop_dialog(const elem* elem);
 
-		void trySwapFocus(elem* newFocus);
+		void drop_all_focus(const elem* target);
 
-		void swapFocus(elem* newFocus);
+		void try_swap_focus(elem* newFocus);
+
+		void swap_focus(elem* newFocus);
 
 		esc_flag on_esc();
 

@@ -130,7 +130,7 @@ void mo_yanxi::ui::tooltip_manager::update(float delta_in_time){
 		active.update_layout(*this);
 	}
 
-	if(!scene->isMousePressed()){
+	if(!scene->is_mouse_pressed()){
 		const auto lastNotInBound = std::ranges::find_if_not(actives, [this](const tooltip_instance& toolTip){
 			if(toolTip.owner->tooltip_should_force_drop(get_cursor_pos()))return false;
 

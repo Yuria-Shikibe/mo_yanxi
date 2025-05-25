@@ -4,6 +4,7 @@ module;
 export module mo_yanxi.game.ecs.component.chamber.turret;
 
 export import mo_yanxi.game.ecs.component.chamber;
+export import mo_yanxi.game.meta.content_ref;
 export import mo_yanxi.game.meta.projectile;
 import mo_yanxi.math;
 
@@ -18,7 +19,7 @@ namespace mo_yanxi::game::ecs{
 
 			float inaccuracy{};
 
-			meta::projectile* projectile_type{};
+			meta::content_ref<meta::projectile> projectile_type{};
 		};
 
 		export
@@ -31,7 +32,6 @@ namespace mo_yanxi::game::ecs{
 
 			float shoot_cone_tolerance{};
 			math::vec2 shoot_offset{};
-
 
 			shoot_mode mode{};
 		};
@@ -133,7 +133,7 @@ namespace mo_yanxi::game::ecs{
 						reload_turret(chunk_meta, top_world);
 					}
 				}else if(auto tgt = data().grid().targets_primary.get_optimal()){
-					if(validate_target((*tgt->*&mech_motion::pos)())){
+					if(validate_target(data().get_trans().apply_inv_to((*tgt->*&mech_motion::pos)()))){
 						target = tgt;
 					}else{
 						target = nullptr;
@@ -160,6 +160,10 @@ namespace mo_yanxi::game::ecs{
 	}
 
 	export
+	struct turret_build_dump{
+
+	};
+
 	template <>
 	struct component_custom_behavior<chamber::turret_build> : component_custom_behavior_base<chamber::turret_build>, chamber::building_trait_base<>{
 	};

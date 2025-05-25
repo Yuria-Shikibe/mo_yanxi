@@ -31,14 +31,14 @@ namespace mo_yanxi::ui{
 			: elem(scene, group, tyName){
 		}
 
-		std::optional<math::vec2> pre_acquire_size(stated_extent extent) override{
+		std::optional<math::vec2> pre_acquire_size_impl(stated_extent extent) override{
 			math::vec2 bound{extent.potential_max_size()};
 
 			bound -= property.boarder.get_size();
 			bound.max({});
 
 			auto rst = layout_text(bound);
-			return rst + property.boarder.get_size();
+			return (rst + property.boarder.get_size());
 		}
 
 		void set_text(std::string_view text){

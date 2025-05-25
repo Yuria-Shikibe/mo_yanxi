@@ -67,13 +67,9 @@ export namespace mo_yanxi::game::ecs{
 		float restitution = 0.1f;
 
 
-		//TODO unfinished part
-
 		/** @brief Used For Force Correction*/
 		float collide_force_scale = 1.0f;
 
-
-		//TODO move drag to motion?
 		float drag{0.025f};
 	};
 }

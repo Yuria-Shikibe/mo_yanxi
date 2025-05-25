@@ -96,7 +96,7 @@ import mo_yanxi.game.world.graphic;
 import mo_yanxi.game.world.hud;
 import mo_yanxi.game.ecs.world.top;
 
-import mo_yanxi.game.ecs.component.manager;
+import mo_yanxi.game.ecs.component.manage;
 import mo_yanxi.game.ecs.task_graph;
 import mo_yanxi.game.ecs.dependency_generator;
 
@@ -187,12 +187,12 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 		pane.cell().margin.set(4);
 	}
 
-	/*{
+	{
 		auto pane = bed.emplace<game::ui::hit_box_editor>();
 		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.9f, 1.f}};
 		pane.cell().align = align::pos::center_right;
 		pane.cell().margin.set(4);
-	}*/
+	}
 
 
 
@@ -378,7 +378,7 @@ void main_loop(){
 	init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
 
 	game::world::hud hud{};
-	hud.focus_hud();
+	// hud.focus_hud();
 
 
 	game::ecs::system::motion_system motion_system{};
@@ -443,9 +443,11 @@ void main_loop(){
 	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
 
 
-	using grided_entity_desc = game::ecs::decl::grided_entity_desc;
+	using grided_entity_desc = game::ecs::decl::chamber_entity_desc;
 
 	using projectile_entity_desc = game::ecs::decl::projectile_entity_desc;
+
+
 
 	{
 
@@ -546,6 +548,9 @@ void main_loop(){
 				});
 		});
 	}
+
+	world.component_manager.do_deferred();
+	game::ecs::component_pack pack{world.component_manager};
 
 	core::global::timer.reset_time();
 	while(!context.window().should_close()){
@@ -695,7 +700,7 @@ void main_loop(){
 
 						draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
 						draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-						                       (colors::red_dusted.create_lerp(colors::pale_green, tile.building.data().hit_point.get_functionality_factor())).to_light(1.5f).set_a(
+						                       (colors::red_dusted.create_lerp(colors::pale_green, tile.building.data().hit_point.get_capability_factor())).to_light(1.5f).set_a(
 							                       tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
 					});
 

@@ -229,7 +229,6 @@ namespace mo_yanxi::ui{
 			: elementTypeName(element_type_name){
 		}
 
-		std::string name{};
 
 
 		//position fields
@@ -320,6 +319,7 @@ namespace mo_yanxi::ui{
 	};
 
 	export struct elem_fields{
+		std::string name{};
 
 		elem_prop property{};
 		cursor_states cursor_state{};
@@ -464,6 +464,8 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] constexpr bool is_visible() const noexcept{ return visible; }
 
 		[[nodiscard]] constexpr bool is_sleep() const noexcept{ return sleep; }
+
+		[[nodiscard]] constexpr bool is_disabled() const noexcept{ return disabled; }
 
 		[[nodiscard]] group* get_parent() const noexcept{
 			return parent;
@@ -668,8 +670,21 @@ namespace mo_yanxi::ui{
 			return extent;
 		}
 
-		virtual std::optional<math::vec2> pre_acquire_size(stated_extent extent){
+	protected:
+
+		/**
+		 * @brief pre get the size of this elem if none/one side of extent is known
+		 * @param extent : any tag of the length should be within {mastering, external}
+		 * @return expected size, or nullopt
+		 */
+		virtual std::optional<math::vec2> pre_acquire_size_impl(stated_extent extent){
 			return std::nullopt;
+		}
+
+	public:
+
+		std::optional<math::vec2> pre_acquire_size(stated_extent extent){
+			return pre_acquire_size_impl(extent).transform([this](const math::vec2 v){return property.size.clamp(v);});
 		}
 
 		virtual void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode){
@@ -722,6 +737,8 @@ namespace mo_yanxi::ui{
 			draw_content(clipSpace);
 			draw_post(clipSpace);
 		}
+
+		void dialog_notify_drop() const;
 
 	protected:
 		virtual void draw_pre(const rect clipSpace) const;

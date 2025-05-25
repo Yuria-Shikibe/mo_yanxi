@@ -1,6 +1,6 @@
 export module mo_yanxi.game.ecs.world.top;
 
-export import mo_yanxi.game.ecs.component.manager;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.system.collision;
 export import mo_yanxi.game.world.graphic;
 

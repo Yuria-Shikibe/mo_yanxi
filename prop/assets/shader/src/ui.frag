@@ -30,7 +30,7 @@ void main() {
 
     if(bool(mode & draw_mode_sdf)){
         float a = msdf(textures[in_indices[0]], in_uv, 1, bool(mode & draw_mode_uniformed));
-        a = smoothstep(-0.0375 * ubo.inv_scale, 0.07 * ubo.inv_scale, a);
+        a = smoothstep(-0.0375 * ubo.inv_scale, 0.1 * ubo.inv_scale, a);
 //        if(a == 0)discard;
 
         texColor = vec4(1, 1, 1, a);

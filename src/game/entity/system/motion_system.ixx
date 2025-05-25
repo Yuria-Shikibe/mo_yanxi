@@ -2,7 +2,7 @@ module;
 
 export module mo_yanxi.game.ecs.system.motion_system;
 
-export import mo_yanxi.game.ecs.component.manager;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.component.physical_property;
 
 import std;

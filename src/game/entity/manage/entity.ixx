@@ -1,6 +1,8 @@
 module;
 
 #include <cassert>
+#include <plf_hive.h>
+#include <gch/small_vector.hpp>
 
 #include "ext/adapted_attributes.hpp"
 
@@ -16,13 +18,16 @@ module;
 
 // NOLINTBEGIN(*-misplaced-const)
 
-export module mo_yanxi.game.ecs.entity;
+export module mo_yanxi.game.ecs.component.manage:entity;
 
+import :serializer;
 export import mo_yanxi.strided_span;
 export import mo_yanxi.meta_programming;
 export import mo_yanxi.seq_chunk;
 
 import mo_yanxi.algo.hash;
+import mo_yanxi.basic_util;
+import mo_yanxi.heterogeneous.open_addr_hash;
 import std;
 
 namespace mo_yanxi::game::ecs{
@@ -119,9 +124,14 @@ namespace mo_yanxi::game::ecs{
 
 		virtual void erase(const entity_id entity);
 
+	protected:
 		virtual void* get_chunk_partial_ptr(std::type_index type, std::size_t idx) noexcept = 0;
+		virtual strided_span<std::byte> get_staging_chunk_partial_slice(std::type_index type) noexcept = 0;
 
+	public:
 		[[nodiscard]] virtual bool has_type(std::type_index type) const = 0;
+
+		[[nodiscard]] virtual std::unique_ptr<archetype_serializer> dump() const = 0;
 
 		// virtual void set_expired(entity_id entity_id);
 
@@ -140,9 +150,17 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		template <typename T>
+		[[nodiscard]] strided_span<T> try_get_slice_of_staging() noexcept{
+			auto span = get_staging_chunk_partial_slice(typeid(T));
+			return strided_span<T>{reinterpret_cast<T*>(span.data()), span.size(), span.stride()};
+		}
+
+		template <typename T>
 		[[nodiscard]] T* try_get_comp(entity_id id) noexcept;
 
 		virtual void dump_staging() = 0;
+
+		[[nodiscard]] virtual std::size_t size() const noexcept = 0;
 	};
 
 	export
@@ -478,10 +496,40 @@ namespace mo_yanxi::game::ecs{
 		return *rst;
 	}
 
-	export
+	template <typename T, typename D>
+	struct dump_base{
+		static void dump(D& srl_type, const T& value) requires (std::is_assignable_v<D&, T>){
+			srl_type = value;
+		}
+
+		static void load(const D& srl_type, T& value) requires (std::is_assignable_v<T&, D>){
+			value = srl_type;
+		}
+	};
+
 	template <typename T>
-	struct component_custom_behavior_base{
+	struct dump_base<T, void>{
+
+	};
+
+	template <typename T>
+	using get_dump_type = decltype([]{
+		if constexpr (requires{
+			typename T::dump_type;
+		}){
+			return std::type_identity<typename T::dump_type>{};
+		}else if constexpr (std::is_copy_assignable_v<T>){
+			return std::type_identity<T>{};
+		}else{
+			return std::type_identity<void>{};
+		}
+	}())::type;
+
+	export
+	template <typename T, typename DumpTy = get_dump_type<T>>
+	struct component_custom_behavior_base : dump_base<T, DumpTy>{
 		using value_type = T;
+		using dump_type = DumpTy;
 
 		static void on_init(const chunk_meta& meta, value_type& comp) = delete;
 		static void on_terminate(const chunk_meta& meta, value_type& comp) = delete;
@@ -492,42 +540,57 @@ namespace mo_yanxi::game::ecs{
 		static void on_relocate(const chunk_meta& meta, const value_type& comp) = delete;
 	};
 
-	export
-	template <typename TypeDesc>
-	struct archetype_custom_behavior_base{
-		using value_type = tuple_to_comp_t<TypeDesc>;
-
-
-		template <typename ...Ts>
-		static auto get_unwrap_of(value_type& comp) noexcept{
-			return [&] <std::size_t... I>(std::index_sequence<I...>){
-				return std::tie(get<Ts>(comp) ...);
-			}(std::index_sequence_for<Ts ...>{});
-		}
-
-		template <typename ...Ts>
-		static auto get_unwrap_of(const value_type& comp) noexcept{
-			return [&] <std::size_t... I>(std::index_sequence<I...>){
-				return std::tie(get<Ts>(comp) ...);
-			}(std::index_sequence_for<Ts ...>{});
-		}
-
-		constexpr static entity_id id_of_chunk(const value_type& comp) noexcept{
-			return static_cast<const chunk_meta&>(get<chunk_meta>(comp)).id();
-		}
-
-		static void on_init(value_type& comp) = delete;
-		static void on_terminate(value_type& comp) = delete;
-		static void on_relocate(value_type& comp) = delete;
-	};
-
-	export
-	template <typename T>
-	struct archetype_custom_behavior : archetype_custom_behavior_base<T>{};
 
 	export
 	template <typename T>
 	struct component_custom_behavior : component_custom_behavior_base<T>{};
+
+
+
+	template <>
+	struct component_custom_behavior<chunk_meta> : component_custom_behavior_base<chunk_meta, void>{
+
+	};
+
+	template <typename T, typename ToJoin>
+	struct tuple_push_back;
+
+	template <typename ToJoin, typename ...TS>
+	struct tuple_push_back<std::tuple<TS...>, ToJoin> : std::type_identity<std::tuple<TS..., ToJoin>>{};
+
+	template <typename T, typename ToJoin>
+	using tuple_push_back_t = tuple_push_back<T, ToJoin>::type;
+
+	using A = tuple_push_back_t<std::tuple<int, float>, double>;
+
+
+	template <typename Prev, typename ...Args>
+		requires (is_tuple_v<Prev>)
+	struct join_to_tuple_if_not_monostate;
+
+	template <typename Prev, typename Cur, typename ...Args>
+		requires (is_tuple_v<Prev>)
+	struct join_to_tuple_if_not_monostate<Prev, Cur, Args...>{
+		using type = join_to_tuple_if_not_monostate<tuple_push_back_t<Prev, Cur>, Args...>::type;
+	};
+
+	template <typename Prev>
+		requires (is_tuple_v<Prev>)
+	struct join_to_tuple_if_not_monostate<Prev>{
+		using type = Prev;
+	};
+
+	template <typename Prev, typename ...Args>
+		requires (is_tuple_v<Prev>)
+	struct join_to_tuple_if_not_monostate<Prev, std::monostate, Args...>{
+		using type = join_to_tuple_if_not_monostate<Prev, Args...>::type;
+	};
+
+	template <typename T>
+	using dump_type_to_tuple_t = std::conditional_t<
+		std::same_as<typename component_custom_behavior<T>::dump_type, void>, std::tuple<>, std::tuple<
+			typename component_custom_behavior<T>::dump_type>>;
+	using B = dump_type_to_tuple_t<int>;
 
 	template <typename T>
 	using unwrap_type = T::type;
@@ -560,6 +623,10 @@ namespace mo_yanxi::game::ecs{
 		using value_type = component_custom_behavior<T>::value_type;
 		static_assert(std::same_as<T, value_type>);
 
+		using dump_type = component_custom_behavior<T>::dump_type;
+
+		static constexpr bool is_transient = std::is_void_v<dump_type>;
+
 		using base_types = get_base_types<value_type>::type;
 
 		static constexpr bool is_polymorphic = !requires{
@@ -591,32 +658,129 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
+
+	export
+	template <typename TypeDesc, typename SrlIdx = int, SrlIdx = SrlIdx{}>
+	struct archetype_custom_behavior_base{
+
+		using raw_desc = TypeDesc;
+		using value_type = tuple_to_comp_t<TypeDesc>;
+		using dump_types = all_apply_to<tuple_cat_t, unary_apply_to_tuple_t<dump_type_to_tuple_t, TypeDesc>>;
+		using dump_chunk = tuple_to_seq_chunk_t<dump_types>;
+
+		static [[nodiscard]] dump_chunk dump(const value_type& comp){
+			dump_chunk chunk{};
+			[&]<std::size_t... I>(std::index_sequence<I...>){
+				([&]<std::size_t Idx>(){
+					using SrcTy = std::tuple_element_t<I, raw_desc>;
+					using DstTy = component_trait<SrcTy>::dump_type;
+					if constexpr (!component_trait<SrcTy>::is_transient){
+						component_custom_behavior<SrcTy>::dump(get<DstTy>(chunk), get<SrcTy>(comp));
+					}
+				}.template operator()<I>(), ...);
+			}(std::make_index_sequence<std::tuple_size_v<raw_desc>>{});
+			return chunk;
+		}
+
+		static [[nodiscard]] value_type load(const dump_chunk& comp){
+			value_type chunk{};
+			[&]<std::size_t... I>(std::index_sequence<I...>){
+				([&]<std::size_t Idx>(){
+					using SrcTy = std::tuple_element_t<I, raw_desc>;
+					using DstTy = component_trait<SrcTy>::dump_type;
+					if constexpr (!component_trait<SrcTy>::is_transient){
+						component_custom_behavior<SrcTy>::load(get<DstTy>(comp), get<SrcTy>(chunk));
+					}
+				}.template operator()<I>(), ...);
+			}(std::make_index_sequence<std::tuple_size_v<raw_desc>>{});
+			return chunk;
+		}
+
+		template <typename ...Ts>
+		static auto get_unwrap_of(value_type& comp) noexcept{
+			return [&] <std::size_t... I>(std::index_sequence<I...>){
+				return std::tie(get<Ts>(comp) ...);
+			}(std::index_sequence_for<Ts ...>{});
+		}
+
+		template <typename ...Ts>
+		static auto get_unwrap_of(const value_type& comp) noexcept{
+			return [&] <std::size_t... I>(std::index_sequence<I...>){
+				return std::tie(get<Ts>(comp) ...);
+			}(std::index_sequence_for<Ts ...>{});
+		}
+
+		constexpr static entity_id id_of_chunk(const value_type& comp) noexcept{
+			return static_cast<const chunk_meta&>(get<chunk_meta>(comp)).id();
+		}
+
+		static void on_init(value_type& comp) = delete;
+		static void on_terminate(value_type& comp) = delete;
+		static void on_relocate(value_type& comp) = delete;
+
+	};
+
+	export
+	template <typename TypeDesc>
+	struct archetype_custom_behavior : archetype_custom_behavior_base<TypeDesc>{};
+
+	export
+	template <typename TypeDesc, archetype_serialize_identity id>
+	struct archetype_serialize_info_base{
+		using behavior = archetype_custom_behavior<TypeDesc>;
+		using value_type = behavior::value_type;
+		using dump_chunk = behavior::dump_chunk;
+
+		static constexpr archetype_serialize_identity identity = id;
+		static constexpr bool is_transient = (std::tuple_size_v<dump_chunk> > 0 && id.index != archetype_serialize_identity::unknown);
+
+		static chunk_serialize_handle write(std::ostream& stream, const dump_chunk& chunk) noexcept {
+			co_yield 0;
+			co_return;
+		}
+
+		static srl_state read(std::istream& stream, component_chunk_offset off, dump_chunk& chunk) noexcept {
+			return srl_state::failed;
+		}
+	};
+
+	export
+	template <typename TypeDesc>
+	struct archetype_serialize_info : archetype_serialize_info_base<TypeDesc, archetype_serialize_identity{}>{
+	};
+
 	template <typename T>
 	struct archetype_trait{
-		using value_type = archetype_custom_behavior<T>::value_type;
+		using behavior = archetype_custom_behavior<T>;
+		using value_type = behavior::value_type;
 		static_assert(std::same_as<tuple_to_comp_t<T>, value_type>);
+
+		using dump_chunk = behavior::dump_chunk;
+		using serialize = archetype_serialize_info<T>;
+
+		static constexpr bool is_transient = serialize::is_transient;
 
 		static void on_init(value_type& chunk) {
 			if constexpr (requires{
-				archetype_custom_behavior<T>::on_init(chunk);
+				behavior::on_init(chunk);
 			}){
-				archetype_custom_behavior<T>::on_init(chunk);
+				behavior::on_init(chunk);
 			}
 		}
 
 		static void on_terminate(value_type& chunk) {
 			if constexpr (requires{
-				archetype_custom_behavior<T>::on_terminate(chunk);
+				behavior::on_terminate(chunk);
 			}){
-				archetype_custom_behavior<T>::on_terminate(chunk);
+				behavior::on_terminate(chunk);
 			}
 		}
 
 		static void on_relocate(value_type& chunk) {
 			if constexpr (requires{
-				archetype_custom_behavior<T>::on_relocate(chunk);
+				behavior::on_relocate(chunk);
 			}){
-				archetype_custom_behavior<T>::on_relocate(chunk);
+				behavior::on_relocate(chunk);
 			}
 		}
 	};
@@ -650,8 +814,12 @@ namespace mo_yanxi::game::ecs{
 		[[nodiscard]] void* get(T& chunk) const noexcept{
 			return comp_converter(std::addressof(chunk));
 		}
-	};
 
+		template <typename T>
+		[[nodiscard]] void* get(T* chunk) const noexcept{
+			return comp_converter(chunk);
+		}
+	};
 
 	struct empty_state{};
 
@@ -674,14 +842,18 @@ namespace mo_yanxi::game::ecs{
 		// }
 	}())::type;
 
-	export
+	// export
 	template <typename Pair, typename Ty>
 	struct find_if_first_equal : std::bool_constant<std::same_as<typename Pair::first_type, Ty>>{};
+
+
 
 	template <typename TupleT>
 	struct archetype : archetype_base{
 		using raw_tuple = TupleT;
 		// using raw_tuple = std::tuple<int>;
+
+		using trait = archetype_trait<raw_tuple>;
 		using appended_tuple = tuple_cat_t<std::tuple<chunk_meta>, raw_tuple>;
 		using components = tuple_to_seq_chunk_t<appended_tuple>;
 		static constexpr std::size_t chunk_comp_count = std::tuple_size_v<appended_tuple>;
@@ -691,6 +863,92 @@ namespace mo_yanxi::game::ecs{
 		using base_to_derive_map = all_apply_to<tuple_cat_t, unary_apply_to_tuple_t<derive_map_of_trait, appended_tuple>>;
 		static constexpr std::size_t type_hash_map_size = std::tuple_size_v<base_to_derive_map>;
 
+		struct serializer : archetype_serializer{
+			std::vector<typename trait::dump_chunk> buffer{};
+
+			[[nodiscard]] archetype_serialize_identity get_identity() const noexcept final{
+				return trait::serialize::identity;
+			}
+
+
+			void clear() noexcept final{
+				buffer.clear();
+			}
+
+			void dump(const archetype& ty){
+				auto view = ty.get_chunk_view();
+				buffer.reserve(buffer.size() + view.size());
+
+				for (const auto & seq_chunk : view){
+					buffer.push_back(trait::behavior::dump(seq_chunk));
+				}
+			}
+
+			void write(std::ostream& stream) const final{
+				std::uint32_t total_count = buffer.size();
+				swapbyte_if_needed(total_count);
+
+				try{
+					stream.write(reinterpret_cast<char*>(&total_count), sizeof(total_count));
+					for (const auto & seq_chunk : buffer){
+						chunk_serialize_handle hdl = trait::serialize::write(stream, seq_chunk);
+						std::uint32_t off = hdl.get_offset();
+						swapbyte_if_needed(off);
+						stream.write(reinterpret_cast<char*>(&off), sizeof(off));
+
+						hdl.resume();
+
+						if(hdl.get_state() != srl_state::succeed){
+							throw bad_archetype_serialize{"assertion failed: unfinished chunk serialize"};
+						}
+					}
+				}catch(const bad_archetype_serialize&){
+					throw;
+				}catch(...){
+					throw bad_archetype_serialize{"serialize failed"};
+				}
+
+
+				//todo insert a check hash?
+			}
+
+			void read(std::istream& stream) final{
+				std::uint32_t total_count;
+				stream.read(reinterpret_cast<char*>(&total_count), sizeof(total_count));
+
+				swapbyte_if_needed(total_count);
+
+				buffer.resize(total_count);
+				auto current = buffer.begin();
+				std::ranges::range_size_t<decltype(buffer)> total_try_count{};
+
+				while(total_try_count != total_count){
+					auto last = stream.tellg();
+
+					component_chunk_offset off;
+					if(!stream.read(reinterpret_cast<char*>(&off), sizeof(off))){
+						throw bad_archetype_serialize{"assertion failed: unfinished chunk serialize"};
+					}
+					swapbyte_if_needed(off);
+
+					const srl_state rst = trait::serialize::read(stream, off, *current);
+
+					if(rst == srl_state::unfinished){
+						throw bad_archetype_serialize{"assertion failed: unfinished chunk serialize"};
+					}else if(rst == srl_state::failed){
+						stream.seekg(last + static_cast<std::streamoff>(off));
+					}else{
+						++current;
+					}
+
+					++total_try_count;
+				}
+
+				buffer.erase(current, buffer.end());
+			}
+
+			void load(component_manager& target) const final;
+		};
 
 		//believe that this is faster than static
 		const std::array<type_index_to_convertor, type_hash_map_size * 2> type_convertor_hash_map = []{
@@ -719,8 +977,8 @@ namespace mo_yanxi::game::ecs{
 		std::vector<components> staging{};
 		std::mutex staging_expire_mutex_{};
 		std::vector<entity_id> staging_expires{};
-	protected:
 
+	protected:
 		template <typename ...Ts>
 		static auto get_unwrap_of(components& comp) noexcept{
 			return archetype_custom_behavior<raw_tuple>::template get_unwrap_of<Ts ...>(comp);
@@ -736,6 +994,15 @@ namespace mo_yanxi::game::ecs{
 		}
 
 	public:
+		[[nodiscard]] std::span<const components> get_chunk_view() const noexcept{
+			return chunks;
+		}
+
+
+		std::size_t size() const noexcept final{
+			return chunks.size();
+		}
+
 		void reserve(std::size_t sz) override{
 			chunks.reserve(sz);
 		}
@@ -759,7 +1026,7 @@ namespace mo_yanxi::game::ecs{
 				(component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp)), ...);
 			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 
-			archetype_trait<raw_tuple>::on_init(added_comp);
+			trait::on_init(added_comp);
 			this->init(added_comp);
 
 			if(last_cap != chunks.capacity()){
@@ -772,8 +1039,8 @@ namespace mo_yanxi::game::ecs{
 
 			return idx;
 		}
-	public:
 
+	public:
 		std::size_t insert(const entity_id eid) final {
 			if(!eid)return 0;
 
@@ -791,7 +1058,7 @@ namespace mo_yanxi::game::ecs{
 			components& chunk = chunks[idx];
 
 			this->terminate(chunk);
-			archetype_trait<raw_tuple>::on_terminate(chunk);
+			trait::on_terminate(chunk);
 
 			[&] <std::size_t... I>(std::index_sequence<I...>){
 				(component_trait<std::tuple_element_t<I, raw_tuple>>::on_terminate(get<0>(chunk), get<I + 1>(chunk)), ...);
@@ -809,7 +1076,7 @@ namespace mo_yanxi::game::ecs{
 					(component_trait<std::tuple_element_t<I, raw_tuple>>::on_relocate(get<0>(chunk), get<I + 1>(chunk)), ...);
 				}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 
-				archetype_trait<raw_tuple>::on_relocate(chunk);
+				trait::on_relocate(chunk);
 			}
 
 
@@ -829,6 +1096,21 @@ namespace mo_yanxi::game::ecs{
 				return itr->convertor.get(chunks[idx]);
 			}else{
 				return nullptr;
+			}
+		}
+
+		strided_span<std::byte> get_staging_chunk_partial_slice(std::type_index type) noexcept final{
+			if(const auto itr = algo::access_hash(type_convertor_hash_map, type, &type_index_to_convertor::type, {}, [](const type_index_to_convertor& conv){
+				return !conv.convertor;
+			}); itr != type_convertor_hash_map.end()){
+				if(chunks.empty()){
+					return {};
+				}else{
+					return {static_cast<std::byte*>(itr->convertor.get(chunks.data())), chunks.size(), single_chunk_size};
+				}
+
+			}else{
+				return {};
 			}
 		}
 
@@ -899,6 +1181,21 @@ namespace mo_yanxi::game::ecs{
 				staging.reserve(32);
 			}else{
 				staging.clear();
+			}
+		}
+
+		std::unique_ptr<archetype_serializer> dump() const final{
+
+			constexpr auto b = ecs::archetype_serialize_info<TupleT>::is_transient;
+			constexpr auto c = std::tuple_size_v<typename ecs::archetype_serialize_info<TupleT>::dump_chunk>;
+			constexpr auto d = ecs::archetype_serialize_info<TupleT>::identity.index;
+
+			if constexpr (trait::is_transient){
+				return {};
+			}else{
+				std::unique_ptr<serializer> ret{std::make_unique<serializer>()};
+				ret->dump(*this);
+				return ret;
 			}
 		}
 
@@ -1000,6 +1297,569 @@ namespace mo_yanxi::game::ecs{
 
 		return &unchecked_get<Tuple>();
 	}
+
+
+}
+
+namespace mo_yanxi::game::ecs{
+	export
+	struct archetype_slice{
+		using acquirer_type = std::add_pointer_t<strided_span<std::byte>(void*) noexcept>;
+	private:
+		void* idt{};
+		acquirer_type getter{};
+
+	public:
+		[[nodiscard]] archetype_slice(void* identity, acquirer_type getter)
+			: idt(identity),
+			  getter(getter){
+		}
+
+		[[nodiscard]] constexpr void* identity() const noexcept{
+			return idt;
+		}
+
+		[[nodiscard]] constexpr acquirer_type get_slice_generator() const noexcept{
+			return getter;
+		}
+
+		// using T = int;
+		template <typename T>
+		[[nodiscard]] constexpr strided_span<T> slice() const noexcept {
+			auto span = getter(idt);
+			return strided_span<T>{reinterpret_cast<T*>(span.data()), span.size(), span.stride()};
+		}
+
+		constexpr auto operator<=>(const archetype_slice& o) const noexcept{
+			return std::compare_three_way{}(idt, o.idt);
+		}
+
+		constexpr bool operator==(const archetype_slice& o) const noexcept{
+			return idt == o.idt;
+		}
+	};
+
+	struct no_propagation_mutex : std::mutex{
+		[[nodiscard]] no_propagation_mutex() = default;
+
+		no_propagation_mutex(const no_propagation_mutex& other) noexcept{
+		}
+
+		no_propagation_mutex(no_propagation_mutex&& other) noexcept{
+		}
+
+		no_propagation_mutex& operator=(const no_propagation_mutex& other) noexcept{
+			return *this;
+		}
+
+		no_propagation_mutex& operator=(no_propagation_mutex&& other) noexcept{
+			return *this;
+		}
+	};
+
+	export struct component_manager{
+		template <typename T>
+		using small_vector_of = gch::small_vector<T>;
+		using archetype_map_type = type_fixed_hash_map<std::unique_ptr<archetype_base>>;
+		// using archetype_map_type = std::unordered_map<std::type_index, std::unique_ptr<archetype_base>>;
+
+	private:
+		//manager should always moved thread safely
+		no_propagation_mutex to_expire_mutex{};
+		no_propagation_mutex entity_mutex{};
+		no_propagation_mutex archetype_mutex{};
+
+		pointer_hash_map<entity_id, int> to_expire{};
+		std::vector<entity_id> expired{};
+
+		plf::hive<entity> entities{};
+		archetype_map_type archetypes{};
+
+		type_fixed_hash_map<std::vector<archetype_slice>> type_to_archetype{};
+		// std::unordered_map<std::type_index, std::vector<archetype_slice>> type_to_archetype{};
+
+	public:
+		float update_delta;
+
+		auto get_archetypes() const noexcept{
+			return archetypes | std::views::values;
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr float get_update_delta() const noexcept{
+			return update_delta;
+		}
+
+		/**
+		 * @brief deferred add entity, whose archtype must have been created
+		 * @return entity handle
+		 */
+		template <typename Tuple, typename... Args>
+			requires (is_tuple_v<Tuple> && (contained_in<std::decay_t<Args>, Tuple> && ...))
+		entity_id create_entity_deferred(Args&& ...args){
+			//TODO add lock?
+			std::type_index idx = typeid(Tuple);
+			entity* ent;
+			{
+				std::lock_guard _{entity_mutex};
+				ent = std::to_address(entities.emplace(idx));
+			}
+
+			if(auto itr = archetypes.find(idx); itr != archetypes.end()){
+				static_cast<archetype<Tuple>&>(*itr->second).push_staging(ent->id(), std::forward<Args>(args) ...);
+			}else{
+				archetype<Tuple>* atype;
+				{
+					std::lock_guard _{archetype_mutex};
+					atype = &add_archetype<Tuple>();
+				}
+
+				atype->push_staging(ent->id(), std::forward<Args>(args) ...);
+			}
+
+			return ent;
+		}
+
+		/**
+		 * @brief deferred add entity, whose archtype must have been created
+		 * @return entity handle
+		 */
+		template <typename Tuple>
+		entity_id create_entity_deferred(tuple_to_comp_t<Tuple>&& comps){
+			//TODO add lock?
+			std::type_index idx = typeid(Tuple);
+			entity* ent;
+			{
+				std::lock_guard _{entity_mutex};
+				ent = std::to_address(entities.emplace(idx));
+			}
+
+			if(auto itr = archetypes.find(idx); itr != archetypes.end()){
+				static_cast<archetype<Tuple>&>(*itr->second).push_staging(ent->id(), std::move(comps));
+			}else{
+				archetype<Tuple>* atype;
+				{
+					std::lock_guard _{archetype_mutex};
+					atype = &add_archetype<Tuple>();
+				}
+
+				atype->push_staging(ent->id(), std::move(comps));
+			}
+
+			return ent;
+		}
+
+		template <typename Tuple, std::derived_from<archetype<Tuple>> Archetype = archetype<Tuple>, typename ... Args>
+			requires (is_tuple_v<Tuple>)
+		auto& add_archetype(Args&& ...args){
+			std::type_index idx = typeid(Tuple);
+
+			return static_cast<Archetype&>(*archetypes.try_emplace(idx, this->create_new_archetype_map<Tuple, Archetype>(std::forward<Args>(args) ...)).first->second);
+		}
+
+		template <typename Archetype>
+			requires requires{
+				typename Archetype::raw_tuple;
+			}
+		auto& add_archetype(){
+			return add_archetype<typename Archetype::raw_tuple, Archetype>();
+		}
+
+		template <typename ...Tuple>
+			requires (sizeof...(Tuple) > 1 && (is_tuple_v<Tuple> && ...))
+		void add_archetype(){
+			(add_archetype<Tuple>(), ...);
+		}
+
+		template <typename Tuple>
+			requires (is_tuple_v<Tuple>)
+		entity_id acquire_entity(){
+			std::type_index idx = typeid(Tuple);
+			auto& ent = *entities.emplace(idx);
+
+			return std::addressof(ent);
+		}
+
+		template <typename Tuple>
+			requires (is_tuple_v<Tuple>)
+		entity_id create_entity(){
+			using ArcheT = archetype<Tuple>;
+			std::type_index idx = typeid(Tuple);
+			auto& ent = *entities.emplace(idx);
+
+			const auto itr = archetypes.try_emplace(idx, std::make_unique<ArcheT>());
+			if(itr.second){
+				this->add_new_archetype_map<Tuple>(static_cast<ArcheT&>(*itr.first->second));
+			}
+			itr.first->second->insert(ent.id());
+
+			return std::addressof(ent);
+		}
+
+		template <typename ...Ts>
+			requires (!is_tuple_v<Ts> && ...)
+		entity_id create_entity(){
+			return create_entity<std::tuple<Ts ...>>();
+		}
+
+		bool mark_expired(entity_id entity){
+			std::lock_guard _{to_expire_mutex};
+			return to_expire.try_emplace(entity).second;
+		}
+
+		void do_deferred(){
+			do_deferred_destroy();
+			do_deferred_add();
+		}
+
+		void do_deferred_add(){
+			for (const auto & [type, archetype] : archetypes){
+				archetype->dump_staging();
+			}
+		}
+
+		void do_deferred_destroy(){
+			modifiable_erase_if(expired, [this](entity_id e){
+				if(e->get_ref_count() == 0){
+					//TODO should this always true?
+					const auto itr = entities.get_iterator(e);
+					if(itr != entities.end())entities.erase(itr);
+					return true;
+				}
+
+				return false;
+			});
+
+			//TODO destroy expiration notify/check
+			for (auto&& e : to_expire | std::views::keys){
+				e->get_archetype()->erase(e);
+
+				if(e->get_ref_count() > 0){
+					expired.push_back(e);
+				}else{
+					auto itr = entities.get_iterator(e);
+					if(itr != entities.end())entities.erase(itr);
+				}
+			}
+			to_expire.clear();
+		}
+
+		void deferred_destroy_no_reference_entities(){
+			for (auto& entity : entities){
+				if(entity.get_ref_count() == 0){
+					to_expire.try_emplace(entity.id());
+				}
+			}
+		}
+
+		template <typename Tuple>
+			requires (is_tuple_v<Tuple>)
+		auto get_slice_of(){
+			static_assert(std::tuple_size_v<Tuple> > 0);
+
+			using chunk_spans = unary_apply_to_tuple_t<strided_span, Tuple>;
+			using searched_spans = small_vector_of<chunk_spans>;
+
+			searched_spans result{};
+
+			this->slice_and_then<Tuple>([&](chunk_spans spans){
+				                            result.push_back(spans);
+			                            }, [&](std::size_t sz){
+				                            result.reserve(sz);
+			                            });
+
+			return result;
+		}
+
+		template <typename Exclusives = std::tuple<>, typename Fn>
+		FORCE_INLINE void sliced_each(Fn fn){
+			using raw_params = remove_mfptr_this_args<Fn>;
+
+			if constexpr (std::same_as<std::remove_cvref_t<std::tuple_element_t<0, raw_params>>, component_manager>){
+				using params = unary_apply_to_tuple_t<std::decay_t, tuple_drop_first_elem_t<raw_params>>;
+				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
+
+				this->slice_and_then<params, Exclusives>([this, f = std::move(fn)](const span_tuple& p){
+					auto count = std::ranges::size(std::get<0>(p));
+
+					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
+
+					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+						((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
+					}(std::make_index_sequence<std::tuple_size_v<params>>{});
+
+					for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
+						[&, this] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+							std::invoke(f, *this, *(std::get<Idx>(iterators)++) ...);
+						}(std::make_index_sequence<std::tuple_size_v<params>>{});
+					}
+				});
+			}else{
+				using params = unary_apply_to_tuple_t<std::decay_t, raw_params>;
+				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
+
+				this->slice_and_then<params, Exclusives>([f = std::move(fn)](const span_tuple& p){
+					auto count = std::ranges::size(std::get<0>(p));
+
+					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
+
+					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+						((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
+					}(std::make_index_sequence<std::tuple_size_v<params>>{});
+
+					for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
+						[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+							std::invoke(f, (assert(std::get<Idx>(iterators) != std::ranges::end(std::get<Idx>(p))), *(std::get<Idx>(iterators)++)) ...);
+						}(std::make_index_sequence<std::tuple_size_v<params>>{});
+					}
+				});
+			}
+
+		}
+
+		template <typename ...T>
+			requires (!is_tuple_v<T> && ...)
+		auto get_slice_of(){
+			return get_slice_of<std::tuple<T...>>();
+		}
+
+
+
+		template <typename Tuple = std::tuple<int>>
+		tuple_to_seq_chunk_t<Tuple>* get_entity_full_chunk(const entity& entity) const noexcept{
+			if(entity.is_expired())return nullptr;
+			const std::type_index idx = typeid(Tuple);
+			if(idx != entity.type())return nullptr;
+			//TODO should this a must event? so at() directly?
+			archetype<Tuple>& aty = static_cast<archetype<Tuple>&>(entity.get_archetype());
+			return &aty[entity.chunk_index()];
+
+			return nullptr;
+		}
+
+		template <typename T>
+		T* get_entity_partial_chunk(const entity_id entity) const noexcept{
+			assert(entity);
+			if(entity->is_expired())return nullptr;
+
+			const std::type_index idx = typeid(T);
+			if(auto slices_itr = type_to_archetype.find(idx); slices_itr != type_to_archetype.end()){
+				auto* archetype = entity->get_archetype();
+
+				if(
+					const auto itr = std::ranges::find(slices_itr->second, archetype, &archetype_slice::identity);
+					itr != slices_itr->second.end()){
+					return &itr->slice<T>()[entity->chunk_index()];
+				}
+			}
+
+			return nullptr;
+		}
+
+	private:
+		struct subrange{
+			using value_type = const archetype_slice;
+			using rng = std::span<value_type>;
+			using itr = rng::iterator;
+
+		// private:
+			itr begin_itr;
+			itr end_itr;
+		public:
+
+			[[nodiscard]] constexpr subrange() noexcept = default;
+
+			[[nodiscard]] constexpr explicit(false) subrange(rng range) noexcept : begin_itr(range.begin()),
+				end_itr(range.end()){
+			}
+
+			constexpr bool empty() const noexcept{
+				return begin_itr == end_itr;
+			}
+
+			value_type& front() const noexcept{
+				return *begin_itr;
+			}
+
+			itr begin() const noexcept{
+				return begin_itr;
+			}
+
+			itr end() const noexcept{
+				return begin_itr;
+			}
+		};
+
+	public:
+		template <
+			tuple_spec Tuple = std::tuple<>,
+			tuple_spec Exclusives = std::tuple<>,
+			typename Fn,
+			std::invocable<std::size_t>	ReserveFn = std::identity>
+			requires (!tuple_has_duplicate_types_v<tuple_cat_t<Tuple, Exclusives>>)
+		void slice_and_then(Fn fn, ReserveFn reserve_fn = {}){
+			static_assert(std::tuple_size_v<Tuple> > 0);
+			using chunk_spans = unary_apply_to_tuple_t<strided_span, Tuple>;
+
+			std::array<std::span<const archetype_slice>, std::tuple_size_v<Tuple>> spans{};
+
+			static constexpr auto ExclusiveSize = std::tuple_size_v<Exclusives>;
+
+			gch::small_vector<const void*, std::clamp<std::size_t>(std::bit_ceil(ExclusiveSize * 2), 4, 32)> exclusives{};
+
+			if constexpr (ExclusiveSize > 0){
+				[&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>){
+					([&, this](std::type_index idx){
+						if(auto itr = type_to_archetype.find(idx); itr != type_to_archetype.end()){
+							for (const auto & slice : itr->second){
+								exclusives.push_back(slice.identity());
+							}
+						}
+					}(typeid(std::tuple_element_t<Idx, Exclusives>)), ...);
+				}(std::make_index_sequence<ExclusiveSize>{});
+
+				std::ranges::sort(exclusives);
+				const auto rst = std::ranges::unique(exclusives);
+				exclusives.erase(rst.begin(), rst.end());
+			}
+
+			std::size_t maximum_size{};
+
+			{
+				//TODO consider that 'none' is really casual, remove it?
+
+				bool none = false;
+				auto try_find = [&, this](std::type_index idx) -> std::span<const archetype_slice>{
+					// std::println(std::cerr, "{}", idx.name());
+					if(none)return {};
+
+					if(auto itr = type_to_archetype.find(idx); itr != type_to_archetype.end()){
+						maximum_size = std::max(maximum_size, itr->second.size());
+						return itr->second;
+					}
+
+					none = true;
+					return {};
+				};
+
+				[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+					((spans[Idx] = try_find(typeid(std::tuple_element_t<Idx, Tuple>))), ...);
+				}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+
+				if(none)return;
+			}
+
+			std::array<subrange, std::tuple_size_v<Tuple>> ranges{};
+
+			static constexpr auto comp = std::less<void>{};
+
+			auto cur_itr_min{spans.front().front().identity()};
+			for(std::size_t i = 0; i < std::tuple_size_v<Tuple>; ++i){
+				ranges[i] = spans[i];
+				cur_itr_min = std::max(cur_itr_min, ranges[i].front().identity(), comp);
+			}
+
+			(void)std::invoke(reserve_fn, maximum_size);
+			while(true){
+				auto last_itr_min = cur_itr_min;
+				for (auto&& rng : ranges){
+					//TODO will binary search(lower bound) faster?
+					if(comp(rng.front().identity(), last_itr_min)){
+						++rng.begin_itr;
+
+						if(rng.empty()){
+							return;
+						}
+
+					}
+
+					cur_itr_min = std::max(cur_itr_min, rng.front().identity(), comp);
+				}
+
+				if(last_itr_min == cur_itr_min){
+					if constexpr (ExclusiveSize > 0){
+						for (const auto& archetype_slice : ranges){
+							if(std::ranges::binary_search(exclusives, archetype_slice.front().identity())){
+								goto skip;
+							}
+						}
+					}
+
+					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+						if constexpr (std::invocable<Fn, std::array<archetype_slice, std::tuple_size_v<Tuple>>>){
+							std::invoke(fn, std::array<archetype_slice, std::tuple_size_v<Tuple>>{static_cast<subrange&>(ranges[Idx]).front() ...});
+						}else if constexpr (std::invocable<Fn, chunk_spans>){
+							std::invoke(fn, std::make_tuple(static_cast<subrange&>(ranges[Idx]).front().slice<std::tuple_element_t<Idx, Tuple>>() ...));
+						}else{
+							std::invoke(fn, static_cast<subrange&>(ranges[Idx]).front().slice<std::tuple_element_t<Idx, Tuple>>() ...);
+						}
+					}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+
+				skip:
+
+					for (auto&& archetype_slice : ranges){
+						++archetype_slice.begin_itr;
+						if(archetype_slice.empty()){
+							return;
+						}
+					}
+
+					cur_itr_min = ranges.back().front().identity();
+				}
+			}
+		}
+
+	private:
+		template <typename Tuple = std::tuple<>>
+		void add_new_archetype_map(archetype<Tuple>& type){
+			using archetype_t = archetype<Tuple>;
+
+			auto insert = [&, this]<typename T>(){
+				std::type_index idx{typeid(T)};
+				auto& vector = type_to_archetype[idx];
+
+				archetype_slice elem{
+					&type,
+					+[](void* arg) noexcept -> strided_span<std::byte>{
+						auto slice = static_cast<archetype_t*>(arg)->template slice<T>();
+						return strided_span<std::byte>{
+							const_cast<std::byte*>(reinterpret_cast<const std::byte*>(std::ranges::data(slice))),
+							slice.size(),
+							slice.stride()
+						};
+					}
+				};
+
+				if(const auto it = std::ranges::lower_bound(vector, elem); it == vector.end() || it->identity() != elem.identity()){
+					vector.insert(it, std::move(elem));
+				}
+			};
+
+			insert.template operator()<chunk_meta>();
+
+			[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+				(insert.template operator()<typename std::tuple_element_t<Idx, typename archetype_t::base_to_derive_map>::first_type>(), ...);
+			}(std::make_index_sequence<std::tuple_size_v<typename archetype_t::base_to_derive_map>>{});
+		}
+
+
+		template <typename Tuple, std::derived_from<archetype<Tuple>> Archetype = archetype<Tuple>, typename ...Args>
+		std::unique_ptr<archetype_base> create_new_archetype_map(Args&& ...args){
+			std::unique_ptr<archetype_base> ptr = std::make_unique<Archetype>(std::forward<Args>(args)...);
+			this->add_new_archetype_map<Tuple>(static_cast<Archetype&>(*ptr));
+			return ptr;
+		}
+
+		//TODO delete empty archetype map?
+	};
+
+	template <typename TupleT>
+	void archetype<TupleT>::serializer::load(component_manager& target) const{
+		archetype& archetype_ = target.add_archetype<archetype>();
+
+		for (const auto& seq_chunk : buffer){
+			archetype_.push_staging(target.acquire_entity<raw_tuple>(), trait::behavior::load(seq_chunk));
+		}
+	}
 }
 
 // NOLINTEND(*-misplaced-const)
@@ -1011,3 +1871,4 @@ struct std::hash<mo_yanxi::game::ecs::entity_ref>{
 		return hasher(ref.id());
 	}
 };
+

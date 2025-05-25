@@ -1111,7 +1111,7 @@ namespace mo_yanxi::ui::creation{
 
 			void yield_path() override{
 				if(std::invoke(yielder, *this, *owner)){
-					remove_self_from_parent();
+					dialog_notify_drop();
 				}
 			}
 
@@ -1120,20 +1120,16 @@ namespace mo_yanxi::ui::creation{
 			}
 
 			esc_flag on_esc() override{
-				remove_self_from_parent();
-				return esc_flag::fall_through;
+				dialog_notify_drop();
+				return esc_flag::intercept;
 			}
 		};
 
 
 		scene& scene = *create_info.requester.get_scene();
-		elem_ptr selector{
-			&scene,
-			scene.root.handle,
-			std::in_place_type<struct selector>,
-			create_info};
 
-		selector->prop().fill_parent = {true, true};
-		return static_cast<file_selector&>(scene.root->add_children(std::move(selector)));
+		file_selector& selector = scene.dialog_manager.emplace<struct selector>({}, create_info);
+		selector.prop().fill_parent = {true, true};
+		return selector;
 	}
 }

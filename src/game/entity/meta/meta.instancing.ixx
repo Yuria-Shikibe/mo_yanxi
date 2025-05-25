@@ -3,7 +3,7 @@ module;
 
 export module mo_yanxi.game.meta.instancing;
 
-export import mo_yanxi.game.ecs.component.manager;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.meta.projectile;
 
 import mo_yanxi.game.ecs.entitiy_decleration;

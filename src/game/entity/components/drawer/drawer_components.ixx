@@ -5,7 +5,7 @@ module;
 export module mo_yanxi.game.ecs.component.drawer;
 
 export import mo_yanxi.math.trans2;
-export import mo_yanxi.game.ecs.entity;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.world.graphic;
 
 import mo_yanxi.graphic.image_manage;

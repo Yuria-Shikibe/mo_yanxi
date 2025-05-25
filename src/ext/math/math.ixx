@@ -1078,6 +1078,28 @@ namespace mo_yanxi::math {
 			section *= val;
 			return section;
 		}
+
+		FORCE_INLINE constexpr friend section operator*(const T val, section section) noexcept{
+			section *= val;
+			return section;
+		}
+
+		FORCE_INLINE constexpr section& operator/=(const T val) noexcept{
+			from /= val;
+			to /= val;
+			return *this;
+		}
+
+		FORCE_INLINE constexpr friend section operator/(section section, const T val) noexcept{
+			section /= val;
+			return section;
+		}
+		//
+		// FORCE_INLINE constexpr friend section operator/(const T val, section section) noexcept{
+		// 	section /= val;
+		// 	return section;
+		// }
+
 	};
 
 	export

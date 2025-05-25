@@ -532,7 +532,7 @@ namespace mo_yanxi::math{
 				CHECKED_ASSUME(yScl >= 0);
 			}
 			
-			size_.scl(xScl, yScl);
+			size_.template scl<std::common_type_t<T1, T2>>(xScl, yScl);
 			
 			if(xScl < 0){
 				src.x += size_.x;
@@ -563,7 +563,7 @@ namespace mo_yanxi::math{
 		}
 
 		template <mo_yanxi::number N>
-		FORCE_INLINE constexpr rect_ortho& scl(typename vector2<N>::const_pass_t scl) noexcept{
+		FORCE_INLINE constexpr rect_ortho& scl(const vector2<N>& scl) noexcept{
 			(void)this->scl_pos<N, N>(scl.x, scl.y);
 			(void)this->scl_size<N, N>(scl.x, scl.y);
 

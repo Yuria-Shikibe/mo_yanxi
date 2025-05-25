@@ -9,7 +9,7 @@ import mo_yanxi.ui.root;
 import mo_yanxi.ui.manual_table;
 import mo_yanxi.ui.table;
 
-import mo_yanxi.game.ecs.component.manager;
+import mo_yanxi.game.ecs.component.manage;
 import mo_yanxi.game.ecs.system.collision;
 import mo_yanxi.game.world.graphic;
 

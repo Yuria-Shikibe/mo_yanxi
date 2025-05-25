@@ -201,10 +201,10 @@ namespace mo_yanxi::ui{
 					for(auto&& [idx_major, elem] : line | std::views::enumerate){
 						auto& head_major = at_major(idx_major);
 
-						if((elem.cell.stated_extent.*extent_major).type == size_category::external){
+						if((elem.cell.stated_extent.*extent_major).type == size_category::dependent){
 							stated_extent ext;
-							ext.*extent_major = {size_category::external};
-							ext.*extent_minor = head_minor.max_size.mastering() ? head_minor.max_size : stated_size{size_category::external};
+							ext.*extent_major = {size_category::dependent};
+							ext.*extent_minor = head_minor.max_size.mastering() ? head_minor.max_size : stated_size{size_category::dependent};
 
 							if(auto size = elem.element->pre_acquire_size(ext)){
 								head_major.max_size.promote(size.value().*major_target);
@@ -247,10 +247,10 @@ namespace mo_yanxi::ui{
 							line_external_consumes = math::max(line_external_consumes, valid);
 							break;
 						}
-						case size_category::external:{
+						case size_category::dependent:{
 							stated_extent ext;
 							ext.*extent_major = head_major.max_size;
-							ext.*extent_minor = {size_category::external};
+							ext.*extent_minor = {size_category::dependent};
 
 							if(auto size = elem.element->pre_acquire_size(ext)){
 								float valid = math::min(size.value().*minor_target, curSize.*minor_target);
@@ -336,11 +336,11 @@ namespace mo_yanxi::ui{
 
 					//TODO
 					if((elem.cell.stated_extent.*extent_minor).dependent()){
-						ext.*extent_minor = {size_category::external};
+						ext.*extent_minor = {size_category::dependent};
 					}
 
 					if((elem.cell.stated_extent.*extent_major).dependent() && !elem.cell.saturate){
-						ext.*extent_major = {size_category::external};
+						ext.*extent_major = {size_category::dependent};
 					}
 
 
@@ -460,7 +460,7 @@ namespace mo_yanxi::ui{
 		}
 
 	public:
-		std::optional<math::vec2> pre_acquire_size(stated_extent extent) override{
+		std::optional<math::vec2> pre_acquire_size_impl(stated_extent extent) override{
 			const auto grid = util::countRowAndColumn_toVector(cells, &table_cell_adaptor::line_feed);
 			if(grid.empty()) return std::nullopt;
 

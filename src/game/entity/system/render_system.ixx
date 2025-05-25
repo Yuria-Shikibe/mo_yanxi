@@ -4,7 +4,7 @@ module;
 export module mo_yanxi.game.ecs.system.renderer;
 export import mo_yanxi.shared_stack;
 
-import mo_yanxi.game.ecs.component.manager;
+import mo_yanxi.game.ecs.component.manage;
 import mo_yanxi.game.ecs.component.drawer;
 import mo_yanxi.game.ecs.component.manifold;
 import mo_yanxi.game.world.graphic;

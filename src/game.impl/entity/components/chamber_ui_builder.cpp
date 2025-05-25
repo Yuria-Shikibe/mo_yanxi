@@ -11,14 +11,14 @@ import mo_yanxi.ui.creation.seperator_line;
 import mo_yanxi.ui.elem.text_elem;
 import mo_yanxi.ui.elem.image_frame;
 import mo_yanxi.ui.elem.progress_bar;
-import mo_yanxi.ui.elem.progress_bar;
+import mo_yanxi.game.ui.bars;
 
 import std;
 
 
 namespace mo_yanxi::game::ecs::chamber{
 	struct chamber_ui : entity_info_table{
-		ui::progress_bar* hitpoint_bar{};
+		ui::stalled_bar* hitpoint_bar{};
 
 		[[nodiscard]] chamber_ui(ui::scene* scene, group* group, const entity_ref& ref)
 			: entity_info_table(scene, group, ref){
@@ -43,10 +43,10 @@ namespace mo_yanxi::game::ecs::chamber{
 			}
 
 			{
-				auto bar = end_line().emplace<ui::progress_bar>();
-				bar.cell().set_pad(4);
+				auto bar = end_line().emplace<ui::stalled_bar>();
+				bar.cell().pad.set_vert(4);
 				bar.cell().set_height(40);
-				bar->reach_speed = 0.125f;
+				bar->approach_speed = 0.125f;
 
 				hitpoint_bar = std::to_address(bar);
 			}
@@ -84,9 +84,10 @@ namespace mo_yanxi::game::ecs::chamber{
 
 			if(!ref)return;
 
-			auto& chunk = ref->unchecked_get<decl::grided_entity_desc>();
+			auto& chunk = ref->unchecked_get<decl::chamber_entity_desc>();
 
-			hitpoint_bar->update_progress(chunk.hit_point.factor(), delta_in_ticks);
+			hitpoint_bar->set_value(chunk.hit_point.factor());
+			hitpoint_bar->valid_range = chunk.hit_point.capability_range / chunk.hit_point.max;
 		}
 	};
 

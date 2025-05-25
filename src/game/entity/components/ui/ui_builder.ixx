@@ -4,7 +4,7 @@
 
 export module mo_yanxi.game.ecs.component.ui.builder;
 
-export import mo_yanxi.game.ecs.entity;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.ui.table;
 import mo_yanxi.ui.action.generic;
 
@@ -19,10 +19,12 @@ namespace mo_yanxi::game::ecs{
 
 		[[nodiscard]] entity_info_table(ui::scene* scene, group* group)
 			: table(scene, group){
+
 		}
 
 		[[nodiscard]] entity_info_table(ui::scene* scene, group* group, entity_ref ref)
 			: table(scene, group), ref(std::move(ref)){
+
 		}
 
 		void update(float delta_in_ticks) override{

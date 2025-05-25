@@ -3,7 +3,7 @@ module;
 
 export module mo_yanxi.game.ecs.system.grid_system;
 
-export import mo_yanxi.game.ecs.component.manager;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.component.chamber;
 export import mo_yanxi.game.ecs.component.physical_property;
 export import mo_yanxi.game.world.graphic;

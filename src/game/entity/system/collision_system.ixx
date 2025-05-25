@@ -5,11 +5,11 @@ module;
 
 export module mo_yanxi.game.ecs.system.collision;
 
-export import mo_yanxi.game.ecs.component.manager;
+export import mo_yanxi.game.ecs.component.manage;
 
+export import mo_yanxi.game.quad_tree;
 export import mo_yanxi.game.ecs.component.manifold;
 export import mo_yanxi.game.ecs.component.physical_property;
-export import mo_yanxi.game.quad_tree;
 export import mo_yanxi.math.intersection;
 
 import mo_yanxi.shared_stack;
@@ -18,7 +18,6 @@ import std;
 
 namespace mo_yanxi::game{
 
-	export
 	template <>
 	struct quad_tree_trait_adaptor<ecs::collision_object, float> : quad_tree_adaptor_base<ecs::collision_object, float>{
 		[[nodiscard]] static rect_type get_bound(const_reference self) noexcept{

@@ -4,7 +4,7 @@ module;
 
 export module mo_yanxi.game.ecs.component.chamber:grid;
 
-export import mo_yanxi.game.ecs.component.manager;
+export import mo_yanxi.game.ecs.component.manage;
 
 export import mo_yanxi.dim2.grid;
 export import mo_yanxi.open_addr_hash_map;
@@ -24,7 +24,6 @@ import std;
 namespace mo_yanxi::game{
 	// using namespace chamber;
 
-	export
 	template <>
 	struct quad_tree_trait_adaptor<ecs::chamber::tile, float> : quad_tree_adaptor_base<ecs::chamber::tile, float>{
 		[[nodiscard]] static rect_type get_bound(const_reference self) noexcept{
@@ -164,11 +163,11 @@ namespace mo_yanxi::game::ecs::chamber{
 			return tiles.find(coord);
 		}
 
-		[[nodiscard]] game::quad_tree<tile_type>& quad_tree(){
+		[[nodiscard]] struct game::quad_tree<tile_type>& quad_tree(){
 			return quad_tree_;
 		}
 
-		[[nodiscard]] const game::quad_tree<tile_type>& quad_tree() const{
+		[[nodiscard]] const struct game::quad_tree<tile_type>& quad_tree() const{
 			return quad_tree_;
 		}
 
@@ -420,7 +419,6 @@ namespace mo_yanxi::game::ecs::chamber{
 		chamber_manifold(chamber_manifold&& other) noexcept
 			: chamber_grid{(other.manager.do_deferred(), std::move(other))}{
 
-
 			manager.sliced_each([this](building_data& data){
 				data.grid_ = this;
 			});
@@ -439,6 +437,27 @@ namespace mo_yanxi::game::ecs::chamber{
 			return *this;
 		}
 	};
+
+	export
+	struct chamber_manifold_dump{
+		ecs::component_pack buildings{};
+
+		chamber_manifold_dump& operator=(const chamber_manifold& manifold){
+			buildings = manifold.manager;
+			return *this;
+		}
+
+		explicit(false) operator chamber_manifold() const{
+			chamber_manifold manifold;
+			buildings.load_to(manifold.manager);
+			for (auto && archetype_base : manifold.manager.get_archetypes()){
+				for (auto& data : archetype_base->try_get_slice_of_staging<building_data>()){
+					data.grid_ = &manifold;
+				}
+			}
+			return manifold;
+		}
+	};
 }
 
 
@@ -446,9 +465,30 @@ namespace mo_yanxi::game::ecs::chamber{
 namespace mo_yanxi::game::ecs{
 	using namespace chamber;
 
+
 	export
+	struct building_data_dump{
+		tile_region region{};
+		hit_point hit_point{};
+		std::vector<tile_status> status{};
+
+		building_data_dump& operator=(const building_data& data){
+			region = data.region();
+			hit_point = data.hit_point;
+			status = data.tile_states;
+			return *this;
+		}
+
+		explicit(false) operator building_data() const{
+			building_data data{region, nullptr};
+
+			return data;
+		}
+	};
+
 	template <>
-	struct component_custom_behavior<chamber::building_data> : component_custom_behavior_base<chamber::building_data>{
+	struct component_custom_behavior<chamber::building_data> : component_custom_behavior_base<chamber::building_data, building_data_dump>{
+
 		static void on_init(const chunk_meta& meta, value_type& comp){
 			comp.tile_states.resize(comp.region().area(), tile_status{
 				comp.get_tile_individual_max_hitpoint(),
@@ -457,6 +497,7 @@ namespace mo_yanxi::game::ecs{
 			comp.grid().local_grid.insert(meta.id());
 
 			on_relocate(meta, comp);
+			building_data_dump d{};
 		}
 
 		static void on_terminate(const chunk_meta& meta, const value_type& comp){
@@ -468,6 +509,13 @@ namespace mo_yanxi::game::ecs{
 			meta.id()->at<building>().data_ = std::addressof(comp);
 		}
 	};
+
+	template <>
+	struct component_custom_behavior<chamber::chamber_manifold> : component_custom_behavior_base<chamber::chamber_manifold, chamber_manifold_dump>{
+
+	};
+
+
 
 
 	namespace chamber{

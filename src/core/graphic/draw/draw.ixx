@@ -26,7 +26,6 @@ namespace mo_yanxi::graphic::draw{
 		static FORCE_INLINE constexpr Vtx& operator()(Vtx* ptr, std::size_t idx, math::vec2 pos, vk::vertices::texture_indices, color color_scl, math::vec2 uv) = delete;
 	};
 
-	export
 	template<>
 	struct mapper<vk::vertices::vertex_world>{
 		static FORCE_INLINE constexpr vk::vertices::vertex_world& operator()(
@@ -41,7 +40,6 @@ namespace mo_yanxi::graphic::draw{
 		}
 	};
 
-	export
 	template<>
 	struct mapper<vk::vertices::vertex_ui>{
 		static FORCE_INLINE constexpr vk::vertices::vertex_ui& operator()(

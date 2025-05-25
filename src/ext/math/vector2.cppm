@@ -21,7 +21,7 @@ export namespace mo_yanxi::math{
 		}
 	};
 
-	template <number T>
+	template <typename T>
 	struct vector2
 	{
 		T x;
@@ -126,11 +126,11 @@ export namespace mo_yanxi::math{
 		}
 
 		FORCE_INLINE constexpr vector2& operator*=(const T val) noexcept {
-			return this->scl(val);
+			return this->mul(val);
 		}
 
 		FORCE_INLINE constexpr vector2& operator/=(const_pass_t tgt) noexcept {
-			return this->sub(tgt);
+			return this->div(tgt);
 		}
 
 		FORCE_INLINE constexpr vector2& operator/=(const T tgt) noexcept {

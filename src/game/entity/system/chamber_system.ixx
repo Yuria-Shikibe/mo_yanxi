@@ -3,8 +3,7 @@ module;
 
 export module mo_yanxi.game.ecs.system.chamber;
 
-export import mo_yanxi.game.ecs.entity;
-export import mo_yanxi.game.ecs.component.manager;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.component.chamber;
 
 namespace mo_yanxi::game::ecs::system{

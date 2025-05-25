@@ -186,6 +186,14 @@ namespace mo_yanxi::game{
 			return std::sqrt(max);
 		}
 
+		explicit operator meta::hitbox() const{
+			meta::hitbox hitbox{};
+			hitbox.components.resize(size());
+			for(const auto& [idx, comp] : components | std::views::enumerate){
+				hitbox.components[idx] = {comp.box.get_identity(), comp.trans};
+			}
+			return hitbox;
+		}
 	};
 
 	export
@@ -203,9 +211,11 @@ namespace mo_yanxi::game{
 
 		using hitbox_identity::size;
 		using hitbox_identity::get_wrap_radius;
+		using hitbox_identity::operator meta::hitbox;
 
-		[[nodiscard]] explicit(false) ccd_hitbox(const hitbox_identity& identity)
+		[[nodiscard]] explicit(false) ccd_hitbox(const hitbox_identity& identity, const math::trans2 transform = {})
 			: hitbox_identity(identity){
+			if(!components.empty())update(transform);
 		}
 
 		[[nodiscard]] explicit ccd_hitbox(const std::vector<hitbox_comp>& comps, const math::trans2 transform = {})
@@ -234,7 +244,8 @@ namespace mo_yanxi::game{
 		}
 
 		/*constexpr*/ void update(const math::trans2 nextTrans) noexcept{
-			if(components.empty())return;
+			assert(!components.empty());
+
 			const auto move = this->trans.vec - nextTrans.vec;
 
 			this->trans = nextTrans;

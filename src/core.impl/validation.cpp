@@ -20,6 +20,7 @@ VkBool32 mo_yanxi::vk::validationCallback(
 
 	std::println(std::cerr, "[Vulkan] ID:{} | {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName);
 
+	std::println(std::cerr, "Current Thread: {}", std::this_thread::get_id());
 	std::println(std::cerr, "{}", str);
 	print_stack_trace(std::cerr, 1);
 

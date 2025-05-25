@@ -21,9 +21,12 @@ void mo_yanxi::game::world::hud::hud_viewport::build_hud(){
 	auto pane = bed.emplace<ui::scroll_pane>();
 	side_bar = &pane->set_elem([](ui::table& t){
 		t.set_style();
+		t.interactivity = ui::interactivity::enabled;
+
 		t.template_cell.pad.bottom = 8;
 		t.template_cell.set_external({false, true});
 	});
+	pane->set_style(ui::theme::styles::general_static);
 	pane.cell().region_scale = {tags::from_extent, {}, {0.3, 1.}};
 	pane.cell().margin.set(4);
 	pane.cell().align = align::pos::center_left;

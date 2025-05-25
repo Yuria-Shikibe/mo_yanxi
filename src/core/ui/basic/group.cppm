@@ -19,7 +19,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] elem* find_children_by_name(const std::string_view name) const{
 			for (const elem_ptr& element : get_children()){
-				if(element->prop().name == name){
+				if(element->name == name){
 					return element.get();
 				}
 			}
@@ -112,7 +112,7 @@ namespace mo_yanxi::ui{
 				item.context_size_restriction.width =
 					set_restriction_to_mastering
 						? ss{size_category::mastering, boundSize.x}
-						: ss{size_category::external};
+						: ss{size_category::dependent};
 			}
 
 			if(fy) item.context_size_restriction.height = {size_category::mastering, boundSize.y};
@@ -120,7 +120,7 @@ namespace mo_yanxi::ui{
 				item.context_size_restriction.height =
 					set_restriction_to_mastering
 						? ss{size_category::mastering, boundSize.y}
-						: ss{size_category::external};
+						: ss{size_category::dependent};
 			}
 
 			item.resize_masked({

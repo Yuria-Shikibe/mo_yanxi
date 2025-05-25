@@ -7,7 +7,7 @@ export module mo_yanxi.game.ecs.component.manifold;
 
 export import mo_yanxi.game.ecs.component.hitbox;
 export import mo_yanxi.game.ecs.component.physical_property;
-export import mo_yanxi.game.ecs.entity;
+export import mo_yanxi.game.ecs.component.manage;
 
 export import mo_yanxi.array_stack;
 
@@ -109,15 +109,17 @@ namespace mo_yanxi::game::ecs{
 		projectile_collider
 	>;
 
-
 	struct manifold{
 		[[nodiscard]] manifold() = default;
 
 		float thickness{0.05f};
 		hitbox hitbox{};
-		colliders collider{};
 		bool no_backtrace_correction{false};
 
+
+		//transients:
+
+		colliders collider{};
 
 		bool is_under_correction{false};
 		math::trans2 collision_vel_trans_sum{};
@@ -209,5 +211,32 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
+	struct manifold_dump{
+		float thickness;
+		bool no_backtrace_correction;
+		meta::hitbox hitbox;
+
+		manifold_dump& operator=(const manifold& manifold){
+			thickness = manifold.thickness;
+			no_backtrace_correction = manifold.no_backtrace_correction;
+			hitbox = static_cast<meta::hitbox>(manifold.hitbox);
+			return *this;
+		}
+
+		explicit(false) operator manifold() const{
+			manifold manifold{};
+			manifold.thickness = thickness;
+			manifold.no_backtrace_correction = no_backtrace_correction;
+			manifold.hitbox = {{hitbox}};
+			return manifold;
+		}
+	};
+
 	static_assert(std::is_default_constructible_v<manifold>);
+
+	// export
+	template <>
+	struct component_custom_behavior<manifold> : component_custom_behavior_base<manifold, manifold_dump>{
+
+	};
 }

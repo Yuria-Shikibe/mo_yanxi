@@ -14,7 +14,7 @@ export namespace mo_yanxi::ui{
 		using SizeType = math::vector2<T>;
 	private:
 		SizeType minimumSize{math::vectors::constant2<T>::zero_vec2};
-		SizeType maximumSize{math::vectors::constant2<T>::max_vec2};
+		SizeType maximumSize{math::vectors::constant2<T>::inf_positive_vec2};
 		SizeType size{};
 
 	public:
@@ -103,6 +103,10 @@ export namespace mo_yanxi::ui{
 				return util::try_modify(size, sz.min(size));
 			}
 			return false;
+		}
+
+		[[nodiscard]] math::vec2 clamp(math::vec2 sz) const noexcept{
+			return sz.clamp_xy(minimumSize, maximumSize);
 		}
 
 		constexpr friend bool operator==(const clamped_size& lhs, const clamped_size& rhs) = default;

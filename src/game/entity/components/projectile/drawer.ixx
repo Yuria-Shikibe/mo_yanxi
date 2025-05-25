@@ -29,7 +29,7 @@ namespace mo_yanxi::game::ecs{
 
 
 	template <>
-	struct component_custom_behavior<projectile_drawer> : component_custom_behavior_base<projectile_drawer>{
+	struct component_custom_behavior<projectile_drawer> : component_custom_behavior_base<projectile_drawer, void>{
 		using base_types = drawer::entity_drawer;
 	};
 }

@@ -144,12 +144,12 @@ namespace mo_yanxi::ui{
 
 		constexpr auto& set_external_weight(math::vec2 weight) noexcept {
 			if(weight.x > 0){
-				stated_extent.width.type = size_category::external;
+				stated_extent.width.type = size_category::dependent;
 				stated_extent.width.value = weight.x;
 			}
 
 			if(weight.y > 0){
-				stated_extent.height.type = size_category::external;
+				stated_extent.height.type = size_category::dependent;
 				stated_extent.height.value = weight.y;
 			}
 
@@ -157,12 +157,12 @@ namespace mo_yanxi::ui{
 		}
 		constexpr auto& set_external(math::vector2<bool> weight) noexcept {
 			if(weight.x){
-				stated_extent.width.type = size_category::external;
+				stated_extent.width.type = size_category::dependent;
 				stated_extent.width.value = static_cast<float>(weight.x);
 			}
 
 			if(weight.y){
-				stated_extent.height.type = size_category::external;
+				stated_extent.height.type = size_category::dependent;
 				stated_extent.height.value = static_cast<float>(weight.y);
 			}
 

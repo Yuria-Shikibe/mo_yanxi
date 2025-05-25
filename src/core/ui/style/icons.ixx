@@ -20,6 +20,7 @@ namespace mo_yanxi::ui::theme{
 		export inline icon_raw_present check{};
 		export inline icon_raw_present plus{};
 
+		export inline icon_raw_present blender_icon_pivot_cursor{};
 		export inline icon_raw_present blender_icon_pivot_active{};
 		export inline icon_raw_present blender_icon_pivot_individual{};
 		export inline icon_raw_present blender_icon_pivot_median{};

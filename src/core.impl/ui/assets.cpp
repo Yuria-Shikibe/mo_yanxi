@@ -51,6 +51,7 @@ void load_icons(mo_yanxi::graphic::image_page& ui_page){
 	NAMED_LOAD(plus);
 
 	NAMED_LOAD(blender_icon_pivot_active);
+	NAMED_LOAD(blender_icon_pivot_cursor);
 	NAMED_LOAD(blender_icon_pivot_individual);
 	NAMED_LOAD(blender_icon_pivot_median);
 

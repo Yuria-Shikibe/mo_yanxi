@@ -11,6 +11,7 @@ import mo_yanxi.graphic.color;
 import mo_yanxi.math;
 import mo_yanxi.encode;
 import std;
+import mo_yanxi.char_filter;
 
 namespace mo_yanxi::ui{
 	bool caresAbout(const font::char_code code) noexcept{
@@ -686,11 +687,11 @@ namespace mo_yanxi::ui{
 					break;
 				}
 				case key::Enter :{
-					buffer.push_back(U'\n');
+					if(!bannedCodePoints.contains(U'\n'))buffer.push_back(U'\n');
 					break;
 				}
 				case key::Tab :{
-					buffer.push_back(U'\t');
+					if(!bannedCodePoints.contains(U'\t'))buffer.push_back(U'\t');
 					break;
 				}
 
@@ -843,6 +844,122 @@ namespace mo_yanxi::ui{
 		}
 	};
 
+	export struct numeric_input_area : text_input_area{
+		// bool using_floating_point{true};
+
+		double ratio{1};
+
+		std::variant<
+			std::monostate,
+			int*,
+			unsigned*,
+			long long*,
+			unsigned long long*,
+			float*,
+			double*
+		> target{};
+
+		bool value_changed{};
+		bool external_check{};
+	public:
+
+		[[nodiscard]] numeric_input_area(scene* scene, group* group)
+			: text_input_area(scene, group){
+			set_banned_characters({'\n', '\t'});
+		}
+
+		[[nodiscard]] double get_ratio() const noexcept{
+			return ratio;
+		}
+
+		void set_ratio(const double ratio) noexcept{
+			this->ratio = ratio;
+		}
+
+		template <typename T>
+			requires std::is_arithmetic_v<T>
+		void set_target(T& target) noexcept{
+			this->target = &target;
+			auto tgt = static_cast<T>(target / ratio);
+			this->set_text(std::format("{}", tgt));
+			value_changed = false;
+		}
+
+		void set_target() noexcept{
+			target = std::monostate{};
+		}
+
+		void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
+			if(action == core::ctrl::act::press && key == core::ctrl::key::Enter){
+				external_check = true;
+				return;
+			}
+
+			text_input_area::input_key(key, action, mode);
+
+			if(key == core::ctrl::key::Delete || key == core::ctrl::key::Backspace){
+				value_changed = true;
+			}
+
+			if(key == core::ctrl::key::Z && mode == core::ctrl::mode::ctrl){
+				value_changed = true;
+			}
+
+		}
+
+		void input_unicode(const char32_t val) override{
+			static constexpr char_filter filter{
+				"1234567890.Ee-"
+			};
+
+			if(val > std::numeric_limits<char>::max()){
+				set_input_invalid();
+				return;
+			}
+
+			if(!filter[val]){
+				set_input_invalid();
+				return;
+			}
+
+			buffer.push_back(val);
+		}
+
+		template <typename T>
+			requires std::is_arithmetic_v<T>
+		[[nodiscard]] std::optional<T> get_value() const noexcept{
+			T t{};
+			std::string_view txt = get_text();
+			std::from_chars_result rst = std::from_chars(txt.data(), txt.data() + txt.size(), t);
+			if(rst.ec != std::errc{}){
+				return std::nullopt;
+			}else{
+				return t;
+			}
+		}
+
+		void update(float delta_in_ticks) override{
+			if(target.index() != 0 && (std::exchange(external_check, {}) || !caret_ && std::exchange(value_changed, {}))){
+				if(!std::visit<bool>([this]<typename T>(T p){
+					if constexpr (!std::same_as<T, std::monostate>){
+						using base = std::remove_pointer_t<T>;
+						std::optional<base> val = get_value<base>();
+						if(val){
+							*p = static_cast<base>(val.value() * ratio);
+						}else{
+							return false;
+						}
+					}
+
+					return true;
+				}, target)){
+					set_input_invalid();
+				}
+			}
+
+			text_input_area::update(delta_in_ticks);
+		}
+	};
 
 	// export
 	// struct ActiveTextInputArea : TextInputArea{

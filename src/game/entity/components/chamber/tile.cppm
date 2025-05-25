@@ -12,7 +12,7 @@ export module mo_yanxi.game.ecs.component.chamber:tile;
 export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.game.ecs.quad_tree_interface;
-export import mo_yanxi.game.ecs.entity;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.component.damage;
 export import mo_yanxi.game.ecs.component.hit_point;
 
@@ -33,6 +33,7 @@ namespace mo_yanxi::game::ecs{
 		export class tile_grid;
 		export class chamber_grid;
 		export struct chamber_manifold;
+		export struct chamber_manifold_dump;
 
 		export using tile_coord = math::point2;
 		export using tile_region = math::irect;
@@ -109,36 +110,46 @@ namespace mo_yanxi::game::ecs{
 			}
 		};
 
+		export
 		struct tile_status{
+			static constexpr float threshold_factor = 1 / 4.f;
 			float valid_hit_point{};
 			float valid_structure_hit_point{};
 
 			constexpr tile_damage take_damage(float damage, float tile_max) noexcept{
-				float structure_damage_threshold = tile_max / 8;
+				float structure_damage_threshold = tile_max * threshold_factor;
+
+				float build_consumed;
+				if(damage >= valid_hit_point){
+					build_consumed = valid_hit_point;
+					valid_hit_point = 0;
+				}else{
+					build_consumed = damage;
+					valid_hit_point -= damage;
+				}
+
+				damage -= build_consumed;
 
 				float struct_consumes{};
-				if(valid_hit_point < structure_damage_threshold && valid_structure_hit_point > structure_damage_threshold){
-					float factor = 1 - valid_hit_point / structure_damage_threshold;
-					struct_consumes = factor * std::min(damage, valid_structure_hit_point);
-					valid_structure_hit_point -= struct_consumes;
+				if(valid_hit_point + build_consumed < structure_damage_threshold){
+					float factor = 1 - (valid_hit_point + build_consumed) / structure_damage_threshold;
+					auto dmg = factor * math::min(damage, valid_structure_hit_point);
+					auto last = valid_structure_hit_point;
+					valid_structure_hit_point -= dmg;
+					valid_structure_hit_point = math::max(valid_structure_hit_point, valid_hit_point);
+					struct_consumes = last - valid_structure_hit_point;
 				}
 
-				damage -= struct_consumes;
-				damage = std::min(damage, tile_max);
-
-				if(damage >= valid_hit_point){
-					return  {std::exchange(valid_hit_point, 0), struct_consumes};
-				}
-
-				valid_hit_point -= damage;
-				return {damage, struct_consumes};
+				return {build_consumed, struct_consumes};
 			}
 		};
+
 
 		struct building_data{
 			friend chamber_grid;
 			friend chamber_manifold;
 			friend ecs::component_custom_behavior<building_data>;
+			friend chamber_manifold_dump;
 
 		private:
 			tile_region region_{};
@@ -163,6 +174,7 @@ namespace mo_yanxi::game::ecs{
 			}
 
 			[[nodiscard]] chamber_manifold& grid() const noexcept{
+				assert(grid_ != nullptr);
 				return *grid_;
 			}
 
@@ -178,14 +190,17 @@ namespace mo_yanxi::game::ecs{
 				return component_head_->id();
 			}
 
-			tile_status& operator[](const tile& tile) noexcept;
-			const tile_status& operator[](const tile& tile) const noexcept;
+			decltype(auto) operator[](this auto&& self, tile_coord global_pos) noexcept{
+				return self.tile_states[self.local_to_index(global_pos - self.region_.src)];
+			}
+
+			decltype(auto) operator[](this auto&& self, const tile& tile) noexcept;
 
 			[[nodiscard]] float get_tile_individual_max_hitpoint() const noexcept{
 				return hit_point.max / region_.area() * 2;
 			}
 
-			template <std::integral T>
+			template <std::integral T = tile_coord::value_type>
 			[[nodiscard]] std::size_t local_to_index(math::vector2<T> coord) const noexcept{
 				return coord.x + coord.y * region_.width();
 			}
@@ -239,6 +254,7 @@ namespace mo_yanxi::game::ecs{
 
 			math::trans2 get_trans() const noexcept;
 		};
+
 	}
 
 
@@ -317,17 +333,12 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 
 		[[nodiscard]] tile_status& get_status() const noexcept{
-			return building.data()[*this];
+			return building.data()[tile_pos];
 		}
 	};
 
 
-	tile_status& building_data::operator[](const tile& tile) noexcept{
-		return tile_states[local_to_index(tile.tile_pos - region_.src)];
+	decltype(auto) building_data::operator[](this auto&& self, const tile& tile) noexcept{
+		return self[tile.tile_pos];
 	}
-
-	const tile_status& building_data::operator[](const tile& tile) const noexcept{
-		return tile_states[local_to_index(tile.tile_pos - region_.src)];
-	}
-
 }

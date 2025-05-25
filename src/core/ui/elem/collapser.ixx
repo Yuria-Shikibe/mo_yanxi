@@ -100,12 +100,12 @@ namespace mo_yanxi::ui{
 			return *content_;
 		}
 
-		std::optional<math::vec2> pre_acquire_size(stated_extent extent) override{
+		std::optional<math::vec2> pre_acquire_size_impl(stated_extent extent) override{
 			auto ext = clip_boarder_from(extent);
 			auto table_size = head_->pre_acquire_size(ext);
 
 			if(policy == layout_policy::hori_major){
-				extent.height = {size_category::external};
+				extent.height = {size_category::dependent};
 
 				math::vec2 content_size{};
 				if(get_interped_progress() >= std::numeric_limits<float>::epsilon()){
@@ -149,14 +149,20 @@ namespace mo_yanxi::ui{
 
 			if(expanded){
 				math::approach_inplace(prog, 1, expand_speed * delta_in_ticks);
+				content_->visible = true;
 			}else{
 				math::approach_inplace(prog, 0, expand_speed * delta_in_ticks);
+				if(expand_progress < std::numeric_limits<float>::epsilon()){
+					content_->visible = false;
+				}
 			}
 
 			if(util::try_modify(expand_progress, prog)){
 				notify_layout_changed(spread_direction::from_content | spread_direction::local);
 				content_->update_opacity(get_interped_progress());
+
 			}
+
 		}
 
 		[[nodiscard]] float get_interped_progress() const noexcept{

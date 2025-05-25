@@ -10,6 +10,9 @@ import mo_yanxi.ui.creation.seperator_line;
 import mo_yanxi.ui.elem.text_elem;
 import mo_yanxi.ui.elem.image_frame;
 import mo_yanxi.ui.elem.progress_bar;
+import mo_yanxi.ui.elem.collapser;
+
+import mo_yanxi.game.ui.chamber_ui_elem;
 
 import mo_yanxi.ui.graphic;
 
@@ -18,24 +21,38 @@ import std;
 
 namespace mo_yanxi::game::ecs::chamber{
 	struct radar_ui : entity_info_table{
-		ui::progress_bar* reload_progress_bar{};
+		ui::reload_bar* reload_progress_bar{};
 		[[nodiscard]] radar_ui(ui::scene* scene, group* group, const entity_ref& ref)
 			: entity_info_table(scene, group, ref){
 
 			template_cell.set_external({false, true});
-			function_init([](ui::label& elem){
-				elem.set_style();
-				elem.set_scale(.5);
-				elem.set_policy(font::typesetting::layout_policy::auto_feed_line);
-				elem.set_text("Radar");
-			}).cell().set_pad({.top = 8});
+			set_style();
 
+			auto collapser = function_init([](ui::collapser& collapser){
+				collapser.head().set_style(ui::theme::styles::no_edge);
+				collapser.head().function_init([](ui::label& elem){
+					elem.set_style();
+					elem.set_scale(.5);
+					elem.set_policy(font::typesetting::layout_policy::auto_feed_line);
+					elem.set_text("Radar");
+				}).cell().set_external({false, true});
+			});
+
+			auto content = collapser->content().function_init([&](ui::table& t){
+				t.set_style();
+				t.template_cell.set_external({false, true});
+			});
+			content.cell().set_external({false, true});
 
 			{
-				auto bar = end_line().emplace<ui::progress_bar>();
-				bar.cell().set_pad(4);
+				auto bar = content->end_line().emplace<ui::chamber_ui_elem>(ref);
+			}
+
+			{
+				auto bar = content->end_line().emplace<ui::reload_bar>();
 				bar.cell().set_height(50);
-				bar->reach_speed = 0.125f;
+				bar.cell().pad.top = 8;
+				bar->approach_speed = 0.125f;
 
 				reload_progress_bar = std::to_address(bar);
 			}
@@ -47,14 +64,18 @@ namespace mo_yanxi::game::ecs::chamber{
 			if(!ref)return;
 			auto& build = ref->at<radar_build>();
 
-			reload_progress_bar->update_progress(build.reload / build.meta.reload_duration, delta_in_ticks);
+			reload_progress_bar->current_value = build.reload / build.meta.reload_duration;
+			reload_progress_bar->current_target_efficiency = build.data().hit_point.get_capability_factor();
+
+			reload_progress_bar->efficiency_color = {graphic::colors::power.to_neutralize_light(), graphic::colors::power.to_neutralize_light()};
+			reload_progress_bar->reload_color = {graphic::colors::dark_gray.to_neutralize_light(), graphic::colors::gray.to_neutralize_light()};
 		}
 	};
 
 	void radar_build::draw_hud(graphic::renderer_ui& renderer) const{
 		using namespace graphic;
 
-		ui::draw_acquirer acquirer{ui::get_draw_acquirer(renderer)};
+		mo_yanxi::ui::draw_acquirer acquirer{ui::get_draw_acquirer(renderer)};
 
 		auto center = get_local_to_global(meta.local_center);
 
@@ -82,22 +103,29 @@ namespace mo_yanxi::game::ecs::chamber{
 	}
 
 	void radar_build::update(const chunk_meta& chunk_meta, world::entity_top_world& top_world){
-		if(const auto rst = math::forward_approach_then(reload, meta.reload_duration, get_update_delta())){
-			if(active){
-				reload = 0;
+		auto cpt = data().hit_point.get_capability_factor();
+		if(cpt > 0){
+			if(const auto rst =
+			math::forward_approach_then(reload, meta.reload_duration, get_update_delta() * cpt)){
+				if(active){
+					reload = 0;
 
-				auto faction = chunk_meta.id()->at<faction_data>().faction;
+					auto faction = chunk_meta.id()->at<faction_data>().faction;
 
-				data().grid().targets_primary.index_candidates_by_distance(
-					top_world.collision_system.quad_tree(),
-					chunk_meta.id(),
-					get_local_to_global(meta.local_center),
-					meta.targeting_range, [&](const collision_object& obj){
-						return faction->is_hostile_to(obj.id->at<faction_data>().faction.get_id());
-					});
+					data().grid().targets_primary.index_candidates_by_distance(
+						top_world.collision_system.quad_tree(),
+						chunk_meta.id(),
+						get_local_to_global(meta.local_center),
+						meta.targeting_range, [&](const collision_object& obj){
+							return faction->is_hostile_to(obj.id->at<faction_data>().faction.get_id());
+						});
+				}
+			}else{
+				reload = rst;
 			}
 		}else{
-			reload = rst;
+			math::lerp_inplace(reload, 0.f, get_update_delta());
 		}
+
 	}
 }

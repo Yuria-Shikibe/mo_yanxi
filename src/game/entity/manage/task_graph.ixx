@@ -4,7 +4,7 @@ module;
 
 export module mo_yanxi.game.ecs.task_graph;
 
-export import mo_yanxi.game.ecs.component.manager;
+export import mo_yanxi.game.ecs.component.manage;
 
 import mo_yanxi.open_addr_hash_map;
 import std;

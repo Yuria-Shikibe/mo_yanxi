@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package mo_yanxi.io.pb.game.component;
+
+import "math.proto";
+
+message hit_point{
+  float max = 1;
+  float current = 2;
+  mo_yanxi.io.pb.math.range capability_range = 3;
+}
+
+message mech_motion{
+  mo_yanxi.io.pb.math.transform2f trans = 1;
+  mo_yanxi.io.pb.math.transform2f vel = 2;
+  mo_yanxi.io.pb.math.transform2f accel = 3;
+  float depth = 4;
+}
+
+message physical_rigid {
+  float inertial_mass = 1;
+  float rotational_inertia_scale = 2;
+
+  float friction_coefficient = 3;
+  float restitution = 4;
+
+  float collide_force_scale = 5;
+
+  float drag = 6;
+}
+
+
+
+message tile_status{
+  float building_damage = 1;
+  float structural_damage = 2;
+}
+
+message building_data{
+  mo_yanxi.io.pb.math.rect_orthoi region = 1;
+  repeated tile_status status = 2;
+
+  hit_point hit_point = 3;
+}

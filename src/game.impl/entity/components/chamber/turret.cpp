@@ -1,3 +1,6 @@
+module;
+
+
 module mo_yanxi.game.ecs.component.chamber.turret;
 
 import mo_yanxi.game.ecs.component.physical_property;
@@ -10,6 +13,7 @@ import mo_yanxi.ui.creation.seperator_line;
 import mo_yanxi.ui.elem.text_elem;
 import mo_yanxi.ui.elem.image_frame;
 import mo_yanxi.ui.elem.progress_bar;
+import mo_yanxi.game.ui.bars;
 
 import mo_yanxi.game.meta.instancing;
 import mo_yanxi.math.rand;
@@ -36,7 +40,7 @@ namespace mo_yanxi::game::ecs::chamber{
 				auto bar = end_line().emplace<ui::progress_bar>();
 				bar.cell().set_pad(4);
 				bar.cell().set_height(50);
-				bar->reach_speed = 0.125f;
+				bar->approach_speed = 0.125f;
 
 				reload_progress_bar = std::to_address(bar);
 			}

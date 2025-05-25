@@ -1,0 +1,5 @@
+syntax = "proto3";
+
+message content{
+  string content_name = 1;
+}

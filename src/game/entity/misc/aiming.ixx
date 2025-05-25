@@ -5,7 +5,7 @@ module;
 
 export module mo_yanxi.game.aiming;
 
-export import mo_yanxi.game.ecs.entity;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.component.physical_property;
 export import mo_yanxi.game.ecs.component.manifold;
 export import mo_yanxi.game.quad_tree;
@@ -82,7 +82,7 @@ namespace mo_yanxi::game{
 			quad_tree->intersect_then(max_bound, [](const math::frect& lhs, const math::frect& rhs){
 				return lhs.overlap_exclusive(rhs);
 			}, [&](const math::frect& lhs, const ecs::collision_object& obj){
-				if(obj.id == self)return;
+				if(obj.id == self || obj.id->is_expired())return;
 				const auto obj_trs = obj.motion->pos();
 				const auto dst = obj_trs.dst(position);
 
@@ -118,7 +118,7 @@ namespace mo_yanxi::game{
 			quad_tree->intersect_then(max_bound, [](const math::frect& lhs, const math::frect& rhs){
 				return lhs.overlap_exclusive(rhs);
 			}, [&](const math::frect& lhs, const ecs::collision_object& obj){
-				if(obj.id == self)return;
+				if(obj.id == self || obj.id->is_expired())return;
 
 				const auto obj_trs = obj.motion->pos();
 				const auto dst = obj_trs.dst(position);

@@ -139,6 +139,18 @@ namespace mo_yanxi::ui{
 		void set_button_callback(Func&& callback){
 			this->callback = std::forward<Func>(callback);
 		}
+
+
+		void set_button_callback_build_tooltip(){
+			this->set_button_callback(button_tags::general, [](elem& elem){
+				if(elem.has_tooltip()){
+					elem.tooltip_notify_drop();
+				}else{
+					elem.build_tooltip();
+				}
+			});
+		}
+
 	};
 
 }

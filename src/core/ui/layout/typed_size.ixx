@@ -24,7 +24,7 @@ namespace mo_yanxi::ui{
 		passive,
 		scaling,
 		mastering,
-		external,
+		dependent,
 	};
 
 	export struct stated_size{
@@ -38,7 +38,7 @@ namespace mo_yanxi::ui{
 		}
 
 		[[nodiscard]] constexpr bool dependent() const noexcept{
-			return type == size_category::external;
+			return type == size_category::dependent;
 		}
 
 		constexpr explicit(false) operator float() const noexcept{
@@ -48,7 +48,7 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] constexpr stated_size decay() const noexcept{
 			switch(type){
 			case size_category::scaling : [[fallthrough]];
-			case size_category::external : return {size_category::passive, value};
+			case size_category::dependent : return {size_category::passive, value};
 			default : return *this;
 			}
 		}
@@ -77,10 +77,10 @@ namespace mo_yanxi::ui{
 					*this = o;
 				}
 				return;
-			case size_category::external : if(type == size_category::external){
+			case size_category::dependent : if(type == size_category::dependent){
 					value = std::max(value, o.value);
 				} else if(type == size_category::passive){
-					type = size_category::external;
+					type = size_category::dependent;
 					value = std::max(value, o.value);
 				}
 				return;
@@ -105,16 +105,16 @@ namespace mo_yanxi::ui{
 		}
 
 		[[nodiscard]] constexpr stated_extent(const float width, const float height) noexcept
-			: width(std::isinf(width) ? size_category::external : size_category::mastering, width),
-			  height(std::isinf(height) ? size_category::external : size_category::mastering, height){
+			: width(std::isinf(width) ? size_category::dependent : size_category::mastering, width),
+			  height(std::isinf(height) ? size_category::dependent : size_category::mastering, height){
 		}
 
 
 
 		constexpr friend bool operator==(const stated_extent& lhs, const stated_extent& rhs) noexcept = delete;
 
-		[[nodiscard]] constexpr bool dependent() const noexcept{
-			return width.type == size_category::external && height.type == size_category::external;
+		[[nodiscard]] constexpr bool fully_dependent() const noexcept{
+			return width.type == size_category::dependent && height.type == size_category::dependent;
 		}
 
 		constexpr void collapse(const math::vec2 size) noexcept{
@@ -152,7 +152,7 @@ namespace mo_yanxi::ui{
 		}
 	};
 
-	export constexpr stated_extent extent_by_external{{size_category::external}, {size_category::external}};
+	export constexpr stated_extent extent_by_external{{size_category::dependent}, {size_category::dependent}};
 
 
 	export {

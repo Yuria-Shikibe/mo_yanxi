@@ -439,29 +439,29 @@ namespace mo_yanxi{
 		}
 
 
-		/**
+		/*/**
 		 * @brief
 		 * @return still offset to bottom left, but aligned to given align within the bound
-		 */
+		 #1#
 		template <signed_number T>
 		constexpr math::vector2<T> transform_offset(
 			const pos align,
-			math::vector2<T> scale
+			math::vector2<T> off
 		){
 			if((align & pos::bottom) != pos{}){
-				scale.y *= -1;
+				off.y *= -1;
 			} else if((align & pos::center_y) != pos{}){
-				scale.y = 0;
+				off.y = 0;
 			}
 
 			if((align & pos::right) != pos{}){
-				scale.x *= -1;
+				off.x *= -1;
 			} else if((align & pos::center_x) != pos{}){
-				scale.x = 0;
+				off.x = 0;
 			}
 
-			return scale;
-		}
+			return off;
+		}*/
 
 		template <signed_number T>
 		constexpr math::vector2<T> transform_offset(
@@ -491,7 +491,7 @@ namespace mo_yanxi{
 		 * @return
 		 */
 		template <signed_number T>
-		constexpr math::vector2<T> get_offset_of(const pos align, const math::rect_ortho<T>& internal_toAlign,
+		[[nodiscard]] constexpr math::vector2<T> get_offset_of(const pos align, const math::rect_ortho<T>& internal_toAlign,
 		                                        const math::rect_ortho<T>& external){
 			return align::get_offset_of(align, internal_toAlign.size(), external);
 		}

@@ -117,7 +117,7 @@ namespace mo_yanxi::ui{
 			: element{element},
 			  cell{cell}{}
 
-		void apply(group& group, stated_extent extent = {{size_category::external}, {size_category::external}}) const{
+		void apply(group& group, stated_extent extent = {{size_category::dependent}, {size_category::dependent}}) const{
 			cell.apply_to(group, *element, extent);
 		}
 	// protected:
@@ -186,7 +186,7 @@ namespace mo_yanxi::ui{
 		template <typename E, std::derived_from<universal_group> G, typename ...Args>
 			requires requires{
 				requires std::is_base_of_v<elem, E>;
-				// requires std::constructible_from<E, scene*, group*, Args...> || (std::constructible_from<E, scene*, group*, std::string_view> && sizeof...(Args) == 0);
+				requires std::constructible_from<E, scene*, group*, Args...>;
 		}
 		create_handle<E, cell_type> emplace(this G& self, Args&&... args){
 			auto [result, adaptor] = self.template add<E>(elem_ptr{self.get_scene(), &self, std::in_place_type<E>, std::forward<Args>(args) ...});

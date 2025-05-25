@@ -41,7 +41,7 @@ namespace mo_yanxi::game{
 
 	template <typename ItemTy, number T>
 	struct quad_tree_trait{
-		using adaptor_type = quad_tree_trait_adaptor<ItemTy>;
+		using adaptor_type = quad_tree_trait_adaptor<ItemTy, T>;
 		using vec_t = adaptor_type::vector_type;
 		using rect_type = adaptor_type::rect_type;
 

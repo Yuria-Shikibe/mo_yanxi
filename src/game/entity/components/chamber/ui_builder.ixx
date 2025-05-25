@@ -5,7 +5,7 @@
 export module mo_yanxi.game.ecs.component.chamber.ui_builder;
 
 export import mo_yanxi.game.ecs.component.ui.builder;
-export import mo_yanxi.game.ecs.entity;
+export import mo_yanxi.game.ecs.component.manage;
 
 namespace mo_yanxi::game::ecs{
 
@@ -16,10 +16,9 @@ namespace mo_yanxi::game::ecs{
 		};
 	}
 
-	export
 	template <>
 	struct component_custom_behavior<chamber::chamber_ui_builder> :
-		component_custom_behavior_base<chamber::chamber_ui_builder>,
+		component_custom_behavior_base<chamber::chamber_ui_builder, void>,
 		ui_builder_behavior_base{
 	};
 }

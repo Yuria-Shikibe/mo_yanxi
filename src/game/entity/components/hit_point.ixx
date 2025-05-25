@@ -14,14 +14,14 @@ namespace mo_yanxi::game::ecs{
 		/**
 		 * @brief [disabled, from(minimal functionality), to(maximum ~), max]
 		 */
-		math::range functionality{500, 1500};
+		math::range capability_range{500, 1500};
 
 	private:
 		//float last{100};
 
 	public:
-		[[nodiscard]] float get_functionality_factor() const noexcept{
-			return functionality.normalize(cur);
+		[[nodiscard]] float get_capability_factor() const noexcept{
+			return capability_range.normalize(cur);
 		}
 
 		[[nodiscard]] float factor() const noexcept{

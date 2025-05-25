@@ -4,7 +4,7 @@
 
 export module mo_yanxi.game.ecs.component.projectile.manifold;
 
-export import mo_yanxi.game.ecs.entity;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.component.damage;
 
 import mo_yanxi.graphic.trail;

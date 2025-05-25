@@ -140,7 +140,7 @@ namespace mo_yanxi{
 	void ui::elem::clear_external_references() noexcept{
 		tooltip_notify_drop();
 		if(scene_){
-			scene_->dropAllFocus(this);
+			scene_->drop_all_focus(this);
 			scene_ = nullptr;
 		}
 	}
@@ -274,6 +274,12 @@ namespace mo_yanxi{
 	// 	if(tooltipProp.useStagnateTime) getScene()->tooltipManager.requestDrop(*this);
 	// }
 
+	void ui::elem::dialog_notify_drop() const{
+		if(scene_){
+			scene_->drop_dialog(this);
+		}
+	}
+
 	void ui::elem::draw_pre(const rect clipSpace) const{
 		if(property.graphic_data.drawer)property.graphic_data.drawer->draw(*this, get_bound(), property.graphic_data.get_opacity());
 	}
@@ -310,6 +316,8 @@ namespace mo_yanxi{
 	}
 
 	void ui::iterateAll_DFSImpl(math::vec2 cursorPos, std::vector<elem*>& selected, elem* current){
+		if(current->is_disabled())return;
+
 		if(!current->ignore_inbound() && current->contains(cursorPos)){
 			selected.push_back(current);
 		}
@@ -319,10 +327,11 @@ namespace mo_yanxi{
 		auto transformed = current->transform_pos(cursorPos);
 
 		for(const auto& child : current->get_children() | std::views::reverse){
+			if(!child->is_visible())continue;
 			iterateAll_DFSImpl(transformed, selected, child.get());
 
 			//TODO better inbound shadow, maybe dialog system instead of add to root
-			if(child->prop().fill_parent.area()){
+			if(child->interactivity == interactivity::intercepted && child->prop().fill_parent.x && child->prop().fill_parent.y){
 				break;
 			}
 		}

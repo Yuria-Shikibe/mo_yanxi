@@ -5,7 +5,7 @@ module;
 
 export module mo_yanxi.game.ecs.component_operation_task_graph;
 
-export import mo_yanxi.game.ecs.component.manager;
+export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.dependency_generator;
 export import mo_yanxi.game.ecs.task_graph;
 

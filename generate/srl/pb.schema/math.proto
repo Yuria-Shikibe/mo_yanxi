@@ -2,6 +2,11 @@ syntax = "proto3";
 
 package mo_yanxi.io.pb.math;
 
+message range{
+  float from = 1;
+  float to = 2;
+}
+
 message vector2f{
   float x = 1;
   float y = 2;

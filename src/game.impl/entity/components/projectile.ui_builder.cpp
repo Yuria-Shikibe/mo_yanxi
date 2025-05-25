@@ -46,7 +46,7 @@ namespace mo_yanxi::game::ecs{
 				auto bar = end_line().emplace<ui::progress_bar>();
 				bar.cell().set_pad(4);
 				bar.cell().set_height(50);
-				bar->reach_speed = 0.125f;
+				bar->approach_speed = 0.125f;
 
 				damage_bar = std::to_address(bar);
 			}

@@ -17,7 +17,7 @@ import std;
 
 namespace mo_yanxi::game::ecs{
 	namespace decl{
-		export using grided_entity_desc = std::tuple<
+		export using chamber_entity_desc = std::tuple<
 			mech_motion,
 			manifold,
 			physical_rigid,
@@ -42,18 +42,21 @@ namespace mo_yanxi::game::ecs{
 
 	export
 	template <>
-	struct ecs::archetype_custom_behavior<decl::grided_entity_desc> : archetype_custom_behavior_base<decl::grided_entity_desc>{
+	struct ecs::archetype_custom_behavior<decl::chamber_entity_desc> : archetype_custom_behavior_base<decl::chamber_entity_desc>{
 		static void on_init(value_type& comps){
 			auto [motion, mf] = get_unwrap_of<mech_motion, manifold>(comps);
 			mf.hitbox.set_trans_unchecked(motion.trans);
 			mf.hitbox.update(motion.trans);
+			comps.chamber::chamber_manifold::update_transform(motion.trans);
 
 			comps.hit_point = {
 				.max = 10000,
 				.cur = 10000,
-				.functionality = {0, 5000}
+				.capability_range = {2000, 8000}
 			};
 			// comps.faction = faction_0;
+
+			auto dump_ = dump(comps);
 
 		}
 	};
@@ -81,6 +84,8 @@ namespace mo_yanxi::game::ecs{
 				};
 				drawer.drawer = d;
 			}
+
+			auto dump_ = dump(comps);
 
 		}
 	};

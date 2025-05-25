@@ -93,6 +93,9 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] constexpr color to_light(float lumaScl = max_luma_scale) const noexcept{
 			return copy().set_light(lumaScl);
 		}
+		[[nodiscard]] constexpr color to_neutralize_light(float factor = .65f) const noexcept{
+			return copy().mul_rgb(factor);
+		}
 
 		[[nodiscard]] FORCE_INLINE constexpr color to_light_color_copy() const noexcept{
 			color ret{*this};
@@ -184,11 +187,12 @@ namespace mo_yanxi::graphic{
 			return to_rgba8888();
 		}
 
-		FORCE_INLINE static constexpr color from_rgb888(const rgba8_bits value, float a = 1) noexcept{
+		FORCE_INLINE static constexpr color from_rgb888(rgba8_bits value, float a = 1) noexcept{
 			color c{};
-			c.r = static_cast<float>(value >> 16 & max_val) / max_val_f;
-			c.g = static_cast<float>(value >> 8 & max_val) / max_val_f;
-			c.b = static_cast<float>(value >> 0 & max_val) / max_val_f;
+			value <<= 8u;
+			c.r = static_cast<float>(value >> r_Offset & max_val) / max_val_f;
+			c.g = static_cast<float>(value >> g_Offset & max_val) / max_val_f;
+			c.b = static_cast<float>(value >> b_Offset & max_val) / max_val_f;
 			c.a = a;
 			return c;
 		}
@@ -712,6 +716,8 @@ namespace mo_yanxi::graphic{
 		constexpr color GOLD{color::from_rgba8888(0xffd700ff)};
 		constexpr color GOLDENROD{color::from_rgba8888(0xdaa520ff)};
 		constexpr color ORANGE{color::from_rgba8888(0xffa500ff)};
+		constexpr color danger{color::from_rgb888(0XFFAC34)};
+		constexpr color power{color::from_rgb888(0XF0D167)};
 
 		constexpr color BROWN{color::from_rgba8888(0x8b4513ff)};
 		constexpr color TAN{color::from_rgba8888(0xd2b48cff)};

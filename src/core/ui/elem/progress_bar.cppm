@@ -82,7 +82,7 @@ namespace mo_yanxi::ui{
 		const progress_bar_drawer* drawer{&DefaultProgressBarDrawer};
 
 	public:
-		float reach_speed = 1.;
+		float approach_speed = 1.;
 
 		[[nodiscard]] progress_bar(scene* scene, group* group)
 			: elem(scene, group, "progress_bar"){
@@ -115,14 +115,14 @@ namespace mo_yanxi::ui{
 			if(!std::isfinite(prog.current)){
 				prog.current = 0;
 			}
-			lastProgress.approach(prog, reach_speed, delta_in_ticks);
+			lastProgress.approach(prog, approach_speed, delta_in_ticks);
 		}
 
 		void update_color(const progress_bar_color& color, float delta_in_ticks){
-			if(reach_speed >= 1.f){
+			if(approach_speed >= 1.f){
 				this->color = color;
 			}else{
-				this->color.lerp(color, reach_speed * delta_in_ticks);
+				this->color.lerp(color, approach_speed * delta_in_ticks);
 			}
 		}
 

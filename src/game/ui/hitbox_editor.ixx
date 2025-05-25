@@ -2,14 +2,14 @@ module;
 
 export module mo_yanxi.game.ui.hitbox_editor;
 
-export import mo_yanxi.ui.basic;
-export import mo_yanxi.ui.table;
-export import mo_yanxi.ui.elem.button;
-export import mo_yanxi.ui.manual_table;
-export import mo_yanxi.ui.elem.text_elem;
-export import mo_yanxi.ui.creation.file_selector;
+import mo_yanxi.ui.basic;
+import mo_yanxi.ui.table;
+import mo_yanxi.ui.elem.button;
+import mo_yanxi.ui.manual_table;
+import mo_yanxi.ui.elem.text_elem;
+import mo_yanxi.ui.creation.file_selector;
 
-export import mo_yanxi.game.quad_tree;
+import mo_yanxi.game.quad_tree;
 export import mo_yanxi.game.meta.hitbox;
 
 import mo_yanxi.graphic.camera;
@@ -18,6 +18,7 @@ import mo_yanxi.graphic.image_manage;
 import mo_yanxi.ui.elem.check_box;
 import mo_yanxi.ui.graphic;
 import mo_yanxi.ui.assets;
+import mo_yanxi.ui.elem.text_input_area;
 import mo_yanxi.ui.selection;
 import mo_yanxi.graphic.layers.ui.grid_drawer;
 
@@ -81,7 +82,6 @@ namespace mo_yanxi::game{
 		}
 	};
 
-	export
 	template <>
 	struct quad_tree_trait_adaptor<box_wrapper*, float> : quad_tree_adaptor_base<box_wrapper*, float>{
 		[[nodiscard]] static rect_type get_bound(const_reference self) noexcept{
@@ -372,6 +372,8 @@ namespace mo_yanxi::game{
 
 		op operation{};
 
+		math::trans2 origin_trans{};
+
 		std::vector<box_wrapper> comps{};
 		history_stack<std::vector<history_entry>> history{12};
 
@@ -398,6 +400,11 @@ namespace mo_yanxi::game{
 			using namespace graphic;
 
 			acquirer.proj.set_layer(ui::draw_layers::base);
+
+			draw::line::square(acquirer, origin_trans, 32, editor_line_width * .65f, ui::theme::colors::accent);
+			draw::line::line_angle(acquirer.get(), math::trans2{32 - editor_line_width * .65f} | origin_trans, 512, editor_line_width, ui::theme::colors::accent);
+
+
 			for(const auto& comp : comps){
 				draw::fill::quad(acquirer.get(), comp.base.crop().view_as_quad(), colors::gray.copy().set_a(.5));
 			}
@@ -987,6 +994,7 @@ namespace mo_yanxi::game{
 		struct hit_box_editor : table{
 		private:
 			struct editor_viewport : elem{
+
 				math::vec2 last_camera_pos{};
 				graphic::camera2 camera{};
 				ui::util::box_selection<> box_select{};
@@ -1123,25 +1131,88 @@ namespace mo_yanxi::game{
 			editor_viewport* viewport{};
 
 			label* cmd_text{};
+			button<icon_frame>* origin_point_modify{};
 			check_box* checkbox{};
 
 			void build_menu(){
 				menu->clear_children();
 				menu->template_cell.set_external({false, true}).set_pad({.bottom = 8});
 
-				auto box = menu->end_line().emplace<ui::check_box>();
-				box.cell().set_height(60);
-				box->set_style(ui::theme::styles::no_edge);
-				box->set_drawable<ui::icon_drawable>(0, ui::theme::icons::blender_icon_pivot_individual);
-				box->set_drawable<ui::icon_drawable>(1, ui::theme::icons::blender_icon_pivot_median);
-				box->set_drawable<ui::icon_drawable>(2, ui::theme::icons::blender_icon_pivot_active);
-				box->add_multi_select_tooltip({
-						.follow = tooltip_follow::owner,
-						.align_owner = align::pos::top_right,
-						.align_tooltip = align::pos::top_left,
-					});
+				{
+					auto box = menu->end_line().emplace<button<icon_frame>>();
+					box.cell().set_height(60);
+					box->set_style(ui::theme::styles::no_edge);
+					box->set_drawable(ui::theme::icons::blender_icon_pivot_cursor);
+					box->set_tooltip_state({
+						.layout_info = tooltip_layout_info{
+							.follow = tooltip_follow::owner,
+							.align_owner = align::pos::top_right,
+							.align_tooltip = align::pos::top_left,
+						},
+						.use_stagnate_time = false,
+						.auto_release = false,
+						.min_hover_time = tooltip_create_info::disable_auto_tooltip
+					}, [this](ui::table& table){
+						table.prop().size.set_minimum_size({400, 0});
+						table.set_entire_align(align::pos::top_left);
+						table.template_cell.set_external({true, true});
+						table.template_cell.pad.top = 12;
 
-				checkbox = std::to_address(box);
+						table.end_line().function_init([this](label& area){
+							area.set_style();
+							area.set_scale(.6f);
+							area.set_text("x  ");
+						});
+						table.function_init([this](numeric_input_area& area){
+							area.set_style();
+							area.set_scale(.6f);
+							area.set_target(viewport->channel_hitbox.origin_trans.vec.x);
+						});
+
+						table.end_line().function_init([this](label& area){
+							area.set_style();
+							area.set_scale(.6f);
+							area.set_text("y  ");
+						});
+						table.function_init([this](numeric_input_area& area){
+							area.set_style();
+							area.set_scale(.6f);
+							area.set_target(viewport->channel_hitbox.origin_trans.vec.y);
+						});
+
+						table.end_line().function_init([this](label& area){
+							area.set_style();
+							area.set_scale(.6f);
+							area.set_text("rot");
+						});
+						table.function_init([this](numeric_input_area& area){
+							area.set_style();
+							area.set_scale(.6f);
+							area.set_ratio(-math::deg_to_rad_v<double>);
+							area.set_target(viewport->channel_hitbox.origin_trans.rot);
+						});
+						table.set_edge_pad(0);
+					});
+					box->set_button_callback_build_tooltip();
+
+					origin_point_modify = std::to_address(box);
+				}
+
+				{
+					auto box = menu->end_line().emplace<ui::check_box>();
+					box.cell().set_height(60);
+					box->set_style(ui::theme::styles::no_edge);
+					box->set_drawable<ui::icon_drawable>(0, ui::theme::icons::blender_icon_pivot_individual);
+					box->set_drawable<ui::icon_drawable>(1, ui::theme::icons::blender_icon_pivot_median);
+					box->set_drawable<ui::icon_drawable>(2, ui::theme::icons::blender_icon_pivot_active);
+					box->add_multi_select_tooltip({
+							.follow = tooltip_follow::owner,
+							.align_owner = align::pos::top_right,
+							.align_tooltip = align::pos::top_left,
+						});
+
+					checkbox = std::to_address(box);
+				}
 
 
 				{
