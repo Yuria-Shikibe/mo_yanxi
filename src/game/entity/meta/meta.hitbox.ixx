@@ -1,3 +1,5 @@
+module;
+
 export module mo_yanxi.game.meta.hitbox;
 
 export import mo_yanxi.math.quad;
@@ -29,6 +31,17 @@ export namespace mo_yanxi::game::meta{
 
 		[[nodiscard]] constexpr std::size_t size() const noexcept{
 			return components.size();
+		}
+	};
+
+	struct hitbox_transed : hitbox{
+		math::trans2 trans{};
+
+		constexpr void apply() noexcept{
+			for (auto & component : components){
+				component.trans = trans.apply_inv_to(component.trans);
+			}
+			trans = {};
 		}
 	};
 }

@@ -40,6 +40,21 @@ namespace mo_yanxi::io{
 			}
 		}
 	};
+
+	template <>
+	struct loader_impl<game::meta::hitbox_transed> : loader_base<pb::game::hitbox_meta, game::meta::hitbox_transed>{
+		static void store(buffer_type& buf, const value_type& data){
+			loader<game::meta::hitbox>::store(buf, data);
+			io::store(buf.mutable_trans(), data.trans);
+		}
+
+		static void load(const buffer_type& buf, value_type& data){
+			loader<game::meta::hitbox>::load(buf, data);
+			io::load(buf.trans(), data.trans);
+		}
+	};
+
+
 	// template <>
 	// struct loader_impl<game::meta::hitbox> : loader_base<pb::game::hitbox_meta, game::meta::hitbox>{
 	// 	static void store(buffer_type& buf, const value_type& data){

@@ -11,4 +11,5 @@ message hitbox_comp{
 
 message hitbox_meta{
   repeated hitbox_comp comps = 1;
+  optional mo_yanxi.io.pb.math.transform2f trans = 2;
 }

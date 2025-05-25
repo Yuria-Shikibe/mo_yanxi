@@ -301,9 +301,9 @@ namespace mo_yanxi::graphic{
 		context_(&context),
 		fence_(context_->get_device(), true),
 		command_pool_(context_->get_device(), context_->graphic_family(), VK_COMMAND_POOL_CREATE_TRANSIENT_BIT),
-		working_thread([this](std::stop_token stop_token){
-				work_func(std::move(stop_token), *this);
-			}){
+		working_thread([](std::stop_token stop_token, async_image_loader& self){
+				work_func(std::move(stop_token), self);
+			}, std::ref(*this)){
 		}
 
 		void push(allocated_image_load_description&& desc){
