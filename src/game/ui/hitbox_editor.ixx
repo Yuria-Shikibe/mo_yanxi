@@ -9,12 +9,13 @@ import mo_yanxi.ui.manual_table;
 import mo_yanxi.ui.elem.text_elem;
 import mo_yanxi.ui.creation.file_selector;
 
-import mo_yanxi.game.quad_tree;
 export import mo_yanxi.game.meta.hitbox;
+import mo_yanxi.game.quad_tree;
 
 import mo_yanxi.graphic.camera;
 import mo_yanxi.graphic.image_manage;
 
+import mo_yanxi.game.ui.viewport;
 import mo_yanxi.ui.elem.check_box;
 import mo_yanxi.ui.graphic;
 import mo_yanxi.ui.assets;
@@ -110,9 +111,9 @@ namespace mo_yanxi::game{
 	};
 
 	constexpr float editor_line_width = 8;
-	constexpr float editor_radius = 5000;
+	// constexpr float editor_radius = 5000;
 	constexpr float editor_margin = 2000;
-	constexpr char_filter cmd_filter{"1234567890+-Ss"};
+	constexpr char_filter cmd_filter{".1234567890+-Ss"};
 
 	struct basic_op{
 		math::vec2 initial_pos{};
@@ -379,7 +380,7 @@ namespace mo_yanxi::game{
 
 		box_wrapper* main_selected{};
 		std::unordered_set<box_wrapper*> selected{};
-		quad_tree<box_wrapper*> quad_tree{math::frect{math::vec2{}, (editor_radius + editor_margin) * 2}};
+		quad_tree<box_wrapper*> quad_tree{math::frect{math::vec2{}, (ui::editor_radius + editor_margin) * 2}};
 		bool quad_tree_changed{};
 
 		[[nodiscard]] hitbox_edit_channel() = default;
@@ -529,13 +530,14 @@ namespace mo_yanxi::game{
 			push_history();
 		}
 
-		meta::hitbox export_to_meta() const{
-			meta::hitbox rst{};
+		meta::hitbox_transed export_to_meta() const{
+			meta::hitbox_transed rst{};
 			rst.components = {
 					std::from_range, comps | std::views::transform([](const box_wrapper& wrap){
 						return static_cast<editor_box_meta>(wrap.base);
 					})
 				};
+			rst.trans = origin_trans;
 			return rst;
 		}
 
@@ -563,7 +565,11 @@ namespace mo_yanxi::game{
 						},
 						[&, this](const ui::rect r, box_wrapper* w){
 							auto b = w->base.crop();
-							if(!b.overlap_rough(r) || !b.overlap_exact(r)) return;
+							if(region.is_point()){
+								if(!b.overlap(r)) return;
+							}else{
+								if(!r.contains(b.get_bound())) return;
+							}
 
 							hit.push_back(w);
 						});
@@ -572,7 +578,7 @@ namespace mo_yanxi::game{
 					} else{
 						switch(select_mode_){
 						case select_mode::single :{
-							if(hit.size() == 1 && region.area() < 10){
+							if(hit.size() == 1 && region.is_point()){
 								if(main_selected == hit.back()){
 									clear_selected();
 								} else{
@@ -993,10 +999,8 @@ namespace mo_yanxi::game{
 		export
 		struct hit_box_editor : table{
 		private:
-			struct editor_viewport : elem{
+			struct editor_viewport : viewport{
 
-				math::vec2 last_camera_pos{};
-				graphic::camera2 camera{};
 				ui::util::box_selection<> box_select{};
 
 				hitbox_edit_channel channel_hitbox{};
@@ -1004,64 +1008,23 @@ namespace mo_yanxi::game{
 
 
 				[[nodiscard]] editor_viewport(scene* scene, group* group)
-					: elem(scene, group, "hitbox_viewport"){
+					: viewport(scene, group, "hitbox_viewport"){
 					set_style(ui::theme::styles::general_static);
 
-					register_event([](ui::events::focus_begin e, editor_viewport& self){
-						self.get_scene()->set_camera_focus(&self.camera);
-						self.set_focused_key(true);
-						self.set_focused_scroll(true);
-					});
-
-					register_event([](ui::events::focus_end e, editor_viewport& self){
-						self.get_scene()->set_camera_focus(nullptr);
-						self.set_focused_key(false);
-						self.set_focused_scroll(false);
-					});
-
-					register_event([](const ui::events::scroll e, editor_viewport& self){
-						self.camera.set_scale_by_delta(e.pos.y * 0.05f);
-					});
-
-					register_event([](const ui::events::drag& e, editor_viewport& self){
-						if(e.code.key() == core::ctrl::mouse::CMB){
-							auto src = self.getTransferredPos(e.pos);
-							auto dst = self.getTransferredPos(e.dst);
-							self.camera.set_center(self.last_camera_pos - (dst - src));
-						}
-					});
-
-					camera.speed_scale = 0;
 					camera.set_scale_range({0.125f, 2});
-					camera.flip_y = true;
 
 					channel_hitbox.add_comp({{0, 0, 200, 200}});
 				}
 
 				void update(const float delta_in_ticks) override{
-					elem::update(delta_in_ticks);
-					camera.clamp_position({math::vec2{}, editor_radius * 2});
-					camera.update(delta_in_ticks);
+					viewport::update(delta_in_ticks);
 
-					channel_hitbox.update(getTransferredPos(get_scene()->get_cursor_pos()));
+					channel_hitbox.update(get_transferred_pos(get_scene()->get_cursor_pos()));
 				}
 
-				bool resize(const math::vec2 size) override{
-					if(elem::resize(size)){
-						auto [x, y] = content_size();
-						camera.resize_screen(x, y);
-						return true;
-					}
-
-					return false;
-				}
 
 				void draw_content(const rect clipSpace) const override{
-					const auto proj = camera.get_world_to_uniformed_flip_y();
-
-					get_renderer().batch.push_projection(proj);
-					get_renderer().batch.push_viewport(prop().content_bound_absolute());
-					get_renderer().batch.push_scissor({camera.get_viewport()});
+					viewport_begin();
 
 					auto& r = get_renderer();
 
@@ -1080,29 +1043,24 @@ namespace mo_yanxi::game{
 
 
 					if(box_select){
-						auto p = getTransferredPos(get_scene()->get_cursor_pos());
+						auto p = get_transferred_pos(get_scene()->get_cursor_pos());
 						draw::fill::rect_ortho(acquirer.get(), box_select.get_region(p), colors::aqua.copy().set_a(.15f));
 						draw::line::rect_ortho(acquirer, box_select.get_region(p), 2, colors::aqua);
 					}
 
-					get_renderer().batch.pop_scissor();
-					get_renderer().batch.pop_viewport();
-					get_renderer().batch.pop_projection();
+					viewport_end();
 				}
 
 				ui::events::click_result on_click(const ui::events::click click_event) override{
-					if(click_event.code.key() == core::ctrl::mouse::CMB){
-						last_camera_pos = camera.get_stable_center();
+					if(click_event.code.key() == core::ctrl::mouse::LMB){
+						channel_hitbox.on_click(click_event, box_select, get_transferred_pos(get_scene()->get_cursor_pos()));
 					}
 
-					if(click_event.code.key() == core::ctrl::mouse::LMB){
-						channel_hitbox.on_click(click_event, box_select, getTransferredPos(get_scene()->get_cursor_pos()));
-					}
-					return ui::events::click_result::intercepted;
+					return viewport::on_click(click_event);
 				}
 
 				esc_flag on_esc() override{
-					if(esc_flag::intercept == channel_hitbox.on_esc()){
+					if(esc_flag::fall_through == channel_hitbox.on_esc()){
 						return esc_flag::fall_through;
 					}
 
@@ -1114,17 +1072,13 @@ namespace mo_yanxi::game{
 				               const core::ctrl::key_code_t mode) override{
 					using namespace core::ctrl;
 
-					channel_hitbox.input_key(key, action, mode, getTransferredPos(get_scene()->get_cursor_pos()));
+					channel_hitbox.input_key(key, action, mode, get_transferred_pos(get_scene()->get_cursor_pos()));
 				}
 
 				void input_unicode(const char32_t val) override{
 					channel_hitbox.input_unicode(val);
 				}
 
-			private:
-				[[nodiscard]] math::vec2 getTransferredPos(const math::vec2 pos) const{
-					return camera.get_screen_to_world(pos, content_src_pos(), true);
-				}
 			};
 
 			table* menu{};
@@ -1188,7 +1142,7 @@ namespace mo_yanxi::game{
 						table.function_init([this](numeric_input_area& area){
 							area.set_style();
 							area.set_scale(.6f);
-							area.set_ratio(-math::deg_to_rad_v<double>);
+							area.set_ratio(math::deg_to_rad_v<double>);
 							area.set_target(viewport->channel_hitbox.origin_trans.rot);
 						});
 						table.set_edge_pad(0);

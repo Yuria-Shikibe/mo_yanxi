@@ -1091,7 +1091,7 @@ namespace mo_yanxi::ui::creation{
 				auto close_b = menu->end_line().emplace<button<icon_frame>>(theme::icons::close);
 				close_b->set_style(theme::styles::no_edge);
 				close_b->set_button_callback(button_tags::general, [this]{
-					remove_self_from_parent();
+					dialog_notify_drop();
 				});
 
 				auto confirm_b = menu->end_line().emplace<button<icon_frame>>(theme::icons::check);

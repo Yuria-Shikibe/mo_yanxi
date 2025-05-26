@@ -50,7 +50,7 @@ namespace mo_yanxi::io{
 
 		static void load(const buffer_type& buf, value_type& data){
 			loader<game::meta::hitbox>::load(buf, data);
-			io::load(buf.trans(), data.trans);
+			if(buf.has_trans())io::load(buf.trans(), data.trans);
 		}
 	};
 

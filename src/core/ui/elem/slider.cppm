@@ -72,7 +72,7 @@ namespace mo_yanxi::ui{
 
 			register_event([](const events::scroll& event, slider& self){
 
-				math::vec2 move = event.pos;
+				math::vec2 move = event.delta;
 
 				if(event.mode & core::ctrl::mode::shift){
 					move.swap_xy();

@@ -1,9 +1,6 @@
 module;
 
-extern "C++"{
 #include <plf_hive.h>
-}
-
 #include <gch/small_vector.hpp>
 
 export module mo_yanxi.game.quad_tree;
@@ -23,8 +20,8 @@ import std;
 namespace mo_yanxi::game{
 	// using gch::erase_if;
 
-	using math::vector2;
-	using math::rect_ortho;
+	// using math::vector2;
+	// using math::rect_ortho;
 
 	//TODO flattened quad tree with pre allocated sub trees
 	constexpr std::size_t MaximumItemCount = 8;

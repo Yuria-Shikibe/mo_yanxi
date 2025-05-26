@@ -160,7 +160,13 @@ namespace mo_yanxi::graphic{
 		}
 
 		[[nodiscard]] math::mat3 get_world_to_uniformed_flip_y() const noexcept {
-			return math::mat3{}.set_orthogonal(viewport.get_src(), viewport.size());
+			math::mat3 mat3;
+			if(!flip_y){
+				mat3.set_orthogonal(viewport.get_src(), viewport.size());
+			}else{
+				mat3.set_orthogonal_flip_y(viewport.get_src(), viewport.size());
+			}
+			return mat3;
 		}
 
 		[[nodiscard]] const math::mat3& get_uniformed_to_world() const noexcept {

@@ -70,7 +70,7 @@ namespace mo_yanxi::ui{
 			events().on<events::scroll>([](const events::scroll& e, elem& el){
 				auto& self = static_cast<scroll_pane&>(el);
 
-				auto cmp = -e.pos;
+				auto cmp = -e.delta;
 
 				if(e.mode & core::ctrl::mode::shift){
 					cmp.swap_xy();

@@ -579,6 +579,13 @@ namespace mo_yanxi::ui{
 		// void notify_remove();
 
 		void clear_external_references() noexcept;
+		void clear_external_references_recursively() noexcept{
+			clear_external_references();
+
+			for (auto && child : get_children()){
+				child->clear_external_references_recursively();
+			}
+		}
 
 		[[nodiscard]] bool is_focused_scroll() const noexcept;
 		[[nodiscard]] bool is_focused_key() const noexcept;
@@ -708,6 +715,18 @@ namespace mo_yanxi::ui{
 
 			return events::click_result::intercepted;
 		}
+
+		virtual void on_drag(const events::drag event){
+
+		}
+
+		virtual void on_focus_changed(bool is_focused){
+
+		}
+
+		virtual void on_scroll(const events::scroll event){
+
+		}
 		// [[nodiscard]] virtual math::vec2 requestSpace(const StatedSize sz, math::vec2 minimumSize,
 		// 											  math::vec2 currentAllocatedSize){
 		// 	auto cur = get_size();
@@ -723,7 +742,7 @@ namespace mo_yanxi::ui{
 		// }
 
 
-		virtual void try_draw(const rect clipSpace) const{
+		/*virtual*/ void try_draw(const rect clipSpace) const{
 			if(!is_visible()) return;
 
 			if(!clipSpace.overlap_inclusive(get_bound()))return;

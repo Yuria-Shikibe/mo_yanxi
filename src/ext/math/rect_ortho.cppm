@@ -653,6 +653,14 @@ namespace mo_yanxi::math{
 			return size_.area();
 		}
 
+		[[nodiscard]] FORCE_INLINE constexpr T is_point(T margin) const noexcept{
+			return size_.is_zero(margin);
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr T is_point() const noexcept{
+			return size_.is_zero();
+		}
+
 		template <std::floating_point Fp = float>
 		[[nodiscard]] FORCE_INLINE constexpr Fp ratio() const noexcept{
 			return static_cast<Fp>(size_.x) / static_cast<Fp>(size_.y);

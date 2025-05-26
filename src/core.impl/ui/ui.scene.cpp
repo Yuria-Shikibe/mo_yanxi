@@ -120,13 +120,17 @@ void mo_yanxi::ui::scene::swap_focus(elem* newFocus){
 			state.clear(cursor_pos);
 		}
 		currentCursorFocus->events().fire(events::focus_end{cursor_pos});
+		currentCursorFocus->on_focus_changed(false);
 		currentCursorFocus->cursor_state.quit_focus();
 	}
 
 	currentCursorFocus = newFocus;
 
 	if(currentCursorFocus){
-		if(currentCursorFocus->interactable())currentCursorFocus->events().fire(events::focus_begin{cursor_pos});
+		if(currentCursorFocus->interactable()){
+			currentCursorFocus->events().fire(events::focus_begin{cursor_pos});
+			currentCursorFocus->on_focus_changed(true);
+		}
 	}
 }
 
@@ -187,6 +191,7 @@ void mo_yanxi::ui::scene::on_unicode_input(char32_t val) const{
 void mo_yanxi::ui::scene::on_scroll(const math::vec2 scroll, core::ctrl::key_code_t mode) const{
 	if(currentScrollFocus){
 		currentScrollFocus->events().fire(events::scroll{scroll, mode});
+		currentScrollFocus->on_scroll(events::scroll{scroll, mode});
 	}
 }
 
@@ -236,6 +241,7 @@ void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos){
 
 		dragEvent = {state.src, newPos, core::ctrl::key_pack{static_cast<core::ctrl::key_code_t>(i), core::ctrl::act::ignore, mode}};
 		currentCursorFocus->events().fire(dragEvent);
+		currentCursorFocus->on_drag(dragEvent);
 	}
 
 	currentCursorFocus->notify_cursor_moved(delta);

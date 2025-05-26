@@ -46,6 +46,8 @@ namespace mo_yanxi::ui{
 				stated_size{extent.dependent.y == dialog_extent_type::dependent ? size_category::dependent : size_category::mastering, size.y}
 			};
 
+			elem->context_size_restriction = sz;
+
 			auto rst_sz = elem->pre_acquire_size(sz).value_or(size);
 			elem->resize(rst_sz);
 
@@ -100,6 +102,7 @@ namespace mo_yanxi::ui{
 		template <typename T, typename ...Args>
 			requires (std::constructible_from<T, scene*, group*, Args...>)
 		T& emplace(dialog_layout layout, Args&&... args){
+			clear_tooltip();
 			dialog& dlg = dialogs.emplace_back(dialog{elem_ptr{scene_, nullptr, std::in_place_type<T>, std::forward<Args>(args) ...}, layout});
 			top_ = dlg.elem.get();
 			draw_sequence.push_back(top());
@@ -123,8 +126,12 @@ namespace mo_yanxi::ui{
 
 		void truncate(const elem* elem){
 			if(auto itr = std::ranges::find(dialogs, elem, &dialog::get); itr != dialogs.end()){
+				std::ranges::subrange rng{itr, dialogs.end()};
+				for (const auto & dialog : rng){
+					dialog.elem->clear_external_references_recursively();
+				}
 				std::ranges::move(
-					std::ranges::subrange{itr, dialogs.end()} | std::views::transform([](auto&& v){
+					rng | std::views::transform([](auto&& v){
 						return dialog_fading{std::move(v)};
 					}), std::back_inserter(fading_dialogs));
 
@@ -135,13 +142,15 @@ namespace mo_yanxi::ui{
 
 		void draw_all(rect clipspace) const;
 
-		bool empty() const noexcept{
+		[[nodiscard]] bool empty() const noexcept{
 			return dialogs.empty();
 		}
 
 		void update(float delta_in_tick);
 
 	private:
+		void clear_tooltip() const;
+
 		void update_top() noexcept{
 			if(dialogs.empty()){
 				top_ = nullptr;

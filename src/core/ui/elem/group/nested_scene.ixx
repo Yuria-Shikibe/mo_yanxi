@@ -306,9 +306,9 @@ namespace mo_yanxi::ui{
 			register_event([](events::scroll e, nested_scene& self){
 
 				if(self.scene_.has_scroll_focus()){
-					self.scene_.on_scroll(e.pos);
+					self.scene_.on_scroll(e.delta);
 				}else{
-					self.camera_.set_scale_by_delta(e.pos.y * 0.05f);
+					self.camera_.set_scale_by_delta(e.delta.y * 0.05f);
 				}
 
 			});

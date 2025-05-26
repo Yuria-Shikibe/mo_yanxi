@@ -11,7 +11,7 @@ import std;
 
 namespace mo_yanxi::game{
 	export
-	template <typename Target_Ty, number N = float>
+	template <typename Target_Ty, number N>
 	struct quad_tree_adaptor_base{
 		using target_type = Target_Ty;
 		using const_reference = const Target_Ty&;

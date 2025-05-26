@@ -31,3 +31,8 @@ void mo_yanxi::ui::dialog_manager::update(float delta_in_tick){
 		value.get()->update(delta_in_tick);
 	}
 }
+
+void mo_yanxi::ui::dialog_manager::clear_tooltip() const{
+
+	scene_->tooltip_manager.clear();
+}

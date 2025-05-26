@@ -14,3 +14,15 @@ import mo_yanxi.ui.creation.file_selector;
 
 
 import std;
+
+namespace mo_yanxi::game{
+	namespace ui{
+		export using namespace mo_yanxi::ui;
+
+		struct grid_editor : table{
+			[[nodiscard]] grid_editor(scene* scene, group* group)
+				: table(scene, group){
+			}
+		};
+	}
+}

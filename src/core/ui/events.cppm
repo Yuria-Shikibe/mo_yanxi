@@ -112,16 +112,17 @@ namespace mo_yanxi::ui{
 		struct focus_begin final : PosedEvent{using PosedEvent::PosedEvent;};
 		struct focus_end final : PosedEvent{using PosedEvent::PosedEvent;};
 
-		struct scroll final : PosedEvent{
+		struct scroll final{
 			[[nodiscard]] scroll() = default;
 
 			[[nodiscard]] explicit scroll(const math::vec2 pos)
-				: PosedEvent{pos}{}
+				: delta{pos}{}
 
 			[[nodiscard]] scroll(const math::vec2 pos, core::ctrl::key_code_t mode)
-				: PosedEvent{pos},
+				: delta{pos},
 				  mode{mode}{}
 
+			math::vec2 delta{};
 			core::ctrl::key_code_t mode{};
 		};
 
