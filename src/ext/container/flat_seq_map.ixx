@@ -3,6 +3,9 @@ export module mo_yanxi.flat_seq_map;
 import std;
 
 namespace mo_yanxi{
+	template <typename K, typename V, typename = std::less<K>>
+	struct flat_seq_span;
+
 	export
 	template <typename K, typename V>
 	struct flat_seq_map_storage{
@@ -21,7 +24,7 @@ namespace mo_yanxi{
 		using comp = Comp;
 
 	private:
-		template <typename, typename, typename = std::less<K>>
+		template <typename, typename, typename>
 		friend struct flat_seq_span;
 
 
@@ -40,13 +43,23 @@ namespace mo_yanxi{
 			}
 		}
 
+		template <typename Key>
+		static constexpr decltype(auto) try_to_underlying(Key&& key) noexcept{
+			return std::forward<Key>(key);
+		}
+
 		[[nodiscard]] static constexpr decltype(auto) get_key_proj(const value_type& value) noexcept{
 			return flat_seq_map::try_to_underlying(value.key);
 		}
 
 	public:
+		template <typename S>
+		constexpr auto get_values(this S&& self) noexcept{
+			return std::forward_like<S>(self.values) | std::views::transform(&value_type::value);
+		}
+
 		template <typename Key, std::ranges::input_range Rng = std::initializer_list<mapped_type>>
-			requires std::constructible_from<key_type, std::remove_cvref_t<Key>> && std::convertible_to<std::ranges::range_reference_t<Rng>, mapped_type>
+			requires std::constructible_from<key_type, Key> && std::convertible_to<std::ranges::range_reference_t<Rng>, mapped_type>
 		constexpr auto insert_chunk_front(const Key& key, Rng&& rng){
 			auto itr = std::ranges::lower_bound(values, flat_seq_map::try_to_underlying(key), comp{},
 			                                    flat_seq_map::get_key_proj);
@@ -56,7 +69,7 @@ namespace mo_yanxi{
 		}
 
 		template <typename Key, std::ranges::input_range Rng = std::initializer_list<mapped_type>>
-			requires std::constructible_from<key_type, std::remove_cvref_t<Key>> && std::convertible_to<std::ranges::range_reference_t<Rng>, mapped_type>
+			requires std::constructible_from<key_type, Key> && std::convertible_to<std::ranges::range_reference_t<Rng>, mapped_type>
 		constexpr auto insert_chunk_back(const Key& key, Rng&& rng){
 			auto itr = std::ranges::upper_bound(values, flat_seq_map::try_to_underlying(key), comp{},
 			                                    flat_seq_map::get_key_proj);
@@ -139,6 +152,13 @@ namespace mo_yanxi{
 			return std::ranges::borrowed_subrange_t<decltype(std::forward_like<S>(self.values))>{
 					itr_end.base(), itr_begin.base()
 				} | std::views::transform(&value_type::value);
+		}
+
+		template <std::invocable<const key_type&, mapped_type&> Fn>
+		void each(Fn fn){
+			for (auto && value : values){
+				std::invoke(fn, value.key, value.value);
+			}
 		}
 	};
 

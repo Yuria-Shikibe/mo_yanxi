@@ -34,16 +34,22 @@ import std;
 
 
 namespace mo_yanxi::vk{
-	struct SwapChainFrameData{
-		VkImage image{};
-		command_buffer post_command{};
-	};
-
+	//
 	struct InFlightData{
 		vk::fence fence{};
 		vk::semaphore fetch_semaphore{};
-		vk::semaphore flush_semaphore{};
+		// vk::semaphore flush_semaphore{};
 	};
+
+	struct SwapChainFrameData{
+		VkImage image{};
+		command_buffer post_command{};
+
+		// fence fence{};
+		// semaphore fetch_semaphore{};
+		semaphore flush_semaphore{};
+	};
+
 
 	export
 	struct swap_chain_staging_image_data{
@@ -113,41 +119,57 @@ namespace mo_yanxi::vk{
 			if(!final_staging_image.image)return;
 
 			auto& current_syncs = ++sync_arr;
-			std::uint32_t imageIndex{};
+			std::uint32_t imageIndex;
+
+
+			const VkAcquireNextImageInfoKHR acquire_info{
+					.sType = VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR,
+					.pNext = nullptr,
+					.swapchain = swap_chain,
+					.timeout = std::numeric_limits<std::uint64_t>::max(),
+					.semaphore = current_syncs.fetch_semaphore,
+					.fence = nullptr,
+					.deviceMask = 0x1
+				};
+
+			current_syncs.fence.wait_and_reset();
+			const auto result = vkAcquireNextImage2KHR(device, &acquire_info, &imageIndex);
+			// constexpr auto timeout = std::numeric_limits<std::uint64_t>::max();
+			// const auto result = vkAcquireNextImageKHR(device, swap_chain, timeout, current_syncs.fetch_semaphore, nullptr, &imageIndex);
+
 			bool out_of_date{};
+			if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+				out_of_date = true;
+			} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+				throw vk_error(result, "failed to acquire swap chain image!");
+			}
+
+			const auto& frame = swap_chain_frames[imageIndex];
+
+			cmd::submit_command/*<2, 2>*/(
+				device.primary_graphics_queue(),
+				frame.post_command,
+				current_syncs.fence,
+				current_syncs.fetch_semaphore,
+				VK_PIPELINE_STAGE_2_TRANSFER_BIT
+				,
+				frame.flush_semaphore,
+				VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
+			);
+
+
+
 			const VkPresentInfoKHR info{
 				.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 				.pNext = nullptr,
 				.waitSemaphoreCount = 1,
-				.pWaitSemaphores = current_syncs.flush_semaphore.as_data(),
+				.pWaitSemaphores = frame.flush_semaphore.as_data(),
 				.swapchainCount = 1,
 				.pSwapchains = swap_chain.as_data(),
 				.pImageIndices = &imageIndex,
 				.pResults = nullptr,
 			};
 
-			current_syncs.fence.wait_and_reset();
-
-			{
-				constexpr auto timeout = std::numeric_limits<std::uint64_t>::max();
-				const auto result = vkAcquireNextImageKHR(device, swap_chain, timeout, current_syncs.fetch_semaphore, nullptr, &imageIndex);
-
-				if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-					out_of_date = true;
-				} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-					throw vk_error(result, "failed to acquire swap chain image!");
-				}
-			}
-
-			cmd::submit_command/*<2, 2>*/(
-				device.primary_graphics_queue(),
-				swap_chain_frames[imageIndex].post_command,
-				current_syncs.fence,
-				current_syncs.fetch_semaphore,
-				VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-				current_syncs.flush_semaphore,
-				VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
-			);
 
 			if(const auto result = vkQueuePresentKHR(device.present_queue(), &info);
 				false
@@ -476,7 +498,6 @@ namespace mo_yanxi::vk{
 
 			for (auto & frame_data : sync_arr){
 				frame_data.fence = fence{device, true};
-				frame_data.flush_semaphore = semaphore{device};
 				frame_data.fetch_semaphore = semaphore{device};
 			}
 
@@ -543,6 +564,7 @@ namespace mo_yanxi::vk{
 
 			for(const auto& [index, imageGroup] : swap_chain_frames | std::ranges::views::enumerate){
 				imageGroup.image = images[index];
+				imageGroup.flush_semaphore = semaphore{device};
 			}
 		}
 

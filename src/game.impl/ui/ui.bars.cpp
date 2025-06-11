@@ -13,7 +13,7 @@ void mo_yanxi::game::ui::stalled_bar::draw_content(const mo_yanxi::ui::rect clip
 	const auto opacity = gprop().get_opacity();
 	if(stall){
 		float scale = (stall->value - current_value);
-		if(scale > 0)draw::fill::rect_ortho(acq.get(), math::frect{tags::unchecked, tags::from_extent, src.copy().add_x(current_value * w), {w * scale, h}}, colors::dark_gray.copy().set_a(opacity));
+		if(scale > 0)draw::fill::rect_ortho(acq.get(), math::frect{tags::from_extent, src.copy().add_x(current_value * w), {w * scale, h}}, colors::dark_gray.copy().set_a(opacity));
 	}
 
 
@@ -50,7 +50,7 @@ void mo_yanxi::game::ui::reload_bar::draw_content(mo_yanxi::ui::rect clipSpace) 
 		auto gradient = reload_color;
 		gradient.from.set_a(opacity);
 		gradient.to.set_a(opacity);
-		const math::frect reload_progress{tags::unchecked, tags::from_extent, src, {w * current_value, h * (1 - efficiency_bar_scale)}};
+		const math::frect reload_progress{tags::from_extent, src, {w * current_value, h * (1 - efficiency_bar_scale)}};
 
 		draw::fill::fill(acq.get(),
 			reload_progress.vert_00(), reload_progress.vert_01(),  reload_progress.vert_11(),  reload_progress.vert_10(),

@@ -26,7 +26,7 @@ import std;
 namespace mo_yanxi::game::ecs{
 
 	namespace chamber{
-		export constexpr int tile_size_integral = 25;
+		export constexpr int tile_size_integral = 64;
 		export constexpr float tile_size = tile_size_integral;
 
 		export struct tile;
@@ -339,6 +339,6 @@ namespace mo_yanxi::game::ecs::chamber{
 
 
 	decltype(auto) building_data::operator[](this auto&& self, const tile& tile) noexcept{
-		return self[tile.tile_pos];
+		return std::forward_like<decltype(self)>(self[tile.tile_pos]);
 	}
 }

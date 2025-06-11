@@ -13,7 +13,7 @@ namespace mo_yanxi::ui{
 	export using draw_acquirer = graphic::draw::ui_acquirer;
 
 	export [[nodiscard]] draw_acquirer get_draw_acquirer(graphic::renderer_ui& renderer) noexcept{
-		return draw_acquirer{renderer.batch, graphic::draw::white_region};
+		return draw_acquirer{renderer.batch};
 	}
 
 	export enum struct draw_layers : unsigned char{

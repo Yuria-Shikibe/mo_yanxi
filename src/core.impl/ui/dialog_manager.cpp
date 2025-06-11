@@ -36,3 +36,30 @@ void mo_yanxi::ui::dialog_manager::clear_tooltip() const{
 
 	scene_->tooltip_manager.clear();
 }
+
+void mo_yanxi::ui::dialog_manager::update_top() noexcept{
+	if(dialogs.empty()){
+		top_ = nullptr;
+	}else{
+		top_ = dialogs.back().elem.get();
+	}
+
+	scene_->drop_event_focus();
+
+	scene_->on_cursor_pos_update();
+}
+
+mo_yanxi::ui::esc_flag mo_yanxi::ui::dialog_manager::on_esc() noexcept{
+	for (auto&& elem : dialogs | std::views::reverse){
+		if(util::thoroughly_esc(elem.elem.get()) != esc_flag::fall_through){
+			return esc_flag::intercept;
+		}
+	}
+
+	if(!dialogs.empty()){
+		truncate(std::prev(dialogs.end()));
+		return esc_flag::intercept;
+	}
+
+	return esc_flag::fall_through;
+}

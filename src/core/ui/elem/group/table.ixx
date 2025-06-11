@@ -195,21 +195,37 @@ namespace mo_yanxi::ui{
 			// if failed to get a pre_acquire size to promote the table head, discard it
 
 			if(std::isinf(curSize.*major_target)){
+				//TODO policy to allocate minor size
+				bool single_line = max_minor_size() == 1 && std::isfinite(valid_size.*minor_target);
 				for(auto&& [idx_minor, line] : view){
 					auto& head_minor = at_minor(idx_minor);
 
 					for(auto&& [idx_major, elem] : line | std::views::enumerate){
 						auto& head_major = at_major(idx_major);
 
-						if((elem.cell.stated_extent.*extent_major).type == size_category::dependent){
+						if((elem.cell.stated_extent.*extent_major).dependent()){
 							stated_extent ext;
 							ext.*extent_major = {size_category::dependent};
-							ext.*extent_minor = head_minor.max_size.mastering() ? head_minor.max_size : stated_size{size_category::dependent};
+
+							if(head_minor.max_size.mastering()){
+								ext.*extent_minor =	head_minor.max_size;
+							}else{
+								if(single_line){
+									ext.*extent_minor = stated_size{size_category::mastering, valid_size.*minor_target};
+								}else{
+									ext.*extent_minor = stated_size{size_category::dependent};
+								}
+
+							}
+
 
 							if(auto size = elem.element->pre_acquire_size(ext)){
 								head_major.max_size.promote(size.value().*major_target);
 								head_minor.max_size.promote(
-									math::min(size.value().*minor_target, curSize.*minor_target));
+									single_line ?
+									curSize.*minor_target :
+									math::min(size.value().*minor_target, curSize.*minor_target)
+									);
 							}
 						}
 					}

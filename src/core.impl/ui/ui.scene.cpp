@@ -91,7 +91,7 @@ void mo_yanxi::ui::scene::notify_layout_update(elem* element){
 
 
 void mo_yanxi::ui::scene::drop_all_focus(const elem* target){
-	dropEventFocus(target);
+	drop_event_focus(target);
 	std::erase(lastInbounds, target);
 	asyncTaskOwners.erase(const_cast<elem*>(target));
 	independentLayout.erase(const_cast<elem*>(target));
@@ -119,7 +119,7 @@ void mo_yanxi::ui::scene::swap_focus(elem* newFocus){
 		for(auto& state : mouseKeyStates){
 			state.clear(cursor_pos);
 		}
-		currentCursorFocus->events().fire(events::focus_end{cursor_pos});
+		currentCursorFocus->events().fire(input_event::focus_end{cursor_pos});
 		currentCursorFocus->on_focus_changed(false);
 		currentCursorFocus->cursor_state.quit_focus();
 	}
@@ -128,7 +128,7 @@ void mo_yanxi::ui::scene::swap_focus(elem* newFocus){
 
 	if(currentCursorFocus){
 		if(currentCursorFocus->interactable()){
-			currentCursorFocus->events().fire(events::focus_begin{cursor_pos});
+			currentCursorFocus->events().fire(input_event::focus_begin{cursor_pos});
 			currentCursorFocus->on_focus_changed(true);
 		}
 	}
@@ -137,6 +137,7 @@ void mo_yanxi::ui::scene::swap_focus(elem* newFocus){
 mo_yanxi::ui::esc_flag mo_yanxi::ui::scene::on_esc(){
 	// return true;
 	if(tooltip_manager.on_esc() != esc_flag::fall_through)return esc_flag::intercept;
+	if(dialog_manager.on_esc() != esc_flag::fall_through)return esc_flag::intercept;
 	//
 	elem* focus = currentKeyFocus;
 	if(!focus) focus = currentCursorFocus;
@@ -150,7 +151,7 @@ void mo_yanxi::ui::scene::on_mouse_action(const core::ctrl::key_code_t key, cons
 	}
 
 	if(currentCursorFocus){
-		const events::click e{cursor_pos, core::ctrl::key_pack{key, action, mode}};
+		const input_event::click e{cursor_pos, core::ctrl::key_pack{key, action, mode}};
 		currentCursorFocus->on_click(e);
 	}
 
@@ -168,18 +169,17 @@ void mo_yanxi::ui::scene::on_mouse_action(const core::ctrl::key_code_t key, cons
 }
 
 void mo_yanxi::ui::scene::on_key_action(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode){
-	elem* focus = currentKeyFocus;
-	if(!focus) focus = currentCursorFocus;
-	if(!focus) return;
-	focus->input_key(key, action, mode);
-	if(action == core::ctrl::act::press){
-		if(key == core::ctrl::key::Esc){
-			if(on_esc() == esc_flag::fall_through){
-				on_cursor_pos_update(cursor_pos);
-			}
-		}
-	}
 
+	if(action == core::ctrl::act::press && key == core::ctrl::key::Esc){
+		if(on_esc() == esc_flag::fall_through){
+			on_cursor_pos_update(cursor_pos);
+		}
+	}else{
+		elem* focus = currentKeyFocus;
+		if(!focus) focus = currentCursorFocus;
+		if(!focus) return;
+		focus->input_key(key, action, mode);
+	}
 }
 
 void mo_yanxi::ui::scene::on_unicode_input(char32_t val) const{
@@ -190,8 +190,8 @@ void mo_yanxi::ui::scene::on_unicode_input(char32_t val) const{
 
 void mo_yanxi::ui::scene::on_scroll(const math::vec2 scroll, core::ctrl::key_code_t mode) const{
 	if(currentScrollFocus){
-		currentScrollFocus->events().fire(events::scroll{scroll, mode});
-		currentScrollFocus->on_scroll(events::scroll{scroll, mode});
+		currentScrollFocus->events().fire(input_event::scroll{scroll, mode});
+		currentScrollFocus->on_scroll(input_event::scroll{scroll, mode});
 	}
 }
 
@@ -233,7 +233,7 @@ void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos){
 
 	if(!currentCursorFocus) return;
 
-	events::drag dragEvent{};
+	input_event::drag dragEvent{};
 	const auto mode = get_input_mode();
 
 	for(const auto& [i, state] : mouseKeyStates | std::views::enumerate){
@@ -364,12 +364,12 @@ void mo_yanxi::ui::scene::updateInbounds(std::vector<elem*>&& next){
 	auto [i1, i2] = std::ranges::mismatch(lastInbounds, next);
 
 	for(const auto& element : std::ranges::subrange{i1, lastInbounds.end()}){
-		element->events().fire(events::exbound{cursor_pos});
+		element->events().fire(input_event::exbound{cursor_pos});
 	}
 
 	// for(const auto& element : std::ranges::subrange{i2, next.end()}){
 	for(const auto& element : next){
-		element->events().fire(events::inbound{cursor_pos});
+		element->events().fire(input_event::inbound{cursor_pos});
 	}
 
 	lastInbounds = std::move(next);

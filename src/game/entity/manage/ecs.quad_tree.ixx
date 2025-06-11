@@ -332,7 +332,9 @@ namespace mo_yanxi::game{
 
 			this->items.reserve(this->branch_size);
 			for (auto& node : children){
-				this->items.append(std::exchange(node.items, {}));
+				auto view = node.items | std::views::as_rvalue;
+				this->items.append(std::ranges::begin(view), std::ranges::end(view));
+				node.items.clear();
 				node.reserved_clear();
 			}
 		}

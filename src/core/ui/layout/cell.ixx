@@ -28,7 +28,7 @@ namespace mo_yanxi::ui{
 	export
 	template <typename Create>
 	concept cell_creator = requires{
-		typename Create::elem_type;
+		typename std::remove_cvref_t<Create>::elem_type;
 	};
 
 	export

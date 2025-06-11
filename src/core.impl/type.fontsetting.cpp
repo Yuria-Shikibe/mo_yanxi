@@ -26,13 +26,19 @@ namespace mo_yanxi::font::typesetting{
 
 		const auto font_region_scale = context.get_current_correction_scale();
 		float advance = current.glyph.metrics().advance.x * font_region_scale.x;
-		if(code.code == real_code && (code.code == U'\0' || code.code == U'\n')){
-			advance = 0;
-		}
+
+		bool emptyChar = code.code == real_code && (code.code == U'\0' || code.code == U'\n');
+
 
 		const auto placementPos = context.get_current_offset().add_x(pen_advance);
 
 		current.region = current.glyph.metrics().place_to(placementPos, font_region_scale);
+
+		if(emptyChar){
+			advance = 0;
+			current.region.set_width(current.region.width() / 4);
+		}
+
 		current.correct_scale = font_region_scale;
 		if(current.region.get_src_x() < 0){
 			//Fetch for italic line head
@@ -165,7 +171,9 @@ namespace mo_yanxi::font::typesetting{
 
 		layout_unit unit{};
 
-		for(; itr != view.end(); ++itr){
+		auto stl = std::prev(view.end());
+
+		for(; itr != stl; ++itr){
 			auto [layout_index, code] = *itr;
 
 			lastTokenItr = func::exec_tokens(layout, context, *this, lastTokenItr, formatted_text, layout_index);
@@ -177,19 +185,20 @@ namespace mo_yanxi::font::typesetting{
 				if((layout.policy() & layout_policy::truncate) != layout_policy{}){
 					do{
 						++itr;
-					}while(itr != view.end() && itr.base()->code != U'\n');
+					}while(itr != stl && itr.base()->code != U'\n');
 				}else{
 					break;
 				}
 			}
 		}
 
-		if(itr != view.end()){
+		if(itr != stl){
 			layout.clip = true;
-			end_parse(layout, context, *itr.base(), itr - view.begin());
 		}else{
 			layout.clip = false;
 		}
+
+		end_parse(layout, context, *itr.base(), itr - view.begin());
 
 		layout.captured_size.min(layout.get_clamp_size());
 	}

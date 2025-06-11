@@ -68,8 +68,8 @@ void mo_yanxi::game::world::hud::hud_viewport::draw_content(const ui::rect clipS
 	manual_table::draw_content(clipSpace);
 }
 
-mo_yanxi::ui::events::click_result mo_yanxi::game::world::hud::hud_viewport::on_click(
-	const ui::events::click click_event){
+mo_yanxi::ui::input_event::click_result mo_yanxi::game::world::hud::hud_viewport::on_click(
+	const ui::input_event::click click_event){
 
 	if(click_event.code.action() == core::ctrl::act::press){
 		auto transed = context.graphic_context->renderer().camera.get_screen_to_world(click_event.pos, {}, true);
@@ -88,7 +88,7 @@ mo_yanxi::ui::events::click_result mo_yanxi::game::world::hud::hud_viewport::on_
 		}
 	}
 
-	return ui::events::click_result::intercepted;
+	return ui::input_event::click_result::intercepted;
 }
 
 mo_yanxi::game::world::hud::hud(){

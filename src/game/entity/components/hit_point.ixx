@@ -7,14 +7,18 @@ import std;
 
 namespace mo_yanxi::game::ecs{
 	export
-	struct hit_point{
+	struct static_hit_point{
 		float max{2000};
-		float cur{2000};
 
 		/**
 		 * @brief [disabled, from(minimal functionality), to(maximum ~), max]
 		 */
 		math::range capability_range{500, 1500};
+
+	};
+	export
+	struct hit_point : static_hit_point{
+		float cur{2000};
 
 	private:
 		//float last{100};

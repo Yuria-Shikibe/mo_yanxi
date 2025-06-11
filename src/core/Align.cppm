@@ -123,7 +123,7 @@ namespace mo_yanxi{
 		};
 
 		template <typename T>
-		padding<T> padBetween(const math::rect_ortho<T>& internal, const math::rect_ortho<T>& external){
+		padding<T> padBetween(const math::rect_ortho<T>& internal, const math::rect_ortho<T>& external) noexcept {
 			return padding<T>{
 					internal.get_src_x() - external.get_src_x(),
 					external.get_end_x() - internal.get_end_x(),
@@ -245,15 +245,21 @@ namespace mo_yanxi{
 		};
 
 		template <number T>
-		constexpr math::vector2<T> embedTo(const scale stretch, math::vector2<T> srcSize, math::vector2<T> toBound){
+		constexpr T get_fit_embed_scale(math::vector2<T> srcSize, math::vector2<T> toBound) noexcept{
+			const float targetRatio = align::floating_div(toBound.y, toBound.x);
+			const float sourceRatio =
+				align::floating_div(srcSize.y, srcSize.x);
+			const float scale = targetRatio > sourceRatio
+									? align::floating_div(toBound.x, srcSize.x)
+									: align::floating_div(toBound.y, srcSize.y);
+			return scale;
+		}
+
+		template <number T>
+		constexpr math::vector2<T> embedTo(const scale stretch, math::vector2<T> srcSize, math::vector2<T> toBound) noexcept{
 			switch(stretch){
 			case scale::fit :{
-				const float targetRatio = align::floating_div(toBound.y, toBound.x);
-				const float sourceRatio =
-					align::floating_div(srcSize.y, srcSize.x);
-				const float scale = targetRatio > sourceRatio
-					                    ? align::floating_div(toBound.x, srcSize.x)
-					                    : align::floating_div(toBound.y, srcSize.y);
+				const float scale = align::get_fit_embed_scale(srcSize, toBound);
 
 				return {align::floating_mul<T>(srcSize.x, scale), align::floating_mul<T>(srcSize.y, scale)};
 			}
@@ -294,7 +300,7 @@ namespace mo_yanxi{
 		constexpr math::vector2<T> get_offset_of(
 			const pos align,
 			const math::vector2<T> bottomLeft,
-			const math::vector2<T> topRight){
+			const math::vector2<T> topRight) noexcept {
 			math::vector2<T> move{};
 
 			if((align & pos::top) != pos{}){
@@ -337,7 +343,7 @@ namespace mo_yanxi{
 		 * @return
 		 */
 		template <signed_number T>
-		constexpr math::vector2<T> get_offset_of(const pos align, const math::vector2<T>& bound){
+		constexpr math::vector2<T> get_offset_of(const pos align, const math::vector2<T>& bound) noexcept{
 			math::vector2<T> offset{};
 
 			if((align & pos::bottom) != pos{}){
@@ -361,13 +367,13 @@ namespace mo_yanxi{
 		 * @return
 		 */
 		template <signed_number T>
-		constexpr math::vector2<T> get_offset_of(const pos align, const math::rect_ortho<T>& bound){
+		constexpr math::vector2<T> get_offset_of(const pos align, const math::rect_ortho<T>& bound) noexcept{
 			return align::get_offset_of<T>(align, bound.size());
 		}
 
 
 		template <signed_number T>
-		[[nodiscard]] constexpr math::vector2<T> get_vert(const pos align, const math::vector2<T>& size){
+		[[nodiscard]] constexpr math::vector2<T> get_vert(const pos align, const math::vector2<T>& size) noexcept{
 			math::vector2<T> offset{};
 
 
@@ -393,7 +399,7 @@ namespace mo_yanxi{
 		 * @return
 		 */
 		template <signed_number T>
-		[[nodiscard]] constexpr math::vector2<T> get_vert(const pos align, const math::rect_ortho<T>& bound){
+		[[nodiscard]] constexpr math::vector2<T> get_vert(const pos align, const math::rect_ortho<T>& bound) noexcept{
 			return align::get_vert<T>(align, bound.size()) + bound.get_src();
 		}
 
@@ -406,7 +412,7 @@ namespace mo_yanxi{
 		[[nodiscard]] constexpr math::vector2<T> get_offset_of(
 			const pos align,
 			typename math::vector2<T>::const_pass_t internal_toAlignSize,
-			const math::rect_ortho<T>& external){
+			const math::rect_ortho<T>& external) noexcept{
 			math::vector2<T> offset{};
 
 			switch(align & pos::mask_y){
@@ -468,7 +474,7 @@ namespace mo_yanxi{
 			const pos align,
 			math::vector2<T> bound_size,
 			math::rect_ortho<T> to_transform_inner
-		){
+		) noexcept{
 			if((align & pos::bottom) != pos{}){
 				to_transform_inner.src.y = bound_size.y - to_transform_inner.src.y - to_transform_inner.height();
 			} else if((align & pos::center_y) != pos{}){
@@ -492,7 +498,7 @@ namespace mo_yanxi{
 		 */
 		template <signed_number T>
 		[[nodiscard]] constexpr math::vector2<T> get_offset_of(const pos align, const math::rect_ortho<T>& internal_toAlign,
-		                                        const math::rect_ortho<T>& external){
+		                                        const math::rect_ortho<T>& external) noexcept{
 			return align::get_offset_of(align, internal_toAlign.size(), external);
 		}
 	}

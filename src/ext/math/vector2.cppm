@@ -806,7 +806,7 @@ export namespace mo_yanxi::math{
 		}
 
 		template <typename N>
-		FORCE_INLINE vector2<N> round_with(vector2<N>::const_pass_t other) const noexcept{
+		FORCE_INLINE vector2<N> round(typename vector2<N>::const_pass_t other) const noexcept{
 			vector2<N> tgt = as<N>();
 			tgt.x = math::round<N>(static_cast<N>(x), other.x);
 			tgt.y = math::round<N>(static_cast<N>(y), other.y);
@@ -815,7 +815,7 @@ export namespace mo_yanxi::math{
 		}
 
 		template <typename N>
-		FORCE_INLINE vector2<N> round_with(const N val) const noexcept{
+		FORCE_INLINE vector2<N> round(const N val) const noexcept{
 			vector2<N> tgt = as<N>();
 			tgt.x = math::round<N>(static_cast<N>(x), val);
 			tgt.y = math::round<N>(static_cast<N>(y), val);
@@ -833,10 +833,47 @@ export namespace mo_yanxi::math{
 			return tgt;
 		}
 
-		template <std::integral N>
-		[[nodiscard]] FORCE_INLINE vector2<N> trunc() const noexcept{
-			return vector2<N>{math::trunc_right<N>(x), math::trunc_right<N>(y)};
+		FORCE_INLINE vector2& floor()  noexcept requires std::is_floating_point_v<T>{
+			if constexpr (std::floating_point<T>){
+				x = std::floor(x);
+				y = std::floor(y);
+			}
+
+			return *this;
 		}
+
+		FORCE_INLINE vector2& ceil()  noexcept requires std::is_floating_point_v<T>{
+			if constexpr (std::floating_point<T>){
+				x = std::ceil(x);
+				y = std::ceil(y);
+			}
+
+			return *this;
+		}
+
+		FORCE_INLINE vector2& trunc() noexcept{
+			if constexpr (std::floating_point<T>){
+				x = math::trunc(x);
+				y = math::trunc(y);
+			}
+			return *this;
+		}
+
+		FORCE_INLINE vector2& trunc(T step) noexcept{
+			x = math::trunc(x, step);
+			y = math::trunc(y, step);
+
+			return *this;
+		}
+
+
+		FORCE_INLINE vector2& trunc(const_pass_t step) noexcept{
+			x = math::trunc(x, step.x);
+			y = math::trunc(y, step.y);
+
+			return *this;
+		}
+
 
 		[[nodiscard]] FORCE_INLINE constexpr auto area() const noexcept {
 			return x * y;
@@ -850,8 +887,12 @@ export namespace mo_yanxi::math{
 			return length2() < margin;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr vector2 sign() const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr vector2 sign_or_zero() const noexcept{
 			return {math::sign(x), math::sign(y)};
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr vector2 sign() const noexcept{
+			return {x >= 0 ? 1 : -1, y >= 0 ? 1 : -1};
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr bool within(const_pass_t other_in_axis) const noexcept{
@@ -1075,6 +1116,21 @@ export namespace mo_yanxi::math{
 	using u32point2 = vector2<std::uint32_t>;
 
 
+	template <std::floating_point T>
+	struct optional_vec2 : vector2<T>{
+		explicit constexpr operator bool() const noexcept{
+			return !this->is_NaN();
+		}
+
+		constexpr void reset() noexcept{
+			this->set_NaN();
+		}
+
+		using vector2<T>::operator=;
+	};
+
+
+
 	namespace vectors{
 		template <typename N = float>
 		vector2<N> hit_normal(const vector2<N> approach_direction, const vector2<N> tangent){
@@ -1084,6 +1140,27 @@ export namespace mo_yanxi::math{
 
 		constexpr vec2 direction_deg(const float angle_Degree) noexcept{
 			return {math::cos_deg(angle_Degree), math::sin_deg(angle_Degree)};
+		}
+
+		/*constexpr*/
+		/**
+		 * @brief
+		 * @return snapped end
+		 */
+		vec2 snap_segment_to_angle(const vec2 src, const vec2 end, float angle_in_rad) noexcept{
+			if(angle_in_rad == 0.0f) return end;
+
+			vec2 delta = end - src;
+
+			float originalAngle = delta.angle_rad();
+
+
+			float snappedAngle = math::round(originalAngle, angle_in_rad);
+
+			auto dir = vec2::from_polar_rad(snappedAngle);
+
+			float projectionLength = dir.dot(delta);
+			return dir * projectionLength + src;
 		}
 
 		template <typename T>

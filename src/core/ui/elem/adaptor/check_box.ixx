@@ -23,13 +23,13 @@ namespace mo_yanxi::ui{
 
 		}
 
-		events::click_result on_click(const events::click click_event) override{
-			if(drawables_.empty())return events::click_result::intercepted;
+		input_event::click_result on_click(const input_event::click click_event) override{
+			if(drawables_.empty())return input_event::click_result::intercepted;
 
 			elem::on_click(click_event);
 
-			if(click_event.code.action() != core::ctrl::act::release)return events::click_result::intercepted;
-			if(!contains(click_event.pos))return events::click_result::intercepted;
+			if(click_event.code.action() != core::ctrl::act::release)return input_event::click_result::intercepted;
+			if(!contains(click_event.pos))return input_event::click_result::intercepted;
 
 			switch(click_event.code.key()){
 			case core::ctrl::mouse::LMB:
@@ -45,7 +45,7 @@ namespace mo_yanxi::ui{
 				break;
 			}
 
-			return events::click_result::intercepted;
+			return input_event::click_result::intercepted;
 		}
 
 		void add_multi_select_tooltip(tooltip_layout_info layout){

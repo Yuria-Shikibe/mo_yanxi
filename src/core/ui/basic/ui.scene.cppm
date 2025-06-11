@@ -189,6 +189,10 @@ namespace mo_yanxi::ui{
 			return std::ranges::any_of(mouseKeyStates, std::identity{}, &MouseState::pressed);
 		}
 
+		[[nodiscard]] bool is_mouse_pressed(core::ctrl::key_code_t mouse_button_code) const noexcept{
+			return mouseKeyStates[mouse_button_code].pressed;
+		}
+
 		// void joinTasks();
 
 		[[nodiscard]] math::vec2 get_cursor_pos() const noexcept{
@@ -257,10 +261,16 @@ namespace mo_yanxi::ui{
 
 		scene& operator=(scene&& other) noexcept;
 
-		void dropEventFocus(const elem* target){
+		void drop_event_focus(const elem* target){
 			if(currentCursorFocus == target)currentCursorFocus = nullptr;
 			if(currentScrollFocus == target)currentScrollFocus = nullptr;
 			if(currentKeyFocus == target)currentKeyFocus = nullptr;
+		}
+
+		void drop_event_focus(){
+			currentCursorFocus = nullptr;
+			currentScrollFocus = nullptr;
+			currentKeyFocus = nullptr;
 		}
 
 		[[nodiscard]] double get_global_time() const noexcept;

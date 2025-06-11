@@ -69,6 +69,10 @@ namespace mo_yanxi::graphic{
 			maxScale = std::log(max);
 		}
 
+		void clamp_target_scale() noexcept {
+			targetScale = std::exp(math::clamp(get_target_scale(), minScale, maxScale));
+		}
+
 		void resize_screen(const float w, const float h) noexcept /*override*/ { // NOLINT(*-make-member-function-const)
 			screenSize.set(w, h);
 		}

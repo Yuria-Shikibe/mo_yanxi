@@ -377,24 +377,16 @@ namespace mo_yanxi{
 
 		value_type& operator[](size_type index) noexcept{
 			assert(index < size());
-			index += head;
-			if(index >= capacity_){
-				index -= capacity_;
-			}
 
 			assert(index < capacity());
-			return data_[index];
+			return data_[(index + head) % capacity_];
 		}
 
 		const value_type& operator[](size_type index) const noexcept{
 			assert(index < size());
-			index += head;
-			if(index >= capacity_){
-				index -= capacity_;
-			}
 
 			assert(index < capacity());
-			return data_[index];
+			return data_[(index + head) % capacity_];
 		}
 
 		template <std::invocable<size_type, value_type&> Fn>

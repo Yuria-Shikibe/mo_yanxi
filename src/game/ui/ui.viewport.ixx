@@ -10,15 +10,15 @@ export import mo_yanxi.graphic.camera;
 namespace mo_yanxi::game::ui{
 	export using namespace mo_yanxi::ui;
 
-	export constexpr float editor_radius = 5000;
+	export constexpr float viewport_default_radius = 5000;
 
 	export
 	struct viewport : elem{
 	private:
-		math::vec2 last_camera_pos{};
+		math::vec2 last_camera_{};
 	protected:
 		graphic::camera2 camera{};
-		math::vec2 viewport_region{editor_radius * 2, editor_radius * 2};
+		math::vec2 viewport_region{viewport_default_radius * 2, viewport_default_radius * 2};
 
 	public:
 		[[nodiscard]] viewport(scene* scene, group* group, const std::string_view tyName)
@@ -52,24 +52,24 @@ namespace mo_yanxi::game::ui{
 			set_focused_key(is_focused);
 		}
 
-		void on_scroll(const ui::events::scroll event) override{
+		void on_scroll(const ui::input_event::scroll event) override{
 			camera.set_scale_by_delta(event.delta.y * 0.05f);
 		}
 
-		void on_drag(const ui::events::drag e) override{
+		void on_drag(const ui::input_event::drag e) override{
 			if(e.code.key() == core::ctrl::mouse::CMB){
 				auto src = get_transferred_pos(e.pos);
 				auto dst = get_transferred_pos(e.dst);
-				camera.set_center(last_camera_pos - (dst - src));
+				camera.set_center(last_camera_ - (dst - src));
 			}
 		}
 
-		ui::events::click_result on_click(const ui::events::click click_event) override{
+		ui::input_event::click_result on_click(const ui::input_event::click click_event) override{
 			if(click_event.code.key() == core::ctrl::mouse::CMB){
-				last_camera_pos = camera.get_stable_center();
+				last_camera_ = camera.get_stable_center();
 			}
 
-			return ui::events::click_result::intercepted;
+			return ui::input_event::click_result::intercepted;
 		}
 
 		void viewport_begin() const {
@@ -86,8 +86,13 @@ namespace mo_yanxi::game::ui{
 			get_renderer().batch.pop_projection();
 		}
 
-		[[nodiscard]] math::vec2 get_transferred_pos(const math::vec2 pos) const{
+		[[nodiscard]] math::vec2 get_transferred_pos(const math::vec2 pos) const noexcept{
 			return camera.get_screen_to_world(pos, content_src_pos(), true);
 		}
+
+		[[nodiscard]] math::vec2 get_transferred_cursor_pos() const noexcept{
+			return get_transferred_pos(get_scene()->get_cursor_pos());
+		}
+
 	};
 }

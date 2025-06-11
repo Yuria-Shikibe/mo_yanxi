@@ -7,7 +7,7 @@
 
 
 const slide_line_style line_style = slide_line_style(
-    45.f, 1.f, 30, 16
+    45.f, 1.f, 35, 19
 );
 
 
@@ -22,7 +22,7 @@ struct ui_ubo_data{
     uint cap3;
 };
 
-float get_ui_alpha_scale(const ui_ubo_data ubo, const uint mode, const vec2 in_pos){
+float get_ui_alpha_scale(const ui_ubo_data ubo, const uint mode, const vec2 in_pos, const vec2 in_raw_pos){
     float scale;
     if(ubo.dst == 0.){
         if(rectNotContains(ubo.rect, in_pos)){
@@ -38,7 +38,7 @@ float get_ui_alpha_scale(const ui_ubo_data ubo, const uint mode, const vec2 in_p
     }
 
     if(bool(mode & draw_mode_slide_line)){
-        float scl = is_in_slide_line_smooth(in_pos * ubo.extent * ubo.inv_scale, line_style, ubo.time * 60, 0.175f);
+        float scl = is_in_slide_line_smooth(in_raw_pos/** / ubo.inv_scale*/, line_style, ubo.time * 60, 0.175f);
         if(scl == 0)discard;
         scale *= scl;
     }

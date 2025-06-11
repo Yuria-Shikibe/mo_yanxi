@@ -18,6 +18,8 @@ export import mo_yanxi.graphic.post_processor.resolve;
 export import mo_yanxi.graphic.post_processor.bloom;
 export import mo_yanxi.graphic.post_processor.ssao;
 
+export import mo_yanxi.graphic.renderer.predecl;
+
 import mo_yanxi.vk.vma;
 
 import std;
@@ -757,5 +759,14 @@ namespace mo_yanxi::graphic{
 		void init_layout(VkCommandBuffer compute_command_buffer) const{
 			merge_result.init_layout_general(compute_command_buffer);
 		}
+
+	public:
+		explicit(false) operator renderer_ui_ref () noexcept{
+			return reinterpret_cast<renderer_ui_ref>(this);
+		}
 	};
+
+	export renderer_ui& renderer_from_erased(renderer_ui_ref ref){
+		return *reinterpret_cast<renderer_ui*>(ref);
+	}
 }

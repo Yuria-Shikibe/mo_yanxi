@@ -36,7 +36,9 @@ namespace mo_yanxi::game{
 		math::vec2 scale{1, 1};
 
 		[[nodiscard]] math::frect_box crop() const noexcept{
-			return static_cast<math::rect_box<float>>(math::rect_box_posed{box * scale, trans});
+			math::rect_box<float> box;
+			box.update(trans, this->box * scale);
+			return box;
 		}
 
 		[[nodiscard]] math::vec2 get_box_v00() const noexcept{
@@ -136,9 +138,6 @@ namespace mo_yanxi::game{
 		explicit operator bool() const noexcept{
 			return this->operation != edit_op::none;
 		}
-
-
-
 
 		[[nodiscard]] float get_scale() const noexcept{
 			return precision_mode ? 0.2f : 1.f;
@@ -380,7 +379,7 @@ namespace mo_yanxi::game{
 
 		box_wrapper* main_selected{};
 		std::unordered_set<box_wrapper*> selected{};
-		quad_tree<box_wrapper*> quad_tree{math::frect{math::vec2{}, (ui::editor_radius + editor_margin) * 2}};
+		quad_tree<box_wrapper*> quad_tree{math::frect{math::vec2{}, (ui::viewport_default_radius + editor_margin) * 2}};
 		bool quad_tree_changed{};
 
 		[[nodiscard]] hitbox_edit_channel() = default;
@@ -413,6 +412,7 @@ namespace mo_yanxi::game{
 			for(const auto& comp : comps){
 				draw::line::quad_expanded(acquirer, comp.edit.temp.crop().view_as_quad(), -editor_line_width, colors::light_gray);
 			}
+
 			acquirer.proj.set_layer(ui::draw_layers::def);
 
 			for(auto comp : selected){
@@ -541,7 +541,7 @@ namespace mo_yanxi::game{
 			return rst;
 		}
 
-		void on_click(ui::events::click click_event, ui::util::box_selection<>& box_select, math::vec2 transed_pos){
+		void on_click(ui::input_event::click click_event, ui::util::box_selection<>& box_select, math::vec2 transed_pos){
 			if(click_event.code.action() == core::ctrl::act::press){
 				box_select.begin_select(transed_pos);
 			} else if(click_event.code.action() == core::ctrl::act::release){
@@ -1000,7 +1000,6 @@ namespace mo_yanxi::game{
 		struct hit_box_editor : table{
 		private:
 			struct editor_viewport : viewport{
-
 				ui::util::box_selection<> box_select{};
 
 				hitbox_edit_channel channel_hitbox{};
@@ -1027,9 +1026,8 @@ namespace mo_yanxi::game{
 					viewport_begin();
 
 					auto& r = get_renderer();
-
 					using namespace graphic;
-					draw_acquirer acquirer{r.batch, draw::white_region};
+					draw_acquirer acquirer{ui::get_draw_acquirer(r)};
 
 
 					{
@@ -1051,7 +1049,7 @@ namespace mo_yanxi::game{
 					viewport_end();
 				}
 
-				ui::events::click_result on_click(const ui::events::click click_event) override{
+				ui::input_event::click_result on_click(const ui::input_event::click click_event) override{
 					if(click_event.code.key() == core::ctrl::mouse::LMB){
 						channel_hitbox.on_click(click_event, box_select, get_transferred_pos(get_scene()->get_cursor_pos()));
 					}

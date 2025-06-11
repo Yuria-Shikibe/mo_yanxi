@@ -19,7 +19,7 @@ void mo_yanxi::core::global::assets::init(void* vk_context_ptr){
 		p.first.uv.shrink(64);
 		font_manager.page().mark_protected("white");
 
-		graphic::draw::white_region = p.first;
+		// graphic::draw::white_region = p.first;
 
 		auto& face_tele = font_manager.register_face("tele", R"(D:\projects\mo_yanxi\prop\assets\fonts\telegrama.otf)");
 		auto& face_srch = font_manager.register_face("srch", R"(D:\projects\mo_yanxi\prop\assets\fonts\SourceHanSerifSC-SemiBold.otf)");

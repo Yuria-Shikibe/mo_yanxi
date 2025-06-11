@@ -515,7 +515,7 @@ namespace mo_yanxi::ui{
 				}
 			});*/
 
-			events().on<events::drag>([](const events::drag& event, elem& e){
+			events().on<input_event::drag>([](const input_event::drag& event, elem& e){
 				auto& self = static_cast<text_input_area&>(e);
 
 				auto layoutSrc = self.get_layout_pos(event.pos);
@@ -597,7 +597,7 @@ namespace mo_yanxi::ui{
 		}
 
 
-		events::click_result on_click(const events::click click_event) override{
+		input_event::click_result on_click(const input_event::click click_event) override{
 			if(click_event.code.action() != core::ctrl::act::release){
 				auto layoutPos = get_layout_pos(click_event.pos);
 

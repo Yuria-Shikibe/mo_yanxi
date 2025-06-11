@@ -3,6 +3,8 @@ module;
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <cassert>
+#include <immintrin.h>
+#include "../src/ext/adapted_attributes.hpp"
 
 export module mo_yanxi.vk.batch;
 
@@ -172,34 +174,86 @@ namespace mo_yanxi::vk{
 		private:
 			VkImageView latest{};
 			std::uint32_t latest_index{};
-			std::array<VkImageView, maximum_images> images{};
+			alignas(32) std::array<VkImageView, maximum_images> images{};
 			std::uint32_t count{};
+
+			static_assert(maximum_images % 4 == 0);
+
 		public:
-			void clear(this image_view_history& self) noexcept{
+			FORCE_INLINE void clear(this image_view_history& self) noexcept{
 				self = {};
 			}
 
-			[[nodiscard]] std::span<const VkImageView> get() const noexcept{
+			[[nodiscard]] FORCE_INLINE std::span<const VkImageView> get() const noexcept{
 				return {images.data(), count};
 			}
 
-			[[nodiscard]] constexpr std::uint32_t try_push(VkImageView image) noexcept {
-				if(!image)return 0;
+			[[nodiscard]] FORCE_INLINE /*constexpr*/ std::uint32_t try_push(VkImageView image) noexcept {
+				if(!image)return std::numeric_limits<std::uint8_t>::max();
 				if(image == latest)return latest_index;
 
-				for(std::size_t i = 0; i < maximum_images; ++i){
-					auto& cur = images[i];
-					if(image == cur){
+				// for(std::size_t i = 0; i < maximum_images; ++i){
+				// 	auto& cur = images[i];
+				// 	if(image == cur){
+				// 		latest = image;
+				// 		latest_index = i;
+				// 		return i;
+				// 	}
+				//
+				// 	if(cur == nullptr){
+				// 		latest = cur = image;
+				// 		latest_index = i;
+				// 		count = i + 1;
+				// 		return i;
+				// 	}
+				// }
+
+				// 将目标指针广播到整个AVX寄存器
+				const __m256i target = _mm256_set1_epi64x(std::bit_cast<int64_t>(image));
+				const __m256i zero = _mm256_setzero_si256();
+
+				for (std::uint32_t i = 0; i != maximum_images; i += 4) {
+					// 对齐加载4个指针
+					const auto vec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&images[i]));
+
+					// 检查是否与目标指针相等
+					const auto eq_mask = _mm256_cmpeq_epi64(vec, target);
+					const auto eq_bits = _mm256_movemask_epi8(eq_mask);
+
+					// 高效生成元素掩码（无分支）
+					const std::uint32_t eq_element_mask =
+						((eq_bits & 0x000000FF) == 0x000000FF) |
+						(((eq_bits & 0x0000FF00) == 0x0000FF00) << 1) |
+						(((eq_bits & 0x00FF0000) == 0x00FF0000) << 2) |
+						(((eq_bits & 0xFF000000) == 0xFF000000) << 3);
+
+					if (eq_element_mask) {
+						// 使用 C++20 位操作找到第一个匹配位置
+						const auto j = std::countr_zero(eq_element_mask);
 						latest = image;
-						latest_index = i;
-						return i;
+						latest_index = i + j;
+						return i + j;
 					}
 
-					if(cur == nullptr){
-						latest = cur = image;
-						latest_index = i;
-						count = i + 1;
-						return i;
+					// 检查空槽（nullptr）
+					const auto null_mask = _mm256_cmpeq_epi64(vec, zero);
+					const auto null_bits = _mm256_movemask_epi8(null_mask);
+
+					// 高效生成空槽掩码（无分支）
+					const std::uint32_t null_element_mask =
+						((null_bits & 0x000000FF) == 0x000000FF) |
+						(((null_bits & 0x0000FF00) == 0x0000FF00) << 1) |
+						(((null_bits & 0x00FF0000) == 0x00FF0000) << 2) |
+						(((null_bits & 0xFF000000) == 0xFF000000) << 3);
+
+					if (null_element_mask) {
+						// 使用 C++20 位操作找到第一个空槽位置
+						const auto j = std::countr_zero(null_element_mask);
+						images[i + j] = image;
+						latest = image;
+						latest_index = i + j;
+						count = i + j + 1;
+						return i + j;
 					}
 				}
 
@@ -235,17 +289,17 @@ namespace mo_yanxi::vk{
 				host_vertices = aligned_data{chunk_size, unit_size * 4};
 			}
 
-			void advance_and_reset() noexcept{
+			void FORCE_INLINE advance_and_reset() noexcept{
 				auto span = views.get();
 				last_image_count = span.size();
-				std::ranges::copy(span.begin(), span.end(), last_images.data());
+				std::ranges::copy(span, last_images.data());
 				views.clear();
 				vertex_group_count = 0;
 				identity = 0;
 				state = region_state::valid;
 			}
 
-			[[nodiscard]] bool is_image_compatitble() const noexcept{
+			[[nodiscard]] bool FORCE_INLINE is_image_compatitble() const noexcept{
 				auto span = views.get();
 				if(last_image_count < span.size())return false;
 
@@ -258,11 +312,11 @@ namespace mo_yanxi::vk{
 				return true;
 			}
 
-			[[nodiscard]] constexpr bool saturate(const std::size_t group_capacity) const noexcept{
+			[[nodiscard]] constexpr bool FORCE_INLINE saturate(const std::size_t group_capacity) const noexcept{
 				return vertex_group_count == group_capacity;
 			}
 
-			[[nodiscard]] constexpr batch_vertex_allocation acquire(
+			[[nodiscard]] FORCE_INLINE /*constexpr*/ batch_vertex_allocation acquire(
 				VkImageView image_view,
 				const std::uint32_t acquired_group_count,
 				const std::size_t unit_size,
@@ -289,7 +343,7 @@ namespace mo_yanxi::vk{
 				return rst;
 			}
 
-			[[nodiscard]] constexpr batch_vertex_allocation fast_acquire(
+			[[nodiscard]] FORCE_INLINE constexpr batch_vertex_allocation fast_acquire(
 				VkImageView image_view,
 				const std::uint32_t acquired_group_count,
 
@@ -326,11 +380,11 @@ namespace mo_yanxi::vk{
 		std::vector<draw_region> fan{};
 		circular_queue<draw_call> pending_draw_calls{};
 
-		draw_region& get_current() noexcept{
+		FORCE_INLINE draw_region& get_current() noexcept{
 			return fan[current_index];
 		}
 
-		draw_region* get_another() noexcept{
+		FORCE_INLINE draw_region* get_another() noexcept{
 			std::size_t idx = (current_index + 1) % vertex_chunk_count;
 			while(idx != current_index){
 				auto& region = fan[idx];
@@ -342,11 +396,11 @@ namespace mo_yanxi::vk{
 			return nullptr;
 		}
 
-		void advance_chunk() noexcept{
+		FORCE_INLINE void advance_chunk() noexcept{
 			current_index = (current_index + 1) % vertex_chunk_count;
 		}
 
-		void push_to_staging(const std::size_t index){
+		FORCE_INLINE void push_to_staging(const std::size_t index){
 			fan[index].state = region_state::frozen;
 
 			pending_draw_calls.push_back({
@@ -470,9 +524,10 @@ namespace mo_yanxi::vk{
 
 			auto& region = get_current();
 
-			consume_pending();
 			if(region.state == region_state::frozen){
 				consume_all();
+			}else{
+				if(pending_draw_calls.size() > pending_draw_calls.capacity() / 2)consume_pending();
 			}
 
 			auto pre_rst = region.acquire(image_view, vertex_group_count, vertex_unit_size, get_vertex_group_count_per_chunk());
@@ -480,7 +535,7 @@ namespace mo_yanxi::vk{
 			if(pre_rst.size_in_bytes == 0){
 				//Current run out of valid image regions
 				pend_current();
-				advance_chunk();
+				// advance_chunk();
 				pre_rst = get_current().acquire(image_view, vertex_group_count, vertex_unit_size, get_vertex_group_count_per_chunk());
 			}
 
@@ -496,7 +551,7 @@ namespace mo_yanxi::vk{
 				vertex_group_count -= pre_rst.get_vertex_group_count(vertex_unit_size);
 
 				pend_current();
-				advance_chunk();
+				// advance_chunk();
 
 				const auto post_rst = get_current().acquire(image_view, vertex_group_count, vertex_unit_size, get_vertex_group_count_per_chunk());
 
@@ -508,7 +563,7 @@ namespace mo_yanxi::vk{
 			}
 		}
 
-		void pend_current(){
+		FORCE_INLINE void pend_current(){
 			push_to_staging(current_index);
 			advance_chunk();
 		}
@@ -516,10 +571,19 @@ namespace mo_yanxi::vk{
 		void consume_pending(){
 			if(pending_draw_calls.empty())return;
 
+			static constexpr std::size_t submit_buffer_size{8};
 
-			//TODO ordered / unordered draw
-			while(!pending_draw_calls.empty()){
-				const auto draw_call = pending_draw_calls.front();
+			std::array<VkSubmitInfo2, submit_buffer_size> submit_infos{};
+			std::array<VkSemaphoreSubmitInfo, submit_buffer_size * 2> semaphore_submit_infos{};
+			std::array<VkCommandBufferSubmitInfo, submit_buffer_size> command_buffer_submit_infos{};
+			std::size_t submit_count{};
+
+			if(pending_draw_calls.size() > submit_buffer_size){
+				throw std::runtime_error("[Graphic] Too much draw calls");
+			}
+
+			for(std::size_t i = 0; i < pending_draw_calls.size(); i++){
+				const auto draw_call = pending_draw_calls[i];
 
 				auto& region = fan[draw_call.chunk_index];
 				const auto vertex_to_wait = region.device_vertex_semaphore_signal++;
@@ -540,7 +604,6 @@ namespace mo_yanxi::vk{
 
 
 				std::memcpy(mapped_data + draw_call.chunk_index * vertex_chunk_size, region.host_vertices.get(), size);
-				// std::memset(mapped_data + draw_call.chunk_index * vertex_chunk_size + size, 0, vertex_chunk_size - size);
 				vertex_buffer.flush(size, draw_call.chunk_index * vertex_chunk_size);
 
 
@@ -559,46 +622,52 @@ namespace mo_yanxi::vk{
 				{
 					const auto cmd = external_consumer(draw_call.chunk_index);
 
-					std::array toSignal{
-						VkSemaphoreSubmitInfo{
-							.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-							.semaphore = region.device_vertex_semaphore,
-							.value = region.device_vertex_semaphore_signal,
-							.stageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT
-						},
-						VkSemaphoreSubmitInfo{
-							.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+					semaphore_submit_infos[submit_count * 2] = VkSemaphoreSubmitInfo{
+						.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+						.semaphore = region.device_vertex_semaphore,
+						.value = region.device_vertex_semaphore_signal,
+						.stageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT
+					};
+
+					semaphore_submit_infos[submit_count * 2 + 1] = VkSemaphoreSubmitInfo{
+						.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
 							.semaphore = region.device_descriptor_semaphore,
 							.value = region.device_descriptor_semaphore_signal,
 							.stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
-						}
 					};
 
-					const VkCommandBufferSubmitInfo cmd_info{
+					command_buffer_submit_infos[submit_count] = VkCommandBufferSubmitInfo{
 						.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
 						.commandBuffer = cmd,
 					};
 
-					VkSubmitInfo2 submit_info{
+					submit_infos[submit_count++] = VkSubmitInfo2{
 						.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
 						.waitSemaphoreInfoCount = 0,
 						.pWaitSemaphoreInfos = nullptr,
 						.commandBufferInfoCount = 1,
-						.pCommandBufferInfos = &cmd_info,
-						.signalSemaphoreInfoCount = static_cast<std::uint32_t>(toSignal.size()),
-						.pSignalSemaphoreInfos = toSignal.data()
+						.pCommandBufferInfos = &command_buffer_submit_infos[submit_count],
+						.signalSemaphoreInfoCount = 2,
+						.pSignalSemaphoreInfos = &semaphore_submit_infos[submit_count * 2]
 					};
-
-					vkQueueSubmit2(context->graphic_queue(), 1, &submit_info, nullptr);
 				}
+			}
+
+			vkQueueSubmit2(context->graphic_queue(), submit_count, submit_infos.data(), nullptr);
+
+			for(std::size_t i = 0; i < pending_draw_calls.size(); i++){
+				const auto draw_call = pending_draw_calls[i];
+				auto& region = fan[draw_call.chunk_index];
+				const auto size = region.vertex_group_count * 4 * vertex_unit_size;
 
 				std::memset(region.host_vertices.get(), 0, size);
 				region.advance_and_reset();
-				pending_draw_calls.pop_front();
 			}
+
+			pending_draw_calls.clear();
 		}
 
-		void consume_all(){
+		FORCE_INLINE void consume_all(){
 			while(true){
 				const auto& cur = get_current();
 				if(cur.state == region_state::valid && cur.vertex_group_count){

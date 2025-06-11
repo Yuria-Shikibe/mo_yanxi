@@ -103,7 +103,11 @@ mo_yanxi::graphic::msdf::svg_info mo_yanxi::graphic::msdf::svg_to_shape(const ch
 			Contour& contour = shape.addContour();
 
 			for(const auto& [p1, p2, p3, p4] :
-				std::span<math::vec2>{reinterpret_cast<math::vec2*>(svgPath->pts), static_cast<std::size_t>(svgPath->npts)}
+				std::span{svgPath->pts, svgPath->npts * 2uz}
+				| std::views::adjacent<2> | std::views::stride(2) | std::views::transform([](auto&& p){
+					auto [x, y] = p;
+					return math::vec2{x, y};
+				})
 				| std::views::adjacent<4>
 				| std::views::stride(3)){
 				Point2 p1_(p1.x, svgImage->height - p1.y);

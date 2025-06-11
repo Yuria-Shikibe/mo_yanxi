@@ -176,7 +176,7 @@ namespace mo_yanxi::ui{
 	export
 	struct basic_group : public group {
 	protected:
-		std::vector<elem_ptr> toRemove{};
+		std::vector<elem_ptr> expired{};
 		std::vector<elem_ptr> children{};
 
 	public:
@@ -186,14 +186,14 @@ namespace mo_yanxi::ui{
 		}
 
 		virtual void clear_children() noexcept{
-			toRemove.clear();
+			expired.clear();
 			children.clear();
 			notify_layout_changed(spread_direction::super | spread_direction::from_content);
 		}
 
 		virtual void post_remove(elem* elem){
 			if(const auto itr = find(elem); itr != children.end()){
-				toRemove.push_back(std::move(*itr));
+				expired.push_back(std::move(*itr));
 				children.erase(itr);
 			}
 			notify_layout_changed(spread_direction::all_visible);
@@ -204,6 +204,14 @@ namespace mo_yanxi::ui{
 				children.erase(itr);
 			}
 			notify_layout_changed(spread_direction::all_visible);
+		}
+
+		virtual elem_ptr exchange_element(std::size_t where, elem_ptr&& elem){
+			assert(elem != nullptr);
+			if(where >= children.size())return {};
+
+			notify_layout_changed(spread_direction::all_visible);
+			return std::exchange(children[where], std::move(elem));
 		}
 
 		//TODO emplace
@@ -225,7 +233,7 @@ namespace mo_yanxi::ui{
 			requires std::is_base_of_v<elem, E>;
 		}
 		E& emplace_children_at(std::size_t index, Args&&... args){
-			auto& elem = add_children(elem_ptr{get_scene(), this, std::in_place_type<E>, std::forward<Args>(args) ...});
+			auto& elem = add_children(elem_ptr{get_scene(), this, std::in_place_type<E>, std::forward<Args>(args) ...}, index);
 			return static_cast<E&>(elem);
 		}
 
@@ -234,7 +242,7 @@ namespace mo_yanxi::ui{
 		}
 
 		void update(const float delta_in_ticks) override{
-			toRemove.clear();
+			expired.clear();
 
 			elem::update(delta_in_ticks);
 

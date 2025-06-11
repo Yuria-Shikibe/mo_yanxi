@@ -14,7 +14,7 @@ import mo_yanxi.math.vector2;
 
 namespace mo_yanxi::graphic::layers{
 
-	struct grid_drawer_data{
+	export struct grid_drawer_data{
 		math::vec2 chunk_size{};
 		math::vector2<std::int32_t> solid_spacing{};
 
@@ -23,8 +23,19 @@ namespace mo_yanxi::graphic::layers{
 
 		float line_width{};
 		float main_line_width{};
-		float line_spacing{};
-		float line_gap{};
+		float dash_line_spacing{};
+		float dash_line_gap{};
+	};
+
+	export grid_drawer_data default_grid_style{
+		.chunk_size = {128, 128},
+		.solid_spacing = {5, 5},
+		.line_color = colors::dark_gray,
+		.main_line_color = colors::pale_green.copy().mul_rgb(.66f),
+		.line_width = 4,
+		.main_line_width = 6,
+		.dash_line_spacing = 15,
+		.dash_line_gap = 5
 	};
 
 	export

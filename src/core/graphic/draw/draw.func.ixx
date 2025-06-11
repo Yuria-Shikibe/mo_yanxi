@@ -333,7 +333,7 @@ namespace mo_yanxi::graphic::draw{
 			const col color_scl_src = colors::white,
 			const col color_scl_dst = colors::white
 			){
-			const vec diff = (dst - src).sign().scl(stroke / 2.f);
+			const vec diff = (dst - src).sign_or_zero().scl(stroke / 2.f);
 
 			fill::fill(
 				param,
@@ -353,9 +353,9 @@ namespace mo_yanxi::graphic::draw{
 			const color color = colors::white){
 			acquirer_guard _{auto_param, 4};
 			line::line_ortho(auto_param[0], rect.vert_00(), rect.vert_01(), stroke, color, color);
-			line::line_ortho(auto_param[1], rect.vert_01(), rect.vert_11(), stroke, color, color);
+			line::line_ortho(auto_param[1], rect.vert_01().add_x(stroke), rect.vert_11().add_x(-stroke), stroke, color, color);
 			line::line_ortho(auto_param[2], rect.vert_11(), rect.vert_10(), stroke, color, color);
-			line::line_ortho(auto_param[3], rect.vert_10(), rect.vert_00(), stroke, color, color);
+			line::line_ortho(auto_param[3], rect.vert_10().add_x(-stroke), rect.vert_00().add_x(stroke), stroke, color, color);
 		}
 
 		export

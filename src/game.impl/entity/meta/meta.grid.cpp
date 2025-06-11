@@ -1,0 +1,78 @@
+module mo_yanxi.game.meta.grid;
+
+import mo_yanxi.game.ecs.component.hitbox;
+import mo_yanxi.ui.graphic;
+
+mo_yanxi::game::meta::chamber::grid::grid(const hitbox& hitbox){
+	auto bound = hitbox.get_bound();
+	bound.trunc_vert(tile_size).scl(1 / tile_size, 1 / tile_size);
+	extent = bound.size().round<unsigned>();
+	origin_coord = -bound.src.round<int>();
+
+
+	tiles.resize(extent.area());
+
+	auto bx = ccd_hitbox{hitbox};
+
+	auto hitboxContains = [&](math::frect region){
+		if(!region.overlap_exclusive(bx.min_wrap_bound()))return false;
+		for (auto && comp : bx.get_comps()){
+			if(comp.box.contains(region))return true;
+		}
+		return false;
+	};
+
+	for(unsigned x = 0; x < extent.x; ++x){
+		for(unsigned y = 0; y < extent.y; ++y){
+			math::vector2 pos{x, y};
+			auto& info = tile_at(pos);
+
+			if(hitboxContains(math::irect{tags::from_extent, pos.as<int>() - origin_coord, 1, 1}.as<float>().scl(tile_size, tile_size))){
+				info.placeable = true;
+			}
+		}
+	}
+}
+
+void mo_yanxi::game::meta::chamber::grid::draw(graphic::renderer_ui& renderer, const graphic::camera2& camera) const{
+	auto acquirer = ui::get_draw_acquirer(renderer);
+	using namespace graphic;
+	
+	acquirer.proj.set_layer(ui::draw_layers::base);
+	
+	auto region = get_grid_region().as<float>().scl(tile_size, tile_size);
+	const auto [w, h] = get_extent();
+
+	constexpr auto color = colors::gray.copy().set_a(.5f);
+
+	for(unsigned x = 0; x <= w; ++x){
+		static constexpr math::vec2 off{tile_size, 0};
+		draw::line::line_ortho(acquirer.get(), region.vert_00() + off * x, region.vert_01() + off * x, 4, color, color);
+	}
+
+	for(unsigned y = 0; y <= h; ++y){
+		static constexpr math::vec2 off{0, tile_size};
+		draw::line::line_ortho(acquirer.get(), region.vert_00() + off * y, region.vert_10() + off * y, 4, color, color);
+	}
+
+	acquirer.proj.set_layer(ui::draw_layers::def);
+	acquirer.proj.mode_flag = draw::mode_flags::slide_line;
+	auto off = get_origin_offset();
+	for(unsigned y = 0; y < h; ++y){
+		for(unsigned x = 0; x < w; ++x){
+			auto& info = (*this)[x, y];
+
+			if(info.is_idle()){
+				auto sz = math::irect{tags::from_extent, off.copy().add(x, y), 1, 1}.as<float>().scl(tile_size, tile_size);
+				draw::fill::rect_ortho(acquirer.get(), sz, colors::aqua.copy().set_a(.1f));
+			}else if (info.is_building_identity({x, y})){
+				acquirer.proj.mode_flag = {};
+
+				auto rg = info.building->get_indexed_region().as<int>().move(get_origin_offset()).as<float>().scl(tile_size, tile_size);
+				draw::line::rect_ortho(acquirer, rg, 4, colors::aqua.copy());
+				info.building->meta_info->draw(rg, renderer, camera);
+				acquirer.proj.mode_flag = draw::mode_flags::slide_line;
+			}
+		}
+	}
+}

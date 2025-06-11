@@ -7,8 +7,23 @@ export module mo_yanxi.basic_util;
 import std;
 
 namespace mo_yanxi{
+
 	export
-	template <typename T, std::predicate<std::ranges::range_value_t<T>&> Pred>
+	template<typename... Fs>
+	struct overload : private Fs... {
+		template <typename ...Args>
+		constexpr explicit(false) overload(Args&&... fs) : Fs{std::forward<Args>(fs)}... {}
+
+		using Fs::operator()...;
+	};
+
+	export
+	template<typename... Fs>
+	overload(Fs&&...) -> overload<std::decay_t<Fs>...>;
+
+
+	export
+	template <typename T, std::predicate<std::ranges::range_reference_t<T>> Pred>
 	constexpr void modifiable_erase_if(T& vec, Pred pred) noexcept(
 		std::is_nothrow_invocable_v<Pred, T&> && std::is_nothrow_move_assignable_v<T>
 		) {

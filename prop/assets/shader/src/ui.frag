@@ -11,6 +11,7 @@ layout(location = 1) flat in uvec4 in_indices;
 layout(location = 2) in vec2 in_uv;
 layout(location = 3) in vec4 in_color;
 layout(location = 4) flat in vec4 in_color_channel;
+layout(location = 5) in vec2 in_raw_pos;
 
 layout(location = 0) out vec4 out_color_base;
 layout(location = 1) out vec4 out_color_light;
@@ -26,16 +27,14 @@ void main() {
     vec4 texColor;
     const uint mode = in_indices.b;
 
-    float scale = get_ui_alpha_scale(ubo, mode, in_pos);
+    float scale = get_ui_alpha_scale(ubo, mode, in_pos, in_raw_pos);
 
     if(bool(mode & draw_mode_sdf)){
         float a = msdf(textures[in_indices[0]], in_uv, 1, bool(mode & draw_mode_uniformed));
         a = smoothstep(-0.0375 * ubo.inv_scale, 0.1 * ubo.inv_scale, a);
-//        if(a == 0)discard;
-
         texColor = vec4(1, 1, 1, a);
     }else{
-        texColor = texture(textures[in_indices[0]], in_uv);
+        texColor = in_indices[0] == 0xff ? vec4(1) :texture(textures[in_indices[0]], in_uv);
     }
 
     vec4 color = scale * texColor * in_color;

@@ -15,6 +15,20 @@ export namespace mo_yanxi{
 
 		std::array<V, base::arg_size> items{};
 
+		template <typename S, typename Fn>
+		void each(this S&& self, Fn fn){
+			[&]<std::size_t ...I>(std::index_sequence<I...>){
+				([&]<std::size_t Idx>(){
+					using T = typename base::template arg_at<Idx>;
+					if constexpr (std::invocable<Fn, std::in_place_type_t<T>, copy_qualifier_t<S&&, value_type>>){
+						std::invoke(fn, std::in_place_type<T>, std::forward_like<S>(self.items[I]));
+					}else if constexpr (std::invocable<Fn, copy_qualifier_t<S&&, value_type>>){
+						std::invoke(fn, std::forward_like<S>(self.items[I]));
+					}
+				}.template operator()<I>(), ...);
+			}(std::make_index_sequence<base::arg_size>{});
+		}
+
 		template <std::size_t I>
 		[[nodiscard]] constexpr auto& at() const noexcept{
 			static_assert(I < base::arg_size, "invalid index");

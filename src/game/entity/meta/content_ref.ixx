@@ -8,13 +8,18 @@ import std;
 
 namespace mo_yanxi::game::meta{
 
+	template <typename T>
+	concept named_content = requires(T& c, std::string_view sv){
+		{ c.name = sv } noexcept -> std::same_as<std::string_view&>;
+	};
+
 	export
 	template <typename T = void>
 	struct content_ref{
 		T* content;
 		std::string_view name;
 
-		constexpr T& operator*() const noexcept requires (!std::is_void_v<T>){
+		constexpr auto& operator*() const noexcept requires (!std::is_void_v<T>){
 			assert(content != nullptr);
 			return *content;
 		}
@@ -31,11 +36,11 @@ namespace mo_yanxi::game::meta{
 			return content_ref<const void>{ name, content};
 		}
 
-		explicit(false) constexpr operator content_ref<void>() const noexcept requires !std::is_const_v<T>{
+		explicit(false) constexpr operator content_ref<void>() const noexcept requires (!std::is_const_v<T>){
 			return content_ref<void>{ name, content};
 		}
 
-		explicit(false) constexpr operator content_ref<const T>() const noexcept{
+		explicit(false) constexpr operator content_ref<const T>() const noexcept requires (!std::is_void_v<T>){
 			return content_ref<const T>{ name, content};
 		}
 

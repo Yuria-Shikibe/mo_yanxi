@@ -6,6 +6,7 @@ export module mo_yanxi.game.ecs.component.chamber.turret;
 export import mo_yanxi.game.ecs.component.chamber;
 export import mo_yanxi.game.meta.content_ref;
 export import mo_yanxi.game.meta.projectile;
+export import mo_yanxi.game.meta.chamber;
 import mo_yanxi.math;
 
 namespace mo_yanxi::game::ecs{

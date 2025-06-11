@@ -47,7 +47,7 @@ namespace mo_yanxi::game::world{
 
 			void draw_content(const ui::rect clipSpace) const override;
 
-			ui::events::click_result on_click(const ui::events::click click_event) override;
+			ui::input_event::click_result on_click(const ui::input_event::click click_event) override;
 
 			void update(float delta_in_ticks) override{
 				manual_table::update(delta_in_ticks);

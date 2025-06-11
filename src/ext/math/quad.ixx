@@ -179,6 +179,25 @@ namespace mo_yanxi::math{
 			return self.overlap_rough(other) && self.overlap_exact(other);
 		}
 
+		template <typename S, any_derived_from<quad> O>
+		[[nodiscard]] FORCE_INLINE constexpr bool contains(this const S& self, const O& other) noexcept{
+			if(!self.get_bound().contains(other.get_bound()))return false;
+
+			for(int i = 0; i < 4; ++i){
+				if(!self.contains(other[i]))return false;
+			}
+			return true;
+		}
+		template <typename S>
+		[[nodiscard]] FORCE_INLINE constexpr bool contains(this const S& self, const rect_t& other) noexcept{
+			if(!self.get_bound().contains(other))return false;
+
+			for(int i = 0; i < 4; ++i){
+				if(!self.contains(other[i]))return false;
+			}
+			return true;
+		}
+
 		constexpr vec_t expand(const T length) noexcept{
 			auto center = avg();
 
@@ -415,14 +434,27 @@ namespace mo_yanxi::math{
 			}
 
 			bool oddNodes = false;
+			constexpr float epsilon = std::numeric_limits<value_type>::epsilon(); // 浮点容差
 
-			for(int i = 0; i < 4; ++i){
-				const auto vertice = this->operator[](i);
-				const auto lastVertice = this->operator[](i + 1);
-				if(
-					(vertice.y < point.y && lastVertice.y >= point.y) ||
-					(lastVertice.y < point.y && vertice.y >= point.y)){
-					if(vertice.x + (point.y - vertice.y) * (lastVertice - vertice).slope_inv() < point.x){
+			for (int i = 0; i < 4; ++i) {
+				const auto& v0 = this->operator[](i);
+				const auto& v1 = this->operator[](i + 1); // 确保 operator[] 支持循环访问
+
+				// 跳过水平边
+				if (std::abs(v1.y - v0.y) < epsilon) {
+					continue;
+				}
+
+				// 检查是否跨越 point.y
+				bool crosses = (v0.y <= point.y + epsilon && v1.y > point.y + epsilon) ||
+							   (v1.y <= point.y + epsilon && v0.y > point.y + epsilon);
+
+				if (crosses) {
+					// 计算交点 x
+					float t = (point.y - v0.y) / (v1.y - v0.y);
+					float intersect_x = v0.x + t * (v1.x - v0.x);
+
+					if (intersect_x < point.x + epsilon) {
 						oddNodes = !oddNodes;
 					}
 				}
@@ -677,7 +709,28 @@ namespace mo_yanxi::math{
 			}
 		}
 
+		void update(const math::trans2 transform, const rect_box_identity<T>& idt) noexcept{
+			typename base::value_type rot = transform.rot;
+			auto [cos, sin] = cos_sin(rot);
 
+			this->v0.set(idt.offset).rotate(cos, sin);
+			this->v1.set(idt.size.x, 0).rotate(cos, sin);
+			this->v3.set(0, idt.size.y).rotate(cos, sin);
+			this->v2 = this->v1 + this->v3;
+
+			normalU = this->v3;
+			normalV = this->v1;
+
+			normalU.normalize();
+			normalV.normalize();
+
+			this->v0 += transform.vec;
+			this->v1 += this->v0;
+			this->v2 += this->v0;
+			this->v3 += this->v0;
+
+			this->bounding_box = quad<float>::get_bound();
+		}
 	};
 
 	export
@@ -731,27 +784,10 @@ namespace mo_yanxi::math{
 			return size.length2() * (scale + lengthRadiusRatio) * mass;
 		}
 
+		void update(trans_t, const rect_box_identity&) = delete;
+
 		void update(const trans_t transform) noexcept{
-			value_type rot = transform.rot;
-			auto [cos, sin] = cos_sin(rot);
-
-			v0.set(offset).rotate(cos, sin);
-			v1.set(size.x, 0).rotate(cos, sin);
-			v3.set(0, size.y).rotate(cos, sin);
-			v2 = v1 + v3;
-
-			normalU = v3;
-			normalV = v1;
-
-			normalU.normalize();
-			normalV.normalize();
-
-			v0 += transform.vec;
-			v1 += v0;
-			v2 += v0;
-			v3 += v0;
-
-			bounding_box = quad<float>::get_bound();
+			rect_box::update(transform, static_cast<const rect_box_identity&>(*this));
 		}
 
 		[[nodiscard]] trans_t deduce_transform() const noexcept{

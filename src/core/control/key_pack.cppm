@@ -73,6 +73,14 @@ namespace mo_yanxi::core::ctrl{
 			return static_cast<int>(code & KeyMask);
 		}
 
+		[[nodiscard]] constexpr bool on_press() const noexcept{
+			return action() == act::press;
+		}
+
+		[[nodiscard]] constexpr bool on_release() const noexcept{
+			return action() == act::release;
+		}
+
 		[[nodiscard]] constexpr key_code_t action() const noexcept{
 			return static_cast<int>((code >> 16) & act::Mask);
 		}
@@ -81,10 +89,16 @@ namespace mo_yanxi::core::ctrl{
 			return static_cast<int>((code >> 24) & act::Mask);
 		}
 
-		[[nodiscard]] constexpr bool matched(const key_pack expected_state) const noexcept{
+		[[nodiscard]] constexpr bool matches(const key_pack expected_state) const noexcept{
 			auto [tk, ta, tm] = unpack();
 			auto [ok, oa, om] = expected_state.unpack();
 			return key::matched(tk, ok) && act::matched(ta, oa) && mode::matched(tm, om);
 		}
 	};
+
+
+	export constexpr inline key_pack lmb_click{mouse::LMB, act::release, mode::ignore};
+	export constexpr inline key_pack lmb_click_no_mode{mouse::LMB, act::release, mode::none};
+	export constexpr inline key_pack rmb_click{mouse::RMB, act::release, mode::ignore};
+	export constexpr inline key_pack rmb_click_no_mode{mouse::RMB, act::release, mode::none};
 }

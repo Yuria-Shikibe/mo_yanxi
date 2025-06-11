@@ -724,7 +724,7 @@ namespace mo_yanxi::ui::creation{
 				activated = get_file_selector().has_selected(path);
 			}
 
-			events::click_result on_click(const events::click click_event) override{
+			input_event::click_result on_click(const input_event::click click_event) override{
 				if(util::is_valid_release_click(*this, click_event)){
 					auto& menu = get_file_selector();
 					if(std::filesystem::is_directory(path)){
@@ -1119,10 +1119,10 @@ namespace mo_yanxi::ui::creation{
 				return std::invoke(checker, *this, *owner);
 			}
 
-			esc_flag on_esc() override{
-				dialog_notify_drop();
-				return esc_flag::intercept;
-			}
+			// esc_flag on_esc() override{
+			// 	dialog_notify_drop();
+			// 	return esc_flag::intercept;
+			// }
 		};
 
 

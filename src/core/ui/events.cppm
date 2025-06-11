@@ -35,7 +35,7 @@ namespace mo_yanxi::ui{
 		}
 	};
 
-	export namespace events{
+	export namespace input_event{
 		// template <typename T, typename Code = long long>
 		// struct ConnectionEvent final : ext::event_type{
 		// 	using TargetType = T;

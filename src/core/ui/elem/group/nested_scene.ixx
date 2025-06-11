@@ -195,7 +195,7 @@ namespace mo_yanxi::ui{
 		void post_remove(elem* element) override{
 			if(const auto itr = find(element); itr != children.end()){
 				removeElemProperty(*element);
-				toRemove.push_back(std::move(*itr));
+				expired.push_back(std::move(*itr));
 				children.erase(itr);
 			}
 
@@ -288,22 +288,22 @@ namespace mo_yanxi::ui{
 
 			camera_.flip_y = true;
 
-			register_event([](events::cursor_moved e, nested_scene& self){
+			register_event([](input_event::cursor_moved e, nested_scene& self){
 				auto p = self.getTransferredPos(self.get_scene()->cursor_pos);
 				self.scene_.on_cursor_pos_update(p);
 			});
 
-			register_event([](events::focus_begin e, nested_scene& self){
+			register_event([](input_event::focus_begin e, nested_scene& self){
 				self.get_scene()->set_camera_focus(&self.camera_);
 				self.set_focused_scroll(true);
 			});
 
-			register_event([](events::focus_end e, nested_scene& self){
+			register_event([](input_event::focus_end e, nested_scene& self){
 				self.get_scene()->set_camera_focus(nullptr);
 				self.set_focused_scroll(false);
 			});
 
-			register_event([](events::scroll e, nested_scene& self){
+			register_event([](input_event::scroll e, nested_scene& self){
 
 				if(self.scene_.has_scroll_focus()){
 					self.scene_.on_scroll(e.delta);
@@ -358,7 +358,7 @@ namespace mo_yanxi::ui{
 			return false;
 		}
 
-		events::click_result on_click(const events::click click_event) override{
+		input_event::click_result on_click(const input_event::click click_event) override{
 			elem::on_click(click_event);
 
 			auto [k, a, m] = click_event.unpack();
@@ -367,7 +367,7 @@ namespace mo_yanxi::ui{
 
 
 			if(drag_state_.has_value()){
-				if(a != act::release)return events::click_result::intercepted;
+				if(a != act::release)return input_event::click_result::intercepted;
 
 				auto cpos = getTransferredPos(click_event.pos);
 				drag_state_->drop(group_, cpos);
@@ -390,7 +390,7 @@ namespace mo_yanxi::ui{
 
 			if(!drag_state_.has_value())scene_.on_mouse_action(k, a, m);
 
-			return events::click_result::intercepted;
+			return input_event::click_result::intercepted;
 		}
 
 		void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{

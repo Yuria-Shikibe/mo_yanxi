@@ -25,16 +25,16 @@ namespace mo_yanxi{
 	}
 
 	void ui::cursor_states::register_default_cursor_events(elem_event_manager& event_manager){
-		event_manager.on<events::focus_begin>([](auto, elem& self){
+		event_manager.on<input_event::focus_begin>([](auto, elem& self){
 			self.cursor_state.focused = true;
 		});
 
-		event_manager.on<events::focus_end>([](auto, elem& self){
+		event_manager.on<input_event::focus_end>([](auto, elem& self){
 			self.cursor_state.focused = false;
 			// stagnateTime = focusedTime = 0.f;
 		});
 
-		event_manager.on<events::cursor_moved>([](auto, elem& self){
+		event_manager.on<input_event::cursor_moved>([](auto, elem& self){
 			self.cursor_state.time_stagnate = 0;
 			if(self.get_tooltip_prop().use_stagnate_time){
 				self.cursor_state.time_tooltip = 0.;
@@ -44,15 +44,15 @@ namespace mo_yanxi{
 	}
 
 	void ui::cursor_states::registerDefEvent(elem_event_manager& event_manager){
-		event_manager.on<events::focus_end>([](auto, elem& self){
+		event_manager.on<input_event::focus_end>([](auto, elem& self){
 			self.cursor_state.pressed = false;
 		});
 
-		event_manager.on<events::inbound>([](auto, elem& self){
+		event_manager.on<input_event::inbound>([](auto, elem& self){
 			self.cursor_state.inbound = true;
 		});
 
-		event_manager.on<events::exbound>([](auto, elem& self){
+		event_manager.on<input_event::exbound>([](auto, elem& self){
 			self.cursor_state.inbound = false;
 		});
 	}

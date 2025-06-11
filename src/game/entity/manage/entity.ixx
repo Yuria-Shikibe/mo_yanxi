@@ -250,8 +250,14 @@ namespace mo_yanxi::game::ecs{
 		template <typename T>
 		[[nodiscard]] T& at() const noexcept{
 #ifdef COMP_AT_CHECK
+
 			if(!archetype_){
 				std::println(std::cerr, "[FATAL ERROR] Illegal Access To Chunk<{}> on entity<{}> on empty archetype", typeid(T).name(), type().name());
+				std::terminate();
+			}
+
+			if(!is_inserted()){
+				std::println(std::cerr, "[FATAL ERROR] Illegal Access To Chunk<{}> on entity<{}> before insertion", typeid(T).name(), type().name());
 				std::terminate();
 			}
 #endif

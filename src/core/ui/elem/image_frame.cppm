@@ -31,7 +31,7 @@ namespace mo_yanxi::ui{
 		}
 
 		void add_collapser_image_swapper(){
-			spreadable_event_handler_on<events::collapser_state_changed>([](events::collapser_state_changed e, image_frame& self){
+			spreadable_event_handler_on<input_event::collapser_state_changed>([](input_event::collapser_state_changed e, image_frame& self){
 				self.current_frame_index = e.expanded;
 				return false;
 			});

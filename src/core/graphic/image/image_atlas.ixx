@@ -266,6 +266,8 @@ namespace mo_yanxi::graphic{
 		condition_variable_single queue_cond{};
 		std::vector<allocated_image_load_description> queue{};
 
+		std::atomic_flag loading{};
+
 		std::jthread working_thread{};
 
 		static void work_func(std::stop_token stop_token, async_image_loader& self){
@@ -282,10 +284,13 @@ namespace mo_yanxi::graphic{
 					dumped_queue = std::exchange(self.queue, {});
 				}
 
-				for (auto& queue : dumped_queue){
+				self.loading.test_and_set(std::memory_order::relaxed);
+				for (auto& desc : dumped_queue){
 					if(stop_token.stop_requested())break;
-					self.load(std::move(queue));
+					self.load(std::move(desc));
 				}
+				self.loading.clear(std::memory_order::release);
+				self.loading.notify_all();
 			}
 
 			self.fence_.wait();
@@ -317,6 +322,16 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] vk::context& context() const noexcept{
 			assert(context_);
 			return *context_;
+		}
+
+		void wait() const noexcept{
+			if(working_thread.joinable()){
+				loading.wait(true, std::memory_order::acquire);
+			}
+		}
+
+		[[nodiscard]] bool is_loading() const noexcept{
+			return loading.test(std::memory_order::acquire);
 		}
 
 		~async_image_loader(){
@@ -745,6 +760,14 @@ namespace mo_yanxi::graphic{
 		image_page& operator[](
 			const std::string_view name){
 			return pages.try_emplace(name, image_page{*async_image_loader_, DefaultTexturePageSize, {}, 4}).first->second;
+		}
+
+		void wait_load() const noexcept{
+			async_image_loader_->wait();
+		}
+
+		bool is_loading() const noexcept{
+			return async_image_loader_->is_loading();
 		}
 
 		void clean_unused() noexcept{

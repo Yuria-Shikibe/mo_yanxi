@@ -91,7 +91,7 @@ namespace mo_yanxi::ui{
 		constexpr friend bool operator==(const elem_ptr& lhs, const elem_ptr& rhs) noexcept = default;
 
 		constexpr bool operator==(std::nullptr_t) const noexcept{
-			return element != nullptr;
+			return element == nullptr;
 		}
 
 		elem_ptr(const elem_ptr& other) = delete;

@@ -161,7 +161,7 @@ namespace mo_yanxi::ui{
 			if(const auto itr = find(element); itr != children.end()){
 				cells.erase(cells.begin() + std::distance(children.begin(), itr));
 
-				toRemove.push_back(std::move(*itr));
+				expired.push_back(std::move(*itr));
 				children.erase(itr);
 			}
 			notify_layout_changed(spread_direction::all_visible);
@@ -208,13 +208,23 @@ namespace mo_yanxi::ui{
 		}
 
 		template <cell_creator Creator, std::derived_from<universal_group> G>
-		create_handle<typename Creator::elem_type, cell_type> create(this G& self, Creator init){
-			auto [result, adaptor] =
-				self.template add<typename Creator::elem_type>(elem_ptr{self.get_scene(), &self, std::in_place_type<typename Creator::elem_type>});
+		create_handle<typename std::remove_cvref_t<Creator>::elem_type, cell_type> create(this G& self, Creator&& init){
+			using ety = std::remove_cvref_t<Creator>::elem_type;
 
-			init(result.elem);
+			elem_ptr ptr{};
+			if constexpr (std::is_invocable_r_v<elem_ptr, Creator&&, scene*, group*>){
+				ptr = std::invoke(std::forward<Creator>(init), self.get_scene(), &self);
+			}else{
+				ptr = elem_ptr{self.get_scene(), &self, std::in_place_type<ety>};
+			}
 
-			if constexpr (std::invocable<Creator, decltype(result)>){
+			auto [result, adaptor] = self.template add<ety>(std::move(ptr));
+
+			if constexpr (std::invocable<Creator&&, ety&>){
+				init(result.elem);
+			}
+
+			if constexpr (std::invocable<Creator&&, decltype(result)>){
 				std::invoke(init, result);
 			}
 
@@ -232,6 +242,15 @@ namespace mo_yanxi::ui{
 		CellTy& get_last_cell() noexcept{
 			assert(!cells.empty());
 			return cells.back().cell;
+		}
+
+		elem_ptr exchange_element(std::size_t where, elem_ptr&& elem) override{
+			assert(elem != nullptr);
+			if(where >= children.size())return {};
+
+			notify_layout_changed(spread_direction::all_visible);
+			cells[where].element = elem.get();
+			return std::exchange(children[where], std::move(elem));
 		}
 
 	protected:

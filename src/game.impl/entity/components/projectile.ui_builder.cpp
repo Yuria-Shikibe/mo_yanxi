@@ -7,7 +7,7 @@ import mo_yanxi.game.ecs.entitiy_decleration;
 
 import mo_yanxi.graphic.draw;
 import mo_yanxi.ui.assets;
-import mo_yanxi.ui.creation.seperator_line;
+import mo_yanxi.ui.creation.generic;
 import mo_yanxi.ui.elem.text_elem;
 import mo_yanxi.ui.elem.image_frame;
 import mo_yanxi.ui.elem.progress_bar;

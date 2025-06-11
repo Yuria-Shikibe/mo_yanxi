@@ -14,6 +14,29 @@ export import mo_yanxi.tags;
 import mo_yanxi.math;
 
 namespace mo_yanxi::math{
+	export
+	template <typename T>
+	struct rect_ortho_trivial{
+	public:
+		using vec_t = vector2<T>;
+
+		vec_t src;
+		vec_t extent;
+
+		constexpr rect_ortho_trivial& flip() noexcept{
+			src += extent;
+			extent = -extent;
+			return *this;
+		}
+
+		constexpr vec_t get_abs_extent() const noexcept{
+			return extent.copy().to_abs();
+		}
+
+		constexpr static rect_ortho_trivial from_vert(vec_t begin, vec_t end) noexcept{
+			return rect_ortho_trivial{begin, end - begin};
+		}
+	};
 	/**
 	 * \brief width, height should be always non-negative.
 	 * \tparam T Arithmetic Type
@@ -578,15 +601,50 @@ namespace mo_yanxi::math{
 			this->set_height<T>(height);
 		}
 
-		template <std::integral N>
-		FORCE_INLINE rect_ortho<N> trunc() const noexcept{
-			return rect_ortho<N>{
-					math::trunc_right<N>(src.x), math::trunc_right<N>(src.y), math::trunc_right<N>(size_.x), math::trunc_right<N>(size_.y)
-				};
+		FORCE_INLINE constexpr rect_ortho& trunc() noexcept{
+			src.trunc();
+			size_.trunc();
+			return *this;
+		}
+
+		FORCE_INLINE constexpr rect_ortho& trunc(T step) noexcept{
+			src.trunc(step);
+			size_.trunc(step);
+			return *this;
+		}
+
+		FORCE_INLINE constexpr rect_ortho& trunc(const vector2<T>& step) noexcept{
+			src.trunc(step);
+			size_.trunc(step);
+			return *this;
+		}
+
+		FORCE_INLINE constexpr rect_ortho& trunc_vert() noexcept{
+			auto v00 = vert_00();
+			auto v11 = vert_11();
+			v00.trunc();
+			v11.trunc();
+			return this->set_vert(v00, v11);;
+		}
+
+		FORCE_INLINE constexpr rect_ortho& trunc_vert(T step) noexcept{
+			auto v00 = vert_00();
+			auto v11 = vert_11();
+			v00.trunc(step);
+			v11.trunc(step);
+			return this->set_vert(v00, v11);
+		}
+
+		FORCE_INLINE constexpr rect_ortho& trunc_vert(const vector2<T>& step) noexcept{
+			auto v00 = vert_00();
+			auto v11 = vert_11();
+			v00.trunc(step);
+			v11.trunc(step);
+			return this->set_vert(v00, v11);
 		}
 
 		template <std::integral N>
-		FORCE_INLINE rect_ortho<N> round() const noexcept{
+		[[nodiscard]] FORCE_INLINE rect_ortho<N> round() const noexcept{
 			return rect_ortho<N>{
 					math::round<N>(src.x), math::round<N>(src.y), math::round<N>(size_.x), math::round<N>(size_.y)
 				};
@@ -639,12 +697,12 @@ namespace mo_yanxi::math{
 			return src + size_;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr vec_t operator[](const unsigned i) const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr vec_t operator[](const std::integral auto i) const noexcept{
 			switch(i & 0b11){
-			case 0u : return vert_00();
-			case 1u : return vert_10();
-			case 2u : return vert_11();
-			case 3u : return vert_01();
+			case 0 : return vert_00();
+			case 1 : return vert_10();
+			case 2 : return vert_11();
+			case 3 : return vert_01();
 			default : std::unreachable();
 			}
 		}

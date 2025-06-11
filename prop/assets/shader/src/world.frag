@@ -58,7 +58,7 @@ bool is_alpha_valid(float a) {
 
 void main() {
     //    vec4 texColor = texture(texSampler[in_indices[0]], vec3(in_uv.xy, in_indices[1]));
-    vec4 texColor = texture(texSampler[in_indices[0]], in_uv);
+    vec4 texColor = in_indices[0] == 0xff ? vec4(1) : texture(texSampler[in_indices[0]], in_uv);
     float maxAlpha = texColor.a * (in_color_base.a + in_color_light.a);
     if (maxAlpha < 1.25 / 255.f)discard;
 

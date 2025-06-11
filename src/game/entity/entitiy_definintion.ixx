@@ -49,10 +49,12 @@ namespace mo_yanxi::game::ecs{
 			mf.hitbox.update(motion.trans);
 			comps.chamber::chamber_manifold::update_transform(motion.trans);
 
-			comps.hit_point = {
-				.max = 10000,
-				.cur = 10000,
-				.capability_range = {2000, 8000}
+			comps.hit_point = hit_point{
+				static_hit_point{
+					.max = 10000,
+					.capability_range = {2000, 8000}
+				},
+				10000,
 			};
 			// comps.faction = faction_0;
 

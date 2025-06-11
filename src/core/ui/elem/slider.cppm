@@ -70,7 +70,7 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] slider(scene* scene, group* group)
 			: elem(scene, group, "Slider"){
 
-			register_event([](const events::scroll& event, slider& self){
+			register_event([](const input_event::scroll& event, slider& self){
 
 				math::vec2 move = event.delta;
 
@@ -93,15 +93,15 @@ namespace mo_yanxi::ui{
 				self.applyLast();
 			});
 
-			register_event([](const events::drag& event, slider& self){
+			register_event([](const input_event::drag& event, slider& self){
 				self.moveBar(event.trans());
 			});
 
-			register_event([](const events::exbound& event, slider& self){
+			register_event([](const input_event::exbound& event, slider& self){
 				self.set_focused_scroll(false);
 			});
 
-			register_event([](const events::inbound& event, slider& self){
+			register_event([](const input_event::inbound& event, slider& self){
 				self.set_focused_scroll(true);
 			});
 
@@ -166,7 +166,7 @@ namespace mo_yanxi::ui{
 	protected:
 		void draw_content(rect clipSpace) const override;
 
-		events::click_result on_click(const events::click click_event) override{
+		input_event::click_result on_click(const input_event::click click_event) override{
 			elem::on_click(click_event);
 
 			const auto [key, action, mode] = click_event.unpack();
@@ -189,7 +189,7 @@ namespace mo_yanxi::ui{
 			default : break;
 			}
 
-			return events::click_result::intercepted;
+			return input_event::click_result::intercepted;
 		}
 
 	public:

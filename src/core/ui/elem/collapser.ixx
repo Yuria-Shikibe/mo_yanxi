@@ -48,11 +48,11 @@ namespace mo_yanxi::ui{
 			content_->update_abs_src(content_src_pos().add_y(head_->property.get_size().y + pad));
 		}
 
-		void collapse(const events::click e){
+		void collapse(const input_event::click e){
 			if(e.code.action() != core::ctrl::act::release)return;
 
 			expanded = !expanded;
-			fire_event(events::collapser_state_changed{expanded}, spread_direction::child, true);
+			fire_event(input_event::collapser_state_changed{expanded}, spread_direction::child, true);
 		}
 
 	public:
@@ -75,14 +75,14 @@ namespace mo_yanxi::ui{
 
 			set_fillparent();
 
-			head().set_button_callback(button_tags::general, [](const events::click e, const head_type& self){
+			head().set_button_callback(button_tags::general, [](const input_event::click e, const head_type& self){
 				static_cast<collapser&>(*self.get_parent()).collapse(e);
 			});
 
 		}
 
 		auto get_collapse_func() noexcept{
-			return [this](const events::click e){
+			return [this](const input_event::click e){
 				collapse(e);
 			};
 		}

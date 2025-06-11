@@ -24,6 +24,8 @@ namespace mo_yanxi::ui{
 
 		float scale{1.f};
 		bool text_expired{false};
+		bool fit{};
+
 	public:
 		align::pos text_entire_align{align::pos::top_left};
 
@@ -63,6 +65,19 @@ namespace mo_yanxi::ui{
 
 		void set_policy(font::typesetting::layout_policy policy){
 			if(glyph_layout.set_policy(policy)){
+				if(policy != font::typesetting::layout_policy::reserve)fit = false;
+				text_expired = true;
+				mark_independent_layout_changed();
+			}
+		}
+
+		void set_fit(){
+			if(!fit){
+				set_policy(font::typesetting::layout_policy::reserve);
+				glyph_layout.set_clamp_size(math::vectors::constant2<float>::inf_positive_vec2);
+
+				fit = true;
+
 				text_expired = true;
 				mark_independent_layout_changed();
 			}
@@ -121,24 +136,43 @@ namespace mo_yanxi::ui{
 		}
 
 		math::vec2 layout_text(math::vec2 bound){
-			//TODO loose the relayout requirement
-			if(text_expired){
-				glyph_layout.set_clamp_size(bound);
-				glyph_layout.clear();
-				parser->operator()(glyph_layout, scale);
-				text_expired = false;
-			}else{
-				if(glyph_layout.get_clamp_size() != bound){
-					glyph_layout.set_clamp_size(bound);
-					if(!glyph_layout.extent().equals(bound)){
-						glyph_layout.clear();
-					}
-					if(glyph_layout.empty()){
-						parser->operator()(glyph_layout, scale);
-					}
+			if(fit){
+				if(text_expired){
+					glyph_layout.clear();
+					parser->operator()(glyph_layout, scale);
+					text_expired = false;
+				}
 
+				const auto sz = glyph_layout.extent();
+				const auto scaled = align::get_fit_embed_scale(sz, bound.copy().max({1, 1}));
+				glyph_layout.scale(scaled);
+
+				auto [w, h] = glyph_layout.extent();
+				math::vec2 rst{
+					std::isfinite(bound.x) ? bound.x : w,
+					std::isfinite(bound.y) ? bound.y : h
+				};
+				return rst;
+			}else{
+				//TODO loose the relayout requirement
+				if(text_expired){
+					glyph_layout.set_clamp_size(bound);
+					glyph_layout.clear();
+					parser->operator()(glyph_layout, scale);
+					text_expired = false;
+				}else{
+					if(glyph_layout.get_clamp_size() != bound){
+						glyph_layout.set_clamp_size(bound);
+						if(!glyph_layout.extent().equals(bound)){
+							glyph_layout.clear();
+						}
+						if(glyph_layout.empty()){
+							parser->operator()(glyph_layout, scale);
+						}
+					}
 				}
 			}
+
 
 			return glyph_layout.extent();
 		}

@@ -20,7 +20,7 @@ namespace mo_yanxi::math {
 	export constexpr inline std::array ZERO_ONE{ 0, 1 };
 	export constexpr inline std::array BOOLEANS{ true, false };
 
-	export constexpr double inline FLOATING_ROUNDING_ERROR = 0.000001;
+	export constexpr double inline FLOATING_ROUNDING_ERROR = std::numeric_limits<float>::epsilon();
 	export constexpr float inline pi                   = std::numbers::pi_v<float>;
 
 
@@ -649,7 +649,7 @@ namespace mo_yanxi::math {
 	 */
 	export
 	template <std::integral T = int>
-	MATH_ATTR constexpr T trunc_right(const float value) noexcept {
+	[[deprecated]] MATH_ATTR constexpr T trunc_right(const float value) noexcept {
 		T val = static_cast<T>(value);
 		if constexpr (mo_yanxi::signed_number<T>){
 			if(value < 0)--val;
@@ -657,6 +657,29 @@ namespace mo_yanxi::math {
 
 		return val;
 	}
+
+	export
+	template <number T>
+	MATH_ATTR constexpr T trunc(T value, T step) noexcept{
+		if (step == 0) [[unlikely]] return value;
+
+		if constexpr (std::floating_point<T>){
+			return std::trunc(value / step) * step;
+		}else{
+			return (value / step) * step;
+		}
+	}
+
+	export
+	template <number T>
+	MATH_ATTR constexpr T trunc(T value) noexcept{
+		if constexpr (std::floating_point<T>){
+			return std::trunc(value);
+		}else{
+			return value;
+		}
+	}
+
 
 	/**
 	 * Returns the smallest integer greater than or equal to the specified float. This method will only properly ceil floats from
@@ -709,7 +732,12 @@ namespace mo_yanxi::math {
 	export
 	template <mo_yanxi::number T>
 	MATH_ATTR T round(const T num, const T step) {
-		return static_cast<T>(std::lround(std::round(static_cast<float>(num) / static_cast<float>(step)) * static_cast<float>(step)));
+		if constexpr (std::floating_point<T>){
+			return static_cast<T>(std::round(num / step) * step);
+		}else{
+			return static_cast<T>(std::lround(std::round(static_cast<float>(num) / static_cast<float>(step)) * static_cast<float>(step)));
+		}
+
 	}
 
 	/**

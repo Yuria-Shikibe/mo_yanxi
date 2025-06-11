@@ -8,6 +8,7 @@ export import mo_yanxi.game.meta.content_ref;
 import mo_yanxi.flat_seq_map;
 import mo_yanxi.heterogeneous;
 import mo_yanxi.heterogeneous.open_addr_hash;
+import mo_yanxi.meta_programming;
 import std;
 
 namespace mo_yanxi::game::meta{
@@ -15,17 +16,33 @@ namespace mo_yanxi::game::meta{
 		using std::runtime_error::runtime_error;
 	};
 
+	template <typename T>
+	void try_set_name(std::string_view name, T& content) noexcept {
+		if constexpr (requires(T& c){
+			{ c.name = name } noexcept -> std::same_as<std::string_view&>;
+		}){
+			content.name = name;
+		}
+	}
+
+
+	export
+	struct content_manager;
+
 	struct content_registry_base{
 	private:
 		bool frozen{};
-		// content_tag tag_;
+
 		std::type_index dst_type_index;
 
+		friend content_manager;
 
 	protected:
 		[[nodiscard]] explicit content_registry_base(const std::type_index& dst_type_index) :
 			dst_type_index(dst_type_index){
 		}
+
+		virtual void update_name() noexcept = 0;
 
 
 	public:
@@ -59,11 +76,26 @@ namespace mo_yanxi::game::meta{
 		using cont_type = flat_seq_map<std::string, content_type, mo_yanxi::transparent::string_comparator_of<std::less>>;
 
 	private:
+		friend content_manager;
 		cont_type contents{};
+
+		void update_name() noexcept override{
+			contents.each([](const std::string& name, content_type& value){
+				meta::try_set_name(name, value);
+			});
+		}
 
 	public:
 		[[nodiscard]] explicit content_registry()
-			: content_registry_base(typeid(T)){
+			: content_registry_base(typeid(content_type)){
+		}
+
+		[[nodiscard]] auto get_values() noexcept{
+			return contents.get_values();
+		}
+
+		[[nodiscard]] auto get_values() const noexcept{
+			return contents.get_values();
 		}
 
 		content_type& add(std::string_view name, content_type&& content){
@@ -78,9 +110,22 @@ namespace mo_yanxi::game::meta{
 			return itr->value;
 		}
 
+		template <typename ...Args>
+		content_type& emplace(std::string_view name, Args&& ...args){
+			if(is_frozen()){
+				throw content_add_error{"add content after frozen may cause dangling"};
+			}
+
+			auto [itr, suc] = contents.insert_unique(name, std::forward<Args>(args) ...);
+			if(!suc){
+				throw content_add_error{std::format("duplicated content name: {}", name)};
+			}
+			return itr->value;
+		}
+
 		content_ref<void> find(std::string_view name) override{
 			if(auto rst = find_raw(name)){
-				return {name, rst};
+				return {rst, name};
 			}else{
 				return {};
 			}
@@ -96,29 +141,47 @@ namespace mo_yanxi::game::meta{
 
 	};
 
-	export
+
+
 	struct content_manager{
 	private:
 		using map = type_fixed_hash_map<std::unique_ptr<content_registry_base>>;
 		map contents{};
+		string_open_addr_hash_map<void*> name_map{};
 
 	public:
 
 		void freeze() const noexcept{
 			for (const auto& ty : contents | std::views::values){
 				ty->set_frozen(true);
+				ty->update_name();
 			}
 		}
+
+		template <typename ContentTy, typename ...Args>
+			requires std::constructible_from<ContentTy, Args...>
+		ContentTy& emplace(std::string_view name, Args&& ...args){
+			if(name_map.contains(name)){
+				throw content_add_error{std::format("duplicated content name: {}", name)};
+			}
+
+			ContentTy* ty;
+			if(const auto it = contents.find(typeid(ContentTy)); it != contents.end()){
+				ty = std::addressof(static_cast<content_registry<ContentTy>*>(it->second.get())->emplace(name, std::forward<Args>(args) ...));
+			}
+
+			content_registry<ContentTy>& chunk = register_type<std::remove_cvref_t<ContentTy>>();
+			ty = std::addressof(chunk.emplace(name, std::forward<Args>(args) ...));
+			name_map.try_emplace(name, ty);
+			return *ty;
+		}
+
 
 		template <typename ContentTy>
 		std::remove_cvref_t<ContentTy>& add(std::string_view name, ContentTy&& content){
-			if(auto it = contents.find(typeid(ContentTy)); it != contents.end()){
-				return static_cast<content_registry<std::remove_cvref_t<ContentTy>>>(it->second.get())->add(name, std::forward<ContentTy>(content));
-			}
-
-			auto& chunk = register_type<ContentTy>();
-			return chunk.add(name, std::forward<ContentTy>(content));
+			return this->emplace<ContentTy>(name, std::forward<ContentTy>(content));
 		}
+
 
 		template <typename T>
 		content_registry<T>& register_type(){
@@ -127,8 +190,21 @@ namespace mo_yanxi::game::meta{
 
 				throw content_add_error{std::format("Duplicated content on type", typeid(T).name())};
 			}else{
-				return itr->second;
+				return static_cast<content_registry<T>&>(*itr->second);
 			}
+		}
+
+		template <typename T>
+		content_registry<T>& at_type() const {
+			return static_cast<content_registry<T>&>(*contents.at(typeid(T)));
+		}
+
+		[[nodiscard]] const void* find(std::string_view name) const noexcept{
+			return name_map.try_find(name);
+		}
+
+		[[nodiscard]] void* find(std::string_view name) noexcept{
+			return name_map.try_find(name);
 		}
 
 		template <typename T>
@@ -139,6 +215,26 @@ namespace mo_yanxi::game::meta{
 			}
 
 			return nullptr;
+		}
+
+
+		template <typename TargetGroup, typename Fn>
+			requires (is_tuple_v<TargetGroup>)
+		void each_content(Fn fn) const{
+			using groups = TargetGroup;
+
+			[&] <std::size_t... I>(std::index_sequence<I...>){
+				([&]<std::size_t Idx>(){
+					using Ty = std::tuple_element_t<Idx, groups>;
+					if(const auto itr = contents.find(typeid(Ty)); itr != contents.end()){
+						meta::content_registry<Ty>& g = static_cast<meta::content_registry<Ty>&>(*itr->second);
+						for(Ty& v : g.get_values()){
+							std::invoke(fn, v);
+						}
+					}
+
+				}.template operator()<I>(), ...);
+			}(std::make_index_sequence<std::tuple_size_v<groups>>{});
 		}
 	};
 }

@@ -84,7 +84,9 @@ namespace mo_yanxi::ui{
 	private:
 		friend scene;
 
-		std::vector<dialog> dialogs{};
+		using container = std::vector<dialog>;
+
+		container dialogs{};
 		std::vector<dialog_fading> fading_dialogs{};
 		std::vector<elem*> draw_sequence{};
 
@@ -94,7 +96,7 @@ namespace mo_yanxi::ui{
 		template <invocable_elem_init_func Fn>
 		typename elem_init_func_trait<Fn>::elem_type& create(dialog_layout layout, Fn fn){
 			dialog& dlg = dialogs.emplace_back(dialog{elem_ptr{scene_, nullptr, std::move(fn)}, layout});
-			top_ = dlg.elem.get();
+			update_top();
 			draw_sequence.push_back(top());
 			return static_cast<typename elem_init_func_trait<Fn>::elem_type&>(dlg.elem.operator*());
 		}
@@ -104,7 +106,7 @@ namespace mo_yanxi::ui{
 		T& emplace(dialog_layout layout, Args&&... args){
 			clear_tooltip();
 			dialog& dlg = dialogs.emplace_back(dialog{elem_ptr{scene_, nullptr, std::in_place_type<T>, std::forward<Args>(args) ...}, layout});
-			top_ = dlg.elem.get();
+			update_top();
 			draw_sequence.push_back(top());
 			return static_cast<T&>(dlg.elem.operator*());
 		}
@@ -126,18 +128,22 @@ namespace mo_yanxi::ui{
 
 		void truncate(const elem* elem){
 			if(auto itr = std::ranges::find(dialogs, elem, &dialog::get); itr != dialogs.end()){
-				std::ranges::subrange rng{itr, dialogs.end()};
-				for (const auto & dialog : rng){
-					dialog.elem->clear_external_references_recursively();
-				}
-				std::ranges::move(
-					rng | std::views::transform([](auto&& v){
-						return dialog_fading{std::move(v)};
-					}), std::back_inserter(fading_dialogs));
-
-				dialogs.erase(itr, dialogs.end());
-				update_top();
+				truncate(itr);
 			}
+		}
+
+		void truncate(container::iterator where){
+			std::ranges::subrange rng{where, dialogs.end()};
+			for (const auto & dialog : rng){
+				dialog.elem->clear_external_references_recursively();
+			}
+			std::ranges::move(
+				rng | std::views::transform([](auto&& v){
+					return dialog_fading{std::move(v)};
+				}), std::back_inserter(fading_dialogs));
+
+			dialogs.erase(where, dialogs.end());
+			update_top();
 		}
 
 		void draw_all(rect clipspace) const;
@@ -151,14 +157,9 @@ namespace mo_yanxi::ui{
 	private:
 		void clear_tooltip() const;
 
-		void update_top() noexcept{
-			if(dialogs.empty()){
-				top_ = nullptr;
-			}else{
-				top_ = dialogs.back().elem.get();
-			}
+		void update_top() noexcept;
 
-		}
+		esc_flag on_esc() noexcept;
 	};
 
 }

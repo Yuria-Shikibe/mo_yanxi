@@ -16,7 +16,7 @@ namespace mo_yanxi::ui{
 
 		static constexpr float VelocitySensitivity = 0.95f;
 		static constexpr float VelocityDragSensitivity = 0.15f;
-		static constexpr float VelocityScale = 20.f;
+		static constexpr float VelocityScale = 55.f;
 
 	private:
 		float scroll_bar_stroke_{20.0f};
@@ -30,6 +30,16 @@ namespace mo_yanxi::ui{
 		bool bar_caps_size{true};
 
 	public:
+
+		template <std::derived_from<elem> T = elem>
+		[[nodiscard]] T& get_item() const noexcept{
+			return dynamic_cast<T&>(*item);
+		}
+
+		template <std::derived_from<elem> T = elem>
+		[[nodiscard]] T& get_item_unchecked() const noexcept{
+			return static_cast<T&>(*item);
+		}
 
 		[[nodiscard]] std::span<const elem_ptr> get_children() const noexcept override{
 			return item ? std::span{&item, 1} : std::span{static_cast<const elem_ptr*>(nullptr), 0};
@@ -47,7 +57,7 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] scroll_pane(scene* scene, group* group)
 			: group(scene, group, "scroll_pane"){
 
-			events().on<events::drag>([](const events::drag& e, elem& el){
+			events().on<input_event::drag>([](const input_event::drag& e, elem& el){
 				auto& self = static_cast<scroll_pane&>(el);
 
 				self.scrollTargetVelocity = self.scrollVelocity = {};
@@ -66,32 +76,19 @@ namespace mo_yanxi::ui{
 					self.updateChildrenAbsSrc();
 				}
 			});
-			//
-			events().on<events::scroll>([](const events::scroll& e, elem& el){
-				auto& self = static_cast<scroll_pane&>(el);
 
-				auto cmp = -e.delta;
-
-				if(e.mode & core::ctrl::mode::shift){
-					cmp.swap_xy();
-				}
-
-				self.scrollTargetVelocity = cmp * self.get_vel_clamp();
-
-				self.scrollVelocity = self.scrollTargetVelocity.scl(VelocityScale);
-			});
-			//
-			events().on<events::inbound>([](const auto& e, elem& el){
+			events().on<input_event::inbound>([](const auto& e, elem& el){
 				el.set_focused_scroll(true);
 			});
 
-			events().on<events::exbound>([](const auto& e, elem& el){
+			events().on<input_event::exbound>([](const auto& e, elem& el){
 				el.set_focused_scroll(false);
 			});
 
 			property.maintain_focus_until_mouse_drop = true;
 		}
 
+	protected:
 		void update(const float delta_in_ticks) override{
 			elem::update(delta_in_ticks);
 
@@ -125,8 +122,9 @@ namespace mo_yanxi::ui{
 		void layout() override{
 			group::layout();
 		}
+	public:
 
-		template <math::vector2<bool> fillParent = {true, false}, elem_init_func Fn>
+		template </*math::vector2<bool> fillParent = {true, false}, */elem_init_func Fn>
 		typename elem_init_func_trait<Fn>::elem_type& set_elem(Fn&& init){
 			this->item = elem_ptr{get_scene(), this, [&](typename elem_init_func_trait<Fn>::elem_type& e){
 
@@ -154,8 +152,41 @@ namespace mo_yanxi::ui{
 			}
 		}
 
+
+		bool resize(const math::vec2 size) override{
+			if(elem::resize(size)){
+				update_item_layout();
+
+				return true;
+			}
+
+			return false;
+		}
+
+		[[nodiscard]] float get_scroll_bar_stroke() const{
+			return scroll_bar_stroke_;
+		}
+
+		void set_scroll_bar_stroke(const float scroll_bar_stroke){
+			scroll_bar_stroke_ = scroll_bar_stroke;
+			mark_independent_layout_changed();
+		}
+
 	private:
-		events::click_result on_click(const events::click click_event) override{
+		void on_scroll(const input_event::scroll e) override{
+
+			auto cmp = -e.delta;
+
+			if((e.mode & core::ctrl::mode::shift) || (enable_hori_scroll() && !enable_vert_scroll())){
+				cmp.swap_xy();
+			}
+
+			scrollTargetVelocity = cmp * get_vel_clamp();
+
+			scrollVelocity = scrollTargetVelocity.scl(VelocityScale);
+		}
+
+		input_event::click_result on_click(const input_event::click click_event) override{
 			if(click_event.code.action() == core::ctrl::act::release){
 				scroll.apply();
 			}
@@ -178,60 +209,7 @@ namespace mo_yanxi::ui{
 			update_item_layout();
 		}
 
-		bool resize(const math::vec2 size) override{
-			if(elem::resize(size)){
-				update_item_layout();
-
-				return true;
-			}
-
-			return false;
-		}
-
-		void update_item_layout(){
-			if(!item)return;
-
-			modifyChildren(*item);
-			setChildrenFillParentSize_Quiet_legacy(*item, content_size());
-
-			auto bound = item->context_size_restriction;
-
-			if(auto sz = item->pre_acquire_size(bound)){
-
-				if(bar_caps_size){
-					bool need_relayout = false;
-					switch(layout_policy_){
-					case layout_policy::hori_major :{
-						if(sz->y > property.content_height()){
-							bound.width.value -= scroll_bar_stroke_;
-							bound.width.value = math::clamp_positive(bound.width.value);
-							need_relayout = true;
-						}
-						break;
-					}
-					case layout_policy::vert_major :{
-						if(sz->x > property.content_width()){
-							bound.height.value -= scroll_bar_stroke_;
-							bound.height.value = math::clamp_positive(bound.height.value);
-							need_relayout = true;
-						}
-						break;
-					}
-					default: break;
-					}
-
-					if(need_relayout){
-						auto s = item->pre_acquire_size(bound);
-						if(s) sz = s;
-					}
-				}
-
-				item->resize_masked(*sz, spread_direction::local | spread_direction::child);
-			}
-
-			// setChildrenFillParentSize_Quiet(*item, get_viewport_size());
-			item->layout();
-		}
+		void update_item_layout();
 
 		void modifyChildren(elem& element) const{
 			element.context_size_restriction = extent_by_external;

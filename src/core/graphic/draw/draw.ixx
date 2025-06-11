@@ -158,13 +158,14 @@ namespace mo_yanxi::graphic::draw{
 		typename range_type::iterator current{};
 		typename range_type::sentinel sentinel{};
 
+
+	public:
 		void acquire(const std::size_t group_count) noexcept{
 			rng = range_type{batch->acquire(group_count, this->region.view)};
 			current = rng.begin();
 			sentinel = rng.end();
 		}
 
-	public:
 		[[nodiscard]] explicit auto_batch_acquirer(vk::batch& batch)
 			: batch(&batch){
 		}
@@ -267,7 +268,7 @@ namespace mo_yanxi::graphic::draw{
 	export
 	using ui_acquirer = auto_batch_acquirer<vk::vertices::vertex_ui, uniformed_rect_uv, mode_bit_proj>;
 
-	export inline image_rect_region white_region{};
+	export constexpr inline image_rect_region white_region{{}, nullptr};
 
 	export
 	template <typename Acq>

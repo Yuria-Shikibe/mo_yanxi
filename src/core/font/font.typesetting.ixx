@@ -156,6 +156,12 @@ namespace mo_yanxi::font::typesetting{
 			ascender = math::max(ascender, region.ascender);
 			descender = math::max(descender, region.descender);
 		}
+
+		constexpr void scale(float scale) noexcept{
+			ascender *= scale;
+			descender *= scale;
+			width *= scale;
+		}
 	};
 
 	export inline font_manager* default_font_manager{};
@@ -421,6 +427,15 @@ namespace mo_yanxi::font::typesetting{
 			layout_rect bound{};
 			row_type glyphs{};
 
+			void scale(float scale) noexcept{
+				src *= scale;
+				bound.scale(scale);
+				for (auto& glyph : glyphs){
+					glyph.correct_scale *= scale; //?
+					glyph.region.scl(scale, scale);
+				}
+			}
+
 			[[nodiscard]] math::frect getRectBound() const noexcept{
 				return {src.x, src.y - bound.ascender, bound.width, bound.height()};
 			}
@@ -495,6 +510,13 @@ namespace mo_yanxi::font::typesetting{
 			clip = false;
 		}
 
+		void scale(float scale) noexcept{
+			if(scale == 1.0f) [[unlikely]] return;
+			captured_size *= scale;
+			for (auto && element : elements){
+				element.scale(scale);
+			}
+		}
 
 		[[nodiscard]] glyph_layout() = default;
 

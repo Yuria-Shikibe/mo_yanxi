@@ -65,10 +65,11 @@ target("mo_yanxi")
 
     add_cxflags("/Zc:__cplusplus")
     add_cxflags("/FC")
-    add_cxflags("/arch:AVX")
+    --add_cxflags("/arch:AVX")
     add_cxflags("/arch:AVX2")
 
     add_cxflags("/wd4244")
+    add_cxflags("/wd4102")
     add_cxflags("/wd4100")
     add_cxflags("/wd4458")
     add_cxflags("/wd4267")

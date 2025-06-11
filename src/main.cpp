@@ -90,6 +90,7 @@ import mo_yanxi.ui.elem.check_box;
 import mo_yanxi.ui.elem.nested_scene;
 import mo_yanxi.ui.creation.file_selector;
 import mo_yanxi.ui.assets;
+import mo_yanxi.ui.menu;
 
 import mo_yanxi.game.graphic.effect;
 import mo_yanxi.game.world.graphic;
@@ -120,9 +121,11 @@ import mo_yanxi.game.ecs.component.chamber.radar;
 import mo_yanxi.game.ecs.component.chamber.turret;
 
 import mo_yanxi.game.meta.instancing;
+import mo_yanxi.game.content;
 
 
 import mo_yanxi.game.ui.hitbox_editor;
+import mo_yanxi.game.ui.grid_editor;
 
 import test;
 import hive;
@@ -187,11 +190,32 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 		pane.cell().margin.set(4);
 	}
 
+	// {
+	// 	auto pane = bed.emplace<ui::menu>();
+	// 	pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.9f, 1.f}};
+	// 	pane.cell().align = align::pos::center_right;
+	// 	pane.cell().margin.set(4);
+	//
+	// 	for(int i = 0; i < 10; ++i){
+	// 		auto rst = pane->add_elem<ui::label, ui::label>();
+	// 		rst.button->set_scale(.5f);
+	// 		rst.button->set_text(std::format("menu {}", i));
+	// 		rst.button->text_entire_align = align::pos::center_left;
+	// 		rst.button.cell().set_width(600);
+	//
+	// 		rst.elem.set_scale(.5f);
+	// 		rst.elem.set_text(std::format("content: {}", i));
+	// 		rst.elem.text_entire_align = align::pos::center;
+	//
+	// 	}
+	//
+	// }
 	{
-		auto pane = bed.emplace<game::ui::hit_box_editor>();
+		auto pane = bed.emplace<game::ui::grid_editor>();
 		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.9f, 1.f}};
 		pane.cell().align = align::pos::center_right;
 		pane.cell().margin.set(4);
+
 	}
 
 
@@ -364,14 +388,7 @@ void main_loop(){
 	auto& merger = core::global::graphic::merger;
 
 	auto& g = renderer_ui.batch.emplace_batch_layer<graphic::layers::grid_drawer>();
-	g.data.current.chunk_size.set(100);
-	g.data.current.solid_spacing.set(5);
-	g.data.current.line_width = 3;
-	g.data.current.main_line_width = 6;
-	g.data.current.line_spacing = 15;
-	g.data.current.line_gap = 5;
-	g.data.current.main_line_color = graphic::colors::pale_green.copy().mul_rgb(.66f);
-	g.data.current.line_color = graphic::colors::dark_gray;
+	g.data.current = graphic::layers::default_grid_style;
 
 	core::global::ui::root->add_scene(ui::scene{"main", new ui::loose_group{nullptr, nullptr}, &renderer_ui}, true);
 	core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()});
@@ -446,7 +463,6 @@ void main_loop(){
 	using grided_entity_desc = game::ecs::decl::chamber_entity_desc;
 
 	using projectile_entity_desc = game::ecs::decl::projectile_entity_desc;
-
 
 
 	{
@@ -552,10 +568,22 @@ void main_loop(){
 	world.component_manager.do_deferred();
 	game::ecs::component_pack pack{world.component_manager};
 
+	std::size_t count{};
+	float dt{};
 	core::global::timer.reset_time();
+
 	while(!context.window().should_close()){
 		context.window().poll_events();
 		core::global::timer.fetch_time();
+
+		count++;
+		dt += core::global::timer.global_delta();
+		if(dt > 1.f){
+			dt = 0.f;
+			// std::println(std::cerr, "{}", count);
+			count = 0;
+		}
+
 		core::global::input.update(core::global::timer.global_delta_tick());
 
 		world.component_manager.update_delta = core::global::timer.update_delta_tick();
@@ -791,6 +819,13 @@ int main(){
 	// foo2();
 
 
+	game::content::load();
+	//
+	// content::content_manager.each_content<meta::chamber::chamber_types>(overload{
+	// 	// [](meta::chamber::radar& radar) static {std::println("radar: {}", radar.name);},
+	// 	// [](meta::chamber::turret_base& radar) static {std::println("turret: {}", radar.name);},
+	// 	[](meta::chamber::basic_chamber& basic) static {std::println("basic: {}", basic.name);},
+	// });
 
 	init_assets();
 	compile_shaders();

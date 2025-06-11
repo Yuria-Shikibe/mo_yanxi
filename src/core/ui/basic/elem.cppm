@@ -65,7 +65,7 @@ namespace mo_yanxi::ui{
 
 	export inline const style_drawer<elem>* global_style_drawer;
 
-	namespace events{
+	namespace input_event{
 
 		export
 		enum struct click_result{
@@ -85,13 +85,13 @@ namespace mo_yanxi::ui{
 		// events::GeneralCodeEvent,
 		// events::ElementConnection,
 		// events::click,
-		events::drag,
-		events::exbound,
-		events::inbound,
-		events::focus_begin,
-		events::focus_end,
-		events::scroll,
-		events::cursor_moved>;
+		input_event::drag,
+		input_event::exbound,
+		input_event::inbound,
+		input_event::focus_begin,
+		input_event::focus_end,
+		input_event::scroll,
+		input_event::cursor_moved>;
 
 	const style_drawer<elem>* getDefaultStyleDrawer(){
 		return global_style_drawer ? global_style_drawer : &DefaultStyleDrawer;
@@ -368,8 +368,8 @@ namespace mo_yanxi::ui{
 	elem_fields,
 	stated_tooltip_owner<elem>,
 	spreadable_event_handler<elem,
-	                         events::collapser_state_changed,
-	                         events::check_box_state_changed
+	                         input_event::collapser_state_changed,
+	                         input_event::check_box_state_changed
 	>,
 
 		// StatedToolTipOwner<elem>,
@@ -554,7 +554,7 @@ namespace mo_yanxi::ui{
 		 * @param delta cursor transform
 		 */
 		void notify_cursor_moved(const math::vec2 delta) const{
-			event_slots.fire(events::cursor_moved{delta});
+			event_slots.fire(input_event::cursor_moved{delta});
 			// dropToolTipIfMoved();
 		}
 
@@ -702,9 +702,9 @@ namespace mo_yanxi::ui{
 
 		}
 
-		virtual events::click_result on_click(const events::click click_event){
+		virtual input_event::click_result on_click(const input_event::click click_event){
 			if(!interactable()){
-				return events::click_result::spread;
+				return input_event::click_result::spread;
 			}
 
 			switch(click_event.code.action()){
@@ -713,10 +713,10 @@ namespace mo_yanxi::ui{
 			default : cursor_state.pressed = false;
 			}
 
-			return events::click_result::intercepted;
+			return input_event::click_result::intercepted;
 		}
 
-		virtual void on_drag(const events::drag event){
+		virtual void on_drag(const input_event::drag event){
 
 		}
 
@@ -724,7 +724,7 @@ namespace mo_yanxi::ui{
 
 		}
 
-		virtual void on_scroll(const events::scroll event){
+		virtual void on_scroll(const input_event::scroll event){
 
 		}
 		// [[nodiscard]] virtual math::vec2 requestSpace(const StatedSize sz, math::vec2 minimumSize,
@@ -850,7 +850,7 @@ namespace mo_yanxi::ui{
 
 	export
 	namespace util{
-		bool is_valid_release_click(const elem& elem, const events::click& click) noexcept{
+		bool is_valid_release_click(const elem& elem, const input_event::click& click) noexcept{
 			return elem.contains(click.pos) && click.code.action() == core::ctrl::act::release;
 		}
 
