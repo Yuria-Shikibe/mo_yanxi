@@ -39,7 +39,7 @@ namespace mo_yanxi::game::ecs::system{
 				projectile_manifold& projectile_manifold,
 				projectile_drawer& drawer){
 					const auto trail_trans = drawer.trail_style.trans | motion.trans;
-					drawer.trail.update(manager.get_update_delta(), trail_trans.offset);
+					drawer.trail.update(manager.get_update_delta(), trail_trans.vec);
 
 					drawer.clip = manifold.hitbox.max_wrap_bound().expand_by(drawer.trail.get_bound());
 

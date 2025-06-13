@@ -475,7 +475,7 @@ namespace mo_yanxi::ui{
 
 		virtual void update_opacity(float val);
 
-		void mark_independent_layout_changed();
+		void notify_isolated_layout_changed();
 
 		void set_parent(group* p) noexcept{
 			parent = p;

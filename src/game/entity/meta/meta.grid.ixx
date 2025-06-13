@@ -15,12 +15,14 @@ namespace mo_yanxi::game::meta::chamber{
 
 	using chamber_meta = const basic_chamber*;
 
+	export
 	struct grid_building{
+	private:
 		math::upoint2 identity_pos{};
-
 		chamber_meta meta_info;
 		std::unique_ptr<chamber_instance_data> instance_data{};
 
+	public:
 		[[nodiscard]] grid_building(const math::upoint2& identity_pos, const basic_chamber& chamber)
 			: identity_pos(identity_pos),
 			  meta_info(std::addressof(chamber)), instance_data(chamber.create_instance_data()){
@@ -31,20 +33,34 @@ namespace mo_yanxi::game::meta::chamber{
 			instance_data = chamber.create_instance_data();
 		}
 
-		// bool has
+
 
 		[[nodiscard]] math::urect get_indexed_region() const noexcept{
 			return {tags::from_extent, identity_pos, meta_info->extent};
 		}
+
+		[[nodiscard]] const basic_chamber& get_meta_info() const noexcept{
+			assert(meta_info != nullptr);
+			return *meta_info;
+		}
+
+		[[nodiscard]] chamber_instance_data* get_instance_data() const noexcept{
+			return instance_data.get();
+		}
+
+		[[nodiscard]] math::upoint2 get_identity_pos() const noexcept{
+			return identity_pos;
+		}
 	};
 
 
+	export
 	struct grid_tile{
 		bool placeable;
 		grid_building* building;
 
 		[[nodiscard]] bool is_building_identity(const math::upoint2 tile_pos) const noexcept{
-			return building && building->identity_pos == tile_pos;
+			return building && building->get_identity_pos() == tile_pos;
 		}
 
 		[[nodiscard]] bool is_idle() const noexcept{

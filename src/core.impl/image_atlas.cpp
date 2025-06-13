@@ -58,12 +58,19 @@ namespace mo_yanxi::graphic{
 
 		running_command_buffer_ = std::move(command_buffer);
 
+
+		auto sz = using_buffer_.get_size();
+		if(sz > 0){
+			stagings.insert({sz, std::exchange(using_buffer_, std::move(buffer))});
+		}else{
+			using_buffer_ = std::move(buffer);
+		}
+
+
 		if(stagings.size() > 16){
 			//TODO better resource recycle
 			stagings.clear();
 		}
 
-		auto sz = buffer.get_size();
-		stagings.insert({sz, std::move(buffer)});
 	}
 }

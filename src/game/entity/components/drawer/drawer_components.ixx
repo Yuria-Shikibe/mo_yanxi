@@ -63,11 +63,11 @@ namespace mo_yanxi::game::ecs::drawer{
 
 	export
 	struct part_pos_transform{
-		math::vec2 offset;
+		math::vec2 vec;
 		float z_offset;
 
 		constexpr part_pos_transform& operator|=(const part_transform parentRef) noexcept{
-			offset |= parentRef.get_trans();
+			vec |= parentRef.get_trans();
 			z_offset += parentRef.z_offset;
 
 			return *this;
@@ -78,7 +78,7 @@ namespace mo_yanxi::game::ecs::drawer{
 		}
 
 		constexpr part_pos_transform& operator|=(const trans_t rhs) noexcept{
-			offset |= rhs;
+			vec |= rhs;
 
 			return *this;
 		}
@@ -88,7 +88,7 @@ namespace mo_yanxi::game::ecs::drawer{
 		}
 
 		FORCE_INLINE constexpr part_pos_transform& operator+=(const part_pos_transform lhs) noexcept{
-			offset += lhs.offset;
+			vec += lhs.vec;
 			z_offset += lhs.z_offset;
 
 			return *this;

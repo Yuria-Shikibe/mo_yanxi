@@ -47,25 +47,36 @@ namespace mo_yanxi::game{
 
 		export using namespace mo_yanxi::ui;
 
-		export struct grid_editor_viewport : ui::viewport{
+		export struct grid_editor_viewport : ui::viewport<ui::manual_table>{
 		private:
 			meta::hitbox_transed reference{};
 			math::optional_vec2<float> last_click_{math::vectors::constant2<float>::SNaN};
 
-
 			bool overview{false};
 
+			scroll_pane* pane_{};
 		public:
 			using index_coord = math::upoint2;
 
 			chamber_meta current_chamber{};
 
 			meta::chamber::grid grid{};
+			meta::chamber::grid_building* selected_building{};
 
 			[[nodiscard]] grid_editor_viewport(scene* scene, group* group)
-				: viewport(scene, group, "editor_viewport"){
+				: viewport(scene, group){
 				camera.set_scale_range({0.25f, 2});
 				property.maintain_focus_until_mouse_drop = true;
+
+				auto pane = emplace<ui::scroll_pane>();
+				pane.cell().region_scale = rect{0, 0, 0.2, 0.5f};
+				pane.cell().align = align::pos::bottom_left;
+				pane->set_elem([](ui::table& table){
+					table.set_style();
+				});
+				pane_ = &pane.elem();
+				pane_->visible = false;
+
 			}
 
 			void draw_content(const rect clipSpace) const override;
@@ -85,6 +96,20 @@ namespace mo_yanxi::game{
 
 
 		private:
+			void update_selected_building(meta::chamber::grid_building* building){
+				auto& t = pane_->get_item_unchecked<table>();
+				if(building){
+					if(selected_building != building){
+						t.clear_children();
+						building->get_meta_info().build_ui(t);
+					}
+					pane_->visible = true;
+				}else{
+					t.clear_children();
+					pane_->visible = false;
+				}
+				selected_building = building;
+			}
 
 			void update(float delta_in_ticks) override{
 				viewport::update(delta_in_ticks);
@@ -115,13 +140,26 @@ namespace mo_yanxi::game{
 							math::irect place_region = get_selected_place_region(current_chamber->extent, get_select_box());
 							each_tile(place_region, current_chamber->extent.as<int>(), [&, this](math::point2 pos){
 								if(const auto idx = grid.coord_to_index(pos)){
-									grid.try_place_building_at(idx.value(), current_chamber);
+									if(auto* b = grid.try_place_building_at(idx.value(), current_chamber)){
+										update_selected_building(b);
+									}
 								}
 							});
+						}else{
+							auto p = get_current_tile_coord();
+							if(auto idx = grid.coord_to_index(p)){
+								update_selected_building(grid[*idx].building);
+							}
 						}
 						break;
 					case core::ctrl::mouse::RMB: {
 						const math::irect place_region = get_selected_place_region({1, 1}, get_select_box());
+						if(selected_building){
+							auto reg = selected_building->get_indexed_region().as<int>().move(grid.get_origin_offset());
+							if(reg.overlap_exclusive(place_region)){
+								update_selected_building(nullptr);
+							}
+						}
 						each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
 							if(const auto idx = grid.coord_to_index(pos)){
 								grid.erase_building_at(idx.value());
@@ -139,7 +177,7 @@ namespace mo_yanxi::game{
 					last_click_.reset();
 				}
 
-				return ui::viewport::on_click(click_event);
+				return viewport::on_click(click_event);
 			}
 
 			esc_flag on_esc() override{
@@ -148,7 +186,12 @@ namespace mo_yanxi::game{
 					return esc_flag::intercept;
 				}
 
-				return ui::viewport::on_esc();
+				if(current_chamber){
+					current_chamber = nullptr;
+					return esc_flag::intercept;
+				}
+
+				return viewport::on_esc();
 			}
 
 			void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
@@ -245,7 +288,7 @@ namespace mo_yanxi::game{
 				{
 					for(int i = 0; i < std::to_underlying(meta::chamber::category::LAST); ++i){
 						auto rst = menu_->add_elem<label, scroll_pane>();
-						rst.button->set_scale(.5f);
+						rst.button->set_fit();
 						rst.button->set_text([i](){
 							std::string str{meta::chamber::category_names[i]};
 							str.front() = std::toupper(str.front());
@@ -305,8 +348,9 @@ namespace mo_yanxi::game{
 
 				auto menu = editor_region->end_line().emplace<ui::menu>();
 				menu->get_button_group_pane().set_scroll_bar_stroke(10);
-				menu->set_button_group_height(80);
-				menu.cell().set_height(400);
+				// menu->get_button_group().template_cell.margin.set(4);
+				menu->set_button_group_height(60);
+				menu.cell().set_height(300);
 				menu_ = std::to_address(menu);
 
 

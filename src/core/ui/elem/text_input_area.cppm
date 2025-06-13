@@ -844,49 +844,188 @@ namespace mo_yanxi::ui{
 		}
 	};
 
+
+	struct monostate : std::monostate{
+		template <typename T>
+		bool operator()(T val) const noexcept{
+			return false;
+		}
+
+		[[nodiscard]] bool has_cycle() const noexcept{
+			return false;
+		}
+
+		template <typename>
+		void set_cycle() const noexcept{}
+
+		template <typename T>
+		void set_ratio(T) noexcept{}
+
+		double get_ratio() const noexcept{
+			return 0;
+		}
+
+		std::string to_string() const noexcept{
+			return {};
+		}
+	};
+
+	export
+	template <typename T>
+	struct edit_target{
+		using value_type = T;
+
+		T* target;
+		T input_to_impl_ratio;
+		T cycle;
+
+		[[nodiscard]] bool has_cycle() const noexcept{
+			return cycle != T{};
+		}
+
+		bool operator()(T val) const noexcept{
+			assert(target != nullptr);
+			val *= input_to_impl_ratio;
+			*target = has_cycle() ? math::mod<T>(val, cycle) : val;
+
+			return true;
+		}
+
+		T get_current() const noexcept{
+			assert(target != nullptr);
+			auto v = has_cycle() ? math::mod<T>(*target, cycle) : *target;
+			v /= input_to_impl_ratio;
+			return v;
+		}
+
+		[[nodiscard]] std::string to_string() const noexcept{
+			if constexpr (std::floating_point<T>){
+				return std::format("{:g<.2f}", get_current());
+			}else{
+				return std::format("{}", get_current());
+			}
+
+		}
+
+		[[nodiscard]] T get_ratio() const noexcept{
+			return input_to_impl_ratio;
+		}
+
+		void set_ratio(T v) noexcept{
+			input_to_impl_ratio = v;
+		}
+
+		template <typename Ty>
+			requires std::constructible_from<T, const Ty&>
+		void set_cycle(Ty val) noexcept{
+			cycle = static_cast<T>(val);
+		}
+	};
+
+	export
+	template <typename T>
+	struct edit_target_range_constrained : edit_target<T>{
+		math::section<T> range;
+
+		bool operator()(T val) const noexcept{
+			if(range.within_closed(val)){
+				return edit_target<T>::operator()(val);
+			}
+
+			return false;
+		}
+	};
+
+	export
+	template <typename T>
+	struct edit_target_predicate_constrained : edit_target<T>{
+		std::move_only_function<bool(T) const> predicate;
+
+		bool operator()(T val) const{
+			assert(this->target != nullptr);
+			if(predicate && predicate(val)){
+				return edit_target<T>::operator()(val);
+			}
+
+			return false;
+		}
+	};
+
 	export struct numeric_input_area : text_input_area{
 		// bool using_floating_point{true};
 
-		double ratio{1};
-
+	private:
 		std::variant<
-			std::monostate,
-			int*,
-			unsigned*,
-			long long*,
-			unsigned long long*,
-			float*,
-			double*
+			monostate,
+			edit_target<int>,
+			edit_target<unsigned>,
+			edit_target<long long>,
+			edit_target<unsigned long long>,
+			edit_target<float>,
+			edit_target<double>,
+			edit_target_range_constrained<int>,
+			edit_target_range_constrained<unsigned>,
+			edit_target_range_constrained<long long>,
+			edit_target_range_constrained<unsigned long long>,
+			edit_target_range_constrained<float>,
+			edit_target_range_constrained<double>,
+			edit_target_predicate_constrained<int>,
+			edit_target_predicate_constrained<unsigned>,
+			edit_target_predicate_constrained<long long>,
+			edit_target_predicate_constrained<unsigned long long>,
+			edit_target_predicate_constrained<float>,
+			edit_target_predicate_constrained<double>
 		> target{};
 
 		bool value_changed{};
 		bool external_check{};
+
 	public:
+		[[nodiscard]] const auto& get_edit_target() const noexcept {
+			return target;
+		}
+
+		[[nodiscard]] auto& get_edit_target() noexcept{
+			return target;
+		}
 
 		[[nodiscard]] numeric_input_area(scene* scene, group* group)
 			: text_input_area(scene, group){
 			set_banned_characters({'\n', '\t'});
 		}
 
-		[[nodiscard]] double get_ratio() const noexcept{
-			return ratio;
+		template <typename T = double>
+		[[nodiscard]] T get_ratio() const noexcept{
+			return static_cast<T>(std::visit([]<typename Ty>(Ty& tgt){
+				return tgt.get_ratio();
+			}, target));
 		}
 
-		void set_ratio(const double ratio) noexcept{
-			this->ratio = ratio;
+		template <typename T = double>
+		void set_ratio(const T ratio) noexcept{
+			std::visit([&]<typename Ty>(Ty& tgt){
+				tgt.set_ratio(ratio);
+			}, target);
 		}
+
+
+		template <typename T>
+			requires std::constructible_from<decltype(target), T&&>
+		void set_target(T&& target) noexcept{
+			this->target = std::forward<T>(target);
+			this->set_text(std::visit([](const auto& v){return v.to_string();}, this->target));
+			value_changed = false;
+		}
+
 
 		template <typename T>
 			requires std::is_arithmetic_v<T>
 		void set_target(T& target) noexcept{
-			this->target = &target;
-			auto tgt = static_cast<T>(target / ratio);
-			this->set_text(std::format("{}", tgt));
-			value_changed = false;
+			this->set_target<edit_target<T>>(edit_target<T>{&target, 1, 0});
 		}
 
 		void set_target() noexcept{
-			target = std::monostate{};
+			target = monostate{};
 		}
 
 		void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
@@ -927,7 +1066,7 @@ namespace mo_yanxi::ui{
 
 		template <typename T>
 			requires std::is_arithmetic_v<T>
-		[[nodiscard]] std::optional<T> get_value() const noexcept{
+		[[nodiscard]] std::optional<T> get_value_from_text() const noexcept{
 			T t{};
 			std::string_view txt = get_text();
 			std::from_chars_result rst = std::from_chars(txt.data(), txt.data() + txt.size(), t);
@@ -939,23 +1078,34 @@ namespace mo_yanxi::ui{
 		}
 
 		void update(float delta_in_ticks) override{
-			if(target.index() != 0 && (std::exchange(external_check, {}) || !caret_ && std::exchange(value_changed, {}))){
-				if(!std::visit<bool>([this]<typename T>(T p){
-					if constexpr (!std::same_as<T, std::monostate>){
-						using base = std::remove_pointer_t<T>;
-						std::optional<base> val = get_value<base>();
-						if(val){
-							*p = static_cast<base>(val.value() * ratio);
-						}else{
-							return false;
+			if(target.index() != 0){
+				disabled = false;
+
+				if(std::exchange(external_check, {}) || !caret_ && std::exchange(value_changed, {})){
+					if(!std::visit<bool>([this]<typename T>(T& p){
+						if constexpr (!std::same_as<T, monostate>){
+							using base = T::value_type;
+							std::optional<base> val = get_value_from_text<base>();
+							if(val){
+								return p(val.value());
+							}
+						}
+
+						return false;
+					}, target)){
+						set_input_invalid();
+					}else{
+						if(std::visit([]<typename T>(const T& p){
+							return p.has_cycle();
+						}, target)){
+							this->set_text(std::visit([](const auto& v){return v.to_string();}, this->target));
 						}
 					}
-
-					return true;
-				}, target)){
-					set_input_invalid();
 				}
+			}else{
+				disabled = true;
 			}
+
 
 			text_input_area::update(delta_in_ticks);
 		}

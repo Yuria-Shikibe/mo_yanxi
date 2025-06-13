@@ -65,7 +65,7 @@ namespace mo_yanxi::ui{
 	protected:
 		/*virtual*/ void draw_children(const rect clipSpace) const{
 			for(const auto& element : get_children()){
-				element->draw(clipSpace);
+				element->try_draw(clipSpace);
 			}
 		}
 	public:

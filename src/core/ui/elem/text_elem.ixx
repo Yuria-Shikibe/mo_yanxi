@@ -47,7 +47,7 @@ namespace mo_yanxi::ui{
 			if(glyph_layout.get_text() != text){
 				glyph_layout.set_text(std::string{text});
 				text_expired = true;
-				mark_independent_layout_changed();
+				notify_isolated_layout_changed();
 			}
 		}
 
@@ -59,7 +59,7 @@ namespace mo_yanxi::ui{
 			if(glyph_layout.get_text() != text){
 				glyph_layout.set_text(std::move(text));
 				text_expired = true;
-				mark_independent_layout_changed();
+				notify_isolated_layout_changed();
 			}
 		}
 
@@ -67,7 +67,7 @@ namespace mo_yanxi::ui{
 			if(glyph_layout.set_policy(policy)){
 				if(policy != font::typesetting::layout_policy::reserve)fit = false;
 				text_expired = true;
-				mark_independent_layout_changed();
+				notify_isolated_layout_changed();
 			}
 		}
 
@@ -79,14 +79,14 @@ namespace mo_yanxi::ui{
 				fit = true;
 
 				text_expired = true;
-				mark_independent_layout_changed();
+				notify_isolated_layout_changed();
 			}
 		}
 
 		void set_scale(float scale){
 			if(util::try_modify(this->scale, scale)){
 				text_expired = true;
-				mark_independent_layout_changed();
+				notify_isolated_layout_changed();
 			}
 		}
 

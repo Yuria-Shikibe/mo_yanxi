@@ -19,7 +19,7 @@ layout(set = 0, binding = 5) uniform UBO{
 
 vec4 applyShadow(vec4 shadowColor, vec4 baseColor) {
     float shadowIntensity = shadowColor.a;
-    vec3 darkenedRGB = mix(vec3(1.f), shadowColor.rgb, shadowIntensity);
+    vec3 darkenedRGB = mix(shadowColor.rgb, shadowColor.rgb, shadowIntensity);
     vec4 darkenedColor = vec4(darkenedRGB * baseColor.rgb, baseColor.a);
 
     return darkenedColor;

@@ -36,7 +36,8 @@ namespace mo_yanxi::graphic::draw{
 			color color_scl,
 			math::vec2 uv
 			) noexcept{
-			return *std::construct_at(ptr + idx, pos, 0., texture_indices, color_scl, uv);
+			const auto p = std::assume_aligned<std::bit_ceil(sizeof(vk::vertices::vertex_world))>(ptr);
+			return *std::construct_at(p + idx, pos, 0., texture_indices, color_scl, uv);
 		}
 	};
 
@@ -50,7 +51,8 @@ namespace mo_yanxi::graphic::draw{
 			color color_scl,
 			math::vec2 uv
 			) noexcept{
-			return *std::construct_at(ptr + idx, pos, texture_indices, color_scl, uv);
+			const auto p = std::assume_aligned<std::bit_ceil(sizeof(vk::vertices::vertex_ui))>(ptr);
+			return *std::construct_at(p + idx, pos, texture_indices, color_scl, uv);
 		}
 	};
 

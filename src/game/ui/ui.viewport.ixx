@@ -7,13 +7,16 @@ export module mo_yanxi.game.ui.viewport;
 export import mo_yanxi.ui.basic;
 export import mo_yanxi.graphic.camera;
 
+import std;
+
 namespace mo_yanxi::game::ui{
 	export using namespace mo_yanxi::ui;
 
 	export constexpr float viewport_default_radius = 5000;
 
 	export
-	struct viewport : elem{
+	template <std::derived_from<elem> E = elem>
+	struct viewport : E{
 	private:
 		math::vec2 last_camera_{};
 	protected:
@@ -21,15 +24,25 @@ namespace mo_yanxi::game::ui{
 		math::vec2 viewport_region{viewport_default_radius * 2, viewport_default_radius * 2};
 
 	public:
-		[[nodiscard]] viewport(scene* scene, group* group, const std::string_view tyName)
-			: elem(scene, group, tyName){
+		[[nodiscard]] viewport(scene* scene, group* group)
+			requires (std::constructible_from<E, ui::scene*, ui::group*, std::string_view>)
+			: E(scene, group, "viewport"){
 
+			this->interactivity = interactivity::enabled;
+			camera.speed_scale = 0;
+		}
+
+		[[nodiscard]] viewport(scene* scene, group* group)
+			requires (std::constructible_from<E, ui::scene*, ui::group*> && !std::constructible_from<E, ui::scene*, ui::group*, std::string_view>)
+			: E(scene, group){
+
+			this->interactivity = interactivity::enabled;
 			camera.speed_scale = 0;
 		}
 
 	protected:
 		void update(const float delta_in_ticks) override{
-			elem::update(delta_in_ticks);
+			E::update(delta_in_ticks);
 			const auto [w, h]{viewport_region - camera.get_viewport().size()};
 			camera.clamp_position({math::vec2{}, w, h});
 			camera.update(delta_in_ticks);
@@ -37,8 +50,8 @@ namespace mo_yanxi::game::ui{
 		}
 
 		bool resize(const math::vec2 size) override{
-			if(elem::resize(size)){
-				auto [x, y] = content_size();
+			if(E::resize(size)){
+				auto [x, y] = this->content_size();
 				camera.resize_screen(x, y);
 				return true;
 			}
@@ -47,9 +60,9 @@ namespace mo_yanxi::game::ui{
 		}
 
 		void on_focus_changed(bool is_focused) override{
-			get_scene()->set_camera_focus(is_focused ? &camera : nullptr);
-			set_focused_scroll(is_focused);
-			set_focused_key(is_focused);
+			this->get_scene()->set_camera_focus(is_focused ? &camera : nullptr);
+			this->set_focused_scroll(is_focused);
+			this->set_focused_key(is_focused);
 		}
 
 		void on_scroll(const ui::input_event::scroll event) override{
@@ -67,31 +80,32 @@ namespace mo_yanxi::game::ui{
 		ui::input_event::click_result on_click(const ui::input_event::click click_event) override{
 			if(click_event.code.key() == core::ctrl::mouse::CMB){
 				last_camera_ = camera.get_stable_center();
+				return ui::input_event::click_result::intercepted;
 			}
 
-			return ui::input_event::click_result::intercepted;
+			return E::on_click(click_event);
 		}
 
 		void viewport_begin() const {
 			const auto proj = camera.get_world_to_uniformed();
 
-			get_renderer().batch.push_projection(proj);
-			get_renderer().batch.push_viewport(prop().content_bound_absolute());
-			get_renderer().batch.push_scissor({camera.get_viewport()});
+			this->get_renderer().batch.push_projection(proj);
+			this->get_renderer().batch.push_viewport(this->prop().content_bound_absolute());
+			this->get_renderer().batch.push_scissor({camera.get_viewport()});
 		}
 
 		void viewport_end() const {
-			get_renderer().batch.pop_scissor();
-			get_renderer().batch.pop_viewport();
-			get_renderer().batch.pop_projection();
+			this->get_renderer().batch.pop_scissor();
+			this->get_renderer().batch.pop_viewport();
+			this->get_renderer().batch.pop_projection();
 		}
 
 		[[nodiscard]] math::vec2 get_transferred_pos(const math::vec2 pos) const noexcept{
-			return camera.get_screen_to_world(pos, content_src_pos(), true);
+			return camera.get_screen_to_world(pos, this->content_src_pos(), true);
 		}
 
 		[[nodiscard]] math::vec2 get_transferred_cursor_pos() const noexcept{
-			return get_transferred_pos(get_scene()->get_cursor_pos());
+			return viewport::get_transferred_pos(this->get_scene()->get_cursor_pos());
 		}
 
 	};

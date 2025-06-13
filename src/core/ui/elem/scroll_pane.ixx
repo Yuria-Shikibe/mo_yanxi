@@ -169,7 +169,7 @@ namespace mo_yanxi::ui{
 
 		void set_scroll_bar_stroke(const float scroll_bar_stroke){
 			scroll_bar_stroke_ = scroll_bar_stroke;
-			mark_independent_layout_changed();
+			notify_isolated_layout_changed();
 		}
 
 	private:

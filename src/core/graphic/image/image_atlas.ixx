@@ -260,7 +260,10 @@ namespace mo_yanxi::graphic{
 		vk::fence fence_{};
 
 		vk::command_pool command_pool_{};
+
 		vk::command_buffer running_command_buffer_{};
+		vk::buffer using_buffer_{};
+
 		std::multimap<VkDeviceSize, vk::buffer> stagings{};
 		std::mutex queue_mutex{};
 		condition_variable_single queue_cond{};
@@ -717,12 +720,12 @@ namespace mo_yanxi::graphic{
 			});
 		}
 
-		template <std::derived_from<image_page> T>
+		template <typename T>
 		[[nodiscard]] auto* find(this T& self, const std::string_view localName) noexcept{
 			return self.named_image_regions.try_find(localName);
 		}
 
-		template <std::derived_from<image_page> T>
+		template <typename T>
 		[[nodiscard]] auto& at(this T& self, const std::string_view localName) noexcept{
 			return self.named_image_regions.at(localName);
 		}
@@ -776,12 +779,12 @@ namespace mo_yanxi::graphic{
 			}
 		}
 
-		template <std::derived_from<image_atlas> T>
+		template <typename T>
 		[[nodiscard]] image_page* find_page(this T& self, const std::string_view name) noexcept{
 			return self.pages.try_find(name);
 		}
 
-		template <std::derived_from<image_atlas> T>
+		template <typename T>
 		allocated_image_region* find(this T& self, const std::string_view name_category_local) noexcept{
 			const auto [category, localName] = splitKey(name_category_local);
 			if(const auto page = self.find_page(category)){
@@ -791,7 +794,7 @@ namespace mo_yanxi::graphic{
 			return nullptr;
 		}
 
-		template <std::derived_from<image_atlas> T>
+		template <typename T>
 		allocated_image_region& at(this T& self, const std::string_view name_category_local){
 			const auto [category, localName] = splitKey(name_category_local);
 			if(const auto page = self.find_page(category)){

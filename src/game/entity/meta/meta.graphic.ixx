@@ -41,7 +41,7 @@ namespace mo_yanxi::game::meta{
 						.out = {color.to, color.to.copy().set_a(0)}
 					}
 				},
-				.trans = {trans.offset, radius},
+				.trans = {trans.vec, radius},
 				.depth = trans.z_offset,
 				.duration = std::max<float>(30, trail.estimate_duration(object_speed)),
 			});

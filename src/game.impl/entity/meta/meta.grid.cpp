@@ -70,7 +70,10 @@ void mo_yanxi::game::meta::chamber::grid::draw(graphic::renderer_ui& renderer, c
 
 				auto rg = info.building->get_indexed_region().as<int>().move(get_origin_offset()).as<float>().scl(tile_size, tile_size);
 				draw::line::rect_ortho(acquirer, rg, 4, colors::aqua.copy());
-				info.building->meta_info->draw(rg, renderer, camera);
+				info.building->get_meta_info().draw(rg, renderer, camera);
+				if(auto ist = info.building->get_instance_data()){
+					ist->draw(info.building->get_meta_info(), rg, renderer, camera);
+				}
 				acquirer.proj.mode_flag = draw::mode_flags::slide_line;
 			}
 		}

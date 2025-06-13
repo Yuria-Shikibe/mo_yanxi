@@ -101,11 +101,13 @@ namespace mo_yanxi::vk{
 			createInfo.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
 			createInfo.ppEnabledExtensionNames = extensions.data();
 
+			auto cur = std::chrono::high_resolution_clock::now();
 			if(const auto rst = vkCreateInstance(&createInfo, nullptr, &handle)){
 				throw vk_error(rst, "failed to create vulkan instance!");
 			}
+			auto end = std::chrono::high_resolution_clock::now();
 
-			std::println("[Vulkan] Instance Create Succeed: {:#X}", std::bit_cast<std::uintptr_t>(handle));
+			std::println("[Vulkan] Instance Create Succeed: {:#X} - {}ms", std::bit_cast<std::uintptr_t>(handle), std::chrono::duration_cast<std::chrono::milliseconds>(end - cur).count());
 		}
 
 	public:

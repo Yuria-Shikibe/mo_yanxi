@@ -6,6 +6,7 @@ module;
 module mo_yanxi.game.ui.grid_editor;
 
 import mo_yanxi.ui.graphic;
+import mo_yanxi.graphic.draw.multi_region;
 import mo_yanxi.graphic.layers.ui.grid_drawer;
 
 import mo_yanxi.game.content;
@@ -41,6 +42,7 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 	grid.draw(get_renderer(), camera);
 
 	acquirer.proj.mode_flag = {};
+	acquirer.proj.set_layer(ui::draw_layers::def);
 
 	if (current_chamber && get_scene()->get_input_mode() == 0){
 		auto extent = current_chamber->extent.as<int>();
@@ -94,7 +96,22 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 
 	drawEnd:
 
+	if(selected_building){
+		auto b = get_region_at(selected_building->get_indexed_region());
+		draw::fancy::select_rect(acquirer, b, 8, theme::colors::accent, ecs::chamber::tile_size / 1.5f, true, 1.f);
+	}
+
+
 	viewport_end();
+
+	if(selected_building != nullptr){
+		acquirer.proj.mode_flag = draw::mode_flags::sdf;
+		draw::nine_patch(acquirer, theme::shapes::base, pane_->get_bound(), colors::black.copy().set_a(.85f));
+
+		acquirer.proj.set_layer(ui::draw_layers::base);
+		draw::nine_patch(acquirer, theme::shapes::base, pane_->get_bound(), colors::black.copy().set_a(.85f));
+		viewport::draw_content(clipSpace);
+	}
 }
 
 mo_yanxi::math::frect mo_yanxi::game::ui::grid_editor_viewport::get_region_at(math::irect region_in_world) const noexcept{
@@ -194,8 +211,8 @@ void mo_yanxi::game::ui::grid_editor::chamber_info_elem::build(){
 			}
 		}
 
-		if(auto trs = c.get_part_trans()){
-			auto pos = trs->vec * useable_region + srcOff;
+		if(auto trs = c.get_part_offset()){
+			auto pos = *trs * useable_region + srcOff;
 		   draw::line::square(acq, {pos, math::pi_half / 2}, 16, 4, theme::colors::accent);
 		}
 

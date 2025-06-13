@@ -130,13 +130,14 @@ namespace mo_yanxi::ui{
 
 			button_menu_pane = std::to_address(pane);
 			button_menu_pane->set_layout_policy(layout_policy::vert_major);
-			button_menu_pane->prop().size.set_minimum_size({0, 80});
 			button_menu_pane->set_style();
 			button_menu_pane->set_elem([](table& table){
 				table.set_entire_align(align::pos::left);
 				table.template_cell.set_external({true, false});
 				table.set_style();
 			});
+
+			pane.cell().set_height(80);
 
 			end_line().emplace<table>();
 		}
@@ -147,7 +148,8 @@ namespace mo_yanxi::ui{
 
 		void set_button_group_height(const float height){
 			cells[0].cell.set_height(height);
-			notify_layout_changed(spread_direction::all_visible);
+			notify_isolated_layout_changed();
+			// notify_layout_changed(spread_direction::all_visible);
 		}
 
 		template <typename B, typename E>

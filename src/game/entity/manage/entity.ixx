@@ -1345,7 +1345,8 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	struct no_propagation_mutex : std::mutex{
+	template <typename T = std::mutex>
+	struct no_propagation_mutex : T{
 		[[nodiscard]] no_propagation_mutex() = default;
 
 		no_propagation_mutex(const no_propagation_mutex& other) noexcept{
@@ -1371,9 +1372,9 @@ namespace mo_yanxi::game::ecs{
 
 	private:
 		//manager should always moved thread safely
-		no_propagation_mutex to_expire_mutex{};
-		no_propagation_mutex entity_mutex{};
-		no_propagation_mutex archetype_mutex{};
+		no_propagation_mutex<> to_expire_mutex{};
+		no_propagation_mutex<> entity_mutex{};
+		no_propagation_mutex<std::shared_mutex> archetype_mutex{};
 
 		pointer_hash_map<entity_id, int> to_expire{};
 		std::vector<entity_id> expired{};
@@ -1409,17 +1410,21 @@ namespace mo_yanxi::game::ecs{
 				std::lock_guard _{entity_mutex};
 				ent = std::to_address(entities.emplace(idx));
 			}
+			{
+				std::shared_lock g{archetype_mutex};
+				if(auto itr = archetypes.find(idx); itr != archetypes.end()){
+					auto& a = static_cast<archetype<Tuple>&>(*itr->second);
+					g.unlock();
+					a.push_staging(ent->id(), std::forward<Args>(args) ...);
+				}else{
+					archetype<Tuple>* atype;
+					{
+						std::unique_lock _{(g.unlock(), *g.release())};
+						atype = &add_archetype<Tuple>();
+					}
 
-			if(auto itr = archetypes.find(idx); itr != archetypes.end()){
-				static_cast<archetype<Tuple>&>(*itr->second).push_staging(ent->id(), std::forward<Args>(args) ...);
-			}else{
-				archetype<Tuple>* atype;
-				{
-					std::lock_guard _{archetype_mutex};
-					atype = &add_archetype<Tuple>();
+					atype->push_staging(ent->id(), std::forward<Args>(args) ...);
 				}
-
-				atype->push_staging(ent->id(), std::forward<Args>(args) ...);
 			}
 
 			return ent;
@@ -1439,16 +1444,22 @@ namespace mo_yanxi::game::ecs{
 				ent = std::to_address(entities.emplace(idx));
 			}
 
-			if(auto itr = archetypes.find(idx); itr != archetypes.end()){
-				static_cast<archetype<Tuple>&>(*itr->second).push_staging(ent->id(), std::move(comps));
-			}else{
-				archetype<Tuple>* atype;
-				{
-					std::lock_guard _{archetype_mutex};
-					atype = &add_archetype<Tuple>();
-				}
+			{
+				std::shared_lock g{archetype_mutex};
 
-				atype->push_staging(ent->id(), std::move(comps));
+				if(auto itr = archetypes.find(idx); itr != archetypes.end()){
+					auto& a = static_cast<archetype<Tuple>&>(*itr->second);
+					g.unlock();
+					a.push_staging(ent->id(), std::move(comps));
+				}else{
+					archetype<Tuple>* atype;
+					{
+						std::unique_lock _{(g.unlock(), *g.release())};
+						atype = &add_archetype<Tuple>();
+					}
+
+					atype->push_staging(ent->id(), std::move(comps));
+				}
 			}
 
 			return ent;

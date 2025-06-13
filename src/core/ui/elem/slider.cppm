@@ -70,33 +70,6 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] slider(scene* scene, group* group)
 			: elem(scene, group, "Slider"){
 
-			register_event([](const input_event::scroll& event, slider& self){
-
-				math::vec2 move = event.delta;
-
-				if(event.mode & core::ctrl::mode::shift){
-					move.swap_xy();
-					move.x *= -1;
-				}
-
-				if(self.is_clamped()){
-					self.moveBar(self.scroll_sensitivity * self.sensitivity.to_sign() * move.y * math::vec2{-1, 1});
-				} else{
-					if(self.is_segment_move_activated()){
-						move.to_sign().mul(self.getSegmentUnit());
-					} else{
-						move *= self.scroll_sensitivity;
-					}
-					self.moveBar(move);
-				}
-
-				self.applyLast();
-			});
-
-			register_event([](const input_event::drag& event, slider& self){
-				self.moveBar(event.trans());
-			});
-
 			register_event([](const input_event::exbound& event, slider& self){
 				self.set_focused_scroll(false);
 			});
@@ -165,6 +138,33 @@ namespace mo_yanxi::ui{
 
 	protected:
 		void draw_content(rect clipSpace) const override;
+
+		void on_scroll(const input_event::scroll event) override{
+
+			math::vec2 move = event.delta;
+
+			if(event.mode & core::ctrl::mode::shift){
+				move.swap_xy();
+				move.x *= -1;
+			}
+
+			if(is_clamped()){
+				moveBar(scroll_sensitivity * sensitivity.to_sign() * move.y * math::vec2{-1, 1});
+			} else{
+				if(is_segment_move_activated()){
+					move.to_sign().mul(getSegmentUnit());
+				} else{
+					move *= scroll_sensitivity;
+				}
+				moveBar(move);
+			}
+
+			applyLast();
+		}
+
+		void on_drag(const input_event::drag event) override{
+			moveBar(event.trans());
+		}
 
 		input_event::click_result on_click(const input_event::click click_event) override{
 			elem::on_click(click_event);

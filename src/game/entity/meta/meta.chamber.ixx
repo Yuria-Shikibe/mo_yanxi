@@ -12,6 +12,7 @@ export import mo_yanxi.ui.table;
 // import mo_yanxi.graphic.renderer.predecl;
 
 import mo_yanxi.type_map;
+import mo_yanxi.owner;
 import std;
 
 #define NAME_OF(e) ((void)category::e, #e)
@@ -46,6 +47,8 @@ namespace mo_yanxi::game::meta::chamber{
 		bool reserve_energy_if_power_off;
 	};
 
+	export struct basic_chamber;
+
 	export
 	struct chamber_instance_data{
 		virtual ~chamber_instance_data() = default;
@@ -67,13 +70,24 @@ namespace mo_yanxi::game::meta::chamber{
 		}
 
 
+		virtual void draw(
+			const basic_chamber& meta,
+			math::frect region,
+			graphic::renderer_ui& renderer_ui,
+			const graphic::camera2& camera
+		) const{
+
+		}
+
+		virtual void build_ui(ui::table& table) const{
+
+		}
 
 		// virtual void mouse_events()
 	};
 
 	// export
 	// using
-	export
 	struct basic_chamber{
 		std::string_view name;
 		category category;
@@ -86,7 +100,11 @@ namespace mo_yanxi::game::meta::chamber{
 
 		virtual ~basic_chamber() = default;
 
-		[[nodiscard]] virtual std::optional<math::trans2> get_part_trans() const noexcept{
+		[[nodiscard]] virtual std::optional<math::vec2> get_part_offset() const noexcept{
+			return std::nullopt;
+		}
+
+		[[nodiscard]] virtual std::optional<float> get_part_direction() const noexcept{
 			return std::nullopt;
 		}
 
@@ -110,16 +128,18 @@ namespace mo_yanxi::game::meta::chamber{
 
 		}
 
-		virtual void build_ui(ui::table& table) const{
+		virtual void build_ui(ui::table& table) const;
 
+		template <typename S>
+		auto create_instance_data(this const S& self)  {
+			return std::unique_ptr<std::remove_pointer_t<decltype(std::declval<const S&>().create_instance_data_impl())>>{self.create_instance_data_impl()};
 		}
 
-		virtual std::unique_ptr<chamber_instance_data> create_instance_data() const{
+	protected:
+		virtual owner<chamber_instance_data*> create_instance_data_impl() const{
 			return nullptr;
 		}
 
-
-	protected:
 		template <typename S>
 		std::optional<energy_consumer_comp> deduced_get_energy_consumption(this const S& self){
 			if constexpr (std::derived_from<S, energy_consumer_comp>){
@@ -134,6 +154,10 @@ namespace mo_yanxi::game::meta::chamber{
 	struct armor : basic_chamber{
 
 	};
+
+	template <std::derived_from<basic_chamber> T>
+	using chamber_meta_instance_data_t = decltype(std::declval<const T&>().create_instance_data())::element_type;
+
 	//
 	// export
 	// struct superstructure
@@ -141,29 +165,42 @@ namespace mo_yanxi::game::meta::chamber{
 
 	export
 	struct turret_base : basic_chamber, energy_consumer_comp{
-		ecs::drawer::part_transform transform{};
+		friend basic_chamber;
 
+		struct turret_instance_data : chamber_instance_data{
+			float rotation;
+		};
+
+		ecs::drawer::part_pos_transform transform{};
 		float rotate_torque{};
 		float shooting_field_angle{};
 
-		[[nodiscard]] std::optional<math::trans2> get_part_trans() const noexcept override{
-			return transform.get_trans();
+		[[nodiscard]] std::optional<math::vec2> get_part_offset() const noexcept override{
+			return transform.vec;
 		}
 		[[nodiscard]] std::optional<energy_consumer_comp> get_energy_consumption() const noexcept override{
 			return deduced_get_energy_consumption();
 		}
+
+	protected:
+		owner<turret_instance_data*> create_instance_data_impl() const override{
+			return new turret_instance_data{};
+		}
 	};
+
 
 	export
 	struct radar : basic_chamber, energy_consumer_comp{
-		ecs::drawer::part_transform transform{};
+		friend basic_chamber;
+
+		ecs::drawer::part_pos_transform transform{};
 
 		math::range targeting_range_radius{};
 		math::range targeting_range_angular{-math::pi, math::pi};
 		float reload_duration{};
 
-		[[nodiscard]] std::optional<math::trans2> get_part_trans() const noexcept override{
-			return transform.get_trans();
+		[[nodiscard]] std::optional<math::vec2> get_part_offset() const noexcept override{
+			return transform.vec;
 		}
 
 		[[nodiscard]] std::optional<energy_consumer_comp> get_energy_consumption() const noexcept override{
@@ -171,6 +208,18 @@ namespace mo_yanxi::game::meta::chamber{
 		}
 
 		void draw(math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const override;
+
+
+		struct radar_instance_data : chamber_instance_data{
+			float rotation;
+
+			void draw(const basic_chamber& meta, math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const override;
+		};
+
+	protected:
+		owner<radar_instance_data*> create_instance_data_impl() const override{
+			return new radar_instance_data{};
+		}
 	};
 
 

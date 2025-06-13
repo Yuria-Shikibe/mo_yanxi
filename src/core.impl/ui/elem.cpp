@@ -91,7 +91,7 @@ namespace mo_yanxi{
 		}
 	}
 
-	void ui::elem::mark_independent_layout_changed(){
+	void ui::elem::notify_isolated_layout_changed(){
 		layout_state.notify_self_changed();
 		get_scene()->independentLayout.insert(this);
 	}
@@ -316,7 +316,7 @@ namespace mo_yanxi{
 	}
 
 	void ui::iterateAll_DFSImpl(math::vec2 cursorPos, std::vector<elem*>& selected, elem* current){
-		if(current->is_disabled())return;
+		if(current->is_disabled() || current->interactivity == interactivity::disabled)return;
 
 		if(!current->ignore_inbound() && current->contains(cursorPos)){
 			selected.push_back(current);
@@ -326,7 +326,7 @@ namespace mo_yanxi{
 
 		auto transformed = current->transform_pos(cursorPos);
 
-		for(const auto& child : current->get_children() | std::views::reverse){
+		for(const auto& child : current->get_children()/* | std::views::reverse*/){
 			if(!child->is_visible())continue;
 			iterateAll_DFSImpl(transformed, selected, child.get());
 

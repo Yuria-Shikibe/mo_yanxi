@@ -225,6 +225,8 @@ namespace mo_yanxi {
         extent_type extent_{};
         size_type remain_area_{};
 
+        // std::unordered_set<math::upoint2> captured{};
+
         struct point_to_size{
             internal_point_t pos;
             extent_size_t size;
@@ -532,15 +534,31 @@ namespace mo_yanxi {
             auto& chamber = map[chamber_src.value()];
             chamber.acquire_and_split(*this, extent);
             remain_area_ -= extent.area();
+            // math::urect{tags::from_extent, chamber_src.value(), extent}.each([this](point_type pos){
+            //    if(!captured.insert(pos).second){
+            //        throw std::invalid_argument("invalid point");
+            //    }
+            // });
+
             return chamber_src.value();
         }
 
         void deallocate(const point_type value) noexcept{
             if(const auto itr = map.find(value); itr != map.end()){
+
                 if(const auto chamber = itr->second.mark_idle(*this)){
+
+                    // math::urect{tags::from_extent, value, chamber->get_extent()}.each([this](point_type pos){
+                    //     if(!captured.erase(pos)){
+                    //         // throw std::invalid_argument("invalid point");
+                    //     }
+                    // });
+
+
                     const auto extent = chamber->get_extent().area();
                     remain_area_ += extent;
                 }
+
             }else{
                 std::println(std::cerr, "try deallocate region not belong to the allocator");
                 std::terminate();

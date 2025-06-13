@@ -152,7 +152,22 @@ void mo_yanxi::ui::scene::on_mouse_action(const core::ctrl::key_code_t key, cons
 
 	if(currentCursorFocus){
 		const input_event::click e{cursor_pos, core::ctrl::key_pack{key, action, mode}};
-		currentCursorFocus->on_click(e);
+
+		if(currentCursorFocus->on_click(e) != input_event::click_result::intercepted){
+			auto cur = lastInbounds.begin();
+			while(cur != lastInbounds.end()){
+				if(*cur == currentCursorFocus){
+					++cur;
+					continue;
+				}
+
+				if((*cur)->on_click(e) != input_event::click_result::intercepted){
+					++cur;
+				}else{
+					break;
+				}
+			}
+		}
 	}
 
 	if(action == core::ctrl::act::press){

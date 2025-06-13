@@ -997,9 +997,9 @@ namespace mo_yanxi::game{
 		export using namespace mo_yanxi::ui;
 
 		export
-		struct hit_box_editor : table{
+		struct hitbox_editor : table{
 		private:
-			struct editor_viewport : viewport{
+			struct editor_viewport : viewport<elem>{
 				ui::util::box_selection<> box_select{};
 
 				hitbox_edit_channel channel_hitbox{};
@@ -1007,7 +1007,7 @@ namespace mo_yanxi::game{
 
 
 				[[nodiscard]] editor_viewport(scene* scene, group* group)
-					: viewport(scene, group, "hitbox_viewport"){
+					: viewport(scene, group){
 					set_style(ui::theme::styles::general_static);
 
 					camera.set_scale_range({0.125f, 2});
@@ -1140,8 +1140,8 @@ namespace mo_yanxi::game{
 						table.function_init([this](numeric_input_area& area){
 							area.set_style();
 							area.set_scale(.6f);
-							area.set_ratio(math::deg_to_rad_v<double>);
-							area.set_target(viewport->channel_hitbox.origin_trans.rot);
+							area.set_target(ui::edit_target{&viewport->channel_hitbox.origin_trans.rot, math::deg_to_rad_v<double>, math::pi_2});
+
 						});
 						table.set_edge_pad(0);
 					});
@@ -1176,10 +1176,10 @@ namespace mo_yanxi::game{
 					b->set_button_callback(ui::button_tags::general, [this]{
 						auto& selector = creation::create_file_selector(creation::file_selector_create_info{
 							.requester = *this,
-							.checker = [](const creation::file_selector& s, const ui::hit_box_editor&){
+							.checker = [](const creation::file_selector& s, const ui::hitbox_editor&){
 								return s.get_current_main_select().has_value();
 							},
-							.yielder = [](const creation::file_selector& s, ui::hit_box_editor& self){
+							.yielder = [](const creation::file_selector& s, ui::hitbox_editor& self){
 								self.write_to(s.get_current_main_select().value());
 								return true;
 							},
@@ -1198,9 +1198,9 @@ namespace mo_yanxi::game{
 					b->set_text("load");
 					b->set_button_callback(ui::button_tags::general, [this]{
 						auto& selector = creation::create_file_selector(creation::file_selector_create_info{
-							*this, [](const creation::file_selector& s, const ui::hit_box_editor&){
+							*this, [](const creation::file_selector& s, const ui::hitbox_editor&){
 								return s.get_current_main_select().has_value();
-							}, [](const creation::file_selector& s, ui::hit_box_editor& self){
+							}, [](const creation::file_selector& s, ui::hitbox_editor& self){
 								self.load_from(s.get_current_main_select().value());
 								return true;
 							}});
@@ -1216,9 +1216,9 @@ namespace mo_yanxi::game{
 					b->set_text("set ref");
 					b->set_button_callback(ui::button_tags::general, [this]{
 						auto& selector = creation::create_file_selector(creation::file_selector_create_info{
-							*this, [](const creation::file_selector& s, const ui::hit_box_editor&){
+							*this, [](const creation::file_selector& s, const ui::hitbox_editor&){
 								return s.get_current_main_select().has_value();
-							}, [](const creation::file_selector& s, ui::hit_box_editor& self){
+							}, [](const creation::file_selector& s, ui::hitbox_editor& self){
 								self.set_image_ref(s.get_current_main_select().value());
 								return true;
 							}});
@@ -1228,7 +1228,7 @@ namespace mo_yanxi::game{
 			}
 
 		public:
-			[[nodiscard]] hit_box_editor(scene* scene, group* group)
+			[[nodiscard]] hitbox_editor(scene* scene, group* group)
 				: table(scene, group){
 				auto m = emplace<table>();
 				m.cell().set_width(200);
@@ -1266,10 +1266,10 @@ namespace mo_yanxi::game{
 					get_frame_index());
 			}
 
-			hit_box_editor(const hit_box_editor& other) = delete;
-			hit_box_editor(hit_box_editor&& other) noexcept = delete;
-			hit_box_editor& operator=(const hit_box_editor& other) = delete;
-			hit_box_editor& operator=(hit_box_editor&& other) noexcept = delete;
+			hitbox_editor(const hitbox_editor& other) = delete;
+			hitbox_editor(hitbox_editor&& other) noexcept = delete;
+			hitbox_editor& operator=(const hitbox_editor& other) = delete;
+			hitbox_editor& operator=(hitbox_editor&& other) noexcept = delete;
 
 		private:
 			void set_image_ref(const std::filesystem::path& path);
