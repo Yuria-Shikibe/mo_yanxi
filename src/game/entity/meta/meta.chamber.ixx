@@ -19,6 +19,92 @@ import std;
 
 namespace mo_yanxi::game::meta::chamber{
 	export
+	struct ui_build_handle{
+		struct promise_type;
+		using handle = std::coroutine_handle<promise_type>;
+
+		[[nodiscard]] ui_build_handle() noexcept = default;
+
+		[[nodiscard]] explicit ui_build_handle(handle&& hdl)
+			: hdl{std::move(hdl)}{}
+
+		struct promise_type{
+			bool has_ui{};
+
+			[[nodiscard]] promise_type() = default;
+
+			ui_build_handle get_return_object() noexcept{
+				return ui_build_handle{handle::from_promise(*this)};
+			}
+
+			[[nodiscard]] static auto initial_suspend() noexcept{ return std::suspend_never{}; }
+
+			[[nodiscard]] static auto final_suspend() noexcept{ return std::suspend_always{}; }
+
+			std::suspend_always yield_value(bool has_ui) noexcept{
+				this->has_ui = has_ui;
+				return {};
+			}
+
+			static void return_void() noexcept{
+			}
+
+			[[noreturn]] static void unhandled_exception() noexcept{
+				std::terminate();
+			}
+
+
+		private:
+			friend ui_build_handle;
+
+		};
+
+		void resume() const{
+			hdl.resume();
+		}
+
+		[[nodiscard]] bool done() const noexcept{
+			return hdl.done();
+		}
+
+		ui_build_handle(const ui_build_handle& other) = delete;
+
+		ui_build_handle(ui_build_handle&& other) noexcept
+			: hdl{std::exchange(other.hdl, {})}{
+		}
+
+		ui_build_handle& operator=(const ui_build_handle& other) = delete;
+
+		ui_build_handle& operator=(ui_build_handle&& other) noexcept{
+			if(this == &other) return *this;
+			dstry();
+			hdl = std::exchange(other.hdl, {});
+			return *this;
+		}
+
+		~ui_build_handle(){
+			dstry();
+		}
+
+
+		[[nodiscard]] bool has_ui() const{
+			return hdl.promise().has_ui;
+		}
+
+	private:
+		void dstry() noexcept{
+			if(hdl){
+				if(!done()){
+					resume();
+				}
+				hdl.destroy();
+			}
+		}
+
+		handle hdl{};
+	};
+
+	export
 	enum struct category{
 		misc,
 		weaponry,
@@ -57,10 +143,6 @@ namespace mo_yanxi::game::meta::chamber{
 
 		}
 
-		virtual void build_ui(){
-
-		}
-
 		virtual void write(std::ostream& stream) const{
 
 		}
@@ -79,8 +161,8 @@ namespace mo_yanxi::game::meta::chamber{
 
 		}
 
-		virtual void build_ui(ui::table& table) const{
-
+		virtual ui_build_handle build_ui(ui::table& table){
+			co_yield false;
 		}
 
 		// virtual void mouse_events()
@@ -214,6 +296,8 @@ namespace mo_yanxi::game::meta::chamber{
 			float rotation;
 
 			void draw(const basic_chamber& meta, math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const override;
+
+			ui_build_handle build_ui(ui::table& table) override;
 		};
 
 	protected:

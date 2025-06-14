@@ -80,12 +80,11 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 			true
 		).first;
 
-
 		graphic::allocated_image_region& base = page.register_named_region(
 			"base"s,
 			graphic::sdf_load{
 				graphic::msdf::msdf_generator{graphic::msdf::create_solid_boarder(12.f), 8.},
-				math::usize2{96, 96}, 5
+				math::usize2{96, 96}, 3
 			},
 			true
 		).first;
@@ -95,6 +94,14 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 			graphic::sdf_load{
 				graphic::msdf::msdf_generator{graphic::msdf::svg_to_shape((assets::dir::svg.path() / "ui/line.svg").string().data())},
 				{40u, 24u}
+			},
+			true).first;
+
+		graphic::allocated_image_region& side_bar = page.register_named_region(
+			"side_bar"s,
+			graphic::sdf_load{
+				graphic::msdf::msdf_generator{graphic::msdf::svg_to_shape((assets::dir::svg.path() / "ui/side_bar.svg").string().data())},
+				{96, 96}
 			},
 			true).first;
 
@@ -116,49 +123,60 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 				graphic::msdf::sdf_image_boarder
 			};
 
+		shapes::side_bar = {
+				side_bar,
+				align::padding<std::uint32_t>{32, 0, 16, 16}.expand(graphic::msdf::sdf_image_boarder),
+				graphic::msdf::sdf_image_boarder
+			};
+
 		shapes::line = graphic::image_caped_region{line, line.get_region(), 12, 12, graphic::msdf::sdf_image_boarder};
 
-
-		using namespace styles;
-
-		general.edge = style::palette_with{shapes::edge, style_pal::front};
-		general.base = style::palette_with{shapes::base, style_pal::base};
-		general.back = style::palette_with{shapes::base, style_pal::back_black};
-
-		whisper = general;
-		whisper.edge.pal = style_pal::front_whisper;
-
-		humble = whisper;
-		humble.edge = shapes::edge_thin;
-		humble.edge.pal.mul_rgb(.5f);
-		humble.edge.pal.activated = whisper.edge.pal.activated;
-		humble.base.pal.mul_rgb(.6f);
-		humble.base.pal.activated = whisper.base.pal.activated;
-
-		accent = general;
-		accent.edge.pal = style_pal::front_accent;
-
-		hint_valid = general;
-		hint_valid.edge.pal = style_pal::front_valid;
-
-		hint_invalid = general;
-		hint_invalid.edge.pal = style_pal::front_invalid;
-
-		no_edge.edge = style::palette_with{shapes::edge, style_pal::front_clear};
-		no_edge.edge.pal.on_focus = {};
-
-		no_edge.base = style::palette_with{shapes::base, style::palette{style_pal::front_clear}.mul_alpha(0.25f)};
-		no_edge.base.pal.activated.set_a(.075f);
-
-		general_static = general;
-		general_static.base.pal.on_focus = {};
-		general_static.base.pal.on_press = {};
-		// general_static.back.pal = pal::back_black;
-
-		global_style_drawer = &general;
-
-		load_icons(page);
 	}
 
 
+
+	using namespace styles;
+
+	general.edge = style::palette_with{shapes::edge, style_pal::front};
+	general.base = style::palette_with{shapes::base, style_pal::base};
+	general.back = style::palette_with{shapes::base, style_pal::back_black};
+
+
+	side_bar_general = general;
+	side_bar_general.edge = shapes::side_bar;
+	side_bar_general.boarder.left = 32;
+
+	whisper = general;
+	whisper.edge.pal = style_pal::front_whisper;
+
+	humble = whisper;
+	humble.edge = shapes::edge_thin;
+	humble.edge.pal.mul_rgb(.5f);
+	humble.edge.pal.activated = whisper.edge.pal.activated;
+	humble.base.pal.mul_rgb(.6f);
+	humble.base.pal.activated = whisper.base.pal.activated;
+
+	accent = general;
+	accent.edge.pal = style_pal::front_accent;
+
+	hint_valid = general;
+	hint_valid.edge.pal = style_pal::front_valid;
+
+	hint_invalid = general;
+	hint_invalid.edge.pal = style_pal::front_invalid;
+
+	no_edge.edge = style::palette_with{shapes::edge, style_pal::front_clear};
+	no_edge.edge.pal.on_focus = {};
+
+	no_edge.base = style::palette_with{shapes::base, style::palette{style_pal::front_clear}.mul_alpha(0.25f)};
+	no_edge.base.pal.activated.set_a(.075f);
+
+	general_static = general;
+	general_static.base.pal.on_focus = {};
+	general_static.base.pal.on_press = {};
+	// general_static.back.pal = pal::back_black;
+
+	global_style_drawer = &general;
+
+	load_icons(page);
 }

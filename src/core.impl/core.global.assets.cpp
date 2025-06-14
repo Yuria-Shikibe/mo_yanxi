@@ -12,12 +12,12 @@ void mo_yanxi::core::global::assets::init(void* vk_context_ptr){
 
 
 	{ //TODO using relative path
-		auto p = font_manager.page().register_named_region(
-			std::string_view{"white"}, graphic::path_load{
-				R"(D:\projects\mo_yanxi\prop\assets\texture\white.png)"
-			});
-		p.first.uv.shrink(64);
-		font_manager.page().mark_protected("white");
+		// auto p = font_manager.page().register_named_region(
+		// 	std::string_view{"white"}, graphic::path_load{
+		// 		R"(D:\projects\mo_yanxi\prop\assets\texture\white.png)"
+		// 	});
+		// p.first.uv.shrink(64);
+		// font_manager.page().mark_protected("white");
 
 		// graphic::draw::white_region = p.first;
 

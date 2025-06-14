@@ -21,7 +21,7 @@ namespace mo_yanxi::ui{
 		/**
 		 * @brief Has 2 degree of freedom [x, y]
 		 */
-		snap_shot<math::vec2> barProgress{};
+		snap_shot<math::vec2> bar_progress_{};
 
 		std::move_only_function<void(slider&)> callback{};
 
@@ -35,21 +35,22 @@ namespace mo_yanxi::ui{
 
 		void moveBar(const math::vec2 baseMovement) noexcept{
 			if(is_segment_move_activated()){
-				barProgress.temp =
-					(barProgress.base + (baseMovement * sensitivity).round_by(getSegmentUnit()) / getBarMovableSize()).clamp_xy({}, {1, 1});
+				bar_progress_.temp =
+					(bar_progress_.base + (baseMovement * sensitivity).round_by(getSegmentUnit()) / getBarMovableSize()).clamp_xy({}, {1, 1});
 			} else{
-				barProgress.temp = (barProgress.base + (baseMovement * sensitivity) / getBarMovableSize()).clamp_xy({}, {1, 1});
+				bar_progress_.temp = (bar_progress_.base + (baseMovement * sensitivity) / getBarMovableSize()).clamp_xy({}, {1, 1});
 			}
 		}
 
 		void applyLast(){
-			if(barProgress.try_apply()){
+			if(bar_progress_.try_apply()){
+				on_data_changed();
 				if(callback)callback(*this);
 			}
 		}
 
 		void resumeLast(){
-			barProgress.resume();
+			bar_progress_.resume();
 		}
 
 	public:
@@ -103,9 +104,9 @@ namespace mo_yanxi::ui{
 
 		}
 
-		void set_initial_progress(math::vec2 progress) noexcept{
+		void set_progress(math::vec2 progress) noexcept{
 			progress.clamp_xy({}, math::vectors::constant2<float>::base_vec2);
-			this->barProgress = progress;
+			this->bar_progress_ = progress;
 		}
 
 		[[nodiscard]] bool is_segment_move_activated() const noexcept{
@@ -117,15 +118,15 @@ namespace mo_yanxi::ui{
 		}
 
 		[[nodiscard]] math::vec2 get_bar_last_pos() const noexcept{
-			return getBarMovableSize() * barProgress.temp;
+			return getBarMovableSize() * bar_progress_.temp;
 		}
 
 		[[nodiscard]] math::vec2 get_bar_cur_pos() const noexcept{
-			return getBarMovableSize() * barProgress.base;
+			return getBarMovableSize() * bar_progress_.base;
 		}
 
 		[[nodiscard]] math::vec2 get_progress() const noexcept{
-			return barProgress.base;
+			return bar_progress_.base;
 		}
 
 		void set_hori_only() noexcept{ sensitivity.y = 0.0f; }
@@ -137,6 +138,10 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] bool is_clamped_to_vert() const noexcept{ return sensitivity.x == 0.0f; }
 
 	protected:
+		virtual void on_data_changed(){
+
+		}
+
 		void draw_content(rect clipSpace) const override;
 
 		void on_scroll(const input_event::scroll event) override{
@@ -162,6 +167,12 @@ namespace mo_yanxi::ui{
 			applyLast();
 		}
 
+	public:
+		bool is_sliding() const noexcept{
+			return bar_progress_.base != bar_progress_.temp;
+		}
+
+	protected:
 		void on_drag(const input_event::drag event) override{
 			moveBar(event.trans());
 		}

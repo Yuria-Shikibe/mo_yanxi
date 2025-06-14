@@ -155,6 +155,7 @@ namespace mo_yanxi::ui{
 
 			return *this;
 		}
+
 		constexpr auto& set_external(math::vector2<bool> weight) noexcept {
 			if(weight.x){
 				stated_extent.width.type = size_category::dependent;

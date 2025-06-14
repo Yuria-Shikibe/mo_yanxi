@@ -133,6 +133,7 @@ namespace mo_yanxi::ui{
 			}else{
 				mergeTo(range.dst, false);
 				const auto idx = layout.at(range.dst.pos).code.unit_index;
+				if(layout.get_text().size() <= idx)return false;
 				auto code = layout.get_text()[idx];
 				if(code == 0)return false;
 				const auto len = encode::getUnicodeLength(layout.get_text()[idx]);
@@ -851,6 +852,10 @@ namespace mo_yanxi::ui{
 			return false;
 		}
 
+		bool set_from_progress(std::floating_point auto val) noexcept{
+			return false;
+		}
+
 		[[nodiscard]] bool has_cycle() const noexcept{
 			return false;
 		}
@@ -868,6 +873,10 @@ namespace mo_yanxi::ui{
 		std::string to_string() const noexcept{
 			return {};
 		}
+
+		std::string get_range_string() const noexcept{
+			return {};
+		}
 	};
 
 	export
@@ -875,20 +884,28 @@ namespace mo_yanxi::ui{
 	struct edit_target{
 		using value_type = T;
 
-		T* target;
-		T input_to_impl_ratio;
-		T cycle;
+		T* target{nullptr};
+		T input_to_impl_ratio{1};
+		T cycle{0};
 
 		[[nodiscard]] bool has_cycle() const noexcept{
 			return cycle != T{};
 		}
 
 		bool operator()(T val) const noexcept{
-			assert(target != nullptr);
 			val *= input_to_impl_ratio;
-			*target = has_cycle() ? math::mod<T>(val, cycle) : val;
+			this->set_raw(val);
 
 			return true;
+		}
+
+		void set_raw(T val) const noexcept{
+			assert(target != nullptr);
+			*target = has_cycle() ? math::mod<T>(val, cycle) : val;
+		}
+
+		bool set_from_progress(std::floating_point auto val) noexcept{
+			return false;
 		}
 
 		T get_current() const noexcept{
@@ -898,7 +915,7 @@ namespace mo_yanxi::ui{
 			return v;
 		}
 
-		[[nodiscard]] std::string to_string() const noexcept{
+		[[nodiscard]] std::string to_string() const{
 			if constexpr (std::floating_point<T>){
 				return std::format("{:g<.2f}", get_current());
 			}else{
@@ -920,6 +937,10 @@ namespace mo_yanxi::ui{
 		void set_cycle(Ty val) noexcept{
 			cycle = static_cast<T>(val);
 		}
+
+		std::string get_range_string() const noexcept{
+			return {};
+		}
 	};
 
 	export
@@ -927,12 +948,37 @@ namespace mo_yanxi::ui{
 	struct edit_target_range_constrained : edit_target<T>{
 		math::section<T> range;
 
+		[[nodiscard]] float get_ratio_of_current() const noexcept{
+			assert(this->target != nullptr);
+			return static_cast<float>(*this->target - range.from) / static_cast<float>(range.length());
+		}
+
+		[[nodiscard]] std::string get_range_string() const noexcept{
+			auto rng = range / this->get_ratio();
+			if constexpr (std::floating_point<T>){
+				return std::format("[{:g>.2f}, {:g>.2f}]", rng.from, rng.to);
+			}else{
+				return std::format("[{}, {}]", rng.from, rng.to);
+			}
+		}
+
 		bool operator()(T val) const noexcept{
-			if(range.within_closed(val)){
-				return edit_target<T>::operator()(val);
+			assert(this->target != nullptr);
+			auto last = *this->target;
+			edit_target<T>::operator()(val);
+			if(range.within_closed(*this->target)){
+				return true;
 			}
 
+			*this->target = last;
 			return false;
+		}
+
+		bool set_from_progress(std::floating_point auto val) noexcept{
+			if(val < 0 || val > 1)return false;
+			assert(this->target != nullptr);
+			this->set_raw(range[val]);
+			return true;
 		}
 	};
 
@@ -1013,10 +1059,13 @@ namespace mo_yanxi::ui{
 			requires std::constructible_from<decltype(target), T&&>
 		void set_target(T&& target) noexcept{
 			this->target = std::forward<T>(target);
-			this->set_text(std::visit([](const auto& v){return v.to_string();}, this->target));
+			fetch_target();
 			value_changed = false;
 		}
 
+		void fetch_target(){
+			this->set_text(std::visit([](const auto& v){return v.to_string();}, this->target));
+		}
 
 		template <typename T>
 			requires std::is_arithmetic_v<T>
@@ -1095,10 +1144,11 @@ namespace mo_yanxi::ui{
 					}, target)){
 						set_input_invalid();
 					}else{
+						on_target_updated();
 						if(std::visit([]<typename T>(const T& p){
 							return p.has_cycle();
 						}, target)){
-							this->set_text(std::visit([](const auto& v){return v.to_string();}, this->target));
+							fetch_target();
 						}
 					}
 				}
@@ -1109,6 +1159,8 @@ namespace mo_yanxi::ui{
 
 			text_input_area::update(delta_in_ticks);
 		}
+
+		virtual void on_target_updated(){}
 	};
 
 	// export

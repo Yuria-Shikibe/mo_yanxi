@@ -2,6 +2,8 @@ module mo_yanxi.game.meta.chamber;
 
 import mo_yanxi.ui.graphic;
 import mo_yanxi.ui.elem.text_elem;
+import mo_yanxi.ui.creation.field_edit;
+import mo_yanxi.ui.assets;
 
 void mo_yanxi::game::meta::chamber::basic_chamber::build_ui(ui::table& table) const{
 	table.end_line().function_init([this](ui::label& l){
@@ -11,15 +13,33 @@ void mo_yanxi::game::meta::chamber::basic_chamber::build_ui(ui::table& table) co
 		l.text_entire_align = align::pos::center;
 	}).cell().set_height(40);
 
+
 	for(int i = 0; i < 10; ++i){
 		table.end_line().function_init([&, this](ui::label& l){
 			l.set_fit();
 			l.set_style();
 			l.set_text(std::format("test {}", i));
-		}).cell().set_height(30);
+		}).cell().set_height(30).pad.set_vert(4);
 
 	}
 }
+
+
+mo_yanxi::game::meta::chamber::ui_build_handle mo_yanxi::game::meta::chamber::radar::radar_instance_data::build_ui(ui::table& table){
+	co_yield true;
+
+	table.end_line().function_init([this](ui::named_field_editor& l){
+		l.get_editor().set_edit_target(ui::edit_target_range_constrained{ui::edit_target{&rotation, math::deg_to_rad, math::pi_2}, {0, math::pi_2}});
+		l.get_unit_label().set_text("#<[#8FD7C0>Deg");
+		l.get_name_label().set_text("Rotation");
+		l.set_unit_label_size({60});
+		l.set_editor_height(50);
+		l.set_name_height(35);
+
+		l.set_style(ui::theme::styles::side_bar_general);
+	}).cell().set_external({false, true});
+}
+
 
 void mo_yanxi::game::meta::chamber::radar::draw(math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const{
 	basic_chamber::draw(region, renderer_ui, camera);

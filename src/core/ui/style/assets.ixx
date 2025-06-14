@@ -85,6 +85,7 @@ namespace mo_yanxi::ui::theme{
 		export inline graphic::image_nine_region edge{};
 		export inline graphic::image_nine_region edge_thin{};
 		export inline graphic::image_nine_region base{};
+		export inline graphic::image_nine_region side_bar{};
 
 
 		export inline graphic::image_caped_region line{};
@@ -92,6 +93,8 @@ namespace mo_yanxi::ui::theme{
 	}
 
 	namespace styles{
+		export inline style::round_style side_bar_general{};
+
 		export inline style::round_style general{};
 		export inline style::round_style general_static{};
 		export inline style::round_style whisper{};

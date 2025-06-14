@@ -18,6 +18,14 @@ void mo_yanxi::ui::basic_cell::apply_to_base(group& group, elem& elem, stated_ex
 		real_cell_extent.height.promote(math::clamp_positive(allocated_region.height() - margin.height()));
 	}
 
+	if(real_cell_extent.width.mastering()){
+		real_cell_extent.width.value = math::clamp_positive(allocated_region.width() - margin.width());
+	}
+
+	if(real_cell_extent.height.mastering()){
+		real_cell_extent.height.value = math::clamp_positive(allocated_region.height() - margin.height());
+	}
+
 	elem.context_size_restriction = real_cell_extent;
 	elem.layout();
 }

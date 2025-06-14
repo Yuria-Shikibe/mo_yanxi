@@ -95,7 +95,7 @@ namespace mo_yanxi::ui{
 
 			if(text_expired){
 				const auto maxSz = context_size_restriction.potential_max_size();
-				const auto resutlSz = layout_text(maxSz);
+				const auto resutlSz = layout_text(property.evaluate_valid_size(maxSz));
 				if(!resutlSz.equals(content_size())){
 					notify_layout_changed(spread_direction::all_visible);
 				}

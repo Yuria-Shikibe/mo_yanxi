@@ -97,15 +97,16 @@ mo_yanxi::ui::tooltip_instance& mo_yanxi::ui::tooltip_manager::append_tooltip(
 	bool belowScene,
 	bool fade_in){
 	auto rst = owner.tooltip_setup(*scene);
+	assert(rst != nullptr);
 	return append_tooltip(owner, std::move(rst), belowScene, fade_in);
 }
 
 mo_yanxi::ui::tooltip_instance& mo_yanxi::ui::tooltip_manager::append_tooltip(tooltip_owner& owner, elem_ptr&& elem,
 	bool belowScene, bool fade_in){
 
-	if(owner.has_tooltip()){
-		owner.tooltip_notify_drop();
-	}
+	// if(owner.has_tooltip()){
+	// 	owner.tooltip_notify_drop();
+	// }
 
 	auto& val = actives.emplace_back(std::move(elem), &owner);
 	val.update_layout(*this);

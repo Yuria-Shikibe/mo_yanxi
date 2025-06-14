@@ -212,12 +212,33 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	//
 	// }
 	{
-		auto pane = bed.emplace<game::ui::edit_floating_point>();
-		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.9f, .1f}};
+		auto pane = bed.emplace<game::ui::grid_editor>();
+		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.9f, 1.f}};
 		pane.cell().align = align::pos::center_right;
 		pane.cell().margin.set(4);
 
+
 	}
+	// {
+	// 	static int t = 0;
+	// 	auto pane = bed.emplace<game::ui::field_editor>();
+	// 	pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.9f, .1f}};
+	// 	pane.cell().align = align::pos::center_right;
+	// 	pane.cell().margin.set(4);
+	// 	pane->set_edit_target(ui::edit_target_range_constrained{ui::edit_target{&t}, {200, 400}});
+	//
+	// }
+	// {
+	// 	static int t = 0;
+	// 	auto pane = bed.emplace<game::ui::named_field_editor>();
+	// 	pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.9f, .15f}};
+	// 	pane.cell().align = align::pos::center_right;
+	// 	pane.cell().margin.set(4);
+	// 	pane->get_editor().set_edit_target(ui::edit_target_range_constrained{ui::edit_target{&t}, {200, 400}});
+	//
+	// 	pane->set_name_height(50);
+	// 	pane->set_editor_height(80);
+	// }
 
 
 

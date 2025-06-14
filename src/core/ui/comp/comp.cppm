@@ -5,6 +5,7 @@
 export module mo_yanxi.ui.comp.drawer;
 
 import mo_yanxi.math.rect_ortho;
+import mo_yanxi.graphic.color;
 
 namespace mo_yanxi::ui{
 	export inline constexpr float BoarderStroke = 8.;

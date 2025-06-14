@@ -109,7 +109,10 @@ namespace mo_yanxi::ui{
 			  height(std::isinf(height) ? size_category::dependent : size_category::mastering, height){
 		}
 
-
+		constexpr void try_add(math::vec2 extent) noexcept{
+			if(width.mastering())width.value += extent.x;
+			if(height.mastering())height.value += extent.y;
+		}
 
 		constexpr friend bool operator==(const stated_extent& lhs, const stated_extent& rhs) noexcept = delete;
 

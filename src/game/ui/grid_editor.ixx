@@ -20,6 +20,7 @@ import mo_yanxi.ui.creation.generic;
 
 import mo_yanxi.ui.assets;
 import mo_yanxi.ui.creation.file_selector;
+import mo_yanxi.ui.creation.generic;
 
 
 import mo_yanxi.game.meta.hitbox;
@@ -102,6 +103,17 @@ namespace mo_yanxi::game{
 					if(selected_building != building){
 						t.clear_children();
 						building->get_meta_info().build_ui(t);
+						if(auto ist = building->get_instance_data()){
+							auto hdl = ist->build_ui(t);
+							if(hdl.has_ui()){
+								t.end_line();
+								auto spl = t.create(creation::general_seperator_line{.stroke = 20, .palette =  ui::theme::style_pal::front_white.copy().mul_alpha(.25f)});
+								spl.cell().pad.set_vert(8);
+								t.end_line();
+								hdl.resume();
+							}
+						}
+
 					}
 					pane_->visible = true;
 				}else{

@@ -859,6 +859,13 @@ namespace mo_yanxi::ui{
 			return thoroughly_esc(std::addressof(where));
 		}
 	}
+
+	export
+	template <typename T>
+	concept ui_component = std::is_base_of_v<elem, T>;
+
+	// template <typename T>
+	// concept ui_constucable_cpm
 	//
 	// export void elementBuildTooltip(elem& element) noexcept{
 	// 	if(!element.hasTooltip()){

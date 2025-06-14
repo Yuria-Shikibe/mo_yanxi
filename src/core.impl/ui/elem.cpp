@@ -34,9 +34,9 @@ namespace mo_yanxi{
 			// stagnateTime = focusedTime = 0.f;
 		});
 
-		event_manager.on<input_event::cursor_moved>([](auto, elem& self){
+		event_manager.on<input_event::cursor_moved>([](input_event::cursor_moved e, elem& self){
 			self.cursor_state.time_stagnate = 0;
-			if(self.get_tooltip_prop().use_stagnate_time){
+			if(self.get_tooltip_prop().use_stagnate_time && !e.pos.equals({})){
 				self.cursor_state.time_tooltip = 0.;
 				self.tooltip_notify_drop();
 			}
