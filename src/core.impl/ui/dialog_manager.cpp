@@ -44,9 +44,8 @@ void mo_yanxi::ui::dialog_manager::update_top() noexcept{
 		top_ = dialogs.back().elem.get();
 	}
 
-	scene_->drop_event_focus();
-
-	scene_->on_cursor_pos_update();
+	scene_->swap_event_focus_to_null();
+	scene_->on_cursor_pos_update(true);
 }
 
 mo_yanxi::ui::esc_flag mo_yanxi::ui::dialog_manager::on_esc() noexcept{

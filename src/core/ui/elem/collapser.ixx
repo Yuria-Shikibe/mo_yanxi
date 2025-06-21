@@ -131,8 +131,6 @@ namespace mo_yanxi::ui{
 
 		void draw_content(const rect clipSpace) const override;
 
-		void draw_post(const rect clipSpace) const override;
-
 
 		void layout_children() override{
 			set_fillparent();

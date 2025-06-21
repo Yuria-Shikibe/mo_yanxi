@@ -16,6 +16,7 @@ namespace mo_yanxi::ui{
 		template <typename... Args>
 		[[nodiscard]] canvas(scene* scene, group* group, Args&& ...args)
 			: elem(scene, group, "canvas"), fn(std::forward<Args>(args)...){
+			interactivity = interactivity::disabled;
 		}
 
 		void draw_content(const rect clipSpace) const override{

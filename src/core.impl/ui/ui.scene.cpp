@@ -89,7 +89,6 @@ void mo_yanxi::ui::scene::notify_layout_update(elem* element){
 
 
 
-
 void mo_yanxi::ui::scene::drop_all_focus(const elem* target){
 	drop_event_focus(target);
 	std::erase(lastInbounds, target);
@@ -98,11 +97,11 @@ void mo_yanxi::ui::scene::drop_all_focus(const elem* target){
 	// tooltipManager.requestDrop(*target);
 }
 
-void mo_yanxi::ui::scene::try_swap_focus(elem* newFocus){
+void mo_yanxi::ui::scene::try_swap_focus(elem* newFocus, bool force_drop){
 	if(newFocus == currentCursorFocus) return;
 
 	if(currentCursorFocus){
-		if(currentCursorFocus->maintain_focus_by_mouse()){
+		if(!force_drop && currentCursorFocus->maintain_focus_by_mouse()){
 			if(!is_mouse_pressed()){
 				swap_focus(newFocus);
 			} else return;
@@ -179,7 +178,7 @@ void mo_yanxi::ui::scene::on_mouse_action(const core::ctrl::key_code_t key, cons
 	}
 
 	if(currentCursorFocus && currentCursorFocus->maintain_focus_by_mouse()){
-		on_cursor_pos_update(cursor_pos);
+		on_cursor_pos_update(cursor_pos, false);
 	}
 }
 
@@ -187,7 +186,7 @@ void mo_yanxi::ui::scene::on_key_action(const core::ctrl::key_code_t key, const 
 
 	if(action == core::ctrl::act::press && key == core::ctrl::key::Esc){
 		if(on_esc() == esc_flag::fall_through){
-			on_cursor_pos_update(cursor_pos);
+			on_cursor_pos_update(cursor_pos, true);
 		}
 	}else{
 		elem* focus = currentKeyFocus;
@@ -210,7 +209,7 @@ void mo_yanxi::ui::scene::on_scroll(const math::vec2 scroll, core::ctrl::key_cod
 	}
 }
 
-void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos){
+void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos, bool force_drop){
 	const auto delta = newPos - cursor_pos;
 	cursor_pos = newPos;
 
@@ -244,7 +243,7 @@ void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos){
 
 	upt:
 
-	updateInbounds(std::move(inbounds));
+	updateInbounds(std::move(inbounds), force_drop);
 
 	if(!currentCursorFocus) return;
 
@@ -375,7 +374,7 @@ mo_yanxi::ui::scene& mo_yanxi::ui::scene::operator=(scene&& other) noexcept{
 	return *this;
 }
 
-void mo_yanxi::ui::scene::updateInbounds(std::vector<elem*>&& next){
+void mo_yanxi::ui::scene::updateInbounds(std::vector<elem*>&& next, bool force_drop){
 	auto [i1, i2] = std::ranges::mismatch(lastInbounds, next);
 
 	for(const auto& element : std::ranges::subrange{i1, lastInbounds.end()}){
@@ -389,6 +388,6 @@ void mo_yanxi::ui::scene::updateInbounds(std::vector<elem*>&& next){
 
 	lastInbounds = std::move(next);
 
-	try_swap_focus(lastInbounds.empty() ? nullptr : lastInbounds.back());
+	try_swap_focus(lastInbounds.empty() ? nullptr : lastInbounds.back(), force_drop);
 }
 

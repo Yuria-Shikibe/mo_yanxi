@@ -13,11 +13,20 @@ export import mo_yanxi.ui.table;
 
 import mo_yanxi.type_map;
 import mo_yanxi.owner;
+import mo_yanxi.game.srl;
 import std;
 
 #define NAME_OF(e) ((void)category::e, #e)
 
 namespace mo_yanxi::game::meta::chamber{
+	export struct chamber_instance_data;
+	export
+	struct ui_edit_context{
+		chamber_instance_data* current_changed_building{};
+		bool dynamic_energy_usage_changed{};
+
+	};
+
 	export
 	struct ui_build_handle{
 		struct promise_type;
@@ -129,13 +138,12 @@ namespace mo_yanxi::game::meta::chamber{
 
 	export
 	struct energy_consumer_comp{
-		unsigned max_energy_unit;
+		unsigned max_energy_consumption;
 		bool reserve_energy_if_power_off;
 	};
 
 	export struct basic_chamber;
 
-	export
 	struct chamber_instance_data{
 		virtual ~chamber_instance_data() = default;
 
@@ -143,11 +151,11 @@ namespace mo_yanxi::game::meta::chamber{
 
 		}
 
-		virtual void write(std::ostream& stream) const{
-
+		virtual srl::chunk_serialize_handle write(std::ostream& stream) const{
+			co_yield 0;
 		}
 
-		virtual void read(std::istream& stream){
+		virtual void read(std::ispanstream& bounded_stream){
 
 		}
 
@@ -161,7 +169,7 @@ namespace mo_yanxi::game::meta::chamber{
 
 		}
 
-		virtual ui_build_handle build_ui(ui::table& table){
+		virtual ui_build_handle build_ui(ui::table& table, ui_edit_context& context){
 			co_yield false;
 		}
 
@@ -210,6 +218,12 @@ namespace mo_yanxi::game::meta::chamber{
 
 		}
 
+		virtual int get_energy_usage() const noexcept{
+			return get_energy_consumption().transform([](energy_consumer_comp&& c){return -c.max_energy_consumption;}).value_or(0);
+		}
+
+
+
 		virtual void build_ui(ui::table& table) const;
 
 		template <typename S>
@@ -218,7 +232,7 @@ namespace mo_yanxi::game::meta::chamber{
 		}
 
 	protected:
-		virtual owner<chamber_instance_data*> create_instance_data_impl() const{
+		[[nodiscard]] virtual owner<chamber_instance_data*> create_instance_data_impl() const{
 			return nullptr;
 		}
 
@@ -235,6 +249,15 @@ namespace mo_yanxi::game::meta::chamber{
 	export
 	struct armor : basic_chamber{
 
+	};
+
+	export
+	struct energy_generator : basic_chamber{
+		unsigned max_energy_generation{};
+
+		[[nodiscard]] int get_energy_usage() const noexcept override{
+			return max_energy_generation;
+		}
 	};
 
 	template <std::derived_from<basic_chamber> T>
@@ -265,7 +288,7 @@ namespace mo_yanxi::game::meta::chamber{
 		}
 
 	protected:
-		owner<turret_instance_data*> create_instance_data_impl() const override{
+		[[nodiscard]] owner<turret_instance_data*> create_instance_data_impl() const override{
 			return new turret_instance_data{};
 		}
 	};
@@ -297,11 +320,13 @@ namespace mo_yanxi::game::meta::chamber{
 
 			void draw(const basic_chamber& meta, math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const override;
 
-			ui_build_handle build_ui(ui::table& table) override;
+			ui_build_handle build_ui(ui::table& table, ui_edit_context& context) override;
+
+
 		};
 
 	protected:
-		owner<radar_instance_data*> create_instance_data_impl() const override{
+		[[nodiscard]] owner<radar_instance_data*> create_instance_data_impl() const override{
 			return new radar_instance_data{};
 		}
 	};
@@ -311,6 +336,7 @@ namespace mo_yanxi::game::meta::chamber{
 		turret_base
 	, radar
 	, armor
+	, energy_generator
 	>;
 
 

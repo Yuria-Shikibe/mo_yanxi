@@ -93,24 +93,15 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] constexpr color to_light(float lumaScl = max_luma_scale) const noexcept{
 			return copy().set_light(lumaScl);
 		}
+
 		[[nodiscard]] constexpr color to_neutralize_light(float factor = .65f) const noexcept{
 			return copy().mul_rgb(factor);
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr color to_light_color_copy() const noexcept{
-			color ret{*this};
-
-			return ret.to_light_color();
+		[[nodiscard]] constexpr color to_neutralize_light_def() const noexcept{
+			return to_neutralize_light(.65f);
 		}
-		[[nodiscard]] FORCE_INLINE constexpr color to_light_color_copy(const bool cond) const noexcept{
-			if(cond){
-				color ret{*this};
 
-				return ret.to_light_color();
-			}else{
-				return *this;
-			}
-		}
 
 		FORCE_INLINE friend constexpr std::size_t hash_value(const color& obj){
 			return obj.hash_value();
@@ -680,64 +671,83 @@ namespace mo_yanxi::graphic{
 		}
 	};
 
-	export namespace colors{
-		constexpr color white{1, 1, 1, 1};
-		constexpr color light_gray{color::from_rgba8888(0xbfbfbfff)};
-		constexpr color gray{color::from_rgba8888(0x7f7f7fff)};
-		constexpr color dark_gray{color::from_rgba8888(0x3f3f3fff)};
-		constexpr color black{0, 0, 0, 1};
-		constexpr color clear{0, 0, 0, 0};
-		constexpr color black_clear{0, 0, 0, 0};
-		constexpr color white_clear{1, 1, 1, 0};
-		constexpr color clear_light{white.to_light().set_a(0)};
+	namespace colors{
+		export {
+			constexpr inline color white{1, 1, 1, 1};
+			constexpr inline color light_gray{color::from_rgba8888(0xbfbfbfff)};
+			constexpr inline color gray{color::from_rgba8888(0x7f7f7fff)};
+			constexpr inline color dark_gray{color::from_rgba8888(0x3f3f3fff)};
+			constexpr inline color black{0, 0, 0, 1};
+			constexpr inline color clear{0, 0, 0, 0};
+			constexpr inline color black_clear{0, 0, 0, 0};
+			constexpr inline color white_clear{1, 1, 1, 0};
+			constexpr inline color clear_light{white.to_light().set_a(0)};
 
-		constexpr color BLUE{0, 0, 1, 1};
-		constexpr color NAVY{0, 0, 0.5f, 1};
-		constexpr color ROYAL{color::from_rgba8888(0x4169e1ff)};
-		constexpr color SLATE{color::from_rgba8888(0x708090ff)};
-		constexpr color SKY{color::from_rgba8888(0x87ceebff)};
+			constexpr inline color BLUE{0, 0, 1, 1};
+			constexpr inline color NAVY{0, 0, 0.5f, 1};
+			constexpr inline color ROYAL{color::from_rgba8888(0x4169e1ff)};
+			constexpr inline color SLATE{color::from_rgba8888(0x708090ff)};
+			constexpr inline color SKY{color::from_rgba8888(0x87ceebff)};
 
-		constexpr color aqua{color::from_rgba8888(0x85A2F3ff)};
-		constexpr color BLUE_SKY = color::from_lerp_span(0.745f, BLUE, SKY);
-		constexpr color AQUA_SKY = color::from_lerp_span(0.5f, aqua, SKY);
+			constexpr inline color aqua{color::from_rgba8888(0x85A2F3ff)};
+			constexpr inline color BLUE_SKY = color::from_lerp_span(0.745f, BLUE, SKY);
+			constexpr inline color AQUA_SKY = color::from_lerp_span(0.5f, aqua, SKY);
 
-		constexpr color CYAN{0, 1, 1, 1};
-		constexpr color TEAL{0, 0.5f, 0.5f, 1};
+			constexpr inline color CYAN{0, 1, 1, 1};
+			constexpr inline color TEAL{0, 0.5f, 0.5f, 1};
 
-		constexpr color GREEN{color::from_rgba8888(0x00ff00ff)};
-		constexpr color pale_green{color::from_rgba8888(0xa1ecabff)};
-		constexpr color LIGHT_GREEN{color::from_rgba8888(0X62F06CFF)};
-		constexpr color ACID{color::from_rgba8888(0x7fff00ff)};
-		constexpr color LIME{color::from_rgba8888(0x32cd32ff)};
-		constexpr color FOREST{color::from_rgba8888(0x228b22ff)};
-		constexpr color OLIVE{color::from_rgba8888(0x6b8e23ff)};
+			constexpr inline color GREEN{color::from_rgba8888(0x00ff00ff)};
+			constexpr inline color pale_green{color::from_rgba8888(0xa1ecabff)};
+			constexpr inline color LIGHT_GREEN{color::from_rgba8888(0X62F06CFF)};
+			constexpr inline color ACID{color::from_rgba8888(0x7fff00ff)};
+			constexpr inline color LIME{color::from_rgba8888(0x32cd32ff)};
+			constexpr inline color FOREST{color::from_rgba8888(0x228b22ff)};
+			constexpr inline color OLIVE{color::from_rgba8888(0x6b8e23ff)};
 
-		constexpr color YELLOW{color::from_rgba8888(0xffff00ff)};
-		constexpr color GOLD{color::from_rgba8888(0xffd700ff)};
-		constexpr color GOLDENROD{color::from_rgba8888(0xdaa520ff)};
-		constexpr color ORANGE{color::from_rgba8888(0xffa500ff)};
-		constexpr color danger{color::from_rgb888(0XFFAC34)};
-		constexpr color power{color::from_rgb888(0XF0D167)};
+			constexpr inline color YELLOW{color::from_rgba8888(0xffff00ff)};
+			constexpr inline color pale_yellow = color::from_rgba8888(0XF0D456FF);
+			constexpr inline color GOLD{color::from_rgba8888(0xffd700ff)};
+			constexpr inline color GOLDENROD{color::from_rgba8888(0xdaa520ff)};
+			constexpr inline color ORANGE{color::from_rgba8888(0xffa500ff)};
+			constexpr inline color danger{color::from_rgb888(0XFFAC34)};
+			constexpr inline color power{color::from_rgb888(0XF0D167)};
 
-		constexpr color BROWN{color::from_rgba8888(0x8b4513ff)};
-		constexpr color TAN{color::from_rgba8888(0xd2b48cff)};
-		constexpr color BRICK{color::from_rgba8888(0xb22222ff)};
+			constexpr inline color BROWN{color::from_rgba8888(0x8b4513ff)};
+			constexpr inline color TAN{color::from_rgba8888(0xd2b48cff)};
+			constexpr inline color BRICK{color::from_rgba8888(0xb22222ff)};
 
-		constexpr color RED{color::from_rgba8888(0xff0000ff)};
-		constexpr color red_dusted{color::from_rgba8888(0xDE6663ff)};
-		constexpr color SCARLET{color::from_rgba8888(0xff341cff)};
-		constexpr color CRIMSON{color::from_rgba8888(0xdc143cff)};
-		constexpr color CORAL{color::from_rgba8888(0xff7f50ff)};
-		constexpr color SALMON{color::from_rgba8888(0xfa8072ff)};
-		constexpr color PINK{color::from_rgba8888(0xff69b4ff)};
-		constexpr color MAGENTA{1, 0, 1, 1};
+			constexpr inline color RED{color::from_rgba8888(0xff0000ff)};
+			constexpr inline color red_dusted{color::from_rgba8888(0xDE6663ff)};
+			constexpr inline color SCARLET{color::from_rgba8888(0xff341cff)};
+			constexpr inline color CRIMSON{color::from_rgba8888(0xdc143cff)};
+			constexpr inline color CORAL{color::from_rgba8888(0xff7f50ff)};
+			constexpr inline color SALMON{color::from_rgba8888(0xfa8072ff)};
+			constexpr inline color PINK{color::from_rgba8888(0xff69b4ff)};
+			constexpr inline color MAGENTA{1, 0, 1, 1};
 
-		constexpr color PURPLE{color::from_rgba8888(0xa020f0ff)};
-		constexpr color VIOLET{color::from_rgba8888(0xee82eeff)};
-		constexpr color MAROON{color::from_rgba8888(0xb03060ff)};
+			constexpr inline color PURPLE{color::from_rgba8888(0xa020f0ff)};
+			constexpr inline color VIOLET{color::from_rgba8888(0xee82eeff)};
+			constexpr inline color MAROON{color::from_rgba8888(0xb03060ff)};
 
-		constexpr color ENERGY{color::from_rgba8888(0XF0C743FF)};
-		constexpr color AMMUNITION{color::from_rgba8888(0XF0A24BFF)};
+			constexpr inline color ENERGY{color::from_rgba8888(0XF0C743FF)};
+			constexpr inline color AMMUNITION{color::from_rgba8888(0XF0A24BFF)};
+		}
+
+		namespace seq{
+			export constexpr inline std::array gray_green_yellow{light_gray, pale_green, pale_yellow};
+
+			template <typename T>
+			concept color_range = requires{
+				requires std::ranges::input_range<T>;
+				requires std::convertible_to<std::ranges::range_reference_t<T>, color>;
+			};
+
+			export
+			template <color_range Rng, std::invocable<std::ranges::range_reference_t<Rng>> Proj>
+			constexpr auto proj(Rng&& rng, Proj proj) noexcept(std::is_nothrow_invocable_v<Proj, std::ranges::range_reference_t<Rng>>) {
+				return std::ranges::transform(std::forward<Rng>(rng), std::move(proj));
+			}
+		}
 	}
 }
 
@@ -754,6 +764,7 @@ template <>
 struct ::std::formatter<mo_yanxi::graphic::color>{
 	bool haveAlpha{false};
 	bool haveWrapper{false};
+	bool haveHexHead{false};
 
 	constexpr auto parse(std::format_parse_context& context){
 		auto it = context.begin();
@@ -764,6 +775,10 @@ struct ::std::formatter<mo_yanxi::graphic::color>{
 			++it;
 		}
 
+		if(*it == '#'){
+			haveHexHead = true;
+			++it;
+		}
 		if(*it == 'a'){
 			haveAlpha = true;
 			++it;
@@ -773,35 +788,38 @@ struct ::std::formatter<mo_yanxi::graphic::color>{
 		return it;
 	}
 
-	auto format(const mo_yanxi::graphic::color& c, auto& context) const{
+	template <typename OutputIt, typename CharT>
+	auto format(const mo_yanxi::graphic::color& c, std::basic_format_context<OutputIt, CharT>& context) const{
 		using mo_yanxi::graphic::color;
 		using ColorBits = color::rgba8_bits;
-		if(haveAlpha){
-			if(haveWrapper){
-				return std::format_to(context.out(), "[{:02X}{:02X}{:02X}{:02X}]",
-				                      static_cast<ColorBits>(color::max_val * c.r),
-				                      static_cast<ColorBits>(color::max_val * c.g),
-				                      static_cast<ColorBits>(color::max_val * c.b),
-				                      static_cast<ColorBits>(color::max_val * c.a));
-			} else{
-				return std::format_to(context.out(), "{:02X}{:02X}{:02X}{:02X}",
-				                      static_cast<ColorBits>(color::max_val * c.r),
-				                      static_cast<ColorBits>(color::max_val * c.g),
-				                      static_cast<ColorBits>(color::max_val * c.b),
-				                      static_cast<ColorBits>(color::max_val * c.a));
-			}
-		} else{
-			if(haveWrapper){
-				return std::format_to(context.out(), "[{:02X}{:02X}{:02X}]",
-				                      static_cast<ColorBits>(color::max_val * c.r),
-				                      static_cast<ColorBits>(color::max_val * c.g),
-				                      static_cast<ColorBits>(color::max_val * c.b));
-			} else{
-				return std::format_to(context.out(), "{:02X}{:02X}{:02X}",
-				                      static_cast<ColorBits>(color::max_val * c.r),
-				                      static_cast<ColorBits>(color::max_val * c.g),
-				                      static_cast<ColorBits>(color::max_val * c.b));
-			}
+
+		if(haveWrapper){
+			context.advance_to(std::format_to(context.out(), "["));
 		}
+
+		if(haveHexHead){
+			context.advance_to(std::format_to(context.out(), "#"));
+		}
+
+		if(haveAlpha){
+			context.advance_to(std::format_to(context.out(), "{:02X}{:02X}{:02X}{:02X}",
+			                                  static_cast<ColorBits>(color::max_val * c.r),
+			                                  static_cast<ColorBits>(color::max_val * c.g),
+			                                  static_cast<ColorBits>(color::max_val * c.b),
+			                                  static_cast<ColorBits>(color::max_val * c.a)));
+		} else{
+			context.advance_to(std::format_to(context.out(), "{:02X}{:02X}{:02X}",
+			                                  static_cast<ColorBits>(color::max_val * c.r),
+			                                  static_cast<ColorBits>(color::max_val * c.g),
+			                                  static_cast<ColorBits>(color::max_val * c.b))
+			);
+		}
+
+
+		if(haveWrapper){
+			context.advance_to(std::format_to(context.out(), "]"));
+		}
+
+		return context.out();
 	}
 };

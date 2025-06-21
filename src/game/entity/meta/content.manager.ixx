@@ -158,8 +158,10 @@ namespace mo_yanxi::game::meta{
 			}
 		}
 
-		template <typename ContentTy, typename ...Args>
-			requires std::constructible_from<ContentTy, Args...>
+		template <typename CommonBase, std::derived_from<CommonBase> ContentTy, typename ...Args>
+			requires requires{
+				requires std::constructible_from<ContentTy, Args&&...>;
+			}
 		ContentTy& emplace(std::string_view name, Args&& ...args){
 			if(name_map.contains(name)){
 				throw content_add_error{std::format("duplicated content name: {}", name)};
@@ -172,7 +174,7 @@ namespace mo_yanxi::game::meta{
 
 			content_registry<ContentTy>& chunk = register_type<std::remove_cvref_t<ContentTy>>();
 			ty = std::addressof(chunk.emplace(name, std::forward<Args>(args) ...));
-			name_map.try_emplace(name, ty);
+			name_map.try_emplace(name, static_cast<CommonBase*>(ty));
 			return *ty;
 		}
 
@@ -200,11 +202,13 @@ namespace mo_yanxi::game::meta{
 		}
 
 		[[nodiscard]] const void* find(std::string_view name) const noexcept{
-			return name_map.try_find(name);
+			auto rst = name_map.try_find(name);
+			return rst ? *rst : nullptr;
 		}
 
 		[[nodiscard]] void* find(std::string_view name) noexcept{
-			return name_map.try_find(name);
+			auto rst = name_map.try_find(name);
+			return rst ? *rst : nullptr;
 		}
 
 		template <typename T>

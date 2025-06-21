@@ -33,8 +33,8 @@ namespace mo_yanxi{
 
 
 		acquirer.proj.set_layer(draw_layers::def);
-		draw::nine_patch(acquirer, edge, region, edge.pal.on_instance(element).mul_a(opacityScl));
-		draw::nine_patch(acquirer, base, region, base.pal.on_instance(element).mul_a(opacityScl));
+		draw::nine_patch(acquirer, edge, region, edge.pal.on_instance(element).mul_a(opacityScl).mul(element.gprop().style_color_scl));
+		draw::nine_patch(acquirer, base, region, base.pal.on_instance(element).mul_a(opacityScl).mul(element.gprop().style_color_scl));
 
 		acquirer.proj.set_layer(draw_layers::background);
 		draw::nine_patch(acquirer, back, region, back.pal.on_instance(element).mul_a(opacityScl));

@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package mo_yanxi.io.pb.game.meta.chamber;
+
+import "math.proto";
+
+message radar_instance{
+    float rotation = 1;
+}

@@ -198,7 +198,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		template <typename Uv>
-			requires std::derived_from<Ty, Uv>
+			requires std::convertible_to<Ty, Uv>
 		constexpr explicit(false) operator combined_image_region<Uv>() const noexcept{
 			return combined_image_region<Uv>{static_cast<Uv>(uv), view};
 		}

@@ -1,29 +1,39 @@
 module mo_yanxi.game.content;
 
 void mo_yanxi::game::content::load(){
-	auto& manager = content_manager;
+	auto& manager = chambers;
 	manager = meta::content_manager{};
 
 	using namespace meta::chamber;
 
 	{
-		auto& r = manager.emplace<armor>("wall");
+		auto& r = manager.emplace<basic_chamber, armor>("wall");
 		r.extent = {1, 1};
 	}
 
 	{
-		auto& b = manager.emplace<radar>("radar");
+		auto& b = manager.emplace<basic_chamber, radar>("radar");
 		b.extent = {4, 4};
 		b.targeting_range_radius = {1200, 6000};
 		b.targeting_range_angular = {-math::pi_half / 3.f, math::pi_half / 3.f};
 		b.transform.vec = {.5f, .5f};
 	}
+
 	{
-		auto& b = manager.emplace<turret_base>("turret");
+		auto& b = manager.emplace<basic_chamber, turret_base>("turret");
 		b.extent = {2, 4};
+		b.max_energy_consumption = 8;
 		// b. = {1200, 6000};
 		// b.targeting_range_angular = {-math::pi_half / 3.f, math::pi_half / 3.f};
 		b.transform.vec = {.5f, .5f};
+	}
+	{
+		auto& b = manager.emplace<basic_chamber, energy_generator>("generator");
+		b.extent = {3, 2};
+		b.max_energy_generation = 4;
+		// b. = {1200, 6000};
+		// b.targeting_range_angular = {-math::pi_half / 3.f, math::pi_half / 3.f};
+
 	}
 
 	manager.freeze();

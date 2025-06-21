@@ -108,7 +108,7 @@ namespace mo_yanxi::ui{
 
 		void cursor_pos_update(const float x, const float y) const{
 			assert(focus != nullptr);
-			focus->on_cursor_pos_update({x, y});
+			focus->on_cursor_pos_update({x, y}, false);
 		}
 
 		scene* get_scene(const std::string_view sceneName){

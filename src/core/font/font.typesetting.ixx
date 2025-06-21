@@ -849,12 +849,12 @@ namespace mo_yanxi::font::typesetting{
 
 
 		export void begin_subscript(glyph_layout& layout, parse_context& context){
-			context.push_scaled_offset({-0.025f, -0.105f});
+			context.push_scaled_offset({-0.025f, 0.105f});
 			context.push_scaled_current_size(0.55f);
 		}
 
 		export void begin_superscript(glyph_layout& layout, parse_context& context){
-			context.push_scaled_offset({-0.025f, 0.525f});
+			context.push_scaled_offset({-0.025f, -0.525f});
 			context.push_scaled_current_size(0.55f);
 		}
 

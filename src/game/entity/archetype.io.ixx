@@ -7,6 +7,7 @@ export module mo_yanxi.game.ecs.component.io;
 export import mo_yanxi.game.ecs.component.manage;
 
 import mo_yanxi.game.ecs.entitiy_decleration;
+import mo_yanxi.game.srl;
 import std;
 
 #define case_of_type(type) case mo_yanxi::game::ecs::archetype_serialize_info<type>::identity.index : \
@@ -36,11 +37,11 @@ namespace mo_yanxi::game::ecs{
 	struct archetype_serialize_info<decl::chamber_entity_desc> : archetype_serialize_info_base<decl::chamber_entity_desc, archetype_serialize_identity{
 		1
 	}>{
-		static chunk_serialize_handle write(std::ostream& stream, const dump_chunk& chunk);
-
-		static srl_state read(std::istream& stream, component_chunk_offset off, dump_chunk& chunk) {
-			return srl_state::failed;
-		}
+		// static chunk_serialize_handle write(std::ostream& stream, const dump_chunk& chunk);
+		//
+		// static srl_state read(std::istream& stream, component_chunk_offset off, dump_chunk& chunk) {
+		// 	return srl_state::failed;
+		// }
 	};
 
 	//
@@ -53,7 +54,7 @@ namespace mo_yanxi::game::ecs{
 		switch(identity.index){
 			// case 0: return nullptr;
 			case_of_type(decl::chamber_entity_desc);
-			default: throw ecs::bad_archetype_serialize{std::format("unknown archetype serialization index: {}", identity.index)};
+		default: throw srl::srl_logical_error{std::format("unknown archetype serialization index: {}", identity.index)};
 		}
 	}
 

@@ -49,6 +49,7 @@ void load_icons(mo_yanxi::graphic::image_page& ui_page){
 	NAMED_LOAD(check);
 	NAMED_LOAD(close);
 	NAMED_LOAD(plus);
+	NAMED_LOAD(minus);
 
 	NAMED_LOAD(blender_icon_pivot_active);
 	NAMED_LOAD(blender_icon_pivot_cursor);
@@ -93,7 +94,7 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 			"line"s,
 			graphic::sdf_load{
 				graphic::msdf::msdf_generator{graphic::msdf::svg_to_shape((assets::dir::svg.path() / "ui/line.svg").string().data())},
-				{40u, 24u}
+				{40u, 24u}, 1
 			},
 			true).first;
 
@@ -137,16 +138,22 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 
 	using namespace styles;
 
-	general.edge = style::palette_with{shapes::edge, style_pal::front};
-	general.base = style::palette_with{shapes::base, style_pal::base};
-	general.back = style::palette_with{shapes::base, style_pal::back_black};
+	standard.edge = style::palette_with{shapes::edge, style_pal::front};
+	standard.base = style::palette_with{shapes::base, style_pal::base};
+	standard.back = style::palette_with{shapes::base, style_pal::back_black};
 
 
-	side_bar_general = general;
-	side_bar_general.edge = shapes::side_bar;
-	side_bar_general.boarder.left = 32;
+	side_bar_standard = standard;
+	side_bar_standard.edge = shapes::side_bar;
+	side_bar_standard.boarder.left = 20;
 
-	whisper = general;
+	side_bar_general = side_bar_standard;
+	side_bar_general.edge.pal = style_pal::front_white;
+
+	side_bar_whisper = side_bar_standard;
+	side_bar_whisper.edge.pal = style_pal::front_whisper;
+
+	whisper = standard;
 	whisper.edge.pal = style_pal::front_whisper;
 
 	humble = whisper;
@@ -156,13 +163,13 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 	humble.base.pal.mul_rgb(.6f);
 	humble.base.pal.activated = whisper.base.pal.activated;
 
-	accent = general;
+	accent = standard;
 	accent.edge.pal = style_pal::front_accent;
 
-	hint_valid = general;
+	hint_valid = standard;
 	hint_valid.edge.pal = style_pal::front_valid;
 
-	hint_invalid = general;
+	hint_invalid = standard;
 	hint_invalid.edge.pal = style_pal::front_invalid;
 
 	no_edge.edge = style::palette_with{shapes::edge, style_pal::front_clear};
@@ -171,12 +178,17 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 	no_edge.base = style::palette_with{shapes::base, style::palette{style_pal::front_clear}.mul_alpha(0.25f)};
 	no_edge.base.pal.activated.set_a(.075f);
 
-	general_static = general;
+	general_static = standard;
 	general_static.base.pal.on_focus = {};
 	general_static.base.pal.on_press = {};
 	// general_static.back.pal = pal::back_black;
 
-	global_style_drawer = &general;
+
+	side_bar_whisper_static = side_bar_whisper;
+	side_bar_whisper_static.edge.pal = general_static.base.pal;
+
+
+	global_style_drawer = &standard;
 
 	load_icons(page);
 }

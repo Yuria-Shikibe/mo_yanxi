@@ -4,6 +4,7 @@ module;
 #include <vk_mem_alloc.h>
 #include <cassert>
 #include <immintrin.h>
+#include <gch/small_vector.hpp>
 #include "../src/ext/adapted_attributes.hpp"
 
 export module mo_yanxi.vk.batch;
@@ -376,9 +377,10 @@ namespace mo_yanxi::vk{
 		};
 
 	private:
+		static constexpr std::size_t static_length = 6;
 		std::size_t current_index{};
-		std::vector<draw_region> fan{};
-		circular_queue<draw_call> pending_draw_calls{};
+		gch::small_vector<draw_region, static_length> fan{};
+		gch::small_vector<draw_call, static_length> pending_draw_calls{};
 
 		FORCE_INLINE draw_region& get_current() noexcept{
 			return fan[current_index];
@@ -485,7 +487,7 @@ namespace mo_yanxi::vk{
 			vmaGetAllocationInfo(context.get_allocator(), vertex_buffer.get_allocation(), &info);
 			mapped_data = static_cast<std::byte*>(info.pMappedData);
 			fan.resize(chunk_count);
-			pending_draw_calls.resize(chunk_count);
+			pending_draw_calls.reserve(chunk_count);
 			for (auto && [idx, draw_region] : fan | std::views::enumerate){
 				draw_region = batch::draw_region{context, vertex_chunk_size, vertex_unit_size};
 			}
@@ -527,7 +529,7 @@ namespace mo_yanxi::vk{
 			if(region.state == region_state::frozen){
 				consume_all();
 			}else{
-				if(pending_draw_calls.size() > pending_draw_calls.capacity() / 2)consume_pending();
+				if(pending_draw_calls.size() > fan.size() / 2)consume_pending();
 			}
 
 			auto pre_rst = region.acquire(image_view, vertex_group_count, vertex_unit_size, get_vertex_group_count_per_chunk());
@@ -571,7 +573,7 @@ namespace mo_yanxi::vk{
 		void consume_pending(){
 			if(pending_draw_calls.empty())return;
 
-			static constexpr std::size_t submit_buffer_size{8};
+			static constexpr std::size_t submit_buffer_size{static_length};
 
 			std::array<VkSubmitInfo2, submit_buffer_size> submit_infos{};
 			std::array<VkSemaphoreSubmitInfo, submit_buffer_size * 2> semaphore_submit_infos{};
@@ -582,9 +584,7 @@ namespace mo_yanxi::vk{
 				throw std::runtime_error("[Graphic] Too much draw calls");
 			}
 
-			for(std::size_t i = 0; i < pending_draw_calls.size(); i++){
-				const auto draw_call = pending_draw_calls[i];
-
+			for(const auto draw_call : pending_draw_calls){
 				auto& region = fan[draw_call.chunk_index];
 				const auto vertex_to_wait = region.device_vertex_semaphore_signal++;
 				const auto descriptor_to_wait = region.device_descriptor_semaphore_signal++;
@@ -655,8 +655,7 @@ namespace mo_yanxi::vk{
 
 			vkQueueSubmit2(context->graphic_queue(), submit_count, submit_infos.data(), nullptr);
 
-			for(std::size_t i = 0; i < pending_draw_calls.size(); i++){
-				const auto draw_call = pending_draw_calls[i];
+			for(const auto draw_call : pending_draw_calls){
 				auto& region = fan[draw_call.chunk_index];
 				const auto size = region.vertex_group_count * 4 * vertex_unit_size;
 

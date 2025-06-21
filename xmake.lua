@@ -115,16 +115,28 @@ task("gen_ide_hintonly_cmake")
         os.exec("xmake project -k cmakelists")
 
         local cmake_file = path.join(os.projectdir(), "CMakeLists.txt")
-
         local content = io.readfile(cmake_file) or ""
+
+        -- 移除不需要的命令
         local cleaned = content:gsub("add_custom_command%(%s-.-%)%s*\n", "")
                                :gsub("add_custom_command%(%s-.-%b())%s*\n", "")
                                :gsub("set_source_files_properties%(%s-.-%)%s*\n", "")
                                :gsub("set_source_files_properties%(%s-.-%b())%s*\n", "")
 
-        io.writefile(cmake_file, cleaned)
+        -- 在 project() 后插入 C++ 标准设置
+        local found_project = false
+        local new_content = cleaned:gsub("(project%s*%b())", function(capture)
+            found_project = true
+            return capture .. "\nset(CMAKE_CXX_STANDARD 23)"
+        end)
 
-        print("Removed all add_custom_command from CMakeLists.txt")
+        if not found_project then
+            -- 如果找不到 project()，则在文件开头插入
+            new_content = "set(CMAKE_CXX_STANDARD 23)\n" .. cleaned
+        end
+
+        io.writefile(cmake_file, new_content)
+        print("Removed custom commands and set C++ standard to 23 in CMakeLists.txt")
     end)
 
     set_menu{usage = "create cmakelists"}

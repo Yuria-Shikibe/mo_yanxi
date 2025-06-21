@@ -101,9 +101,8 @@ namespace mo_yanxi::ui{
 		const style_drawer<elem>* drawer{getDefaultStyleDrawer()};
 
 		graphic::color style_color_scl{graphic::colors::white};
-		graphic::color style_color_ovr{};
-		float inherent_opacity{1.f};
 
+		float inherent_opacity{1.f};
 		float context_opacity{1.f};
 
 		[[nodiscard]] constexpr float get_opacity() const noexcept{
@@ -384,13 +383,20 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] elem(
 			scene* scene,
 			group* group,
-			const std::string_view tyName = "")
+			const std::string_view tyName)
 			: elem_fields{tyName}{
 			elem::set_scene(scene);
 			elem::set_parent(group);
 
 			cursor_state.register_default_cursor_events(events());
 			event_slots.set_context(*this);
+		}
+
+		[[nodiscard]] elem(
+			scene* scene,
+			group* group
+		)
+			: elem{scene, group, ""}{
 		}
 
 		virtual ~elem(){

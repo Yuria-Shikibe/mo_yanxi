@@ -9,6 +9,9 @@ import mo_yanxi.ui.graphic;
 import mo_yanxi.graphic.draw.multi_region;
 import mo_yanxi.graphic.layers.ui.grid_drawer;
 
+
+import mo_yanxi.game.meta.grid.srl;
+
 import mo_yanxi.game.content;
 
 mo_yanxi::game::meta::hitbox_transed mo_yanxi::game::load_hitbox_from(const std::filesystem::path& path){
@@ -19,12 +22,43 @@ mo_yanxi::game::meta::hitbox_transed mo_yanxi::game::load_hitbox_from(const std:
 	return meta;
 }
 
+void mo_yanxi::game::ui::grid_editor_viewport::grid_info_bar::draw_content(const ui::rect clipSpace) const{
+	elem::draw_content(clipSpace);
+
+	auto& edit = get_editor();
+
+	auto max_consume = edit.grid.get_maximum_energy_consume();
+	auto max_generate = edit.grid.get_maximum_energy_generate();
+
+	auto max_count = std::max(max_consume, max_generate);
+	if(max_count == 0)return;
+
+	const auto src = content_src_pos();
+	const auto extent = content_size();
+	const auto width = extent.x / 2.f;
+	const auto height = std::min<float>(extent.y / max_count, 24);
+
+	using namespace graphic;
+	auto acquirer{ui::get_draw_acquirer(get_renderer())};
+
+
+	for(unsigned i = 0; i < max_generate; ++i){
+		draw::fill::rect_ortho(acquirer.get_reserved(max_generate), rect{tags::from_extent, src.copy().add_y(i * height), width, height}.shrink(2), colors::power);
+	}
+
+	for(unsigned i = 0; i < max_consume; ++i){
+		draw::fill::rect_ortho(acquirer.get_reserved(max_consume), rect{tags::from_extent, src.copy().add(width, i * height), width, height}.shrink(2), colors::red_dusted);
+	}
+
+
+}
+
+
 void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace) const{
 	viewport_begin();
 	auto& r = get_renderer();
 	using namespace graphic;
 	auto acquirer{mo_yanxi::ui::get_draw_acquirer(r)};
-
 
 
 	{
@@ -50,7 +84,7 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 		math::irect to_place_region{tags::from_extent, currentCoord, extent};
 		auto world_region = get_region_at(to_place_region);
 
-		if(auto idxp = grid.coord_to_index(currentCoord); idxp && grid.is_building_placeable_at(*idxp, current_chamber)){
+		if(auto idxp = grid.coord_to_index(currentCoord); idxp && grid.is_building_placeable_at(*idxp, *current_chamber)){
 			draw::line::rect_ortho(acquirer, world_region, 4, colors::pale_green.copy().set_a(.5f));
 		}else{
 			draw::line::rect_ortho(acquirer, world_region, 4, colors::red_dusted.copy().set_a(.5f));
@@ -70,7 +104,7 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 			acquirer.proj.mode_flag = draw::mode_flags::slide_line;
 			each_tile(place_region, chamber_sz, [&, this](math::point2 pos){
 				if(auto idxp = grid.coord_to_index(pos)){
-					if(grid.is_building_placeable_at(*idxp, current_chamber)){
+					if(grid.is_building_placeable_at(*idxp, *current_chamber)){
 						draw::fill::rect_ortho(acquirer.get(), get_region_at({tags::from_extent, pos, chamber_sz}).shrink(4), colors::pale_green.copy().set_a(.5f));
 					}
 				}
@@ -104,17 +138,26 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 
 	viewport_end();
 
-	if(selected_building != nullptr){
+	static constexpr auto shadow = colors::black.copy().set_a(.85f);
+	auto drawShadow = [&](const ui::rect bound){
 		acquirer.proj.mode_flag = draw::mode_flags::sdf;
-		draw::nine_patch(acquirer, theme::shapes::base, pane_->get_bound(), colors::black.copy().set_a(.85f));
+		acquirer.proj.set_layer(ui::draw_layers::light);
+		draw::nine_patch(acquirer, theme::shapes::base, bound, shadow);
 
 		acquirer.proj.set_layer(ui::draw_layers::base);
-		draw::nine_patch(acquirer, theme::shapes::base, pane_->get_bound(), colors::black.copy().set_a(.85f));
-		viewport::draw_content(clipSpace);
+		draw::nine_patch(acquirer, theme::shapes::base, bound, shadow);
+	};
+
+	drawShadow(grid_info_bar_->get_bound());
+	grid_info_bar_->draw(clipSpace);
+
+	if(selected_building != nullptr){
+		drawShadow(current_selected_building_info_pane_->get_bound());
+		current_selected_building_info_pane_->draw(clipSpace);
 	}
 }
 
-mo_yanxi::math::frect mo_yanxi::game::ui::grid_editor_viewport::get_region_at(math::irect region_in_world) const noexcept{
+	mo_yanxi::math::frect mo_yanxi::game::ui::grid_editor_viewport::get_region_at(math::irect region_in_world) const noexcept{
 	region_in_world.scl(ecs::chamber::tile_size_integral, ecs::chamber::tile_size_integral);
 	return region_in_world.as<float>();
 }
@@ -195,15 +238,16 @@ void mo_yanxi::game::ui::grid_editor::chamber_info_elem::build(){
 		auto ext = c.extent;
 
 
-		auto useable_region = align::embedTo(align::scale::fit, ext.as<float>(), e.content_size());
+		auto useable_region = align::embed_to(align::scale::fit, ext.as<float>(), e.content_size());
 		auto srcOff = align::get_offset_of(align::pos::center, useable_region, e.prop().content_bound_absolute());
 		auto unit_size = useable_region / ext.as<float>();
 
 		auto acq = ui::get_draw_acquirer(e.get_renderer());
 		using namespace graphic;
 		acq.acquire(ext.area());
-		for(int y = 0; y < ext.y; ++y){
-			for(int x = 0; x < ext.x; ++x){
+
+		for(int x = 0; x < ext.x; ++x){
+			for(int y = 0; y < ext.y; ++y){
 				math::vec2 pos = srcOff + unit_size.copy().mul(x, y);
 				math::frect rect{tags::from_extent, pos, unit_size};
 				rect.shrink(3, 3);
@@ -222,8 +266,109 @@ void mo_yanxi::game::ui::grid_editor::chamber_info_elem::build(){
 }
 
 void mo_yanxi::game::ui::grid_editor::load_chambers(){
-	content::content_manager.each_content<meta::chamber::chamber_types>([this]<typename C>(C& c){
+	content::chambers.each_content<meta::chamber::chamber_types>([this]<typename C>(C& c){
 		chambers.at<C>().push_back(std::addressof(c));
 	});
 
+}
+
+void mo_yanxi::game::ui::grid_editor::build_menu(){
+	{
+		auto b = side_menu->end_line().emplace<ui::button<ui::label>>();
+
+		b->set_style(ui::theme::styles::no_edge);
+		b->set_fit();
+		b->set_text("load");
+		b->set_button_callback(ui::button_tags::general, [this]{
+			auto& selector = creation::create_file_selector(creation::file_selector_create_info{
+				*this, [](const creation::file_selector& s, const ui::grid_editor&){
+					return s.get_current_main_select().has_value();
+				}, [](const creation::file_selector& s, ui::grid_editor& self){
+					self.viewport->set_reference(load_hitbox_from(s.get_current_main_select().value()));
+					return true;
+				}});
+			selector.set_cared_suffix({".hbox"});
+		});
+		b.cell().set_height(50);
+	}
+
+	{
+		auto b = side_menu->end_line().emplace<ui::button<ui::label>>();
+
+		b->set_style(ui::theme::styles::no_edge);
+		b->set_fit();
+		b->set_text("save grid");
+		b->set_button_callback(ui::button_tags::general, [this]{
+			auto& selector = creation::create_file_selector(creation::file_selector_create_info{
+				.requester = *this,
+				.checker = [](const creation::file_selector& s, const ui::grid_editor&){
+					return s.get_current_main_select().has_value();
+				},
+				.yielder = [](const creation::file_selector& s, ui::grid_editor& self){
+					std::ofstream ofs(s.get_current_main_select().value(), std::ios::binary | std::ios::out);
+					auto hdl = meta::srl::write_grid(ofs, self.viewport->grid);
+					hdl.resume();
+					return true;
+				},
+				.add_file_create_button = true
+			});
+			selector.set_cared_suffix({".metagrid"});
+		});
+		b.cell().set_height(50);
+	}
+
+	{
+		auto b = side_menu->end_line().emplace<ui::button<ui::label>>();
+
+		b->set_style(ui::theme::styles::no_edge);
+		b->set_fit();
+		b->set_text("load grid");
+		b->set_button_callback(ui::button_tags::general, [this]{
+			auto& selector = creation::create_file_selector(creation::file_selector_create_info{
+				*this, [](const creation::file_selector& s, const ui::grid_editor&){
+					return s.get_current_main_select().has_value();
+				}, [this](const creation::file_selector& s, ui::grid_editor& self){
+					std::ifstream ifs(s.get_current_main_select().value(), std::ios::binary | std::ios::in);
+					meta::srl::read_grid(ifs, viewport->grid);
+					return true;
+				}});
+			selector.set_cared_suffix({".metagrid"});
+		});
+		b.cell().set_height(50);
+	}
+
+	{
+		for(int i = 0; i < std::to_underlying(meta::chamber::category::LAST); ++i){
+			auto rst = menu_->add_elem<label, scroll_pane>();
+			rst.button->set_fit();
+			rst.button->set_text([i](){
+				std::string str{meta::chamber::category_names[i]};
+				str.front() = std::toupper(str.front());
+				return str;
+			}());
+			rst.button->text_entire_align = align::pos::center_left;
+			rst.button->property.size.set_minimum_size({400, 0});
+			rst.button->set_style(ui::theme::styles::no_edge);
+
+			rst.elem.set_layout_policy(layout_policy::vert_major);
+			rst.elem.set_style();
+
+			rst.elem.set_elem([&, this](ui::table& table){
+				table.set_style();
+				chambers.each([&, this]<typename T>(std::in_place_type_t<T> tag, const decltype(chambers)::value_type& values){
+					for (auto basic_chamber : values){
+						if(basic_chamber->category != meta::chamber::category{i})continue;
+						if(table.has_children()){
+							table.get_last_cell().set_pad({.right = 8});
+						}
+
+						create_handle<chamber_info_elem, table::cell_type> hdl = table.emplace<chamber_info_elem>(*this, *basic_chamber);
+						hdl.cell().set_external({true, false});
+					}
+				});
+
+			});
+		}
+
+	}
 }

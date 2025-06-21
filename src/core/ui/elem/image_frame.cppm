@@ -11,7 +11,7 @@ namespace mo_yanxi::ui{
 
 	[[nodiscard]] math::vec2 get_expected_size(const drawable& drawable, const image_display_style& style, const math::vec2 bound) noexcept{
 		if(const auto sz = drawable.get_default_size()){
-			return align::embedTo(style.scaling, *sz, bound);
+			return align::embed_to(style.scaling, *sz, bound);
 		}
 
 		return bound;

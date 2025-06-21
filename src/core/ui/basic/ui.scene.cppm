@@ -205,7 +205,7 @@ namespace mo_yanxi::ui{
 
 		void drop_all_focus(const elem* target);
 
-		void try_swap_focus(elem* newFocus);
+		void try_swap_focus(elem* newFocus, bool force_drop);
 
 		void swap_focus(elem* newFocus);
 
@@ -222,9 +222,9 @@ namespace mo_yanxi::ui{
 			on_scroll(scroll, get_input_mode());
 		}
 
-		void on_cursor_pos_update(math::vec2 newPos);
-		void on_cursor_pos_update(){
-			on_cursor_pos_update(cursor_pos);
+		void on_cursor_pos_update(math::vec2 newPos, bool force_drop);
+		void on_cursor_pos_update(bool force_drop){
+			on_cursor_pos_update(cursor_pos, force_drop);
 		}
 
 		void resize(math::frect region);
@@ -267,8 +267,8 @@ namespace mo_yanxi::ui{
 			if(currentKeyFocus == target)currentKeyFocus = nullptr;
 		}
 
-		void drop_event_focus(){
-			currentCursorFocus = nullptr;
+		void swap_event_focus_to_null(){
+			try_swap_focus(nullptr, false);
 			currentScrollFocus = nullptr;
 			currentKeyFocus = nullptr;
 		}
@@ -276,7 +276,7 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] double get_global_time() const noexcept;
 
 	private:
-		void updateInbounds(std::vector<elem*>&& next);
+		void updateInbounds(std::vector<elem*>&& next, bool force_drop);
 
 		// void moveOwnerShip();
 	};

@@ -1,0 +1,40 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/25.0.2 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="25.0.2">
+  <diagram name="第 1 页" id="_5rNQp9DrVljcLZ6eNeV">
+    <mxGraphModel dx="1420" dy="827" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="yY378XC3B-W8pHZmDGaJ-5" value="Chunk Data" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="560" y="400" width="1200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="yY378XC3B-W8pHZmDGaJ-9" value="" style="group" vertex="1" connectable="0" parent="1">
+          <mxGeometry x="1280" y="320" width="480" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="yY378XC3B-W8pHZmDGaJ-7" value="Chunk Data" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="yY378XC3B-W8pHZmDGaJ-9">
+          <mxGeometry y="40" width="480" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="yY378XC3B-W8pHZmDGaJ-8" value="Atomic Represent" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="yY378XC3B-W8pHZmDGaJ-9">
+          <mxGeometry width="480" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="yY378XC3B-W8pHZmDGaJ-10" value="" style="group" vertex="1" connectable="0" parent="1">
+          <mxGeometry x="720" y="320" width="400" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="yY378XC3B-W8pHZmDGaJ-3" value="Chunk Data" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="yY378XC3B-W8pHZmDGaJ-10">
+          <mxGeometry y="40" width="400" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="yY378XC3B-W8pHZmDGaJ-4" value="Atomic Represent" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="yY378XC3B-W8pHZmDGaJ-10">
+          <mxGeometry width="400" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="yY378XC3B-W8pHZmDGaJ-11" value="Chunk Head&lt;div&gt;uint64(&lt;span style=&quot;background-color: initial;&quot;&gt;little endian)&lt;/span&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="400" y="400" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="yY378XC3B-W8pHZmDGaJ-13" value="Chunk Head&lt;div&gt;uint64(&lt;span style=&quot;background-color: initial;&quot;&gt;little endian)&lt;/span&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="560" y="360" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="yY378XC3B-W8pHZmDGaJ-14" value="Chunk Head&lt;div&gt;uint64(&lt;span style=&quot;background-color: initial;&quot;&gt;little endian)&lt;/span&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="360" width="160" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

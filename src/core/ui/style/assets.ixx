@@ -12,8 +12,8 @@ namespace mo_yanxi::ui::theme{
 		using graphic::color;
 		export using namespace graphic::colors;
 
-		export constexpr inline color accent = color::from_rgba8888(0XF0D456FF);
-		export constexpr inline color theme = colors::aqua;
+		export constexpr inline color accent = pale_yellow;
+		export constexpr inline color theme = aqua;
 	}
 	
 	namespace style_pal{
@@ -94,8 +94,11 @@ namespace mo_yanxi::ui::theme{
 
 	namespace styles{
 		export inline style::round_style side_bar_general{};
+		export inline style::round_style side_bar_standard{};
+		export inline style::round_style side_bar_whisper{};
+		export inline style::round_style side_bar_whisper_static{};
 
-		export inline style::round_style general{};
+		export inline style::round_style standard{};
 		export inline style::round_style general_static{};
 		export inline style::round_style whisper{};
 		export inline style::round_style humble{};

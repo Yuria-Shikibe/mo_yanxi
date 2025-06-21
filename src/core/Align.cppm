@@ -256,7 +256,7 @@ namespace mo_yanxi{
 		}
 
 		template <number T>
-		constexpr math::vector2<T> embedTo(const scale stretch, math::vector2<T> srcSize, math::vector2<T> toBound) noexcept{
+		constexpr math::vector2<T> embed_to(const scale stretch, math::vector2<T> srcSize, math::vector2<T> toBound) noexcept{
 			switch(stretch){
 			case scale::fit :{
 				const float scale = align::get_fit_embed_scale(srcSize, toBound);
@@ -286,9 +286,9 @@ namespace mo_yanxi{
 			case scale::stretchX : return {toBound.x, std::min(srcSize.y, toBound.y)};
 			case scale::stretchY : return {std::min(srcSize.x, toBound.x), toBound.y};
 			case scale::clamped : if(srcSize.y > toBound.y || srcSize.x > toBound.x){
-					return align::embedTo<T>(scale::fit, srcSize, toBound);
+					return align::embed_to<T>(scale::fit, srcSize, toBound);
 				} else{
-					return align::embedTo<T>(scale::none, srcSize, toBound);
+					return align::embed_to<T>(scale::none, srcSize, toBound);
 				}
 			case scale::none : return srcSize;
 			}

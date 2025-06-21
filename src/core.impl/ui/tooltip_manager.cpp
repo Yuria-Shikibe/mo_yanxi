@@ -110,7 +110,7 @@ mo_yanxi::ui::tooltip_instance& mo_yanxi::ui::tooltip_manager::append_tooltip(to
 
 	auto& val = actives.emplace_back(std::move(elem), &owner);
 	val.update_layout(*this);
-	scene->on_cursor_pos_update();
+	scene->on_cursor_pos_update(true);
 
 	if(fade_in){
 		val.element->update_opacity(0.f);

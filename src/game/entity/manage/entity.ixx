@@ -25,6 +25,8 @@ export import mo_yanxi.strided_span;
 export import mo_yanxi.meta_programming;
 export import mo_yanxi.seq_chunk;
 
+import mo_yanxi.game.srl;
+
 import mo_yanxi.algo.hash;
 import mo_yanxi.basic_util;
 import mo_yanxi.heterogeneous.open_addr_hash;
@@ -740,13 +742,13 @@ namespace mo_yanxi::game::ecs{
 		static constexpr archetype_serialize_identity identity = id;
 		static constexpr bool is_transient = (std::tuple_size_v<dump_chunk> > 0 && id.index != archetype_serialize_identity::unknown);
 
-		static chunk_serialize_handle write(std::ostream& stream, const dump_chunk& chunk) noexcept {
+		static srl::chunk_serialize_handle write(std::ostream& stream, const dump_chunk& chunk) noexcept {
 			co_yield 0;
 			co_return;
 		}
 
-		static srl_state read(std::istream& stream, component_chunk_offset off, dump_chunk& chunk) noexcept {
-			return srl_state::failed;
+		static void read(std::istream& stream, component_chunk_offset off, dump_chunk& chunk) noexcept {
+			return;
 		}
 	};
 
@@ -897,21 +899,21 @@ namespace mo_yanxi::game::ecs{
 				try{
 					stream.write(reinterpret_cast<char*>(&total_count), sizeof(total_count));
 					for (const auto & seq_chunk : buffer){
-						chunk_serialize_handle hdl = trait::serialize::write(stream, seq_chunk);
-						std::uint32_t off = hdl.get_offset();
+						srl::chunk_serialize_handle hdl = trait::serialize::write(stream, seq_chunk);
+						srl::srl_size off = hdl.get_offset();
 						swapbyte_if_needed(off);
 						stream.write(reinterpret_cast<char*>(&off), sizeof(off));
 
 						hdl.resume();
 
-						if(hdl.get_state() != srl_state::succeed){
-							throw bad_archetype_serialize{"assertion failed: unfinished chunk serialize"};
-						}
+						// if(hdl.get_state() != srl_state::succeed){
+						// 	throw bad_archetype_serialize{"assertion failed: unfinished chunk serialize"};
+						// }
 					}
-				}catch(const bad_archetype_serialize&){
+				}catch(const srl::srl_logical_error&){
 					throw;
 				}catch(...){
-					throw bad_archetype_serialize{"serialize failed"};
+					throw srl::srl_logical_error{"serialize failed"};
 				}
 
 
@@ -933,18 +935,16 @@ namespace mo_yanxi::game::ecs{
 
 					component_chunk_offset off;
 					if(!stream.read(reinterpret_cast<char*>(&off), sizeof(off))){
-						throw bad_archetype_serialize{"assertion failed: unfinished chunk serialize"};
+						throw srl::srl_logical_error{"assertion failed: unfinished chunk serialize"};
 					}
 					swapbyte_if_needed(off);
 
-					const srl_state rst = trait::serialize::read(stream, off, *current);
-
-					if(rst == srl_state::unfinished){
-						throw bad_archetype_serialize{"assertion failed: unfinished chunk serialize"};
-					}else if(rst == srl_state::failed){
-						stream.seekg(last + static_cast<std::streamoff>(off));
-					}else{
+					try{
+						trait::serialize::read(stream, off, *current);
 						++current;
+					}catch(...){
+						//TODO logit
+						stream.seekg(last + static_cast<std::streamoff>(off));
 					}
 
 					++total_try_count;

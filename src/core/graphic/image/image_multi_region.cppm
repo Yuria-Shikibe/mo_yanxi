@@ -180,8 +180,8 @@ namespace mo_yanxi::graphic{
 				auto target_bot_lft = external.size().scl(ratio_l - err, ratio_b - err).to_abs();
 				auto target_top_rit = external.size().scl(1 - ratio_l - err, 1 - ratio_b - err).to_abs();
 
-				auto true_botlft = align::embedTo(align::scale::fit, edge.bot_lft(), target_bot_lft);
-				auto true_toprit = align::embedTo(align::scale::fit, edge.top_rit(), target_top_rit);
+				auto true_botlft = align::embed_to(align::scale::fit, edge.bot_lft(), target_bot_lft);
+				auto true_toprit = align::embed_to(align::scale::fit, edge.top_rit(), target_top_rit);
 
 				values = graphic::create_grid<4, T>({
 							external.vert_00(),
@@ -223,7 +223,7 @@ namespace mo_yanxi::graphic{
 
 		constexpr void set_center_scale(const math::vector2<T> centerSize, const align::scale centerScale) noexcept{
 			if(centerScale != DefaultScale){
-				const auto sz = align::embedTo(centerScale, centerSize, center().size());
+				const auto sz = align::embed_to(centerScale, centerSize, center().size());
 				const auto offset = align::get_offset_of<to_signed_t<T>>(align::pos::center, sz.as_signed(), center().as_signed());
 				center() = {tags::from_extent, static_cast<math::vector2<T>>(offset), sz};
 			}

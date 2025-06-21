@@ -950,7 +950,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] float get_ratio_of_current() const noexcept{
 			assert(this->target != nullptr);
-			return static_cast<float>(*this->target - range.from) / static_cast<float>(range.length());
+			return range.normalize(*this->target);
 		}
 
 		[[nodiscard]] std::string get_range_string() const noexcept{

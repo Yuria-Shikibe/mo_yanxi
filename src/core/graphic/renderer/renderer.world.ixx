@@ -507,7 +507,7 @@ namespace mo_yanxi::graphic{
 				context, std::bit_cast<math::usize2>(context.get_extent()),
 				assets::graphic::shaders::comp::bloom,
 				assets::graphic::samplers::blit_sampler,
-				7, 1.6f
+				6, 1.6f
 			},
 			ssao{
 				context, std::bit_cast<math::usize2>(context.get_extent()),

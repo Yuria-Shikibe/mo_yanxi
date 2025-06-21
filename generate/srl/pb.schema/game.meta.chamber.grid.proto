@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package mo_yanxi.io.pb.game.meta;
+
+
+import "math.proto";
+import "game.meta.proto";
+
+message grid_tile{
+  bool placeable = 1;
+}
+
+message grid_building{
+  meta.content meta = 1;
+  optional uint64 instance_data_size = 2;
+  math.rect_orthou region = 3;
+}
+
+message grid{
+  math.vector2u extent = 1;
+  math.vector2i origin_coord = 2;
+
+  repeated grid_tile tiles = 3;
+  repeated grid_building buildings = 4;
+}

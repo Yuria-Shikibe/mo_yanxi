@@ -43,40 +43,71 @@ namespace mo_yanxi::game{
 		}
 	}
 
+
 	using chamber_meta = const meta::chamber::basic_chamber*;
 	namespace ui{
 
 		export using namespace mo_yanxi::ui;
 
-		export struct grid_editor_viewport : ui::viewport<ui::manual_table>{
+		export struct grid_editor_viewport final : ui::viewport<ui::manual_table>{
 		private:
+
+			struct grid_info_bar : ui::elem{
+				[[nodiscard]] grid_info_bar(ui::scene* scene, ui::group* group)
+					: elem(scene, group){
+				}
+
+			private:
+				grid_editor_viewport& get_editor() const{
+					return *static_cast<grid_editor_viewport*>(get_parent());
+				}
+
+				void draw_content(const ui::rect clipSpace) const override;
+			};
+
 			meta::hitbox_transed reference{};
 			math::optional_vec2<float> last_click_{math::vectors::constant2<float>::SNaN};
 
 			bool overview{false};
 
-			scroll_pane* pane_{};
+			scroll_pane* current_selected_building_info_pane_{};
+			grid_info_bar* grid_info_bar_{};
+
 		public:
 			using index_coord = math::upoint2;
 
-			chamber_meta current_chamber{};
-
 			meta::chamber::grid grid{};
-			meta::chamber::grid_building* selected_building{};
 
+			chamber_meta current_chamber{};
+			meta::chamber::grid_building* selected_building{};
+		private:
+			meta::chamber::ui_edit_context edit_context{};
+
+
+		public:
 			[[nodiscard]] grid_editor_viewport(scene* scene, group* group)
 				: viewport(scene, group){
 				camera.set_scale_range({0.25f, 2});
 				property.maintain_focus_until_mouse_drop = true;
+				{
+					auto pane = emplace<ui::scroll_pane>();
+					pane.cell().region_scale = rect{0, 0, 0.3, 0.5f};
+					pane.cell().align = align::pos::bottom_left;
+					pane->set_elem([](ui::table& table){
+						table.set_style();
+						table.template_cell.pad.top = 8;
+					});
+					current_selected_building_info_pane_ = &pane.elem();
+					current_selected_building_info_pane_->visible = false;
+				}
 
-				auto pane = emplace<ui::scroll_pane>();
-				pane.cell().region_scale = rect{0, 0, 0.2, 0.5f};
-				pane.cell().align = align::pos::bottom_left;
-				pane->set_elem([](ui::table& table){
-					table.set_style();
-				});
-				pane_ = &pane.elem();
-				pane_->visible = false;
+				{
+					auto pane = emplace<grid_info_bar>();
+					pane.cell().region_scale = rect{0, 0, 0.1, 0.8f};
+					pane.cell().align = align::pos::top_right;
+
+					grid_info_bar_ = &pane.elem();
+				}
 
 			}
 
@@ -98,27 +129,28 @@ namespace mo_yanxi::game{
 
 		private:
 			void update_selected_building(meta::chamber::grid_building* building){
-				auto& t = pane_->get_item_unchecked<table>();
+				auto& t = current_selected_building_info_pane_->get_item_unchecked<table>();
 				if(building){
 					if(selected_building != building){
 						t.clear_children();
 						building->get_meta_info().build_ui(t);
 						if(auto ist = building->get_instance_data()){
-							auto hdl = ist->build_ui(t);
+							auto hdl = ist->build_ui(t, edit_context);
 							if(hdl.has_ui()){
 								t.end_line();
 								auto spl = t.create(creation::general_seperator_line{.stroke = 20, .palette =  ui::theme::style_pal::front_white.copy().mul_alpha(.25f)});
 								spl.cell().pad.set_vert(8);
+								spl.cell().margin.set_hori(8);
 								t.end_line();
 								hdl.resume();
 							}
 						}
 
 					}
-					pane_->visible = true;
+					current_selected_building_info_pane_->visible = true;
 				}else{
 					t.clear_children();
-					pane_->visible = false;
+					current_selected_building_info_pane_->visible = false;
 				}
 				selected_building = building;
 			}
@@ -152,7 +184,7 @@ namespace mo_yanxi::game{
 							math::irect place_region = get_selected_place_region(current_chamber->extent, get_select_box());
 							each_tile(place_region, current_chamber->extent.as<int>(), [&, this](math::point2 pos){
 								if(const auto idx = grid.coord_to_index(pos)){
-									if(auto* b = grid.try_place_building_at(idx.value(), current_chamber)){
+									if(auto* b = grid.try_place_building_at(idx.value(), *current_chamber)){
 										update_selected_building(b);
 									}
 								}
@@ -278,61 +310,7 @@ namespace mo_yanxi::game{
 
 			void load_chambers();
 
-			void build_menu(){
-				{
-					auto b = side_menu->end_line().emplace<ui::button<ui::label>>();
-
-					b->set_style(ui::theme::styles::no_edge);
-					b->set_scale(.6f);
-					b->set_text("load");
-					b->set_button_callback(ui::button_tags::general, [this]{
-						auto& selector = creation::create_file_selector(creation::file_selector_create_info{
-							*this, [](const creation::file_selector& s, const ui::grid_editor&){
-								return s.get_current_main_select().has_value();
-							}, [](const creation::file_selector& s, ui::grid_editor& self){
-								self.viewport->set_reference(load_hitbox_from(s.get_current_main_select().value()));
-								return true;
-							}});
-						selector.set_cared_suffix({".hbox"});
-					});
-				}
-
-				{
-					for(int i = 0; i < std::to_underlying(meta::chamber::category::LAST); ++i){
-						auto rst = menu_->add_elem<label, scroll_pane>();
-						rst.button->set_fit();
-						rst.button->set_text([i](){
-							std::string str{meta::chamber::category_names[i]};
-							str.front() = std::toupper(str.front());
-							return str;
-						}());
-						rst.button->text_entire_align = align::pos::center_left;
-						rst.button->property.size.set_minimum_size({400, 0});
-						rst.button->set_style(ui::theme::styles::no_edge);
-
-						rst.elem.set_layout_policy(layout_policy::vert_major);
-						rst.elem.set_style();
-
-						rst.elem.set_elem([&, this](ui::table& table){
-							table.set_style();
-							chambers.each([&, this]<typename T>(std::in_place_type_t<T> tag, const decltype(chambers)::value_type& values){
-								for (auto basic_chamber : values){
-									if(basic_chamber->category != meta::chamber::category{i})continue;
-									if(table.has_children()){
-										table.get_last_cell().set_pad({.right = 8});
-									}
-
-									create_handle<chamber_info_elem, table::cell_type> hdl = table.emplace<chamber_info_elem>(*this, *basic_chamber);
-									hdl.cell().set_external({true, false});
-								}
-							});
-
-						});
-					}
-
-				}
-			}
-
+			void build_menu();
 
 		public:
 			grid_editor(const grid_editor& other) = delete;
@@ -346,8 +324,7 @@ namespace mo_yanxi::game{
 				auto m = emplace<table>();
 				m.cell().set_width(200);
 				m.cell().pad.right = 8;
-
-				side_menu = std::to_address(m);
+				side_menu = &m.elem();
 
 				const auto editor_region = emplace<table>();
 				editor_region->set_style();

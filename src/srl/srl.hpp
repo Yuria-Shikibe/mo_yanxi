@@ -153,6 +153,71 @@ namespace mo_yanxi::io{
 		}
 	};
 
+	template <>
+	struct loader_impl<math::vector2<std::uint32_t>> : loader_base<pb::math::vector2u, math::vector2<std::uint32_t>>{
+		static void store(buffer_type& buf, const value_type& data){
+			buf.set_x(data.x);
+			buf.set_y(data.y);
+		}
+
+		static void load(const buffer_type& buf, value_type& data){
+			data.x = buf.x();
+			data.y = buf.y();
+		}
+	};
+
+	template <>
+	struct loader_impl<math::vector2<std::int32_t>> : loader_base<pb::math::vector2i, math::vector2<std::int32_t>>{
+		static void store(buffer_type& buf, const value_type& data){
+			buf.set_x(data.x);
+			buf.set_y(data.y);
+		}
+
+		static void load(const buffer_type& buf, value_type& data){
+			data.x = buf.x();
+			data.y = buf.y();
+		}
+	};
+
+	template <>
+	struct loader_impl<math::rect_ortho<float>> : loader_base<pb::math::rect_orthof, math::rect_ortho<float>>{
+		static void store(buffer_type& buf, const value_type& data){
+			io::store(buf.mutable_src(), data.src);
+			io::store(buf.mutable_size(), data.size());
+		}
+
+		static void load(const buffer_type& buf, value_type& data){
+			io::load(buf.src(), data.src);
+			data.set_size(io::extract<value_type::vec_t>(buf.size()));
+		}
+	};
+
+	template <>
+	struct loader_impl<math::rect_ortho<std::int32_t>> : loader_base<pb::math::rect_orthoi, math::rect_ortho<std::int32_t>>{
+		static void store(buffer_type& buf, const value_type& data){
+			io::store(buf.mutable_src(), data.src);
+			io::store(buf.mutable_size(), data.size());
+		}
+
+		static void load(const buffer_type& buf, value_type& data){
+			io::load(buf.src(), data.src);
+			data.set_size(io::extract<value_type::vec_t>(buf.size()));
+		}
+	};
+
+	template <>
+	struct loader_impl<math::rect_ortho<std::uint32_t>> : loader_base<pb::math::rect_orthou, math::rect_ortho<std::uint32_t>>{
+		static void store(buffer_type& buf, const value_type& data){
+			io::store(buf.mutable_src(), data.src);
+			io::store(buf.mutable_size(), data.size());
+		}
+
+		static void load(const buffer_type& buf, value_type& data){
+			io::load(buf.src(), data.src);
+			data.set_size(io::extract<value_type::vec_t>(buf.size()));
+		}
+	};
+
 	template <typename Ang>
 	struct loader_impl<math::transform2<Ang>> : loader_base<pb::math::transform2f, math::transform2<Ang>>{
 		static void store(pb::math::transform2f& buf, const math::transform2<Ang>& data){

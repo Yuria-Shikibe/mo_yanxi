@@ -69,7 +69,7 @@ export namespace mo_yanxi::math{
 		}*/
 
 		FORCE_INLINE [[nodiscard]] constexpr auto operator-() const noexcept{
-			if constexpr (std::is_unsigned_v<T>){
+			if constexpr (std::unsigned_integral<T>){
 				using S = std::make_signed_t<T>;
 				return vector2<std::make_signed_t<T>>{-static_cast<S>(x), -static_cast<S>(y)};
 			}else{
@@ -191,7 +191,7 @@ export namespace mo_yanxi::math{
 			return this->set(static_cast<T>(0), static_cast<T>(0));
 		}
 
-		FORCE_INLINE constexpr vector2& set_NaN() noexcept requires std::is_floating_point_v<T> {
+		FORCE_INLINE constexpr vector2& set_NaN() noexcept requires std::floating_point<T> {
 			return set(std::numeric_limits<float>::signaling_NaN(), std::numeric_limits<float>::signaling_NaN());
 		}
 
@@ -1107,6 +1107,7 @@ export namespace mo_yanxi::math{
 	using nor_vec2 = vector2<float>;
 
 	using point2 = vector2<int>;
+	using i32point2 = vector2<std::int32_t>;
 	using isize2 = vector2<int>;
 	using usize2 = vector2<unsigned int>;
 	using upoint2 = vector2<unsigned int>;

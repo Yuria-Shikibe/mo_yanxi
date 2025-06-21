@@ -290,7 +290,7 @@ namespace mo_yanxi::ui{
 
 			register_event([](input_event::cursor_moved e, nested_scene& self){
 				auto p = self.getTransferredPos(self.get_scene()->cursor_pos);
-				self.scene_.on_cursor_pos_update(p);
+				self.scene_.on_cursor_pos_update(p, false);
 			});
 
 			register_event([](input_event::focus_begin e, nested_scene& self){

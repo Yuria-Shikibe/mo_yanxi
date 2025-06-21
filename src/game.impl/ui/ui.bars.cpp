@@ -8,7 +8,7 @@ void mo_yanxi::game::ui::stalled_bar::draw_content(const mo_yanxi::ui::rect clip
 	using namespace graphic;
 
 	const auto src = elem::content_src_pos();
-	const auto [w, h] = prop().content_size();
+	const auto [w, h] = content_size();
 
 	const auto opacity = gprop().get_opacity();
 	if(stall){

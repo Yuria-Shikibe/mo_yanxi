@@ -1084,6 +1084,11 @@ namespace mo_yanxi::math {
 			return math::curve<T>(value, from, to);
 		}
 
+		template <std::floating_point Tgt = float>
+		MATH_ATTR constexpr Tgt normalize(const T value) const noexcept requires (!std::floating_point<T>){
+			return math::curve<Tgt>(static_cast<Tgt>(value), static_cast<Tgt>(from), static_cast<Tgt>(to));
+		}
+
 		MATH_ATTR constexpr T length() const noexcept{
 			return math::dst_safe(from, to);
 		}

@@ -18,7 +18,3 @@ void mo_yanxi::ui::collapser::draw_content(const rect clipSpace) const{
 
 	if(is_expanding())get_renderer().batch.pop_scissor();
 }
-
-void mo_yanxi::ui::collapser::draw_post(const rect clipSpace) const{
-	basic_group::draw_post(clipSpace);
-}
