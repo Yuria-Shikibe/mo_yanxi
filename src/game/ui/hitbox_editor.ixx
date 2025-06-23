@@ -1140,7 +1140,7 @@ namespace mo_yanxi::game{
 						table.function_init([this](numeric_input_area& area){
 							area.set_style();
 							area.set_scale(.6f);
-							area.set_target(ui::edit_target{&viewport->channel_hitbox.origin_trans.rot, math::deg_to_rad_v<double>, math::pi_2});
+							area.set_target(ui::edit_target{&viewport->channel_hitbox.origin_trans.rot, math::deg_to_rad_v<float>, math::pi_2});
 
 						});
 						table.set_edge_pad(0);

@@ -9,7 +9,7 @@ export import mo_yanxi.math;
 import std;
 
 export namespace mo_yanxi::math{
-	template <number T>
+	template <arithmetic T>
 	struct vector3{
 		T x, y, z;
 

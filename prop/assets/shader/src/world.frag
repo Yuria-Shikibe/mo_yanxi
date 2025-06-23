@@ -62,8 +62,6 @@ void main() {
     float maxAlpha = texColor.a * (in_color_base.a + in_color_light.a);
     if (maxAlpha < 1.25 / 255.f)discard;
 
-    //    bool enable_depth = bool(ubo.depth_test);
-
     vec4 out_base = texColor * in_color_base;
     vec4 out_light = texColor * in_color_light;
 

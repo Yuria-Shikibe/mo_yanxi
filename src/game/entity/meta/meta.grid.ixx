@@ -60,6 +60,10 @@ namespace mo_yanxi::game::meta::chamber{
 		}
 	};
 
+	export
+	struct grid_complex{
+		plf::hive<grid_building> buildings{};
+	};
 
 	export
 	struct grid_tile{
@@ -84,87 +88,101 @@ namespace mo_yanxi::game::meta::chamber{
 		/**
 		 * @brief Coord of the tile to be the real original tile after instancing
 		 */
-		math::point2 origin_coord{};
-		math::usize2 extent{};
-		std::vector<grid_tile> tiles{};
-		plf::hive<grid_building> buildings{};
+		math::point2 origin_coord_{};
+		math::usize2 extent_{};
+		std::vector<grid_tile> tiles_{};
+		plf::hive<grid_building> buildings_{};
 
-		std::vector<grid_building*> energy_consumer{};
-		std::vector<grid_building*> energy_generator{};
+		struct energy_status{
+			friend grid;
 
-		unsigned maximum_energy_generate_{};
-		unsigned maximum_energy_consume_{};
+		private:
+			std::vector<grid_building*> energy_consumer{};
+			std::vector<grid_building*> energy_generator{};
 
-	private:
-		void update_energy_status_on_erase(grid_building& building){
-			if(auto e_usage = building.get_meta_info().get_energy_usage()){
-				if(e_usage > 0){
-					algo::erase_unique_unstable(energy_generator, &building);
-					maximum_energy_generate_ -= e_usage;
-				}else{
-					algo::erase_unique_unstable(energy_consumer, &building);
-					maximum_energy_consume_ -= static_cast<decltype(maximum_energy_consume_)>(-e_usage);
+			unsigned maximum_energy_generate_{};
+			unsigned maximum_energy_consume_{};
+
+			void update_energy_status_on_erase(grid_building& building){
+				if(auto e_usage = building.get_meta_info().get_energy_usage()){
+					if(e_usage > 0){
+						algo::erase_unique_unstable(energy_generator, &building);
+						maximum_energy_generate_ -= e_usage;
+					}else{
+						algo::erase_unique_unstable(energy_consumer, &building);
+						maximum_energy_consume_ -= static_cast<decltype(maximum_energy_consume_)>(-e_usage);
+					}
 				}
 			}
-		}
 
-		void update_energy_status_on_add(grid_building& building) noexcept {
-			if(auto e_usage = building.get_meta_info().get_energy_usage()){
-				if(e_usage > 0){
-					energy_generator.push_back(&building);
-					maximum_energy_generate_ += e_usage;
-				}else{
-					energy_consumer.push_back(&building);
-					maximum_energy_consume_ += static_cast<decltype(maximum_energy_consume_)>(-e_usage);
+			void update_energy_status_on_add(grid_building& building) noexcept {
+				if(auto e_usage = building.get_meta_info().get_energy_usage()){
+					if(e_usage > 0){
+						energy_generator.push_back(&building);
+						maximum_energy_generate_ += e_usage;
+					}else{
+						energy_consumer.push_back(&building);
+						maximum_energy_consume_ += static_cast<decltype(maximum_energy_consume_)>(-e_usage);
+					}
 				}
 			}
-		}
+
+		public:
+			[[nodiscard]] auto max_generate() const noexcept{
+				return maximum_energy_generate_;
+			}
+
+			[[nodiscard]] auto max_consume() const noexcept{
+				return maximum_energy_consume_;
+			}
+
+			[[nodiscard]] std::span<const grid_building* const> generators() const noexcept{
+				return energy_generator;
+			}
+
+			[[nodiscard]] std::span<const grid_building* const> consumers() const noexcept{
+				return energy_consumer;
+			}
+
+		};
+
+		energy_status energy_status_{};
 
 	public:
+
 		[[nodiscard]] grid() noexcept = default;
 
 		[[nodiscard]] explicit grid(const hitbox& hitbox);
 
+
 		[[nodiscard]] grid(math::usize2 extent, math::point2 origin_coord, std::span<const grid_tile> tiles) :
-			origin_coord(origin_coord), extent(extent), tiles(std::from_range, tiles){}
+			origin_coord_(origin_coord), extent_(extent), tiles_(std::from_range, tiles){}
 
 		[[nodiscard]] grid(math::usize2 extent, math::point2 origin_coord, std::vector<grid_tile>&& tiles) noexcept :
-			origin_coord(origin_coord), extent(extent), tiles(std::move(tiles)){}
+			origin_coord_(origin_coord), extent_(extent), tiles_(std::move(tiles)){}
+
+		const energy_status& get_energy_status() const noexcept{
+			return energy_status_;
+		}
 
 		[[nodiscard]] math::vector2<int> get_origin_coord() const noexcept{
-			return origin_coord;
+			return origin_coord_;
 		}
 
 		[[nodiscard]] math::vector2<int> get_origin_offset() const noexcept{
-			return -origin_coord;
+			return -origin_coord_;
 		}
 
-		[[nodiscard]] const decltype(buildings)& get_buildings() const noexcept{
-			return buildings;
-		}
-
-		[[nodiscard]] auto get_maximum_energy_generate() const noexcept{
-			return maximum_energy_generate_;
-		}
-
-		[[nodiscard]] auto get_maximum_energy_consume() const noexcept{
-			return maximum_energy_consume_;
-		}
-
-		[[nodiscard]] std::span<const grid_building* const> get_generators() const noexcept{
-			return energy_generator;
-		}
-
-		[[nodiscard]] std::span<const grid_building* const> get_energy_consumers() const noexcept{
-			return energy_consumer;
+		[[nodiscard]] const decltype(buildings_)& get_buildings() const noexcept{
+			return buildings_;
 		}
 
 		[[nodiscard]] std::span<const grid_tile> get_tiles() const noexcept{
-			return tiles;
+			return tiles_;
 		}
 
 		[[nodiscard]] math::usize2 get_extent() const noexcept{
-			return extent;
+			return extent_;
 		}
 
 		static math::point2 pos_to_tile_coord(math::vec2 coord) noexcept{
@@ -172,18 +190,18 @@ namespace mo_yanxi::game::meta::chamber{
 		}
 
 		[[nodiscard]] math::irect get_grid_region() const noexcept{
-			return math::irect{tags::from_extent, -origin_coord, extent.as<int>()};
+			return math::irect{tags::from_extent, -origin_coord_, extent_.as<int>()};
 		}
 
 		[[nodiscard]] std::optional<index_coord> coord_to_index(math::point2 world_tile_coord) const noexcept{
-			world_tile_coord += origin_coord;
-			if(!math::irect{extent.as<int>()}.contains(world_tile_coord))return {};
+			world_tile_coord += origin_coord_;
+			if(!math::irect{extent_.as<int>()}.contains(world_tile_coord))return {};
 			return world_tile_coord.as<unsigned>();
 		}
 
 		[[nodiscard]] std::optional<math::urect> coord_to_index(math::irect world_tile_region) const noexcept{
-			world_tile_region.src += origin_coord;
-			if(!math::irect{extent.as<int>()}.contains_loose(world_tile_region))return {};
+			world_tile_region.src += origin_coord_;
+			if(!math::irect{extent_.as<int>()}.contains_loose(world_tile_region))return {};
 			return world_tile_region.as<unsigned>();
 		}
 
@@ -193,9 +211,9 @@ namespace mo_yanxi::game::meta::chamber{
 			const auto ext = info.extent;
 			const math::urect region{tags::from_extent, indexed_pos.as<unsigned>(), ext};
 
-			auto& b = buildings.insert(grid_building{indexed_pos.as<unsigned>(), info}).operator*();
+			auto& b = buildings_.insert(grid_building{indexed_pos.as<unsigned>(), info}).operator*();
 
-			update_energy_status_on_add(b);
+			energy_status_.update_energy_status_on_add(b);
 
 			region.each([&](math::upoint2 p){
 				tile_at(p).building = std::addressof(b);
@@ -205,28 +223,28 @@ namespace mo_yanxi::game::meta::chamber{
 		}
 
 		bool erase_building_at(math::upoint2 indexed_pos) noexcept {
-			if(indexed_pos.beyond_equal(extent))return false;
+			if(indexed_pos.beyond_equal(extent_))return false;
 
 			auto& tile = tile_at(indexed_pos);
 			auto* b = tile.building;
 			if(!b)return false;
 
-			update_energy_status_on_erase(*b);
+			energy_status_.update_energy_status_on_erase(*b);
 
 			tile.building->get_indexed_region().each([this](math::upoint2 p){
 				tile_at(p).building = nullptr;
 			});
 
-			const auto itr = buildings.get_iterator(b);
-			assert(itr != buildings.end());
-			buildings.erase(itr);
+			const auto itr = buildings_.get_iterator(b);
+			assert(itr != buildings_.end());
+			buildings_.erase(itr);
 			return true;
 		}
 
 		bool is_building_placeable_at(index_coord indexed_pos, const basic_chamber& info) const noexcept{
 			auto ext = info.extent;
 			math::urect region{tags::from_extent, indexed_pos, ext};
-			if(!math::urect{extent}.contains_loose(region))return false;
+			if(!math::urect{extent_}.contains_loose(region))return false;
 
 			for(auto y = region.src.y; y < region.get_end_y(); ++y){
 				for(auto x = region.src.x; x < region.get_end_x(); ++x){
@@ -249,13 +267,13 @@ namespace mo_yanxi::game::meta::chamber{
 		}
 
 		[[nodiscard]] grid_tile& tile_at(math::upoint2 index_pos) noexcept{
-			assert(index_pos.within(extent));
-			return tiles[extent.x * index_pos.y + index_pos.x];
+			assert(index_pos.within(extent_));
+			return tiles_[extent_.x * index_pos.y + index_pos.x];
 		}
 
 		[[nodiscard]] const grid_tile& tile_at(math::upoint2 index_pos) const noexcept{
-			assert(index_pos.within(extent));
-			return tiles[extent.x * index_pos.y + index_pos.x];
+			assert(index_pos.within(extent_));
+			return tiles_[extent_.x * index_pos.y + index_pos.x];
 		}
 
 		template <typename S>
@@ -270,5 +288,7 @@ namespace mo_yanxi::game::meta::chamber{
 		//TODO move draw to other place?
 
 		void draw(graphic::renderer_ui& renderer, const graphic::camera2& camera) const;
+
+		void dump(ecs::chamber::manifold_ref clear_grid_manifold) const;
 	};
 }

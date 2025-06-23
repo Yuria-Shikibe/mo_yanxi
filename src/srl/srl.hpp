@@ -68,26 +68,28 @@ namespace mo_yanxi::io{
 	private:
 		using base = loader_impl<V>;
 	public:
-		static typename base::buffer_type pack(const typename base::value_type& data){
+		static base::buffer_type pack(const base::value_type& data){
 			typename base::buffer_type buf;
 			base::store(buf, data);
 			return buf;
 		}
 
-		static typename base::value_type extract(const typename base::buffer_type& buf){
+		static base::value_type extract(const base::buffer_type& buf){
 			typename base::value_type val;
 			base::load(buf, val);
 			return val;
 		}
 
-		static bool serialize_to(std::ostream& stream, const typename base::value_type& data){
+		template <std::derived_from<std::ostream> S>
+		static bool serialize_to(S& stream, const base::value_type& data){
 			const auto msg = loader::pack(data);
-			return static_cast<const google::protobuf::MessageLite&>(msg).SerializeToOstream(&stream);
+			return static_cast<const google::protobuf::MessageLite&>(msg).SerializeToOstream(std::addressof(stream));
 		}
 
-		static bool parse_from(std::istream& stream, typename base::value_type& data){
+		template <std::derived_from<std::istream> S>
+		static bool parse_from(S& stream, base::value_type& data){
 			typename base::buffer_type msg{};
-			if(static_cast<google::protobuf::MessageLite&>(msg).ParseFromIstream(&stream)){
+			if(static_cast<google::protobuf::MessageLite&>(msg).ParseFromIstream(std::addressof(stream))){
 				base::load(msg, data);
 				return true;
 			}
@@ -96,8 +98,6 @@ namespace mo_yanxi::io{
 
 	};
 
-	template <typename V>
-	struct deducing_loader;
 
 	template <typename B, typename V>
 		requires requires (B& buf, const V& data){
@@ -138,6 +138,7 @@ namespace mo_yanxi::io{
 	auto pack(const V& data){
 		return loader<V>::pack(data);
 	}
+
 
 
 	template <>

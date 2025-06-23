@@ -1,3 +1,9 @@
+module;
+
+
+#include "../src/srl/srl.hpp"
+#include <srl/game.meta.chamber.pb.h>
+
 module mo_yanxi.game.meta.chamber;
 
 import mo_yanxi.ui.graphic;
@@ -9,6 +15,32 @@ import mo_yanxi.ui.assets;
 import mo_yanxi.math;
 import mo_yanxi.math.fancy;
 
+
+import mo_yanxi.game.ecs.component.chamber;
+import mo_yanxi.game.ecs.component.chamber.radar;
+import mo_yanxi.game.ecs.component.chamber.turret;
+
+
+namespace mo_yanxi::io{
+	template <>
+	struct loader_impl<game::meta::chamber::radar::radar_instance_data> : loader_base<pb::game::meta::chamber::radar_instance, game::meta::chamber::radar::radar_instance_data>{
+		static void store(buffer_type& buf, const value_type& data){
+			buf.set_rotation(data.rotation);
+		}
+
+		static void load(const buffer_type& buf, value_type& data){
+			data.rotation = buf.rotation();
+		}
+	};
+}
+
+template <std::derived_from<mo_yanxi::game::ecs::chamber::building> T>
+T& add_build(mo_yanxi::game::ecs::chamber::manifold_ref grid, mo_yanxi::math::point2 where, mo_yanxi::math::usize2 extent){
+	using namespace mo_yanxi;
+	using namespace game;
+	auto& g = ecs::chamber::to_manifold(grid);
+	return g.add_building<T>(ecs::chamber::tile_region{tags::from_extent, where, extent.as<int>()});
+}
 
 void energy_bar_drawer(const mo_yanxi::ui::elem& e, const mo_yanxi::ui::rect& r, int consumption){
 	using namespace mo_yanxi;
@@ -47,6 +79,16 @@ void energy_bar_drawer(const mo_yanxi::ui::elem& e, const mo_yanxi::ui::rect& r,
 		}
 	}
 
+}
+
+void mo_yanxi::game::meta::chamber::basic_chamber::install(ecs::chamber::build_ref build_ref) const{
+	using namespace ecs::chamber;
+	auto& building = to_building(build_ref);
+
+	building.data().hit_point.reset(hit_point);
+	if(auto cons = get_energy_consumption()){
+		building.data().energy_status = *cons;
+	}
 }
 
 void mo_yanxi::game::meta::chamber::basic_chamber::build_ui(ui::table& table) const{
@@ -140,6 +182,13 @@ void mo_yanxi::game::meta::chamber::basic_chamber::build_ui(ui::table& table) co
 	}
 }
 
+mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::basic_chamber::create_instance_chamber(
+	ecs::chamber::manifold_ref grid, math::point2 where) const{
+	auto& g = ecs::chamber::to_manifold(grid);
+	g.add_building<std::tuple<ecs::chamber::empty_building>>(ecs::chamber::tile_region{tags::from_extent, where, extent.as<int>()});
+	return nullptr;
+}
+
 
 mo_yanxi::game::meta::chamber::ui_build_handle mo_yanxi::game::meta::chamber::radar::radar_instance_data::build_ui(ui::table& table, ui_edit_context& context){
 	co_yield true;
@@ -156,14 +205,50 @@ mo_yanxi::game::meta::chamber::ui_build_handle mo_yanxi::game::meta::chamber::ra
 	}).cell().set_external({false, true});
 }
 
+mo_yanxi::game::srl::chunk_serialize_handle mo_yanxi::game::meta::chamber::radar::radar_instance_data::write(
+	std::ostream& stream) const{
+	const auto msg = io::pack(*this);
+	co_yield msg.ByteSizeLong();
+	msg.SerializeToOstream(&stream);
+}
+
+void mo_yanxi::game::meta::chamber::radar::radar_instance_data::read(std::ispanstream& bounded_stream){
+	chamber_instance_data::read(bounded_stream);
+	io::loader<radar_instance_data>::parse_from(bounded_stream, *this);
+}
+
+
+mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::turret_base::create_instance_chamber(
+	ecs::chamber::manifold_ref grid, math::point2 where) const{
+	return add_build<ecs::chamber::turret_build>(grid, where, extent);
+}
 
 void mo_yanxi::game::meta::chamber::radar::draw(math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const{
 	basic_chamber::draw(region, renderer_ui, camera);
 
 }
 
+mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::radar::create_instance_chamber(
+	ecs::chamber::manifold_ref grid, math::point2 where) const{
+	return add_build<ecs::chamber::radar_build>(grid, where, extent);
+}
+
+void mo_yanxi::game::meta::chamber::radar::install(ecs::chamber::build_ref build_ref) const{
+	basic_chamber::install(build_ref);
+
+	using namespace ecs::chamber;
+	auto& building = to_building<radar_build>(build_ref);
+
+	building.meta.reload_duration = reload_duration;
+}
+
+void mo_yanxi::game::meta::chamber::radar::radar_instance_data::install(ecs::chamber::build_ref build_ref){
+	using namespace ecs::chamber;
+	auto& building = to_building<radar_build>(build_ref);
+}
+
 void mo_yanxi::game::meta::chamber::radar::radar_instance_data::draw(const basic_chamber& meta, math::frect region,
-	graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const{
+                                                                     graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const{
 	chamber_instance_data::draw(meta, region, renderer_ui, camera);
 
 	auto& m = static_cast<const radar&>(meta);
@@ -181,7 +266,7 @@ void mo_yanxi::game::meta::chamber::radar::radar_instance_data::draw(const basic
 	float stk = 3 / math::max(camera.get_scale(), 0.1f);
 
 	float ratio = m.targeting_range_angular.length() / math::pi_2;
-	if(math::equal(ratio, 1)){
+	if(math::equal(ratio, 1.f)){
 		draw::line::circle(acq, pos.vec, m.targeting_range_radius.from, stk, from_color, from_color);
 		draw::line::circle(acq, pos.vec, m.targeting_range_radius.to, stk, to_color, to_color);
 	}else{
@@ -198,6 +283,4 @@ void mo_yanxi::game::meta::chamber::radar::radar_instance_data::draw(const basic
 		draw::line::line<false>(acq.get(), math::vec2{m.targeting_range_radius.from} | p1, pos.vec, stk, from_color, src_color);
 		draw::line::line<false>(acq.get(), math::vec2{m.targeting_range_radius.from} | p2, pos.vec, stk, from_color, src_color);
 	}
-
-
 }

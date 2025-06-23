@@ -91,8 +91,9 @@ namespace mo_yanxi::game::fx{
 		math::frect viewport;
 
 
-		[[nodiscard]] FORCE_INLINE graphic::combined_image_region<graphic::uniformed_rect_uv>
-		get_default_image_region() const noexcept;
+		[[nodiscard]] constexpr static FORCE_INLINE graphic::combined_image_region<graphic::uniformed_rect_uv> get_default_image_region() noexcept{
+			return {};
+		}
 	};
 
 	/*struct palette{

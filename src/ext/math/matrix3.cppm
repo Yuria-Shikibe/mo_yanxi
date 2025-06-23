@@ -409,7 +409,7 @@ namespace mo_yanxi::math{
 			return math::rad_to_deg_v<floating_point_t> * get_rotation_rad();
 		}
 
-		[[nodiscard]] FORCE_INLINE floating_point_t get_rotation_rad() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE floating_point_t get_rotation_rad() const noexcept{
 			return math::atan2(c1.y, c1.x);
 		}
 		//

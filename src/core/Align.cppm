@@ -13,12 +13,12 @@ import mo_yanxi.math;
 
 namespace mo_yanxi{
 	namespace align{
-		template <number T1, number T2>
+		template <arithmetic T1, arithmetic T2>
 		constexpr float floating_div(const T1 a, const T2 b) noexcept{
 			return static_cast<float>(a) / static_cast<float>(b);
 		}
 
-		template <number T1>
+		template <arithmetic T1>
 		constexpr T1 floating_mul(const T1 a, const float b) noexcept{
 			if constexpr(std::is_floating_point_v<T1>){
 				return a * b;
@@ -244,7 +244,7 @@ namespace mo_yanxi{
 			stretchY,
 		};
 
-		template <number T>
+		template <arithmetic T>
 		constexpr T get_fit_embed_scale(math::vector2<T> srcSize, math::vector2<T> toBound) noexcept{
 			const float targetRatio = align::floating_div(toBound.y, toBound.x);
 			const float sourceRatio =
@@ -255,7 +255,7 @@ namespace mo_yanxi{
 			return scale;
 		}
 
-		template <number T>
+		template <arithmetic T>
 		constexpr math::vector2<T> embed_to(const scale stretch, math::vector2<T> srcSize, math::vector2<T> toBound) noexcept{
 			switch(stretch){
 			case scale::fit :{

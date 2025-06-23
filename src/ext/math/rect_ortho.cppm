@@ -42,7 +42,7 @@ namespace mo_yanxi::math{
 	 * \tparam T Arithmetic Type
 	 */
 	export
-	template <mo_yanxi::number T>
+	template <mo_yanxi::arithmetic T>
 	class rect_ortho{
 		static constexpr T TWO{2};
 
@@ -177,7 +177,7 @@ namespace mo_yanxi::math{
 			return size_.y;
 		}
 
-		template <mo_yanxi::number T_>
+		template <mo_yanxi::arithmetic T_>
 		[[nodiscard]] FORCE_INLINE constexpr rect_ortho<T_> as() const noexcept{
 			return rect_ortho<T_>{
 					static_cast<T_>(src.x),
@@ -202,7 +202,7 @@ namespace mo_yanxi::math{
 			}
 		}
 
-		template <mo_yanxi::number N>
+		template <mo_yanxi::arithmetic N>
 		FORCE_INLINE constexpr auto& set_width(const N w) noexcept{
 			if constexpr(std::is_unsigned_v<N>){
 				size_.x = static_cast<T>(w);
@@ -219,7 +219,7 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		template <mo_yanxi::number N>
+		template <mo_yanxi::arithmetic N>
 		FORCE_INLINE constexpr auto& set_height(const N h) noexcept{
 			if constexpr(std::is_unsigned_v<N>){
 				size_.y = static_cast<T>(h);
@@ -273,7 +273,7 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		template <mo_yanxi::number N>
+		template <mo_yanxi::arithmetic N>
 		FORCE_INLINE constexpr rect_ortho& add_size(const N x, const N y) noexcept{
 			using S = std::make_signed_t<T>;
 			this->set_width<S>(static_cast<S>(size_.x) + static_cast<S>(x));
@@ -553,7 +553,7 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		template <mo_yanxi::number T1, mo_yanxi::number T2>
+		template <mo_yanxi::arithmetic T1, mo_yanxi::arithmetic T2>
 		FORCE_INLINE constexpr rect_ortho& scl_size(const T1 xScl, const T2 yScl) noexcept{
 			if constexpr (std::unsigned_integral<T>){
 				CHECKED_ASSUME(xScl >= 0);
@@ -575,14 +575,14 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		template <mo_yanxi::number T1, mo_yanxi::number T2>
+		template <mo_yanxi::arithmetic T1, mo_yanxi::arithmetic T2>
 		FORCE_INLINE constexpr rect_ortho& scl_pos(const T1 xScl, const T2 yScl) noexcept{
 			src.scl(xScl, yScl);
 
 			return *this;
 		}
 
-		template <mo_yanxi::number T1, mo_yanxi::number T2>
+		template <mo_yanxi::arithmetic T1, mo_yanxi::arithmetic T2>
 		FORCE_INLINE constexpr rect_ortho& scl(const T1 xScl, const T2 yScl) noexcept{
 			(void)this->scl_pos<T1, T2>(xScl, yScl);
 			(void)this->scl_size<T1, T2>(xScl, yScl);
@@ -590,7 +590,7 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		template <mo_yanxi::number N>
+		template <mo_yanxi::arithmetic N>
 		FORCE_INLINE constexpr rect_ortho& scl(const vector2<N>& scl) noexcept{
 			(void)this->scl_pos<N, N>(scl.x, scl.y);
 			(void)this->scl_size<N, N>(scl.x, scl.y);

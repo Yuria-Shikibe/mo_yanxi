@@ -36,7 +36,7 @@ namespace mo_yanxi::game{
 	// using Adaptor = quad_tree_trait_adaptor<ItemTy>;
 	// using T = float;
 
-	template <typename ItemTy, number T>
+	template <typename ItemTy, arithmetic T>
 	struct quad_tree_trait{
 		using adaptor_type = quad_tree_trait_adaptor<ItemTy, T>;
 		using vec_t = adaptor_type::vector_type;
@@ -94,7 +94,7 @@ namespace mo_yanxi::game{
 		}
 	};
 
-	template <typename ItemTy, number T = float>
+	template <typename ItemTy, arithmetic T = float>
 	struct quad_tree_node{
 		using arth_type = T;
 		using value_type = ItemTy;
@@ -836,7 +836,7 @@ namespace mo_yanxi::game{
 	// using ItemTy = int;
 	// using T = float;
 	export
-	template <typename ItemTy, number T = float>
+	template <typename ItemTy, arithmetic T = float>
 	struct quad_tree{
 		using node_type = quad_tree_node<ItemTy, T>;
 

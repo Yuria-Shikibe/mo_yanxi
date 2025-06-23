@@ -168,7 +168,7 @@ namespace mo_yanxi::ui{
 		}
 
 		[[nodiscard]] bool is_expanding() const noexcept{
-			return !math::equal(expand_progress, 1) && !math::equal(expand_progress, 0);
+			return !math::equal(expand_progress, 1.f) && !math::equal(expand_progress, 0.f);
 		}
 
 		[[nodiscard]] rect get_collapsed_region() const noexcept{

@@ -322,8 +322,10 @@ namespace mo_yanxi::game{
 				: table(scene, group){
 
 				auto m = emplace<table>();
-				m.cell().set_width(200);
+				m.cell().set_width(300);
 				m.cell().pad.right = 8;
+				m->template_cell.set_height(60);
+				m->template_cell.pad.bottom = 6;
 				side_menu = &m.elem();
 
 				const auto editor_region = emplace<table>();

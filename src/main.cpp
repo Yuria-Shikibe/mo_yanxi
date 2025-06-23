@@ -175,21 +175,21 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	e->skip_inbound_capture = true;
 	auto& bed = static_cast<ui::manual_table&>(root.add_children(std::move(e)));
 
-	{
-		auto pane = bed.emplace<ui::button<>>();
-		pane->set_button_callback(ui::button_tags::general, [](ui::elem& elem){
-			using namespace ui;
-			auto& selector = creation::create_file_selector(creation::file_selector_create_info{elem, [](const creation::file_selector& s, const ui::elem&){
-				return s.get_current_main_select().has_value();
-			}, [](const creation::file_selector& s, const ui::elem&){
-				return true;
-			}, true});
-			selector.set_cared_suffix({".png"});
-		});
-		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.1f, 1.f}};
-		pane.cell().align = align::pos::center_left;
-		pane.cell().margin.set(4);
-	}
+	// {
+	// 	auto pane = bed.emplace<ui::button<>>();
+	// 	pane->set_button_callback(ui::button_tags::general, [](ui::elem& elem){
+	// 		using namespace ui;
+	// 		auto& selector = creation::create_file_selector(creation::file_selector_create_info{elem, [](const creation::file_selector& s, const ui::elem&){
+	// 			return s.get_current_main_select().has_value();
+	// 		}, [](const creation::file_selector& s, const ui::elem&){
+	// 			return true;
+	// 		}, true});
+	// 		selector.set_cared_suffix({".png"});
+	// 	});
+	// 	pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.1f, 1.f}};
+	// 	pane.cell().align = align::pos::center_left;
+	// 	pane.cell().margin.set(4);
+	// }
 
 	// {
 	// 	auto pane = bed.emplace<ui::menu>();
@@ -212,10 +212,10 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	//
 	// }
 	{
-		auto pane = bed.emplace<game::ui::grid_editor>();
-		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.9f, 1.f}};
-		pane.cell().align = align::pos::center_right;
-		pane.cell().margin.set(4);
+		// auto pane = bed.emplace<game::ui::grid_editor>();
+		// pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 1.f}};
+		// pane.cell().align = align::pos::center_right;
+		// pane.cell().margin.set(4);
 
 
 	}
@@ -498,7 +498,7 @@ void main_loop(){
 
 				manifold mf{};
 				math::trans2 trs = {{rand(4000.f), rand(2000.f)}, rand(180.f)};
-				mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 17, chamber::tile_size * 17}}}};
+				mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 18, chamber::tile_size * 18}}}};
 
 				faction_data faction_data{};
 				if(i & 1){
@@ -511,25 +511,26 @@ void main_loop(){
 
 				chamber::chamber_manifold grid{};
 				grid.add_building<std::tuple<chamber::turret_build>>(
-					{tags::from_extent, chamber::tile_coord{-8, -8}, 4, 17},
-					chamber::turret_build{chamber::turret_meta{
-						.range = {0, 3000},
-						// .rotation_speed = ,
-						// .default_angle = ,
-						// .shooting_field_angle = ,
-						// .shoot_cone_tolerance = ,
-						.mode = {
-							.reload_duration = 200,
-							.burst_count = 3,
-							.burst_spacing = 15,
-							.inaccuracy = 6 * math::deg_to_rad,
-							.projectile_type = &projectile_meta
-						}
-					}});
+					{tags::from_extent, chamber::tile_coord{-8, -9}, 4, 18},
+					chamber::turret_build{
+						// chamber::turret_meta{
+						// .range = {0, 3000},
+						// // .rotation_speed = ,
+						// // .default_angle = ,
+						// // .shooting_field_angle = ,
+						// // .shoot_cone_tolerance = ,
+						// .mode = {
+						// 	.reload_duration = 200,
+						// 	.burst_count = 3,
+						// 	.burst_spacing = 15,
+						// 	.inaccuracy = 6 * math::deg_to_rad,
+						// 	.projectile_type = &projectile_meta
+						// }
+					});
 				grid.add_building<std::tuple<chamber::radar_build>>(
-					{tags::from_extent, chamber::tile_coord{5, -8}, 4, 17}, chamber::radar_build{chamber::radar_meta{
-						.local_center = {20, 20},
-						.targeting_range = {400, 2000},
+					{tags::from_extent, chamber::tile_coord{5, -8}, 4, 18}, chamber::radar_build{chamber::radar_meta{
+						// .local_center = {20, 20},
+						// .targeting_range = {400, 2000},
 						.reload_duration = 120
 					}});
 
@@ -726,6 +727,9 @@ void main_loop(){
 				   draw::line::rect_ortho(acquirer, comp.box.get_bound(), 1, colors::CRIMSON);
 			   }
 			   draw::line::quad(acquirer, manifold.hitbox.ccd_wrap_box(), 1, colors::pale_green);
+			   draw::line::line_angle_center(acquirer.get(), motion.trans, 1000, 4);
+			   draw::line::line_angle_center(acquirer.get(), {motion.trans.vec, motion.trans.rot + math::pi_half}, 1000, 4);
+			   draw::line::line_angle(acquirer.get(), math::trans2{600} | motion.trans, 600, 8, colors::ORANGE);
 		   });
 
 			world.component_manager.sliced_each([&](

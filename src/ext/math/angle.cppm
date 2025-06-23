@@ -51,7 +51,8 @@ namespace mo_yanxi::math{
 		 */
 		MATH_ATTR static value_type getAngleInPi2(value_type rad) noexcept{
 			rad = std::fmod(rad, cycles);
-			if(rad < 0) rad += cycles;
+			if(rad < -pi) rad += cycles;
+			else if(rad > pi) rad -= cycles;
 			return rad;
 		}
 
@@ -63,23 +64,27 @@ namespace mo_yanxi::math{
 		}
 
 		MATH_ATTR CONSTEXPR_26 void clampInternal() noexcept{
-			ang_ = uniformed_angle::getAngleInPi(ang_);
+			ang_ = uniformed_angle::getAngleInPi2(ang_);
 		}
 
 		MATH_ATTR static constexpr value_type simpleClamp(value_type val) noexcept{
 			//val should between [-540 deg, 540 deg]
-			CHECKED_ASSUME(val >= -half_cycles * 3);
-			CHECKED_ASSUME(val <= half_cycles * 3);
+			// if consteval{
+				CHECKED_ASSUME(val >= -half_cycles * 3);
+				CHECKED_ASSUME(val <= half_cycles * 3);
 
-			if(val >= half_cycles){
-				return val - cycles;
-			}
+				if(val >= half_cycles){
+					return val - cycles;
+				}
 
-			if(val < -half_cycles){
-				return val + cycles;
-			}
+				if(val < -half_cycles){
+					return val + cycles;
+				}
 
-			return val;
+				return val;
+			// }else{
+			// 	return uniformed_angle::getAngleInPi(val);
+			// }
 		}
 
 		MATH_ATTR constexpr void simpleClamp() noexcept{
@@ -97,13 +102,18 @@ namespace mo_yanxi::math{
 			clampInternal();
 		}
 
-		[[nodiscard]] CONSTEXPR_26 explicit(false) uniformed_angle(const value_type rad) noexcept : ang_(rad){
-			clampInternal();
+		[[nodiscard]] CONSTEXPR_26 explicit(false) uniformed_angle(const value_type rad) noexcept : ang_(uniformed_angle::getAngleInPi2(rad)){
+
 		}
 
 		[[nodiscard]] constexpr uniformed_angle(tags::unchecked_t, const value_type rad) noexcept : ang_(rad){
-			assert(rad >= -Pi);
-			assert(rad <= Pi);
+			assert(ang_ >= -Pi);
+			assert(ang_ <= Pi);
+		}
+
+		[[nodiscard]] constexpr uniformed_angle(tags::unchecked_t, tags::from_deg_t, const value_type rad) noexcept : ang_(rad * deg_to_rad_v<value_type>){
+			assert(ang_ >= -Pi);
+			assert(ang_ <= Pi);
 		}
 
 
@@ -141,6 +151,22 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
+		FORCE_INLINE constexpr uniformed_angle& operator+=(const value_type other) noexcept{
+			ang_ += other;
+
+			clampInternal();
+
+			return *this;
+		}
+
+		FORCE_INLINE constexpr uniformed_angle& operator-=(const value_type other) noexcept{
+			ang_ -= other;
+
+			clampInternal();
+
+			return *this;
+		}
+
 		FORCE_INLINE CONSTEXPR_26 uniformed_angle& operator*=(const value_type val) noexcept{
 			ang_ *= val;
 
@@ -173,6 +199,22 @@ namespace mo_yanxi::math{
 
 		FORCE_INLINE constexpr friend uniformed_angle operator-(uniformed_angle lhs, const uniformed_angle rhs) noexcept{
 			return lhs -= rhs;
+		}
+
+		FORCE_INLINE constexpr friend uniformed_angle operator+(uniformed_angle lhs, const value_type rhs) noexcept{
+			return lhs += rhs;
+		}
+
+		FORCE_INLINE constexpr friend uniformed_angle operator-(uniformed_angle lhs, const value_type rhs) noexcept{
+			return lhs -= rhs;
+		}
+
+		FORCE_INLINE constexpr friend uniformed_angle operator+(value_type lhs, const uniformed_angle rhs) noexcept{
+			return uniformed_angle{lhs + rhs.ang_};
+		}
+
+		FORCE_INLINE constexpr friend uniformed_angle operator-(value_type lhs, const uniformed_angle rhs) noexcept{
+			return uniformed_angle{lhs - rhs.ang_};
 		}
 
 		FORCE_INLINE CONSTEXPR_26 friend uniformed_angle operator*(uniformed_angle lhs, const value_type rhs) noexcept{
@@ -252,10 +294,29 @@ namespace mo_yanxi::math{
 
 			simpleClamp();
 		}
+
+		[[nodiscard]] FORCE_INLINE constexpr uniformed_angle abs(this uniformed_angle self) noexcept{
+			self.ang_ = math::abs(self.ang_);
+			return self;
+		}
 	};
 
 	export using angle = uniformed_angle<float>;
 
+	template <typename T>
+	FORCE_INLINE uniformed_angle<T>::value_type distance(const uniformed_angle<T>& lhs, const uniformed_angle<T>& rhs) noexcept{
+		return math::abs((lhs - rhs).radians());
+	}
+
+	template <typename T>
+	FORCE_INLINE uniformed_angle<T>::value_type abs(const uniformed_angle<T>& v) noexcept{
+		return math::cpo::abs(v.radians());
+	}
+
+	template <typename T>
+	FORCE_INLINE uniformed_angle<T>::value_type sqr(const uniformed_angle<T>& v) noexcept{
+		return math::cpo::sqr(v.radians());
+	}
 
 	export
 	uniformed_angle<long double> operator"" _deg_to_uang(const long double val){

@@ -4,12 +4,15 @@
 
 export module mo_yanxi.game.meta.chamber;
 
-export import mo_yanxi.math.rect_ortho;
-export import mo_yanxi.game.ecs.component.hit_point;
-export import mo_yanxi.game.ecs.component.drawer;
-export import mo_yanxi.ui.table;
+export import mo_yanxi.game.ecs.component.chamber.general;
+
+import mo_yanxi.math.rect_ortho;
+import mo_yanxi.game.ecs.component.hit_point;
+import mo_yanxi.game.ecs.component.drawer;
+import mo_yanxi.ui.table;
 
 // import mo_yanxi.graphic.renderer.predecl;
+
 
 import mo_yanxi.type_map;
 import mo_yanxi.owner;
@@ -136,18 +139,13 @@ namespace mo_yanxi::game::meta::chamber{
 		};
 
 
-	export
-	struct energy_consumer_comp{
-		unsigned max_energy_consumption;
-		bool reserve_energy_if_power_off;
-	};
 
 	export struct basic_chamber;
 
 	struct chamber_instance_data{
 		virtual ~chamber_instance_data() = default;
 
-		virtual void install(/*building*/){
+		virtual void install(ecs::chamber::build_ref build_ref){
 
 		}
 
@@ -186,7 +184,7 @@ namespace mo_yanxi::game::meta::chamber{
 		ecs::static_hit_point hit_point;
 
 		bool has_placement_direction;
-		bool is_pure_static;
+		// bool is_pure_static;
 
 		virtual ~basic_chamber() = default;
 
@@ -206,7 +204,7 @@ namespace mo_yanxi::game::meta::chamber{
 			return std::nullopt;
 		}
 
-		[[nodiscard]] virtual std::optional<energy_consumer_comp> get_energy_consumption() const noexcept{
+		[[nodiscard]] virtual std::optional<ecs::chamber::energy_status> get_energy_consumption() const noexcept{
 			return std::nullopt;
 		}
 
@@ -219,12 +217,14 @@ namespace mo_yanxi::game::meta::chamber{
 		}
 
 		virtual int get_energy_usage() const noexcept{
-			return get_energy_consumption().transform([](energy_consumer_comp&& c){return -c.max_energy_consumption;}).value_or(0);
+			return get_energy_consumption().transform([](ecs::chamber::energy_status&& c){return -c.power;}).value_or(0);
 		}
 
-
+		virtual void install(ecs::chamber::build_ref build_ref) const;
 
 		virtual void build_ui(ui::table& table) const;
+
+		virtual ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::manifold_ref grid, math::point2 where) const;
 
 		template <typename S>
 		auto create_instance_data(this const S& self)  {
@@ -237,14 +237,20 @@ namespace mo_yanxi::game::meta::chamber{
 		}
 
 		template <typename S>
-		std::optional<energy_consumer_comp> deduced_get_energy_consumption(this const S& self){
-			if constexpr (std::derived_from<S, energy_consumer_comp>){
-				return static_cast<const energy_consumer_comp&>(self);
+		std::optional<ecs::chamber::energy_status> deduced_get_energy_consumption(this const S& self){
+			if constexpr (std::derived_from<S, ecs::chamber::energy_status>){
+				return static_cast<const ecs::chamber::energy_status&>(self);
 			}else{
 				return std::nullopt;
 			}
 		}
 	};
+
+	export constexpr basic_chamber empty_chamber{[]{
+		basic_chamber c{};
+		c.extent = {1, 1};
+		return c;
+	}()};
 
 	export
 	struct armor : basic_chamber{
@@ -269,21 +275,24 @@ namespace mo_yanxi::game::meta::chamber{
 
 
 	export
-	struct turret_base : basic_chamber, energy_consumer_comp{
+	struct turret_base : basic_chamber, ecs::chamber::energy_status{
 		friend basic_chamber;
 
 		struct turret_instance_data : chamber_instance_data{
 			float rotation;
 		};
 
-		ecs::drawer::part_pos_transform transform{};
+		math::pos_trans2z transform{};
 		float rotate_torque{};
 		float shooting_field_angle{};
+
+		ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::manifold_ref grid, math::point2 where) const override;
 
 		[[nodiscard]] std::optional<math::vec2> get_part_offset() const noexcept override{
 			return transform.vec;
 		}
-		[[nodiscard]] std::optional<energy_consumer_comp> get_energy_consumption() const noexcept override{
+
+		[[nodiscard]] std::optional<ecs::chamber::energy_status> get_energy_consumption() const noexcept override{
 			return deduced_get_energy_consumption();
 		}
 
@@ -295,10 +304,10 @@ namespace mo_yanxi::game::meta::chamber{
 
 
 	export
-	struct radar : basic_chamber, energy_consumer_comp{
+	struct radar : basic_chamber, ecs::chamber::energy_status{
 		friend basic_chamber;
 
-		ecs::drawer::part_pos_transform transform{};
+		math::trans2z transform{};
 
 		math::range targeting_range_radius{};
 		math::range targeting_range_angular{-math::pi, math::pi};
@@ -308,21 +317,28 @@ namespace mo_yanxi::game::meta::chamber{
 			return transform.vec;
 		}
 
-		[[nodiscard]] std::optional<energy_consumer_comp> get_energy_consumption() const noexcept override{
+		[[nodiscard]] std::optional<ecs::chamber::energy_status> get_energy_consumption() const noexcept override{
 			return deduced_get_energy_consumption();
 		}
 
 		void draw(math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const override;
 
+		ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::manifold_ref grid, math::point2 where) const override;
+
+		void install(ecs::chamber::build_ref build_ref) const override;
 
 		struct radar_instance_data : chamber_instance_data{
 			float rotation;
+
+			void install(ecs::chamber::build_ref build_ref) override;
 
 			void draw(const basic_chamber& meta, math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const override;
 
 			ui_build_handle build_ui(ui::table& table, ui_edit_context& context) override;
 
+			srl::chunk_serialize_handle write(std::ostream& stream) const override;
 
+			void read(std::ispanstream& bounded_stream) override;
 		};
 
 	protected:
@@ -362,17 +378,17 @@ namespace mo_yanxi::game::meta::chamber{
 	// 		return std::nullopt;
 	// 	}
 	//
-	// 	[[nodiscard]] virtual std::optional<energy_consumer_comp> get_energy_consumption(const basic_chamber& info) const noexcept{
+	// 	[[nodiscard]] virtual std::optional<ecs::chamber::energy_consumer_status> get_energy_consumption(const basic_chamber& info) const noexcept{
 	// 		return std::nullopt;
 	// 	}
 	//
 	// protected:
 	// 	template <typename S>
-	// 	std::optional<energy_consumer_comp> duduced_get_energy_consumption(this const S& self, const basic_chamber& info){
+	// 	std::optional<ecs::chamber::energy_consumer_status> duduced_get_energy_consumption(this const S& self, const basic_chamber& info){
 	// 		auto& dinfo = self.get(info);
 	// 		using Ty = std::remove_cvref_t<decltype(dinfo)>;
-	// 		if constexpr (std::derived_from<Ty, energy_consumer_comp>){
-	// 			return static_cast<const energy_consumer_comp&>(dinfo);
+	// 		if constexpr (std::derived_from<Ty, ecs::chamber::energy_consumer_status>){
+	// 			return static_cast<const ecs::chamber::energy_consumer_status&>(dinfo);
 	// 		}else{
 	// 			return std::nullopt;
 	// 		}
@@ -401,7 +417,7 @@ namespace mo_yanxi::game::meta::chamber{
 	// 		return math::range{-math::pi, math::pi};
 	// 	}
 	//
-	// 	[[nodiscard]] std::optional<energy_consumer_comp> get_energy_consumption(const basic_chamber& info) const noexcept override{
+	// 	[[nodiscard]] std::optional<ecs::chamber::energy_consumer_status> get_energy_consumption(const basic_chamber& info) const noexcept override{
 	// 		return duduced_get_energy_consumption(info);
 	// 	}
 	// };
@@ -427,7 +443,7 @@ namespace mo_yanxi::game::meta::chamber{
 	// 		return get(info).targeting_range_radius;
 	// 	}
 	//
-	// 	[[nodiscard]] std::optional<energy_consumer_comp> get_energy_consumption(const basic_chamber& info) const noexcept override{
+	// 	[[nodiscard]] std::optional<ecs::chamber::energy_consumer_status> get_energy_consumption(const basic_chamber& info) const noexcept override{
 	// 		return duduced_get_energy_consumption(info);
 	// 	}
 	// };

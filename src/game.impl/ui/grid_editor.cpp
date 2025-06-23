@@ -27,8 +27,8 @@ void mo_yanxi::game::ui::grid_editor_viewport::grid_info_bar::draw_content(const
 
 	auto& edit = get_editor();
 
-	auto max_consume = edit.grid.get_maximum_energy_consume();
-	auto max_generate = edit.grid.get_maximum_energy_generate();
+	auto max_consume = edit.grid.get_energy_status().max_consume();
+	auto max_generate = edit.grid.get_energy_status().max_generate();
 
 	auto max_count = std::max(max_consume, max_generate);
 	if(max_count == 0)return;
@@ -39,7 +39,7 @@ void mo_yanxi::game::ui::grid_editor_viewport::grid_info_bar::draw_content(const
 	const auto height = std::min<float>(extent.y / max_count, 24);
 
 	using namespace graphic;
-	auto acquirer{ui::get_draw_acquirer(get_renderer())};
+	auto acquirer{mo_yanxi::ui::get_draw_acquirer(get_renderer())};
 
 
 	for(unsigned i = 0; i < max_generate; ++i){
@@ -157,7 +157,7 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 	}
 }
 
-	mo_yanxi::math::frect mo_yanxi::game::ui::grid_editor_viewport::get_region_at(math::irect region_in_world) const noexcept{
+mo_yanxi::math::frect mo_yanxi::game::ui::grid_editor_viewport::get_region_at(math::irect region_in_world) const noexcept{
 	region_in_world.scl(ecs::chamber::tile_size_integral, ecs::chamber::tile_size_integral);
 	return region_in_world.as<float>();
 }
@@ -242,7 +242,7 @@ void mo_yanxi::game::ui::grid_editor::chamber_info_elem::build(){
 		auto srcOff = align::get_offset_of(align::pos::center, useable_region, e.prop().content_bound_absolute());
 		auto unit_size = useable_region / ext.as<float>();
 
-		auto acq = ui::get_draw_acquirer(e.get_renderer());
+		auto acq = mo_yanxi::ui::get_draw_acquirer(e.get_renderer());
 		using namespace graphic;
 		acq.acquire(ext.area());
 
@@ -274,37 +274,50 @@ void mo_yanxi::game::ui::grid_editor::load_chambers(){
 
 void mo_yanxi::game::ui::grid_editor::build_menu(){
 	{
-		auto b = side_menu->end_line().emplace<ui::button<ui::label>>();
+		menu_->get_default_elem().set_style();
 
-		b->set_style(ui::theme::styles::no_edge);
+		auto hdl = menu_->get_default_elem().function_init([](label& label){
+			label.set_style();
+			label.set_scale(2);
+			label.set_fit();
+			label.prop().graphic_data.inherent_opacity = .5f;
+			label.set_text("Chamber Edit");
+		});
+
+		hdl.cell().margin.set(32);
+	}
+
+	{
+		auto b = side_menu->end_line().emplace<button<label>>();
+
+		b->set_style(theme::styles::side_bar_whisper);
 		b->set_fit();
-		b->set_text("load");
-		b->set_button_callback(ui::button_tags::general, [this]{
+		b->set_text("from mesh");
+		b->set_button_callback(button_tags::general, [this]{
 			auto& selector = creation::create_file_selector(creation::file_selector_create_info{
-				*this, [](const creation::file_selector& s, const ui::grid_editor&){
+				*this, [](const creation::file_selector& s, const grid_editor&){
 					return s.get_current_main_select().has_value();
-				}, [](const creation::file_selector& s, ui::grid_editor& self){
+				}, [](const creation::file_selector& s, grid_editor& self){
 					self.viewport->set_reference(load_hitbox_from(s.get_current_main_select().value()));
 					return true;
 				}});
 			selector.set_cared_suffix({".hbox"});
 		});
-		b.cell().set_height(50);
 	}
 
 	{
-		auto b = side_menu->end_line().emplace<ui::button<ui::label>>();
+		auto b = side_menu->end_line().emplace<button<label>>();
 
-		b->set_style(ui::theme::styles::no_edge);
+		b->set_style(theme::styles::side_bar_whisper);
 		b->set_fit();
 		b->set_text("save grid");
-		b->set_button_callback(ui::button_tags::general, [this]{
+		b->set_button_callback(button_tags::general, [this]{
 			auto& selector = creation::create_file_selector(creation::file_selector_create_info{
 				.requester = *this,
-				.checker = [](const creation::file_selector& s, const ui::grid_editor&){
+				.checker = [](const creation::file_selector& s, const grid_editor&){
 					return s.get_current_main_select().has_value();
 				},
-				.yielder = [](const creation::file_selector& s, ui::grid_editor& self){
+				.yielder = [](const creation::file_selector& s, grid_editor& self){
 					std::ofstream ofs(s.get_current_main_select().value(), std::ios::binary | std::ios::out);
 					auto hdl = meta::srl::write_grid(ofs, self.viewport->grid);
 					hdl.resume();
@@ -314,27 +327,25 @@ void mo_yanxi::game::ui::grid_editor::build_menu(){
 			});
 			selector.set_cared_suffix({".metagrid"});
 		});
-		b.cell().set_height(50);
 	}
 
 	{
-		auto b = side_menu->end_line().emplace<ui::button<ui::label>>();
+		auto b = side_menu->end_line().emplace<button<label>>();
 
-		b->set_style(ui::theme::styles::no_edge);
+		b->set_style(theme::styles::side_bar_whisper);
 		b->set_fit();
 		b->set_text("load grid");
-		b->set_button_callback(ui::button_tags::general, [this]{
+		b->set_button_callback(button_tags::general, [this]{
 			auto& selector = creation::create_file_selector(creation::file_selector_create_info{
-				*this, [](const creation::file_selector& s, const ui::grid_editor&){
+				*this, [](const creation::file_selector& s, const grid_editor&){
 					return s.get_current_main_select().has_value();
-				}, [this](const creation::file_selector& s, ui::grid_editor& self){
+				}, [this](const creation::file_selector& s, grid_editor& self){
 					std::ifstream ifs(s.get_current_main_select().value(), std::ios::binary | std::ios::in);
 					meta::srl::read_grid(ifs, viewport->grid);
 					return true;
 				}});
 			selector.set_cared_suffix({".metagrid"});
 		});
-		b.cell().set_height(50);
 	}
 
 	{
@@ -348,12 +359,12 @@ void mo_yanxi::game::ui::grid_editor::build_menu(){
 			}());
 			rst.button->text_entire_align = align::pos::center_left;
 			rst.button->property.size.set_minimum_size({400, 0});
-			rst.button->set_style(ui::theme::styles::no_edge);
+			rst.button->set_style(theme::styles::no_edge);
 
 			rst.elem.set_layout_policy(layout_policy::vert_major);
 			rst.elem.set_style();
 
-			rst.elem.set_elem([&, this](ui::table& table){
+			rst.elem.set_elem([&, this](table& table){
 				table.set_style();
 				chambers.each([&, this]<typename T>(std::in_place_type_t<T> tag, const decltype(chambers)::value_type& values){
 					for (auto basic_chamber : values){
@@ -362,7 +373,7 @@ void mo_yanxi::game::ui::grid_editor::build_menu(){
 							table.get_last_cell().set_pad({.right = 8});
 						}
 
-						create_handle<chamber_info_elem, table::cell_type> hdl = table.emplace<chamber_info_elem>(*this, *basic_chamber);
+						create_handle<chamber_info_elem, cell_type> hdl = table.emplace<chamber_info_elem>(*this, *basic_chamber);
 						hdl.cell().set_external({true, false});
 					}
 				});

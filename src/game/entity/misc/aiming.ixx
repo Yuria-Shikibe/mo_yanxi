@@ -230,8 +230,7 @@ namespace mo_yanxi::game{
 
 	export
 	[[nodiscard]] FORCE_INLINE trivial_optional_float estimate_shoot_hit_delay(
-		const math::vec2 shoot_pos,
-		const math::vec2 target,
+		const math::vec2 approach_delta,
 		const math::vec2 target_vel,
 		const float bullet_speed,
 		const float bullet_initial_displacement) noexcept{
@@ -239,11 +238,9 @@ namespace mo_yanxi::game{
 			return {bullet_speed > 0 ? 0 : std::numeric_limits<float>::infinity()};
 		}
 
-		const auto local = target - shoot_pos;
-
 		const auto a = target_vel.length2() - bullet_speed * bullet_speed;
-		const auto b = 2 * (local.dot(target_vel) - bullet_speed * bullet_initial_displacement);
-		const auto c = local.length2() - bullet_initial_displacement * bullet_initial_displacement;
+		const auto b = 2 * (approach_delta.dot(target_vel) - bullet_speed * bullet_initial_displacement);
+		const auto c = approach_delta.length2() - bullet_initial_displacement * bullet_initial_displacement;
 
 		return resolve(a, b, c);
 	}

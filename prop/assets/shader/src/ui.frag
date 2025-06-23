@@ -30,7 +30,7 @@ void main() {
     float scale = get_ui_alpha_scale(ubo, mode, in_pos, in_raw_pos);
 
     if(bool(mode & draw_mode_sdf)){
-        float a = msdf(textures[in_indices[0]], in_uv, 1, bool(mode & draw_mode_uniformed));
+        float a = msdf(textures[in_indices[0]], in_uv, 1);
         a = smoothstep(-0.0375 * ubo.inv_scale, 0.1 * ubo.inv_scale, a);
         texColor = vec4(1, 1, 1, a);
     }else{

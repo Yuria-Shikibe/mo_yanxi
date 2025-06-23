@@ -20,16 +20,17 @@ export namespace mo_yanxi::math {
 		using seed_t = std::uint64_t;
 
 	private:
-		/** Normalization constant for double. */
-		static constexpr double NORM_DOUBLE = 1.0 / static_cast<double>(1ull << 53);
-		/** Normalization constant for float. */
-		static constexpr float NORM_FLOAT = 1.0f / static_cast<float>(1ull << 24);
+		/** Normalization constant for IEEE754 double. */
+		static constexpr double NORM_DOUBLE = 1.0 / static_cast<double>(1ll << 53);
+
+		/** Normalization constant for IEEE754 float. */
+		static constexpr float NORM_FLOAT = 1.0f / static_cast<float>(1ll << 24);
 
 		static constexpr seed_t murmurHash3(seed_t x) noexcept {
 			x ^= x >> 33;
-			x *= 0xff51afd7ed558ccdL;
+			x *= 0xff51afd7ed558ccdull;
 			x ^= x >> 33;
-			x *= 0xc4ceb9fe1a85ec53L;
+			x *= 0xc4ceb9fe1a85ec53ull;
 			x ^= x >> 33;
 
 			return x;
@@ -213,16 +214,6 @@ export namespace mo_yanxi::math {
 		constexpr void set_state(const seed_t s0, const seed_t s1) noexcept {
 			this->seed0 = s0;
 			this->seed1 = s1;
-		}
-
-		/**
-		 * OPTM WTF??
-		 * Returns the internal seeds to allow state saving.
-		 * @param seedIndex must be 0 or 1, designating which of the 2 long seeds to return
-		 * @return the internal seed that can be used in setState
-		 */
-		[[nodiscard]] constexpr seed_t get_state(const int seedIndex) const {
-			return seedIndex == 0 ? seed0 : seed1;
 		}
 	};
 }

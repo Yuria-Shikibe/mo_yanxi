@@ -11,10 +11,11 @@ namespace mo_yanxi::game::ecs{
 	namespace chamber{
 		export
 		struct radar_meta{
-			math::vec2 local_center{};
-			math::range targeting_range{};
-			float reload_duration{};
+			math::trans2z transform{};
 
+			math::range targeting_range_radius{};
+			math::range targeting_range_angular{-math::pi, math::pi};
+			float reload_duration{};
 		};
 
 		export
@@ -36,6 +37,7 @@ namespace mo_yanxi::game::ecs{
 			void build_hud(ui::table& where, const entity_ref& eref) const override;
 
 			void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world) override;
+
 		};
 	}
 

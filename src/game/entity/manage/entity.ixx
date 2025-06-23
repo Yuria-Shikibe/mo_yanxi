@@ -642,27 +642,47 @@ namespace mo_yanxi::game::ecs{
 		};
 
 		static void on_init(const chunk_meta& meta, T& comp) {
-			if constexpr (requires{
-				component_custom_behavior<T>::on_init(meta, comp);
-			}){
-				component_custom_behavior<T>::on_init(meta, comp);
-			}
+
+			[&]<std::size_t ... I>(std::index_sequence<I...>){
+				([&]<std::size_t J>{
+					using Cur = std::tuple_element_t<J, base_types>;
+
+					if constexpr (requires{
+						component_custom_behavior<Cur>::on_init(meta, comp);
+					}){
+						component_custom_behavior<Cur>::on_init(meta, comp);
+					}
+				}.template operator()<I>(), ...);
+			}(std::make_index_sequence<std::tuple_size_v<base_types>>());
 		}
 
 		static void on_terminate(const chunk_meta& meta, T& comp) {
-			if constexpr (requires{
-				component_custom_behavior<T>::on_terminate(meta, comp);
-			}){
-				component_custom_behavior<T>::on_terminate(meta, comp);
-			}
+			[&]<std::size_t ... I>(std::index_sequence<I...>){
+				([&]<std::size_t J>{
+					using Cur = std::tuple_element_t<J, base_types>;
+
+					if constexpr (requires{
+						component_custom_behavior<Cur>::on_terminate(meta, comp);
+					}){
+						component_custom_behavior<Cur>::on_terminate(meta, comp);
+					}
+				}.template operator()<I>(), ...);
+			}(std::make_index_sequence<std::tuple_size_v<base_types>>());
 		}
 
 		static void on_relocate(const chunk_meta& meta, T& comp) {
-			if constexpr (requires{
-				component_custom_behavior<T>::on_relocate(meta, comp);
-			}){
-				component_custom_behavior<T>::on_relocate(meta, comp);
-			}
+			[&]<std::size_t ... I>(std::index_sequence<I...>){
+				([&]<std::size_t J>{
+					using Cur = std::tuple_element_t<J, base_types>;
+
+					if constexpr (requires{
+						component_custom_behavior<Cur>::on_relocate(meta, comp);
+					}){
+						component_custom_behavior<Cur>::on_relocate(meta, comp);
+					}
+				}.template operator()<I>(), ...);
+			}(std::make_index_sequence<std::tuple_size_v<base_types>>());
+
 		}
 	};
 
@@ -1038,7 +1058,7 @@ namespace mo_yanxi::game::ecs{
 			if(last_cap != chunks.capacity()){
 				for(components& prev_comp : chunks | std::views::reverse | std::views::drop(1)){
 					[&] <std::size_t... I>(std::index_sequence<I...>){
-						(component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(prev_comp), get<I + 1>(prev_comp)), ...);
+						(component_trait<std::tuple_element_t<I, raw_tuple>>::on_relocate(get<0>(prev_comp), get<I + 1>(prev_comp)), ...);
 					}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 				}
 			}
@@ -1720,8 +1740,9 @@ namespace mo_yanxi::game::ecs{
 			std::array<std::span<const archetype_slice>, std::tuple_size_v<Tuple>> spans{};
 
 			static constexpr auto ExclusiveSize = std::tuple_size_v<Exclusives>;
+			using vec = std::conditional_t<ExclusiveSize, gch::small_vector<const void*, std::clamp<std::size_t>(std::bit_ceil(ExclusiveSize * 2), 4, 32)>, std::monostate>;
 
-			gch::small_vector<const void*, std::clamp<std::size_t>(std::bit_ceil(ExclusiveSize * 2), 4, 32)> exclusives{};
+			vec exclusives;
 
 			if constexpr (ExclusiveSize > 0){
 				[&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>){
@@ -1775,7 +1796,7 @@ namespace mo_yanxi::game::ecs{
 				cur_itr_min = std::max(cur_itr_min, ranges[i].front().identity(), comp);
 			}
 
-			(void)std::invoke(reserve_fn, maximum_size);
+			if constexpr (!std::same_as<ReserveFn, std::identity>)(void)std::invoke(reserve_fn, maximum_size);
 			while(true){
 				auto last_itr_min = cur_itr_min;
 				for (auto&& rng : ranges){

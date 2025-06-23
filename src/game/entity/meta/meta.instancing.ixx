@@ -143,7 +143,7 @@ namespace mo_yanxi::game::meta{
 		}
 
 		void set_initial_vel(const float direction_angle_rad, const float angular_override = 0) const noexcept{
-			set_initial_vel(direction_angle_rad, get_meta().initial_speed.value(), angular_override);
+			set_initial_vel(direction_angle_rad, get_meta().initial_speed, angular_override);
 		}
 
 		void set_faction(const faction_ref faction) const noexcept{

@@ -17,7 +17,7 @@ namespace mo_yanxi::graphic::draw{
 		using namespace mo_yanxi::graphic;
 		color tempColor{};
 
-		acquirer.proj.mode_flag = vk::vertices::mode_flag_bits::sdf /*| vk::vertices::mode_flag_bits::uniformed*/;
+		acquirer.proj.mode_flag = vk::vertices::mode_flag_bits::sdf | vk::vertices::mode_flag_bits::uniformed;
 		const font::typesetting::glyph_elem* last_elem{};
 
 		for(const auto& row : layout.rows()){

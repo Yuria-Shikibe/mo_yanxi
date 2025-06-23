@@ -65,7 +65,7 @@ namespace mo_yanxi::math{
 
 	// using T = float;
 
-	template <typename ItemTy, number T>
+	template <typename ItemTy, arithmetic T>
 	struct quad_tree_evaluateable_traits{
 		using vec_t = vector2<T>;
 		using rect_type = rect_ortho<T>;
@@ -122,7 +122,7 @@ namespace mo_yanxi::math{
 		}
 	};
 
-	template <typename ItemTy, number T = float>
+	template <typename ItemTy, arithmetic T = float>
 	struct quad_tree_node{
 		//OPTM if branch_size == 0 then skip some iteration
 		using rect_type = rect_ortho<T>;
@@ -637,7 +637,7 @@ namespace mo_yanxi::math{
 		}
 	};
 
-	template <typename ItemTy, number T = float>
+	template <typename ItemTy, arithmetic T = float>
 	struct quad_tree_root_base{
 	protected:
 		using node = quad_tree_node<ItemTy, T>;
@@ -645,7 +645,7 @@ namespace mo_yanxi::math{
 	};
 
 	export
-	template <typename ItemTy, number T = float>
+	template <typename ItemTy, arithmetic T = float>
 	struct quad_tree : quad_tree_root_base<ItemTy, T>, quad_tree_node<ItemTy, T>{
 	private:
 		using base = quad_tree_node<ItemTy, T>;
@@ -659,7 +659,7 @@ namespace mo_yanxi::math{
 	};
 
 	// export
-	template <typename ItemTy, number T = typename ItemTy::coordinate_type>
+	template <typename ItemTy, arithmetic T = typename ItemTy::coordinate_type>
 	struct quad_tree_with_buffer : quad_tree_node<ItemTy, T>{
 	private:
 		using buffer = std::vector<ItemTy*>;

@@ -124,7 +124,7 @@ namespace mo_yanxi::math{
 
 		constexpr friend bool operator==(const quad& lhs, const quad& rhs) noexcept = default;
 
-		FORCE_INLINE constexpr void move(typename vec_t::const_pass_t vec) noexcept{
+		FORCE_INLINE constexpr void move(vec_t::const_pass_t vec) noexcept{
 			if constexpr (std::same_as<float, value_type>){
 				if (!std::is_constant_evaluated()){
 					/* 创建重复的vec.x/vec.y模式 */
@@ -512,7 +512,7 @@ namespace mo_yanxi::math{
 		using base = quad<T>;
 
 	protected:
-		typename base::rect_t bounding_box{};
+		base::rect_t bounding_box{};
 
 	public:
 		[[nodiscard]] constexpr quad_bounded() = default;
@@ -522,31 +522,31 @@ namespace mo_yanxi::math{
 			: base{base}, bounding_box{base::get_bound()}{
 		}
 
-		[[nodiscard]] constexpr explicit(false) quad_bounded(typename base::rect_t& rect)
+		[[nodiscard]] constexpr explicit(false) quad_bounded(base::rect_t& rect)
 			: base{rect.vert_00(), rect.vert_10(), rect.vert_11(), rect.vert_01()}, bounding_box{rect}{
 		}
 
 		[[nodiscard]] constexpr explicit(false) quad_bounded(
-			typename base::vec_t::const_pass_t v0,
-			typename base::vec_t::const_pass_t v1,
-			typename base::vec_t::const_pass_t v2,
-			typename base::vec_t::const_pass_t v3
+			base::vec_t::const_pass_t v0,
+			base::vec_t::const_pass_t v1,
+			base::vec_t::const_pass_t v2,
+			base::vec_t::const_pass_t v3
 
 		)
 			: base{v0, v1, v2, v3}, bounding_box{base::get_bound()}{
 		}
 
-		[[nodiscard]] constexpr FORCE_INLINE typename base::rect_t get_bound() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE base::rect_t get_bound() const noexcept{
 			return bounding_box;
 		}
 
-		FORCE_INLINE constexpr void move(typename base::vec_t::const_pass_t vec) noexcept{
+		FORCE_INLINE constexpr void move(base::vec_t::const_pass_t vec) noexcept{
 			base::move(vec);
 
 			bounding_box.src += vec;
 		}
 
-		constexpr typename base::vec_t expand(const T length) noexcept{
+		constexpr base::vec_t expand(const T length) noexcept{
 			auto rst = base::expand(length);
 
 			bounding_box = base::get_bound();
@@ -557,7 +557,7 @@ namespace mo_yanxi::math{
 		/**
 		 * @warning Breaks Invariant! For Fast Only
 		 */
-		constexpr typename base::vec_t expand_unchecked(const T length) noexcept{
+		constexpr base::vec_t expand_unchecked(const T length) noexcept{
 			return base::expand(length);
 		}
 
@@ -570,7 +570,7 @@ namespace mo_yanxi::math{
 		}
 
 		template <std::integral Idx>
-		FORCE_INLINE constexpr typename base::vec_t operator[](const Idx idx) const noexcept{
+		FORCE_INLINE constexpr base::vec_t operator[](const Idx idx) const noexcept{
 			switch (idx & vertex_mask<Idx>){
 			case 0: return this->v0;
 			case 1: return this->v1;
@@ -660,38 +660,38 @@ namespace mo_yanxi::math{
 		 * Normal Vector for v0-v1, v2-v3
 		 * Edge Vector for v1-v2, v3-v0
 		 */
-		typename base::vec_t normalU{};
+		base::vec_t normalU{};
 
 		/**
 		 * \brief
 		 * Normal Vector for v1-v2, v3-v0
 		 * Edge Vector for v0-v1, v2-v3
 		 */
-		typename base::vec_t normalV{};
+		base::vec_t normalV{};
 
-		/*constexpr*/ void updateNormal() noexcept{
+		constexpr void updateNormal() noexcept{
 			//TODO constexpr normal in c++26
 			normalU = (this->v0 - this->v3).normalize();
 			normalV = (this->v1 - this->v0).normalize();
 		}
 
 	public:
-		[[nodiscard]] rect_box() = default;
+		[[nodiscard]] constexpr rect_box() = default;
 
-		[[nodiscard]] explicit rect_box(const base& base)
+		[[nodiscard]] constexpr explicit(false) rect_box(const base& base)
 			: base(base), normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
 		}
-		[[nodiscard]] explicit rect_box(const typename base::rect_t& rect)
+		[[nodiscard]] constexpr explicit(false) rect_box(const base::rect_t& rect)
 			: base(rect), normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
 		}
 
 		// [[nodiscard]] RectBoxBrief() = default;
 		//
 		[[nodiscard]] constexpr rect_box(
-			const typename base::vec_t::const_pass_t v0,
-			const typename base::vec_t::const_pass_t v1,
-			const typename base::vec_t::const_pass_t v2,
-			const typename base::vec_t::const_pass_t v3) noexcept
+			const base::vec_t::const_pass_t v0,
+			const base::vec_t::const_pass_t v1,
+			const base::vec_t::const_pass_t v2,
+			const base::vec_t::const_pass_t v3) noexcept
 			: base{v0, v1, v2, v3}, normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
 			// assert(math::abs(normalU.dot(normalV)) < 1E-2);
 		}
@@ -699,7 +699,7 @@ namespace mo_yanxi::math{
 		/**
 		 * @brief normal at vtx[idx] - vtx[idx + 1]
 		 */
-		FORCE_INLINE typename base::vec_t edge_normal_at(const std::integral auto idx) const noexcept{
+		constexpr FORCE_INLINE base::vec_t edge_normal_at(const std::integral auto idx) const noexcept{
 			switch(idx & vertex_mask<decltype(idx)>) {
 				case 0 : return -normalU;
 				case 1 : return normalV;
@@ -709,7 +709,7 @@ namespace mo_yanxi::math{
 			}
 		}
 
-		void update(const math::trans2 transform, const rect_box_identity<T>& idt) noexcept{
+		constexpr void update(const math::trans2 transform, const rect_box_identity<T>& idt) noexcept{
 			typename base::value_type rot = transform.rot;
 			auto [cos, sin] = cos_sin(rot);
 
@@ -760,12 +760,12 @@ namespace mo_yanxi::math{
 
 		[[nodiscard]] constexpr rect_box_posed() = default;
 
-		[[nodiscard]] explicit(false) rect_box_posed(const rect_idt_t& idt, const trans_t transform = {})
+		[[nodiscard]] constexpr explicit(false) rect_box_posed(const rect_idt_t& idt, const trans_t transform = {})
 			: rect_box_identity{idt}{
 			update(transform);
 		}
 
-		[[nodiscard]] explicit(false) rect_box_posed(const vec_t size, const trans_t transform = {})
+		[[nodiscard]] constexpr explicit(false) rect_box_posed(const vec_t size, const trans_t transform = {})
 			: rect_box_posed{{size / -2.f, size}, transform}{
 		}
 
@@ -784,19 +784,24 @@ namespace mo_yanxi::math{
 			return size.length2() * (scale + lengthRadiusRatio) * mass;
 		}
 
-		void update(trans_t, const rect_box_identity&) = delete;
+		constexpr void update(trans_t, const rect_box_identity&) = delete;
 
-		void update(const trans_t transform) noexcept{
+		constexpr void update(const trans_t transform) noexcept{
 			rect_box::update(transform, static_cast<const rect_box_identity&>(*this));
 		}
 
-		[[nodiscard]] trans_t deduce_transform() const noexcept{
+		[[nodiscard]] constexpr trans_t deduce_transform() const noexcept{
 
 			const vec2 rotated_offset = offset.x * normalV + offset.y * normalU;
 			const vec2 translation = v0 - rotated_offset;
 			const auto v = (normalV + normalU.copy().rotate_rt_counter_clockwise());
 
-			return {translation, std::atan2(v.y, v.x)};
+			if consteval{
+				return {translation, math::atan2(v.y, v.x)};
+			}else{
+				return {translation, std::atan2(v.y, v.x)};
+			}
+
 		}
 	};
 

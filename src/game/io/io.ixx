@@ -23,7 +23,7 @@ namespace mo_yanxi::game::srl{
 		using std::runtime_error::runtime_error;
 
 		[[nodiscard]] srl_hard_error()
-			: runtime_error("srl fatal error"){
+			: runtime_error("srl hard error"){
 		}
 	};
 
@@ -32,11 +32,6 @@ namespace mo_yanxi::game::srl{
 			stream.read(buf, static_cast<std::streamsize>(buf_size));
 			return buf_size;
 		});
-
-		bool g = stream.good();
-		bool b = stream.bad();
-		bool f = stream.fail();
-		auto actual_size = stream.gcount();
 
 		if(!stream){
 			throw srl_hard_error{};
@@ -50,9 +45,9 @@ namespace mo_yanxi::game::srl{
 	}
 
 	export
-	template <std::derived_from<std::basic_istream<char>> S, typename T>
+	template <typename T>
 		requires (std::is_trivially_copyable_v<T>)
-	void read_to(S& stream, T& value){
+	void read_to(std::istream& stream, T& value){
 		if(!stream.read(reinterpret_cast<char*>(std::addressof(value)), static_cast<std::streamsize>(sizeof(T)))){
 			throw srl_hard_error{};
 		}
@@ -128,7 +123,7 @@ namespace mo_yanxi::game::srl{
 		}
 
 		[[nodiscard]] constexpr std::streampos get_target_pos() const noexcept{
-			return initial_pos + static_cast<std::streampos>(chunk_size - sizeof(srl_size));
+			return initial_pos + static_cast<std::streampos>(chunk_size);
 		}
 
 		[[nodiscard]] constexpr srl_size get_chunk_size() const noexcept{

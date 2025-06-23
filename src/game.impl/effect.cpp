@@ -12,15 +12,11 @@ import mo_yanxi.graphic.draw.trail;
 namespace mo_yanxi::game{
 	namespace draw = graphic::draw;
 	FORCE_INLINE graphic::draw::world_acquirer<> get_acquirer(const fx::effect& e, const fx::effect_draw_context& ctx){
-		graphic::draw::world_acquirer<> acq {ctx.renderer.batch, ctx.get_default_image_region()};
+		graphic::draw::world_acquirer<> acq {ctx.renderer.batch};
 		acq.proj.depth = e.depth;
 		return acq;
 	}
 
-	graphic::combined_image_region<graphic::uniformed_rect_uv>
-		fx::effect_draw_context::get_default_image_region() const noexcept{
-		return graphic::draw::white_region;
-	}
 
 
 	void fx::trail_effect::operator()(const effect& e, const effect_draw_context& ctx) const noexcept{

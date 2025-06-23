@@ -77,9 +77,14 @@ target("mo_yanxi")
     add_cxflags("/wd5030")
     add_cxflags("/bigobj")
 
+    --ide hint only
+--     add_files("src/**.hpp")
+--     add_files("src/**.h")
+
     add_files("src/**.cppm")
     add_files("src/**.ixx")
     add_files("src/**.cpp")
+
 
     add_packages("glfw")
     add_packages("msdfgen")

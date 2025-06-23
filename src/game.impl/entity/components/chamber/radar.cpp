@@ -77,10 +77,10 @@ namespace mo_yanxi::game::ecs::chamber{
 
 		mo_yanxi::ui::draw_acquirer acquirer{ui::get_draw_acquirer(renderer)};
 
-		auto center = get_local_to_global(meta.local_center);
+		auto center = get_local_to_global(meta.transform.vec);
 
-		if(meta.targeting_range.from > 0)draw::line::circle(acquirer, center, meta.targeting_range.from, 3);
-		draw::line::circle(acquirer, center, meta.targeting_range.to, 5, ui::theme::colors::theme, ui::theme::colors::theme);
+		if(meta.targeting_range_radius.from > 0)draw::line::circle(acquirer, center, meta.targeting_range_radius.from, 3);
+		draw::line::circle(acquirer, center, meta.targeting_range_radius.to, 5, ui::theme::colors::theme, ui::theme::colors::theme);
 
 		for (const auto & candidate : data().grid().targets_primary.get_candidates()){
 			if(!candidate.ref)continue;
@@ -115,8 +115,8 @@ namespace mo_yanxi::game::ecs::chamber{
 					data().grid().targets_primary.index_candidates_by_distance(
 						top_world.collision_system.quad_tree(),
 						chunk_meta.id(),
-						get_local_to_global(meta.local_center),
-						meta.targeting_range, [&](const collision_object& obj){
+						get_local_to_global(meta.transform.vec),
+						meta.targeting_range_radius, [&](const collision_object& obj){
 							return faction->is_hostile_to(obj.id->at<faction_data>().faction.get_id());
 						});
 				}

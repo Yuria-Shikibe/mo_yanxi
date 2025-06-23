@@ -306,8 +306,8 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 
 		void update_transform(math::trans2 trans){
-			static constexpr math::vec2 Offset = math::vec2{tile_size, tile_size} / 2.f;
-			trans.vec -= Offset.copy().rotate_rad(trans.rot);
+			// static constexpr math::vec2 Offset = math::vec2{tile_size, tile_size} / 2.f;
+			// trans.vec -= Offset.copy().rotate_rad(trans.rot);
 
 			if(transform != trans){
 				transform = trans;
@@ -406,11 +406,26 @@ namespace mo_yanxi::game::ecs::chamber{
 				}, std::forward<Args>(args)...);
 			}
 		}
+		template <std::derived_from<building> Building, typename ...Args>
+		Building& add_building(tile_region region, Args&& ...args){
+			if(region.area() == 0){
+				throw std::invalid_argument("invalid region");
+			}
+
+			const entity_id ent = manager.create_entity_deferred<std::tuple<building_data, Building>>(building_data{
+				region, this
+			}, std::forward<Args>(args)...);
+			return ent->at<Building>();
+		}
 
 		void draw_hud(graphic::renderer_ui& renderer){
 			manager.sliced_each([&](const building& building){
 				building.draw_hud(renderer);
 			});
+		}
+
+		explicit(false) operator manifold_ref() noexcept{
+			return reinterpret_cast<manifold_ref&>(*this);
 		}
 
 
@@ -437,6 +452,11 @@ namespace mo_yanxi::game::ecs::chamber{
 			return *this;
 		}
 	};
+
+	export
+	[[nodiscard]] chamber_manifold& to_manifold(manifold_ref ref) noexcept{
+		return reinterpret_cast<chamber_manifold&>(ref);
+	}
 
 	export
 	struct chamber_manifold_dump{
@@ -497,7 +517,6 @@ namespace mo_yanxi::game::ecs{
 			comp.grid().local_grid.insert(meta.id());
 
 			on_relocate(meta, comp);
-			building_data_dump d{};
 		}
 
 		static void on_terminate(const chunk_meta& meta, const value_type& comp){

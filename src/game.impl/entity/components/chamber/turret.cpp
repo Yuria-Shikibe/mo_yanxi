@@ -52,7 +52,7 @@ namespace mo_yanxi::game::ecs::chamber{
 			if(!ref)return;
 			auto& build = ref->at<turret_build>();
 
-			reload_progress_bar->update_progress(build.reload / build.meta.mode.reload_duration, delta_in_ticks);
+			reload_progress_bar->update_progress(build.reload / build.body.reload_duration, delta_in_ticks);
 		}
 	};
 
@@ -63,15 +63,15 @@ namespace mo_yanxi::game::ecs::chamber{
 	void turret_build::draw_hud(graphic::renderer_ui& renderer) const{
 		auto acquirer = ui::get_draw_acquirer(renderer);
 		using namespace graphic;
-		auto trs = get_local_to_global_trans(turret_center_local_trans.vec);
+		auto trs = get_local_to_global_trans(transform.vec);
 		auto pos = trs.vec;
 
-		if(meta.range.from > 0){
-			draw::line::circle(acquirer, pos, meta.range.from, 3, ui::theme::colors::red_dusted);
+		if(body.range.from > 0){
+			draw::line::circle(acquirer, pos, body.range.from, 3, ui::theme::colors::red_dusted);
 		}
-		draw::line::circle(acquirer, pos, meta.range.to, 5, ui::theme::colors::pale_green, ui::theme::colors::pale_green);
+		draw::line::circle(acquirer, pos, body.range.to, 5, ui::theme::colors::pale_green, ui::theme::colors::pale_green);
 
-		auto offset_dir = math::vec2::from_polar_rad(turret_center_local_trans.rot.radians() + trs.rot);
+		auto offset_dir = math::vec2::from_polar_rad(rotation.radians() + trs.rot);
 		draw::line::line(acquirer.get(), pos + offset_dir * 32, pos + offset_dir * 96, 4, ui::theme::colors::accent, ui::theme::colors::accent);
 
 
@@ -79,7 +79,7 @@ namespace mo_yanxi::game::ecs::chamber{
 			auto& motion = target.entity->at<mech_motion>();
 			draw::line::line(acquirer.get(), pos, motion.pos(), 4, ui::theme::colors::theme, ui::theme::colors::accent);
 
-			if(auto rst = estimate_shoot_hit_delay({}, target.local_pos, motion.vel.vec, cache_.projectile_speed, meta.shoot_offset.x)){
+			if(auto rst = estimate_shoot_hit_delay(target.local_pos, motion.vel.vec, cache_.projectile_speed, body.shoot_type.offset.trunk.x)){
 				auto mov = rst * motion.vel.vec;
 				draw::line::line(acquirer.get(), pos, motion.pos() + mov, 4, ui::theme::colors::clear, ui::theme::colors::accent);
 				draw::line::square(acquirer, {motion.pos() + mov, 45 * math::deg_to_rad}, 32, 3, ui::theme::colors::accent);
@@ -90,12 +90,12 @@ namespace mo_yanxi::game::ecs::chamber{
 	}
 
 	void turret_build::shoot(const chunk_meta& chunk_meta, world::entity_top_world& top_world) const{
-		if(meta.mode.projectile_type){
-			auto hdl = meta::create(top_world.component_manager, *meta.mode.projectile_type);
-			auto trs = get_local_to_global_trans(turret_center_local_trans);
+		if(body.shoot_type.projectile){
+			auto hdl = meta::create(top_world.component_manager, *body.shoot_type.projectile);
+			auto trs = get_local_to_global_trans(transform);
 
-			hdl.set_initial_trans(math::trans2{meta.shoot_offset} | trs);
-			hdl.set_initial_vel(trs.rot + math::rand{}(meta.mode.inaccuracy));
+			hdl.set_initial_trans(math::trans2{body.shoot_type.offset.trunk} | trs);
+			hdl.set_initial_vel(trs.rot + math::rand{}(body.shoot_type.angular_inaccuracy));
 			hdl.set_faction(chunk_meta.id()->at<faction_data>().faction);
 		}
 	}

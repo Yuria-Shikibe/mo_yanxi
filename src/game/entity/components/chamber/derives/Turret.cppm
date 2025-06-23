@@ -7,49 +7,40 @@ export import mo_yanxi.game.ecs.component.chamber;
 export import mo_yanxi.game.meta.content_ref;
 export import mo_yanxi.game.meta.projectile;
 export import mo_yanxi.game.meta.chamber;
+export import mo_yanxi.game.meta.turret;
 import mo_yanxi.math;
+
+import std;
 
 namespace mo_yanxi::game::ecs{
 	namespace chamber{
-		export
-		struct shoot_mode{
-			float reload_duration{};
-
-			unsigned burst_count{};
-			float burst_spacing{};
-
-			float inaccuracy{};
-
-			meta::content_ref<meta::projectile> projectile_type{};
-		};
 
 		export
-		struct turret_meta{
-			math::range range{};
-			float rotate_speed{};
-
-			float default_angle{};
-			float shooting_field_angle{};
-
-			float shoot_cone_tolerance{};
-			math::vec2 shoot_offset{};
-
-			shoot_mode mode{};
+		enum struct turret_state{
+			standby,
+			will_standby,
+			reloading,
+			shooting
 		};
 
 		struct turret_cache{
+
 			float projectile_speed{};
 		};
 
 		export
 		struct turret_build : building{
-			turret_meta meta{};
+			meta::turret::turret_body body;
 
-			math::uniform_trans2 turret_center_local_trans{};
+			math::trans2z transform{};
+			float rotate_torque{};
+			float shooting_field_angle{};
+
+			math::angle rotation{};
+			float standby_reload{};
+
+
 			float reload{};
-
-			float rotate_back_reload{};
-
 			unsigned burst_progress{};
 			float burst_reload{};
 			target target{};
@@ -61,11 +52,9 @@ namespace mo_yanxi::game::ecs{
 
 			[[nodiscard]] turret_build() = default;
 
-			[[nodiscard]] explicit turret_build(const turret_meta& meta)
-				: meta(meta){
-				if(meta.mode.projectile_type){
-					cache_.projectile_speed = meta.mode.projectile_type->initial_speed.value_or(0);
-				}
+			void reset_body(const meta::turret::turret_body& body) noexcept{
+				this->body = body;
+				cache_.projectile_speed = body.shoot_type.projectile->initial_speed;
 			}
 
 			void build_hud(ui::table& where, const entity_ref& eref) const override;
@@ -73,7 +62,7 @@ namespace mo_yanxi::game::ecs{
 			void draw_hud(graphic::renderer_ui& renderer) const override;
 
 			[[nodiscard]] bool validate_target(const math::vec2 target_local_trs) const noexcept{
-				return meta.range.within_open(target_local_trs.length());
+				return body.range.within_open(target_local_trs.length());
 			}
 
 		private:
@@ -89,30 +78,34 @@ namespace mo_yanxi::game::ecs{
 
 			void rotate(){
 				if(target){
-					auto& motion = target.entity->at<mech_motion>();
+					const auto& motion = target.entity->at<mech_motion>();
+					const auto pos = get_local_to_global_trans(transform.vec);
 
-					auto pos = get_local_to_global_trans(turret_center_local_trans.vec);
-
-					if(auto rst = estimate_shoot_hit_delay({}, target.local_pos, motion.vel.vec, cache_.projectile_speed, meta.shoot_offset.x)){
-						auto tgt = pos.apply_inv_to(motion.pos() + motion.vel.vec * rst);
-						auto ang = tgt.angle_rad();
-						turret_center_local_trans.rot.rotate_toward(ang, get_update_delta());
+					if(const auto rst =
+						estimate_shoot_hit_delay(
+							target.local_pos,
+							motion.vel.vec,
+							cache_.projectile_speed,
+							body.shoot_type.offset.trunk.x)){
+						const auto tgt = pos.apply_inv_to(motion.pos() + motion.vel.vec * rst);
+						const auto ang = tgt.angle_rad();
+						rotation.rotate_toward(ang, get_update_delta());
 					}
 				}
 			}
 
 			void reload_turret(const chunk_meta& chunk_meta, world::entity_top_world& top_world){
 				if(!is_shooting()){
-					if(const auto rst = math::forward_approach_then(reload, meta.mode.reload_duration, get_update_delta())){
+					if(const auto rst = math::forward_approach_then(reload, body.reload_duration, get_update_delta())){
 						reload = 0;
 						begin_shoot();
 					}else{
 						reload = rst;
 					}
 				}else{
-					if(const auto rst = math::forward_approach_then(burst_reload, meta.mode.burst_spacing, get_update_delta())){
+					if(const auto rst = math::forward_approach_then(burst_reload, body.shoot_type.burst.spacing, get_update_delta())){
 						burst_reload = 0;
-						if(burst_progress <= meta.mode.burst_count){
+						if(burst_progress <= body.shoot_type.burst.count){
 							++burst_progress;
 							shoot(chunk_meta, top_world);
 						}else{
@@ -127,7 +120,7 @@ namespace mo_yanxi::game::ecs{
 		public:
 			void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world) override{
 				if(target){
-					target.update(turret_center_local_trans | data().get_trans());
+					target.update(transform.get_trans() | data().get_trans());
 					if(!validate_target(target.local_pos)){
 						target = nullptr;
 					}else{
@@ -158,7 +151,9 @@ namespace mo_yanxi::game::ecs{
 				}*/
 			}
 		};
+
 	}
+
 
 	export
 	struct turret_build_dump{

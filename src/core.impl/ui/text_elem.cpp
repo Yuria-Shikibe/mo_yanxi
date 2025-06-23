@@ -43,6 +43,6 @@ std::optional<mo_yanxi::font::typesetting::layout_pos_t> mo_yanxi::ui::label::ge
 void mo_yanxi::ui::label::draw_content(const rect clipSpace) const{
 	// elem::draw_content(clipSpace, redirect);
 
-	draw_acquirer acquirer{get_renderer().batch, {}};
+	draw_acquirer acquirer{get_renderer().batch};
 	graphic::draw::glyph_layout(acquirer, glyph_layout, get_glyph_abs_src(), property.graphic_data.get_opacity() * (disabled ? 0.3f : 1.f));
 }

@@ -20,85 +20,10 @@ namespace mo_yanxi::game::ecs::drawer{
 	using trans_t = math::transform2<float>;
 
 	export
-	struct part_transform : trans_t{
-		float z_offset;
-
-		using part_transform::operator|=;
-
-		[[nodiscard]] FORCE_INLINE constexpr trans_t get_trans() const noexcept{
-			return static_cast<trans_t>(*this);
-		}
-
-		FORCE_INLINE constexpr part_transform& operator|=(const part_transform parentRef) noexcept{
-			trans_t::operator|=(static_cast<trans_t>(parentRef)); // NOLINT(*-slicing)
-			z_offset += parentRef.z_offset;
-
-			return *this;
-		}
-
-		[[nodiscard]] FORCE_INLINE  constexpr friend part_transform operator|(part_transform self, const part_transform parentRef) noexcept{
-			return self |= parentRef;
-		}
-
-		FORCE_INLINE constexpr part_transform& operator+=(const part_transform parentRef) noexcept{
-			trans_t::operator+=(static_cast<trans_t>(parentRef)); // NOLINT(*-slicing)
-			z_offset += parentRef.z_offset;
-
-			return *this;
-		}
-
-		FORCE_INLINE constexpr part_transform friend operator+( part_transform lhs, const part_transform& rhs) noexcept{
-			return lhs += rhs;
-		}
-
-		[[nodiscard]] constexpr part_transform operator*(const float scl) const noexcept{
-			part_transform state = *this;
-			state.trans_t::operator*=(scl);
-			state.z_offset *= scl;
-
-			return state;
-		}
-	};
-
+	using part_transform = math::transform2z<float>;
 
 	export
-	struct part_pos_transform{
-		math::vec2 vec;
-		float z_offset;
-
-		constexpr part_pos_transform& operator|=(const part_transform parentRef) noexcept{
-			vec |= parentRef.get_trans();
-			z_offset += parentRef.z_offset;
-
-			return *this;
-		}
-
-		[[nodiscard]] constexpr friend part_pos_transform operator|(part_pos_transform self, const part_transform parentRef) noexcept{
-			return self |= parentRef;
-		}
-
-		constexpr part_pos_transform& operator|=(const trans_t rhs) noexcept{
-			vec |= rhs;
-
-			return *this;
-		}
-
-		[[nodiscard]] constexpr friend part_pos_transform operator|(part_pos_transform self, const trans_t parentRef) noexcept{
-			return self |= parentRef;
-		}
-
-		FORCE_INLINE constexpr part_pos_transform& operator+=(const part_pos_transform lhs) noexcept{
-			vec += lhs.vec;
-			z_offset += lhs.z_offset;
-
-			return *this;
-		}
-
-		FORCE_INLINE constexpr part_pos_transform friend operator+(part_pos_transform lhs, const part_pos_transform& rhs) noexcept{
-			return lhs += rhs;
-		}
-	};
-
+	using part_pos_transform = math::pos_transform2z;
 
 	export
 	struct texture_region{

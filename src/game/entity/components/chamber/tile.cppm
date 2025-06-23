@@ -21,6 +21,8 @@ import mo_yanxi.game.ecs.component.ui.builder;
 
 export import mo_yanxi.game.ecs.world.top;
 
+export import mo_yanxi.game.ecs.component.chamber.general;
+
 import std;
 
 namespace mo_yanxi::game::ecs{
@@ -62,44 +64,6 @@ namespace mo_yanxi::game::ecs{
 			damage_type damage;
 		};
 
-		export
-		struct building : ui_builder{
-			friend building_data;
-			friend game::ecs::component_custom_behavior<chamber::building_data>;
-			friend game::ecs::component_custom_behavior<chamber::building>;
-
-		private:
-			building_data* data_{};
-
-		protected:
-			[[nodiscard]] float get_update_delta() const noexcept;
-
-			[[nodiscard]] math::vec2 get_local_to_global(math::vec2 p) const noexcept;
-			[[nodiscard]] math::trans2 get_local_to_global_trans(math::vec2 p) const noexcept;
-			[[nodiscard]] math::trans2 get_local_to_global_trans(math::trans2 p) const noexcept;
-
-		public:
-			[[nodiscard]] building_data& data() const noexcept{
-				assert(data_ != nullptr);
-				return *data_;
-			}
-
-			~building() override = default;
-
-			virtual void draw_hud(graphic::renderer_ui& renderer) const{
-
-			}
-
-			virtual void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world){
-
-			}
-		};
-
-		export
-		template <typename ...Bases>
-		struct building_trait_base{
-			using base_types = std::tuple<building, ui_builder, Bases ...>;
-		};
 
 		struct tile_damage{
 			float building_damage;
@@ -144,6 +108,81 @@ namespace mo_yanxi::game::ecs{
 			}
 		};
 
+		export
+		struct empty_building{};
+
+		export
+		struct building : ui_builder{
+			friend building_data;
+			friend game::ecs::component_custom_behavior<chamber::building_data>;
+			friend game::ecs::component_custom_behavior<chamber::building>;
+
+		private:
+			building_data* data_{};
+
+		protected:
+			[[nodiscard]] float get_update_delta() const noexcept;
+
+			[[nodiscard]] math::vec2 get_local_to_global(math::vec2 p) const noexcept;
+			[[nodiscard]] math::trans2 get_local_to_global_trans(math::vec2 p) const noexcept;
+			[[nodiscard]] math::trans2 get_local_to_global_trans(math::trans2 p) const noexcept;
+
+		public:
+			[[nodiscard]] building_data& data() const noexcept{
+				assert(data_ != nullptr);
+				return *data_;
+			}
+
+			~building() override = default;
+
+			explicit(false) operator build_ref() noexcept{
+				return reinterpret_cast<build_ref>(*this);
+			}
+
+			explicit(false) operator build_ptr() noexcept{
+				return reinterpret_cast<build_ptr>(this);
+			}
+
+			explicit(false) operator const_build_ref() const noexcept{
+				return reinterpret_cast<const_build_ref>(*this);
+			}
+
+			virtual void draw_hud(graphic::renderer_ui& renderer) const{
+
+			}
+
+			virtual void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world){
+
+			}
+		};
+
+		export
+		template <std::derived_from<building> T = building>
+		[[nodiscard]] T& to_building(build_ref ptr) noexcept{
+#if DEBUG_CHECK
+			return dynamic_cast<T&>(reinterpret_cast<building&>(ptr));
+#else
+			return static_cast<T&>(reinterpret_cast<building&>(ptr));
+
+			// if constexpr (std::is_pointer_interconvertible_base_of_v<building, T>){
+			// 	return *reinterpret_cast<T*>(ptr);
+			// }else{
+			// 	return *static_cast<T*>(reinterpret_cast<building*>(ptr));
+			// }
+#endif
+		}
+
+		export
+		template <std::derived_from<building> T = building>
+		[[nodiscard]] const T& to_building(const_build_ref ptr) noexcept{
+			return to_building<T>(const_cast<build_ref>(ptr));
+		}
+
+		export
+		template <typename ...Bases>
+		struct building_trait_base{
+			using base_types = std::tuple<building, ui_builder, Bases ...>;
+		};
 
 		struct building_data{
 			friend chamber_grid;
@@ -162,13 +201,24 @@ namespace mo_yanxi::game::ecs{
 			std::vector<tile_damage_event> damage_events{};
 
 			//TODO should this be public?
+			//TODO uses unique ptr to save bytes?
 			std::vector<tile_status> tile_states{};
 			float building_damage_take{};
 			float structural_damage_take{};
 
+			energy_status energy_status{};
+
 		private:
 
 		public:
+			[[nodiscard]] float get_capability_factor() const noexcept{
+				return hit_point.get_capability_factor();
+			}
+
+			[[nodiscard]] int get_max_usable_energy() const noexcept{
+				return energy_status.power * hit_point.get_capability_factor();
+			}
+
 			[[nodiscard]] tile_region region() const noexcept{
 				return region_;
 			}
@@ -232,9 +282,6 @@ namespace mo_yanxi::game::ecs{
 					return damage_consume_result::hitpoint_exhaust;
 				}
 			}
-		//
-		// private:
-		// 	std::unique_ptr<building> actor{};
 
 		public:
 			[[nodiscard]] building_data() = default;
@@ -252,7 +299,7 @@ namespace mo_yanxi::game::ecs{
 				return region_.as<float>().scl(tile_size, tile_size);
 			}
 
-			math::trans2 get_trans() const noexcept;
+			[[nodiscard]] math::trans2 get_trans() const noexcept;
 		};
 
 	}
@@ -291,6 +338,11 @@ namespace mo_yanxi::game::ecs::chamber{
 
 		[[nodiscard]] building_data& data() const noexcept{
 			return id()->at<building_data>();
+		}
+
+		template <std::derived_from<building> Building>
+		[[nodiscard]] Building& build() const noexcept{
+			return id()->at<Building>();
 		}
 	};
 

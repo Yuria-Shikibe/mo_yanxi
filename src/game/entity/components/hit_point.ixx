@@ -20,10 +20,21 @@ namespace mo_yanxi::game::ecs{
 	struct hit_point : static_hit_point{
 		float cur{2000};
 
+
+
 	private:
 		//float last{100};
 
 	public:
+		void reset(const static_hit_point& static_hit_point) noexcept{
+			this->static_hit_point::operator=(static_hit_point);
+			reset();
+		}
+
+		void reset() noexcept{
+			cur = max;
+		}
+
 		[[nodiscard]] float get_capability_factor() const noexcept{
 			return capability_range.normalize(cur);
 		}

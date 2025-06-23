@@ -8,8 +8,8 @@ import mo_yanxi.math;
 import mo_yanxi.concepts;
 import std;
 
-export namespace mo_yanxi::math{
-
+namespace mo_yanxi::math{
+	export
 	template <typename T>
 	struct vec2_products{
 		T dot;
@@ -21,6 +21,7 @@ export namespace mo_yanxi::math{
 		}
 	};
 
+	export
 	template <typename T>
 	struct vector2
 	{
@@ -90,11 +91,11 @@ export namespace mo_yanxi::math{
 			return {math::mod<T>(x, tgt.x), math::mod<T>(y, tgt.y)};
 		}
 
-		FORCE_INLINE constexpr vector2& operator+=(const_pass_t tgt) noexcept {
+		constexpr FORCE_INLINE vector2& operator+=(const_pass_t tgt) noexcept {
 			return this->add(tgt);
 		}
 
-		FORCE_INLINE constexpr vector2 operator~() const noexcept{
+		constexpr FORCE_INLINE vector2 operator~() const noexcept{
 			if constexpr (std::floating_point<T>){
 				return {static_cast<T>(1) / x, static_cast<T>(1) / y};
 			}else if constexpr (std::unsigned_integral<T>){
@@ -104,99 +105,99 @@ export namespace mo_yanxi::math{
 			}
 		}
 
-		FORCE_INLINE constexpr vector2& inverse() noexcept{
+		constexpr FORCE_INLINE vector2& inverse() noexcept{
 			return this->set(this->operator~());
 		}
 
 		template <std::floating_point Ty = float>
-		FORCE_INLINE constexpr vector2<Ty>& reciprocal() const noexcept{
+		constexpr FORCE_INLINE vector2<Ty>& reciprocal() const noexcept{
 			return ~as<Ty>();
 		}
 
-		FORCE_INLINE constexpr vector2& operator+=(const T tgt) noexcept {
+		constexpr FORCE_INLINE vector2& operator+=(const T tgt) noexcept {
 			return this->add(tgt);
 		}
 
-		FORCE_INLINE constexpr vector2& operator-=(const_pass_t tgt) noexcept {
+		constexpr FORCE_INLINE vector2& operator-=(const_pass_t tgt) noexcept {
 			return this->sub(tgt);
 		}
 
-		FORCE_INLINE constexpr vector2& operator*=(const_pass_t tgt) noexcept {
+		constexpr FORCE_INLINE vector2& operator*=(const_pass_t tgt) noexcept {
 			return this->mul(tgt);
 		}
 
-		FORCE_INLINE constexpr vector2& operator*=(const T val) noexcept {
+		constexpr FORCE_INLINE vector2& operator*=(const T val) noexcept {
 			return this->mul(val);
 		}
 
-		FORCE_INLINE constexpr vector2& operator/=(const_pass_t tgt) noexcept {
+		constexpr FORCE_INLINE vector2& operator/=(const_pass_t tgt) noexcept {
 			return this->div(tgt);
 		}
 
-		FORCE_INLINE constexpr vector2& operator/=(const T tgt) noexcept {
+		constexpr FORCE_INLINE vector2& operator/=(const T tgt) noexcept {
 			return this->div(tgt, tgt);
 		}
 
-		FORCE_INLINE constexpr vector2& operator%=(const_pass_t tgt) noexcept {
+		constexpr FORCE_INLINE vector2& operator%=(const_pass_t tgt) noexcept {
 			return this->mod(tgt.x, tgt.y);
 		}
 
-		FORCE_INLINE constexpr vector2& operator%=(const T tgt) noexcept {
+		constexpr FORCE_INLINE vector2& operator%=(const T tgt) noexcept {
 			return this->mod(tgt, tgt);
 		}
 
-		FORCE_INLINE constexpr vector2& inf_to0() noexcept{
+		constexpr FORCE_INLINE vector2& inf_to0() noexcept{
 			if(std::isinf(x))x = 0;
 			if(std::isinf(y))y = 0;
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& nan_to(const_pass_t value) noexcept{
+		constexpr FORCE_INLINE vector2& nan_to(const_pass_t value) noexcept{
 			if(std::isnan(x))x = value.x;
 			if(std::isnan(y))y = value.y;
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& nan_to0() noexcept{
+		constexpr FORCE_INLINE vector2& nan_to0() noexcept{
 			if(std::isnan(x))x = 0;
 			if(std::isnan(y))y = 0;
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& nan_to1() noexcept{
+		constexpr FORCE_INLINE vector2& nan_to1() noexcept{
 			if(std::isnan(x))x = 1;
 			if(std::isnan(y))y = 1;
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& mod(const T ox, const T oy) noexcept {
+		constexpr FORCE_INLINE vector2& mod(const T ox, const T oy) noexcept {
 			x = math::mod(x, ox);
 			y = math::mod(y, oy);
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& mod(const T val) noexcept {
+		constexpr FORCE_INLINE vector2& mod(const T val) noexcept {
 			return this->mod(val, val);
 		}
 
-		FORCE_INLINE constexpr vector2& mod(const_pass_t other) noexcept {
+		constexpr FORCE_INLINE vector2& mod(const_pass_t other) noexcept {
 			return this->mod(other.x, other.y);
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr vector2 copy() const noexcept {
+		[[nodiscard]] constexpr FORCE_INLINE vector2 copy() const noexcept {
 			return vector2{ x, y };
 		}
 
-		FORCE_INLINE constexpr vector2& set_zero() noexcept {
+		constexpr FORCE_INLINE vector2& set_zero() noexcept {
 			return this->set(static_cast<T>(0), static_cast<T>(0));
 		}
 
-		FORCE_INLINE constexpr vector2& set_NaN() noexcept requires std::floating_point<T> {
+		constexpr FORCE_INLINE vector2& set_NaN() noexcept requires std::floating_point<T> {
 			return set(std::numeric_limits<float>::signaling_NaN(), std::numeric_limits<float>::signaling_NaN());
 		}
 
 
-		[[nodiscard]] FORCE_INLINE constexpr std::size_t hash_value() const noexcept requires (sizeof(T) <= 8){
+		[[nodiscard]] constexpr FORCE_INLINE std::size_t hash_value() const noexcept requires (sizeof(T) <= 8){
 			static constexpr std::hash<std::size_t> hasher{};
 
 			if constexpr (sizeof(T) == 8){
@@ -216,72 +217,72 @@ export namespace mo_yanxi::math{
 		}
 
 
-		FORCE_INLINE constexpr vector2& set(const T ox, const T oy) noexcept {
+		constexpr FORCE_INLINE vector2& set(const T ox, const T oy) noexcept {
 			this->x = ox;
 			this->y = oy;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& snap_to(const_pass_t snap, const_pass_t offset = {}) noexcept {
+		constexpr FORCE_INLINE vector2& snap_to(const_pass_t snap, const_pass_t offset = {}) noexcept {
 			this->x = math::snap_to(x, snap.x, offset.x);
 			this->y = math::snap_to(y, snap.y, offset.y);
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& set(const T val) noexcept {
+		constexpr FORCE_INLINE vector2& set(const T val) noexcept {
 			return this->set(val, val);
 		}
 
-		FORCE_INLINE constexpr vector2& set(const_pass_t tgt) noexcept {
+		constexpr FORCE_INLINE vector2& set(const_pass_t tgt) noexcept {
 			return this->operator=(tgt);
 		}
 
-		FORCE_INLINE constexpr vector2& add(const T ox, const T oy) noexcept {
+		constexpr FORCE_INLINE vector2& add(const T ox, const T oy) noexcept {
 			x += ox;
 			y += oy;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& swap_xy() noexcept{
+		constexpr FORCE_INLINE vector2& swap_xy() noexcept{
 			std::swap(x, y);
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& add(const T val) noexcept {
+		constexpr FORCE_INLINE vector2& add(const T val) noexcept {
 			x += val;
 			y += val;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& add_x(const T val) noexcept {
+		constexpr FORCE_INLINE vector2& add_x(const T val) noexcept {
 			x += val;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& add_y(const T val) noexcept {
+		constexpr FORCE_INLINE vector2& add_y(const T val) noexcept {
 			y += val;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& set_x(const T val) noexcept {
+		constexpr FORCE_INLINE vector2& set_x(const T val) noexcept {
 			x = val;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& set_y(const T val) noexcept {
+		constexpr FORCE_INLINE vector2& set_y(const T val) noexcept {
 			y = val;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& add(const_pass_t other) noexcept {
+		constexpr FORCE_INLINE vector2& add(const_pass_t other) noexcept {
 			return this->add(other.x, other.y);
 		}
 
@@ -314,105 +315,105 @@ export namespace mo_yanxi::math{
 			return rst;
 		}
 
-		FORCE_INLINE constexpr vector2& sub(const T ox, const T oy) noexcept {
+		constexpr FORCE_INLINE vector2& sub(const T ox, const T oy) noexcept {
 			x -= ox;
 			y -= oy;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& sub(const_pass_t other) noexcept {
+		constexpr FORCE_INLINE vector2& sub(const_pass_t other) noexcept {
 			return this->sub(other.x, other.y);
 		}
 
-		FORCE_INLINE constexpr vector2& sub(const_pass_t other, const T scale) noexcept {
+		constexpr FORCE_INLINE vector2& sub(const_pass_t other, const T scale) noexcept {
 			return this->sub(other.x * scale, other.y * scale);
 		}
 
-		FORCE_INLINE constexpr vector2& mul(const T ox, const T oy) noexcept {
+		constexpr FORCE_INLINE vector2& mul(const T ox, const T oy) noexcept {
 			x *= ox;
 			y *= oy;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& mul(const T val) noexcept {
+		constexpr FORCE_INLINE vector2& mul(const T val) noexcept {
 			return this->mul(val, val);
 		}
 
-		FORCE_INLINE constexpr vector2& reverse() noexcept requires mo_yanxi::signed_number<T> {
+		constexpr FORCE_INLINE vector2& reverse() noexcept requires mo_yanxi::signed_number<T> {
 			x = -x;
 			y = -y;
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& mul(const_pass_t other) noexcept {
+		constexpr FORCE_INLINE vector2& mul(const_pass_t other) noexcept {
 			return this->mul(other.x, other.y);
 		}
 
-		FORCE_INLINE constexpr vector2& div(const T ox, const T oy) noexcept {
+		constexpr FORCE_INLINE vector2& div(const T ox, const T oy) noexcept {
 			x /= ox;
 			y /= oy;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& div(const T val) noexcept {
+		constexpr FORCE_INLINE vector2& div(const T val) noexcept {
 			return this->div(val, val);
 		}
 
-		FORCE_INLINE constexpr vector2& div(const_pass_t other) noexcept {
+		constexpr FORCE_INLINE vector2& div(const_pass_t other) noexcept {
 			return this->div(other.x, other.y);
 		}
 
 
-		[[nodiscard]] FORCE_INLINE constexpr vec2_products<T> get_products_with(const_pass_t tgt) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE vec2_products<T> get_products_with(const_pass_t tgt) const noexcept{
 			return vec2_products<T>{this->dot(tgt), this->cross(tgt)};
 		}
 
 		/*
-		[[nodiscard]] FORCE_INLINE constexpr T getX() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE T getX() const noexcept{
 			return x;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr T getY() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE T getY() const noexcept{
 			return y;
 		}
 
-		FORCE_INLINE constexpr vector2& setX(const T ox) noexcept{
+		constexpr FORCE_INLINE vector2& setX(const T ox) noexcept{
 			this->x = ox;
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& setY(const T oy) noexcept{
+		constexpr FORCE_INLINE vector2& setY(const T oy) noexcept{
 			this->y = oy;
 			return *this;
 		}*/
 
-		[[nodiscard]] FORCE_INLINE constexpr T dst2(const_pass_t other) const noexcept {
+		[[nodiscard]] constexpr FORCE_INLINE T dst2(const_pass_t other) const noexcept {
 			const T dx = math::dst_safe(x, other.x);
 			const T dy = math::dst_safe(y, other.y);
 
 			return math::dst2(x, y, other.x, other.y);
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr float dst(const_pass_t other) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE T dst(const_pass_t other) const noexcept{
 			return math::dst(x, y, other.x, other.y);
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr float dst(const float tx, const float ty) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE T dst(const T tx, const T ty) const noexcept{
 			return math::dst(x, y, tx, ty);
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr float dst2(const float tx, const float ty) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE T dst2(const T tx, const T ty) const noexcept{
 			return math::dst2(x, y, tx, ty);
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool within(const_pass_t other, const T dst) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool within(const_pass_t other, const T dst) const noexcept{
 			return this->dst2(other) < dst * dst;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool is_NaN() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool is_NaN() const noexcept{
 			if constexpr(std::floating_point<T>) {
 				return std::isnan(x) || std::isnan(y);
 			} else {
@@ -420,15 +421,15 @@ export namespace mo_yanxi::math{
 			}
 		}
 
-		[[nodiscard]] FORCE_INLINE bool is_Inf() const noexcept{
-			return std::isinf(x) || std::isinf(y);
+		[[nodiscard]] constexpr FORCE_INLINE bool is_Inf() const noexcept{
+			return math::isinf(x) || math::isinf(y);
 		}
 
-		[[nodiscard]] FORCE_INLINE float length() const noexcept {
+		[[nodiscard]] constexpr FORCE_INLINE float length() const noexcept {
 			return math::dst(x, y);
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr T length2() const noexcept {
+		[[nodiscard]] constexpr FORCE_INLINE T length2() const noexcept {
 			return x * x + y * y;
 		}
 
@@ -436,31 +437,31 @@ export namespace mo_yanxi::math{
 		 * @brief
 		 * @return angle in [-180 deg, 180 deg]
 		 */
-		[[nodiscard]] FORCE_INLINE float angle_deg() const noexcept {
-			return angle_rad();
+		[[nodiscard]] constexpr FORCE_INLINE float angle_deg() const noexcept {
+			return angle_rad() * math::rad_to_deg_v<floating_point_t>;
 		}
 
-		[[nodiscard]] FORCE_INLINE floating_point_t angle_to_deg(const_pass_t where) const noexcept {
+		[[nodiscard]] constexpr FORCE_INLINE floating_point_t angle_to_deg(const_pass_t where) const noexcept {
 			return (where - *this).angle_deg();
 		}
 
-		[[nodiscard]] FORCE_INLINE floating_point_t angle_to_rad(const_pass_t where) const noexcept {
+		[[nodiscard]] constexpr FORCE_INLINE floating_point_t angle_to_rad(const_pass_t where) const noexcept {
 			return (where - *this).angle_rad();
 		}
 
-		[[nodiscard]] FORCE_INLINE floating_point_t angle_between_deg(const_pass_t other) const noexcept {
+		[[nodiscard]] constexpr FORCE_INLINE floating_point_t angle_between_deg(const_pass_t other) const noexcept {
 			return math::atan2(this->cross(other), this->dot(other)) * math::rad_to_deg_v<floating_point_t>;
 		}
 
-		[[nodiscard]] FORCE_INLINE floating_point_t angle_between_rad(const_pass_t other) const noexcept {
+		[[nodiscard]] constexpr FORCE_INLINE floating_point_t angle_between_rad(const_pass_t other) const noexcept {
 			return math::atan2(this->cross(other), this->dot(other));
 		}
 
-		FORCE_INLINE vector2& normalize() noexcept {
+		constexpr FORCE_INLINE vector2& normalize() noexcept {
 			return div(length());
 		}
 
-		FORCE_INLINE vector2& to_sign() noexcept{
+		constexpr FORCE_INLINE vector2& to_sign() noexcept{
 			x = math::sign<T>(x);
 			y = math::sign<T>(y);
 
@@ -468,7 +469,7 @@ export namespace mo_yanxi::math{
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& rotate_rad(const Fp rad) noexcept{
+		constexpr FORCE_INLINE vector2& rotate_rad(const Fp rad) noexcept{
 			//  Matrix Multi
 			//  cos rad		-sin rad	x    crx   -sry
 			//	sin rad		 cos rad	y	 srx	cry
@@ -476,7 +477,7 @@ export namespace mo_yanxi::math{
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& rotate(const Fp cos, const Fp sin) noexcept{
+		constexpr FORCE_INLINE vector2& rotate(const Fp cos, const Fp sin) noexcept{
 			if constexpr(std::floating_point<T>) {
 				return this->set(cos * x - sin * y, sin * x + cos * y);
 			}else {
@@ -488,15 +489,15 @@ export namespace mo_yanxi::math{
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& rotate_deg(const Fp degree) noexcept{
+		constexpr FORCE_INLINE vector2& rotate_deg(const Fp degree) noexcept{
 			return this->rotate_rad(degree * math::deg_to_rad_v<Fp>);
 		}
 
-		FORCE_INLINE constexpr vector2& lerp(const_pass_t tgt, const floating_point_t alpha) noexcept{
+		constexpr FORCE_INLINE vector2& lerp(const_pass_t tgt, const floating_point_t alpha) noexcept{
 			return this->set(math::lerp(x, tgt.x, alpha), math::lerp(y, tgt.y, alpha));
 		}
 
-		FORCE_INLINE vector2& approach(const_pass_t target, const mo_yanxi::number auto alpha) noexcept{
+		constexpr FORCE_INLINE vector2& approach(const_pass_t target, const mo_yanxi::arithmetic auto alpha) noexcept{
 			vector2 approach = target - *this;
 			const auto alpha2 = alpha * alpha;
 			const auto len2 = approach.dst2();
@@ -504,7 +505,7 @@ export namespace mo_yanxi::math{
 				return this->set(target);
 			}
 
-			const auto scl = std::sqrt(static_cast<floating_point_t>(alpha2) / static_cast<floating_point_t>(len2));
+			const auto scl = math::sqrt(static_cast<floating_point_t>(alpha2) / static_cast<floating_point_t>(len2));
 			return this->operator=(this->fma(approach, scl));
 		}
 
@@ -519,111 +520,111 @@ export namespace mo_yanxi::math{
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& set_polar_deg(const Fp angDeg, const T length) noexcept{
+		constexpr FORCE_INLINE vector2& set_polar_deg(const Fp angDeg, const T length) noexcept{
 			return vector2::set_polar_rad(angDeg * math::deg_to_rad_v<Fp>, length);
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& set_polar_deg(const Fp angDeg) noexcept{
+		constexpr FORCE_INLINE vector2& set_polar_deg(const Fp angDeg) noexcept{
 			return vector2::set_polar_deg(angDeg, length());
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& set_polar_rad(const Fp angDeg, const T length) noexcept{
+		constexpr FORCE_INLINE vector2& set_polar_rad(const Fp angDeg, const T length) noexcept{
 			return vector2::set(length * math::cos(angDeg), length * math::sin(angDeg));
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& set_polar_rad(const Fp angDeg) noexcept{
+		constexpr FORCE_INLINE vector2& set_polar_rad(const Fp angDeg) noexcept{
 			return vector2::set_polar_deg(angDeg, length());
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr T dot(const_pass_t tgt) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE T dot(const_pass_t tgt) const noexcept{
 			return x * tgt.x + y * tgt.y;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr T cross(const_pass_t tgt) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE T cross(const_pass_t tgt) const noexcept{
 			return x * tgt.y - y * tgt.x;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr vector2 cross(const T val_zAxis) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE vector2 cross(const T val_zAxis) const noexcept{
 			return {y * val_zAxis, -x * val_zAxis};
 		}
 
-		FORCE_INLINE constexpr vector2& project(const_pass_t tgt) noexcept{
+		constexpr FORCE_INLINE vector2& project(const_pass_t tgt) noexcept{
 			float scl = this->dot(tgt);
 
 			return this->set(tgt).mul(scl / tgt.length2());
 		}
 
-		FORCE_INLINE constexpr vector2& project_scaled(const_pass_t tgt) noexcept {
+		constexpr FORCE_INLINE vector2& project_scaled(const_pass_t tgt) noexcept {
 			const float scl = this->dot(tgt);
 
 			return this->set(tgt.x * scl, tgt.y * scl);
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr auto scalar_proj2(const_pass_t axis) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE auto scalar_proj2(const_pass_t axis) const noexcept{
 			const auto dot = this->dot(axis);
 			return dot * dot / axis.length2();
 		}
 
-		[[nodiscard]] FORCE_INLINE auto scalar_proj(const_pass_t axis) const noexcept{
-			return std::sqrt(this->scalar_proj2(axis));
+		[[nodiscard]] constexpr FORCE_INLINE auto scalar_proj(const_pass_t axis) const noexcept{
+			return math::sqrt(this->scalar_proj2(axis));
 		}
 
 		FORCE_INLINE friend constexpr bool operator==(const vector2& lhs, const vector2& rhs) noexcept = default;
 
-		FORCE_INLINE constexpr vector2& clamp_x(const T min, const T max) noexcept {
+		constexpr FORCE_INLINE vector2& clamp_x(const T min, const T max) noexcept {
 			x = math::clamp(x, min, max);
 			return *this;
 		}
 
 
-		FORCE_INLINE constexpr vector2& clamp_xy(const_pass_t min, const_pass_t max) noexcept {
+		constexpr FORCE_INLINE vector2& clamp_xy(const_pass_t min, const_pass_t max) noexcept {
 			x = math::clamp(x, min.x, max.x);
 			y = math::clamp(y, min.y, max.y);
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& clamp_y(const T min, const T max) noexcept {
+		constexpr FORCE_INLINE vector2& clamp_y(const T min, const T max) noexcept {
 			y = math::clamp(y, min, max);
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& min_x(const T min) noexcept {
+		constexpr FORCE_INLINE vector2& min_x(const T min) noexcept {
 			x = math::min(x, min);
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& min_y(const T min) noexcept {
+		constexpr FORCE_INLINE vector2& min_y(const T min) noexcept {
 			y = math::min(y, min);
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& max_x(const T max) noexcept {
+		constexpr FORCE_INLINE vector2& max_x(const T max) noexcept {
 			x = math::max(x, max);
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& max_y(const T max) noexcept {
+		constexpr FORCE_INLINE vector2& max_y(const T max) noexcept {
 			y = math::max(y, max);
 			return *this;
 		}
 
 
-		FORCE_INLINE constexpr vector2& min(const_pass_t min) noexcept {
+		constexpr FORCE_INLINE vector2& min(const_pass_t min) noexcept {
 			x = math::min(x, min.x);
 			y = math::min(y, min.y);
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& max(const_pass_t max) noexcept {
+		constexpr FORCE_INLINE vector2& max(const_pass_t max) noexcept {
 			x = math::max(x, max.x);
 			y = math::max(y, max.y);
 			return *this;
 		}
 
-		// FORCE_INLINE constexpr vector2& clampNormalized() noexcept requires std::floating_point<T>{
+		// constexpr FORCE_INLINE vector2& clampNormalized() noexcept requires std::floating_point<T>{
 		// 	return clamp_x(0, 1).clamp_y(0, 1);
 		// }
 
@@ -657,12 +658,12 @@ export namespace mo_yanxi::math{
 			return this->limit_max_length2(limit * limit);
 		}
 
-		FORCE_INLINE vector2& limit_max_length2(const T limit2) noexcept {
+		constexpr FORCE_INLINE vector2& limit_max_length2(const T limit2) noexcept {
 			const float len2 = length2();
 			if (len2 == 0) [[unlikely]] return *this;
 
 			if (len2 > limit2) {
-				return this->scl(std::sqrt(static_cast<floating_point_t>(limit2) / static_cast<floating_point_t>(len2)));
+				return this->scl(math::sqrt(static_cast<floating_point_t>(limit2) / static_cast<floating_point_t>(len2)));
 			}
 
 			return *this;
@@ -672,82 +673,82 @@ export namespace mo_yanxi::math{
 			return this->limit_min_length2(limit * limit);
 		}
 
-		FORCE_INLINE vector2& limit_min_length2(const T limit2) noexcept {
+		constexpr FORCE_INLINE vector2& limit_min_length2(const T limit2) noexcept {
 			const float len2 = length2();
 			if (len2 == 0) [[unlikely]] return *this;
 
 			if (len2 < limit2) {
-				return this->scl(std::sqrt(static_cast<float>(limit2) / static_cast<float>(len2)));
+				return this->scl(math::sqrt(static_cast<float>(limit2) / static_cast<float>(len2)));
 			}
 
 			return *this;
 		}
 
-		FORCE_INLINE vector2& limit_length(const T min, const T max) noexcept {
+		constexpr FORCE_INLINE vector2& limit_length(const T min, const T max) noexcept {
 			return this->limit_length2(min * min, max * max);
 		}
 
 
-		FORCE_INLINE vector2& limit_length2(const T min, const T max) noexcept {
+		constexpr FORCE_INLINE vector2& limit_length2(const T min, const T max) noexcept {
 			if (const float len2 = length2(); len2 < min) {
-				return this->scl(std::sqrt(static_cast<float>(min) / static_cast<float>(len2)));
+				return this->scl(math::sqrt(static_cast<float>(min) / static_cast<float>(len2)));
 			}else if(len2 > max){
-				return this->scl(std::sqrt(static_cast<float>(max) / static_cast<float>(len2)));
+				return this->scl(math::sqrt(static_cast<float>(max) / static_cast<float>(len2)));
 			}
 
 			return *this;
 		}
 
 		template <std::floating_point V>
-		FORCE_INLINE constexpr vector2& scl_round(const vector2<V> val) noexcept {
+		constexpr FORCE_INLINE vector2& scl_round(const vector2<V> val) noexcept {
 			V rstX = static_cast<V>(x) * val.x;
 			V rstY = static_cast<V>(y) * val.y;
 			return this->set(math::round<T>(rstX), math::round<T>(rstY));
 		}
 
 		template <std::floating_point V>
-		FORCE_INLINE constexpr vector2& scl(const V val) noexcept {
+		constexpr FORCE_INLINE vector2& scl(const V val) noexcept {
 			return this->scl(val, val);
 		}
 
 		template <std::floating_point V>
-		FORCE_INLINE constexpr vector2& scl(const V ox, const V oy) noexcept {
+		constexpr FORCE_INLINE vector2& scl(const V ox, const V oy) noexcept {
 			x = static_cast<T>(static_cast<V>(x) * ox);
 			y = static_cast<T>(static_cast<V>(y) * oy);
 			return *this;
 		}
 
 		template <std::integral V>
-		FORCE_INLINE constexpr vector2& scl(const V val) noexcept {
+		constexpr FORCE_INLINE vector2& scl(const V val) noexcept {
 			return this->scl(static_cast<floating_point_t>(val), static_cast<floating_point_t>(val));
 		}
 
 		template <std::integral V>
-		FORCE_INLINE constexpr vector2& scl(const V ox, const V oy) noexcept {
+		constexpr FORCE_INLINE vector2& scl(const V ox, const V oy) noexcept {
 			return this->scl(static_cast<floating_point_t>(ox), static_cast<floating_point_t>(oy));
 		}
 
-		FORCE_INLINE constexpr vector2& flip_x() noexcept {
+		constexpr FORCE_INLINE vector2& flip_x() noexcept {
 			x = -x;
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& flip_y() noexcept {
+		constexpr FORCE_INLINE vector2& flip_y() noexcept {
 			y = -y;
 			return *this;
 		}
 
-		FORCE_INLINE vector2& set_length(const T len) noexcept {
+		constexpr FORCE_INLINE vector2& set_length(const T len) noexcept {
 			return this->set_length2(len * len);
 		}
 
-		FORCE_INLINE vector2& set_length2(const T len2) noexcept {
+		constexpr FORCE_INLINE vector2& set_length2(const T len2) noexcept {
 			const float oldLen2 = length2();
-			return oldLen2 == 0 || oldLen2 == len2 ? *this : this->scl(std::sqrt(len2 / oldLen2));  // NOLINT(clang-diagnostic-float-equal)
+			return oldLen2 == 0 || oldLen2 == len2 ? *this : this->scl(math::sqrt(len2 / oldLen2));  // NOLINT(clang-diagnostic-float-equal)
 		}
 
 
-		[[nodiscard]] FORCE_INLINE floating_point_t angle_rad() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE floating_point_t angle_rad() const noexcept{
 			return math::atan2(static_cast<floating_point_t>(y), static_cast<floating_point_t>(x));
 		}
 
@@ -758,7 +759,7 @@ export namespace mo_yanxi::math{
 		/**
 		 * \brief clockwise rotation
 		 */
-		FORCE_INLINE constexpr vector2& rotate_rt_clockwise() noexcept requires std::is_signed_v<T> {
+		constexpr FORCE_INLINE vector2& rotate_rt_clockwise() noexcept requires std::is_signed_v<T> {
 			return this->set(-y, x);
 		}
 
@@ -767,8 +768,8 @@ export namespace mo_yanxi::math{
 		 * @param signProv > 0: counterClockwise; < 0: clockWise; = 0: do nothing
 		 * @return
 		 */
-		template <mo_yanxi::number S>
-		FORCE_INLINE constexpr vector2& rotate_rt_with(const S signProv) noexcept requires std::is_signed_v<T> {
+		template <mo_yanxi::arithmetic S>
+		constexpr FORCE_INLINE vector2& rotate_rt_with(const S signProv) noexcept requires std::is_signed_v<T> {
 			const int sign = math::sign(signProv);
 			if(sign){
 				return this->set(y * sign, -x * sign);
@@ -780,14 +781,14 @@ export namespace mo_yanxi::math{
 		/**
 		 * \brief clockwise rotation
 		 */
-		[[deprecated]] FORCE_INLINE constexpr vector2& rotate_rt() noexcept requires std::is_signed_v<T> {
+		[[deprecated]] constexpr FORCE_INLINE vector2& rotate_rt() noexcept requires std::is_signed_v<T> {
 			return rotate_rt_clockwise();
 		}
 
 		/**
 		 * \brief counterclockwise rotation
 		 */
-		FORCE_INLINE constexpr vector2& rotate_rt_counter_clockwise() noexcept requires std::is_signed_v<T> {
+		constexpr FORCE_INLINE vector2& rotate_rt_counter_clockwise() noexcept requires std::is_signed_v<T> {
 			return this->set(y, -x);
 		}
 
@@ -875,39 +876,39 @@ export namespace mo_yanxi::math{
 		}
 
 
-		[[nodiscard]] FORCE_INLINE constexpr auto area() const noexcept {
+		[[nodiscard]] constexpr FORCE_INLINE auto area() const noexcept {
 			return x * y;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool is_zero() const noexcept {
+		[[nodiscard]] constexpr FORCE_INLINE bool is_zero() const noexcept {
 			return x == static_cast<T>(0) && y == static_cast<T>(0);
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool is_zero(const T margin) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool is_zero(const T margin) const noexcept{
 			return length2() < margin;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr vector2 sign_or_zero() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE vector2 sign_or_zero() const noexcept{
 			return {math::sign(x), math::sign(y)};
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr vector2 sign() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE vector2 sign() const noexcept{
 			return {x >= 0 ? 1 : -1, y >= 0 ? 1 : -1};
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool within(const_pass_t other_in_axis) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool within(const_pass_t other_in_axis) const noexcept{
 			return x < other_in_axis.x && y < other_in_axis.y;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool beyond(const_pass_t other_in_axis) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool beyond(const_pass_t other_in_axis) const noexcept{
 			return x > other_in_axis.x || y > other_in_axis.y;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool within_equal(const_pass_t other_in_axis) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool within_equal(const_pass_t other_in_axis) const noexcept{
 			return x <= other_in_axis.x && y <= other_in_axis.y;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool beyond_equal(const_pass_t other_in_axis) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool beyond_equal(const_pass_t other_in_axis) const noexcept{
 			return x >= other_in_axis.x || y >= other_in_axis.y;
 		}
 
@@ -966,8 +967,8 @@ export namespace mo_yanxi::math{
 		// 	return std::weak_ordering::equivalent;
 		// }
 
-		template <mo_yanxi::number TN>
-		[[nodiscard]] FORCE_INLINE constexpr vector2<TN> as() const noexcept{
+		template <mo_yanxi::arithmetic TN>
+		[[nodiscard]] constexpr FORCE_INLINE vector2<TN> as() const noexcept{
 			if constexpr (std::same_as<TN, T>){
 				return *this;
 			}else{
@@ -991,16 +992,16 @@ export namespace mo_yanxi::math{
 		}
 
 		template <spec_of<vector2> TN>
-		[[nodiscard]] FORCE_INLINE constexpr auto as() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE auto as() const noexcept{
 			return as<typename TN::value_type>();
 		}
 
-		template <mo_yanxi::number TN>
-		[[nodiscard]] FORCE_INLINE constexpr explicit operator vector2<TN>() const noexcept{
+		template <mo_yanxi::arithmetic TN>
+		[[nodiscard]] constexpr FORCE_INLINE explicit operator vector2<TN>() const noexcept{
 			return as<TN>();
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr auto as_signed() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE auto as_signed() const noexcept{
 			if constexpr (std::is_unsigned_v<T>){
 				using S = std::make_signed_t<T>;
 				return vector2<S>{static_cast<S>(x), static_cast<S>(y)};
@@ -1013,7 +1014,7 @@ export namespace mo_yanxi::math{
 			return os << '(' << std::to_string(obj.x) << ", " << std::to_string(obj.y) << ')';
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool equals(const_pass_t other) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool equals(const_pass_t other) const noexcept{
 			if constexpr (std::is_integral_v<T>){
 				return *this == other;
 			}else{
@@ -1021,7 +1022,7 @@ export namespace mo_yanxi::math{
 			}
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr bool equals(const_pass_t other, const T margin) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool equals(const_pass_t other, const T margin) const noexcept{
 			return this->within(other, margin);
 		}
 
@@ -1029,11 +1030,11 @@ export namespace mo_yanxi::math{
 		 * @brief
 		 * @return y / x
 		 */
-		[[nodiscard]] FORCE_INLINE constexpr T slope() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE T slope() const noexcept{
 			return y / x;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr vector2& uniform() noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE vector2& uniform() noexcept{
 			x = x * 2 - 1;
 			y = y * 2 - 1;
 			return *this;
@@ -1043,7 +1044,7 @@ export namespace mo_yanxi::math{
 		 * @brief
 		 * @return x / y
 		 */
-		[[nodiscard]] FORCE_INLINE constexpr T slope_inv() const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE T slope_inv() const noexcept{
 			return x / y;
 		}
 
@@ -1056,7 +1057,7 @@ export namespace mo_yanxi::math{
 		}
 
 		template <typename N1, typename N2>
-		[[nodiscard]] FORCE_INLINE constexpr bool axis_less(const N1 ox, const N2 oy) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool axis_less(const N1 ox, const N2 oy) const noexcept{
 			if constexpr(std::floating_point<N1> || std::floating_point<N2> || std::floating_point<T>){
 				using cmt = std::common_type_t<T, N1, N2>;
 
@@ -1067,12 +1068,12 @@ export namespace mo_yanxi::math{
 		}
 
 		template <typename N>
-		[[nodiscard]] FORCE_INLINE constexpr bool axis_less(vector2<N>::const_pass_t other) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool axis_less(vector2<N>::const_pass_t other) const noexcept{
 			return this->axis_less(other.x, other.y);
 		}
 
 		template <typename N1, typename N2>
-		[[nodiscard]] FORCE_INLINE constexpr bool axis_greater(const N1 ox, const N2 oy) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool axis_greater(const N1 ox, const N2 oy) const noexcept{
 			if constexpr(std::floating_point<N1> || std::floating_point<N2> || std::floating_point<T>){
 				using cmt = std::common_type_t<T, N1, N2>;
 
@@ -1083,40 +1084,42 @@ export namespace mo_yanxi::math{
 		}
 
 		template <typename N>
-		[[nodiscard]] FORCE_INLINE constexpr bool axis_greater(vector2<N>::const_pass_t other) const noexcept{
+		[[nodiscard]] constexpr FORCE_INLINE bool axis_greater(vector2<N>::const_pass_t other) const noexcept{
 			return this->axis_greater(other.x, other.y);
 		}
 	};
 
-
+	export
 	template <std::integral L, std::integral R>
-	FORCE_INLINE constexpr vector2<bool> operator&&(const vector2<L>& l, const vector2<R>& r) noexcept{
+	constexpr FORCE_INLINE vector2<bool> operator&&(const vector2<L>& l, const vector2<R>& r) noexcept{
 		return {l.x && r.x, l.y && r.y};
 	}
 
+	export
 	template <std::integral L, std::integral R>
-	FORCE_INLINE constexpr vector2<bool> operator||(const vector2<L>& l, const vector2<R>& r) noexcept{
+	constexpr FORCE_INLINE vector2<bool> operator||(const vector2<L>& l, const vector2<R>& r) noexcept{
 		return {l.x || r.x, l.y || r.y};
 	}
 
-	using vec2 = vector2<float>;
-	using bool2 = vector2<bool>;
-	/**
-	 * @brief indicate a normalized vector2<float>
-	 */
-	using nor_vec2 = vector2<float>;
 
-	using point2 = vector2<int>;
-	using i32point2 = vector2<std::int32_t>;
-	using isize2 = vector2<int>;
-	using usize2 = vector2<unsigned int>;
-	using upoint2 = vector2<unsigned int>;
-	using short_point2 = vector2<short>;
-	using ushort_point2 = vector2<unsigned short>;
-	using u32size2 = vector2<std::uint32_t>;
-	using u32point2 = vector2<std::uint32_t>;
+	export using vec2 = vector2<float>;
+	export using bool2 = vector2<bool>;
+	 /**
+	  * @brief indicate a normalized vector2<float>
+	  */
+	export using nor_vec2 = vector2<float>;
 
+	export using point2 = vector2<int>;
+	export using i32point2 = vector2<std::int32_t>;
+	export using isize2 = vector2<int>;
+	export using usize2 = vector2<unsigned int>;
+	export using upoint2 = vector2<unsigned int>;
+	export using short_point2 = vector2<short>;
+	export using ushort_point2 = vector2<unsigned short>;
+	export using u32size2 = vector2<std::uint32_t>;
+	export using u32point2 = vector2<std::uint32_t>;
 
+	export
 	template <std::floating_point T>
 	struct optional_vec2 : vector2<T>{
 		explicit constexpr operator bool() const noexcept{
@@ -1132,7 +1135,7 @@ export namespace mo_yanxi::math{
 
 
 
-	namespace vectors{
+	export namespace vectors{
 		template <typename N = float>
 		vector2<N> hit_normal(const vector2<N> approach_direction, const vector2<N> tangent){
 			auto p = std::copysign(1, tangent.cross(approach_direction));
@@ -1148,7 +1151,7 @@ export namespace mo_yanxi::math{
 		 * @brief
 		 * @return snapped end
 		 */
-		vec2 snap_segment_to_angle(const vec2 src, const vec2 end, float angle_in_rad) noexcept{
+		constexpr vec2 snap_segment_to_angle(const vec2 src, const vec2 end, float angle_in_rad) noexcept{
 			if(angle_in_rad == 0.0f) return end;
 
 			vec2 delta = end - src;
@@ -1189,6 +1192,23 @@ export namespace mo_yanxi::math{
 			static constexpr vector2<T> QNaN_vec2{std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::quiet_NaN()};
 		};
 	}
+
+	template <typename T>
+	constexpr FORCE_INLINE vector2<T>::value_type distance(const vector2<T>& lhs, const vector2<T>& rhs) noexcept{
+		return lhs.dst(rhs);
+	}
+
+	template <typename T>
+	constexpr FORCE_INLINE vector2<T>::value_type abs(const vector2<T>& v) noexcept{
+		return v.length();
+	}
+
+	template <typename T>
+	constexpr FORCE_INLINE vector2<T>::value_type sqr(const vector2<T>& v) noexcept{
+		return v.length2();
+	}
+
+
 }
 
 

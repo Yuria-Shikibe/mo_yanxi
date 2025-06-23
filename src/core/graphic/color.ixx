@@ -28,16 +28,16 @@ namespace mo_yanxi::graphic{
 
 		static constexpr auto max_val = std::numeric_limits<std::uint8_t>::max();
 		static constexpr float max_val_f = std::numeric_limits<std::uint8_t>::max();
-		static constexpr unsigned int r_Offset = 24;
-		static constexpr unsigned int g_Offset = 16;
-		static constexpr unsigned int b_Offset = 8;
-		static constexpr unsigned int a_Offset = 0;
-		static constexpr unsigned int a_Mask = 0x00'00'00'ff;
-		static constexpr unsigned int b_Mask = 0x00'00'ff'00;
-		static constexpr unsigned int g_Mask = 0x00'ff'00'00;
-		static constexpr unsigned int r_Mask = 0xff'00'00'00;
+		static constexpr std::uint32_t r_Offset = 24;
+		static constexpr std::uint32_t g_Offset = 16;
+		static constexpr std::uint32_t b_Offset = 8;
+		static constexpr std::uint32_t a_Offset = 0;
+		static constexpr std::uint32_t a_Mask = 0x00'00'00'ff;
+		static constexpr std::uint32_t b_Mask = 0x00'00'ff'00;
+		static constexpr std::uint32_t g_Mask = 0x00'ff'00'00;
+		static constexpr std::uint32_t r_Mask = 0xff'00'00'00;
 
-		using rgba8_bits = unsigned int;
+		using rgba8_bits = std::uint32_t;
 
 		// constexpr color() noexcept : color(1, 1, 1, 1){
 		// }
@@ -53,52 +53,21 @@ namespace mo_yanxi::graphic{
 		// constexpr color(const float r, const float g, const float b) noexcept : color(r, g, b, 1){
 		// }
 
-	private:
-		template <bool doClamp>
-		FORCE_INLINE constexpr color& clampCond() noexcept{
-			if constexpr(doClamp){
-				return clamp();
-			} else{
-				return *this;
-			}
-		}
-
 	public:
-		//TODO is this really good??
-		FORCE_INLINE constexpr color& append_light_color(const color& color) noexcept{
-			r += static_cast<float>(math::floor((light_color_range - 10) * color.r, 10) + 10);
-			g += static_cast<float>(math::floor((light_color_range - 10) * color.g, 10) + 10);
-			b += static_cast<float>(math::floor((light_color_range - 10) * color.b, 10) + 10);
-			a += static_cast<float>(math::floor((light_color_range - 10) * color.a, 10) + 10);
 
-			return *this;
+		FORCE_INLINE constexpr color& set_light(float lumaScl = max_luma_scale) noexcept{
+			return mul_rgb(lumaScl);
 		}
 
-		FORCE_INLINE constexpr color& to_light_color() noexcept{
-			r = static_cast<float>(math::floor((light_color_range - 10) * r, 10) + 10);
-			g = static_cast<float>(math::floor((light_color_range - 10) * g, 10) + 10);
-			b = static_cast<float>(math::floor((light_color_range - 10) * b, 10) + 10);
-			a = static_cast<float>(math::floor((light_color_range - 10) * a, 10) + 10);
-
-			return *this;
-		}
-
-		constexpr color& set_light(float lumaScl = max_luma_scale) noexcept{
-			r *= lumaScl;
-			g *= lumaScl;
-			b *= lumaScl;
-			return *this;
-		}
-
-		[[nodiscard]] constexpr color to_light(float lumaScl = max_luma_scale) const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr color to_light(float lumaScl = max_luma_scale) const noexcept{
 			return copy().set_light(lumaScl);
 		}
 
-		[[nodiscard]] constexpr color to_neutralize_light(float factor = .65f) const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr color to_neutralize_light(float factor = .65f) const noexcept{
 			return copy().mul_rgb(factor);
 		}
 
-		[[nodiscard]] constexpr color to_neutralize_light_def() const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr color to_neutralize_light_def() const noexcept{
 			return to_neutralize_light(.65f);
 		}
 
@@ -209,63 +178,63 @@ namespace mo_yanxi::graphic{
 
 		//TODO operator overload?
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& mul(const color& color) noexcept{
 			this->r *= color.r;
 			this->g *= color.g;
 			this->b *= color.b;
 			this->a *= color.a;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& mul_rgb(const float value) noexcept{
 			this->r *= value;
 			this->g *= value;
 			this->b *= value;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& mul_rgba(const float value) noexcept{
 			this->r *= value;
 			this->g *= value;
 			this->b *= value;
 			this->a *= value;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& add(const color& color) noexcept{
 			this->r += color.r;
 			this->g += color.g;
 			this->b += color.b;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& sub(const color& color) noexcept{
 			this->r -= color.r;
 			this->g -= color.g;
 			this->b -= color.b;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& set(const float tr, const float tg, const float tb, const float ta) noexcept{
 			this->r = tr;
 			this->g = tg;
 			this->b = tb;
 			this->a = ta;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& set(const float tr, const float tg, const float tb) noexcept{
 			this->r = tr;
 			this->g = tg;
 			this->b = tb;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
 		FORCE_INLINE constexpr color& set(const rgba8_bits rgba) noexcept{
@@ -276,38 +245,38 @@ namespace mo_yanxi::graphic{
 			return r + g + b;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& add(const float tr, const float tg, const float tb, const float ta) noexcept{
 			this->r += tr;
 			this->g += tg;
 			this->b += tb;
 			this->a += ta;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& add(const float tr, const float tg, const float tb) noexcept{
 			this->r += tr;
 			this->g += tg;
 			this->b += tb;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& sub(const float tr, const float tg, const float tb, const float ta) noexcept{
 			this->r -= tr;
 			this->g -= tg;
 			this->b -= tb;
 			this->a -= ta;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& sub(const float tr, const float tg, const float tb) noexcept{
 			this->r -= tr;
 			this->g -= tg;
 			this->b -= tb;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
 		FORCE_INLINE constexpr color& inv_rgb(){
@@ -342,75 +311,58 @@ namespace mo_yanxi::graphic{
 			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& mul(const float tr, const float tg, const float tb, const float ta) noexcept{
 			this->r *= tr;
 			this->g *= tg;
 			this->b *= tb;
 			this->a *= ta;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = true>
+		
 		FORCE_INLINE constexpr color& mul(const float val) noexcept{
 			this->r *= val;
 			this->g *= val;
 			this->b *= val;
 			this->a *= val;
-			return clampCond<doClamp>();
+			return *this;
 		}
 
 		using vector4::lerp;
 
-		constexpr FORCE_INLINE auto& light_reserved_lerp(const color& target, const float t) noexcept{
-			color base_self = *this % 10.f;
-			color base_target = target % 10.f;
-
-			color light_self = (*this - base_self) / light_color_range;
-			color light_target = (target - base_target) / light_color_range;
-
-			base_self.lerp(base_target, t);
-			light_self.lerp(light_target, t);
-			return set(base_self).append_light_color(light_self);
-		}
-
-		// template <bool doClamp = true>
+		// 
 		// FORCE_INLINE constexpr color& lerp(const color& target, const float t) noexcept{
 		// 	math::lerp_inplace(r, target.r, t);
 		// 	math::lerp_inplace(g, target.g, t);
 		// 	math::lerp_inplace(b, target.b, t);
 		// 	math::lerp_inplace(a, target.a, t);
-		// 	return clampCond<doClamp>();
+		// 	return *this;
 		// }
 
-		template <bool doClamp = false>
 		FORCE_INLINE constexpr color& lerpRGB(const color& target, const float t) noexcept{
 			math::lerp_inplace(r, target.r, t);
 			math::lerp_inplace(g, target.g, t);
 			math::lerp_inplace(b, target.b, t);
-			return clampCond<doClamp>();
+			return *this;
 		}
 
-		template <bool doClamp = false>
 		[[nodiscard]] FORCE_INLINE constexpr color create_lerp(const color& target, const float t) const noexcept{
-			color newColor{
+			return {
 					math::lerp(r, target.r, t),
 					math::lerp(g, target.g, t),
 					math::lerp(b, target.b, t),
 					math::lerp(a, target.a, t)
 				};
-
-			return newColor.clampCond<doClamp>();
 		}
 
-		template <bool doClamp = false>
 		FORCE_INLINE constexpr color& lerp(const float tr, const float tg, const float tb, const float ta,
 		                                   const float t) noexcept{
 			this->r += t * (tr - this->r);
 			this->g += t * (tg - this->g);
 			this->b += t * (tb - this->b);
 			this->a += t * (ta - this->a);
-			return clampCond<doClamp>();
+			return *this;
 		}
 
 		FORCE_INLINE constexpr color& mul_self_alpha() noexcept{
@@ -549,7 +501,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr hsv_t to_hsv() const noexcept{
-			hsv_t hsv = {};
+			hsv_t hsv{};
 
 			const float maxV = math::max(math::max(r, g), b);
 			const float minV = math::min(math::min(r, g), b);
@@ -575,7 +527,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		[[nodiscard]] FORCE_INLINE bool equals(const color& other) const noexcept{
-			constexpr float tolerance = 0.5f / max_val_f;
+			static constexpr float tolerance = 0.5f / max_val_f;
 			return
 				math::equal(r, other.r, tolerance) &&
 				math::equal(g, other.g, tolerance) &&
@@ -666,8 +618,8 @@ namespace mo_yanxi::graphic{
 			return this->operator=(color::lerp_span(s, colors));
 		}
 
-		[[nodiscard]] constexpr color copy() const noexcept{
-			return {*this};
+		[[nodiscard]] FORCE_INLINE constexpr color copy() const noexcept{
+			return *this;
 		}
 	};
 

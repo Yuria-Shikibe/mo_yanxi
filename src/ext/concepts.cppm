@@ -36,7 +36,7 @@ namespace mo_yanxi {
 	>::type;
 
     export template <typename T>
-    concept number = std::is_arithmetic_v<T>;
+    concept arithmetic = std::is_arithmetic_v<T>;
 
     export template <class DerivedT, class Base>
     concept derived = std::derived_from<DerivedT, Base>;
@@ -66,7 +66,7 @@ namespace mo_yanxi {
 	concept non_negative = std::is_unsigned_v<T>;
 
 	export template <typename T>
-	concept signed_number = !std::is_unsigned_v<T> && number<T>;
+	concept signed_number = !std::is_unsigned_v<T> && arithmetic<T>;
 
 	// constexpr bool b = std::is_unsigned_v<float>;
 
