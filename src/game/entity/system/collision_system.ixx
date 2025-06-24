@@ -12,6 +12,8 @@ export import mo_yanxi.game.ecs.component.manifold;
 export import mo_yanxi.game.ecs.component.physical_property;
 export import mo_yanxi.math.intersection;
 
+export import mo_yanxi.type_register;
+
 import mo_yanxi.shared_stack;
 
 import std;
