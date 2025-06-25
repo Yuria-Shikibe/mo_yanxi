@@ -1,6 +1,3 @@
-module;
-
-
 module mo_yanxi.game.ecs.component.chamber.turret;
 
 import mo_yanxi.game.ecs.component.physical_property;

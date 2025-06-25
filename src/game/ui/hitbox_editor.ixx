@@ -1,4 +1,4 @@
-module;
+// module;
 
 export module mo_yanxi.game.ui.hitbox_editor;
 
@@ -11,6 +11,7 @@ import mo_yanxi.ui.creation.file_selector;
 
 export import mo_yanxi.game.meta.hitbox;
 import mo_yanxi.game.quad_tree;
+import mo_yanxi.game.quad_tree_interface;
 
 import mo_yanxi.graphic.camera;
 import mo_yanxi.graphic.image_manage;
@@ -239,6 +240,7 @@ namespace mo_yanxi::game{
 
 	};
 
+
 	struct reference_image_channel{
 		graphic::allocated_image_region image_region{};
 
@@ -253,14 +255,14 @@ namespace mo_yanxi::game{
 			}};
 		}
 
-		void draw(ui::draw_acquirer& acquirer) const{
+		void draw(mo_yanxi::ui::draw_acquirer& acquirer) const{
 			if(image_region){
 				auto last = acquirer.get_region();
 				auto mode = acquirer.proj;
 
-				acquirer << static_cast<const ui::draw_acquirer::region_type&>(image_region);
+				acquirer << static_cast<const mo_yanxi::ui::draw_acquirer::region_type&>(image_region);
 
-				acquirer.proj.set_layer(ui::draw_layers::base);
+				acquirer.proj.set_layer(mo_yanxi::ui::draw_layers::base);
 				graphic::draw::fill::quad(acquirer.get(), wrapper.base.crop().view_as_quad());
 
 				acquirer << last;
@@ -270,105 +272,106 @@ namespace mo_yanxi::game{
 		}
 	};
 
-	struct hitbox_edit_channel{
 
-		struct history_entry : editor_box_meta{
-			bool selected{};
-			bool main_selected{};
-		};
+	enum struct reference_frame{
+		global,
+		local,
+		COUNT
+	};
 
-		enum struct reference_frame{
-			global,
-			local,
-			COUNT
-		};
+	enum struct reference_center{
+		local,
+		average,
+		selected
+	};
 
-		enum struct reference_center{
-			local,
-			average,
-			selected
-		};
+	enum struct select_mode{
+		single,
+		join,
+		intersection,
+		subtract,
+		difference,
+	};
 
-		enum struct select_mode{
-			single,
-			join,
-			intersection,
-			subtract,
-			difference,
-		};
+	struct op : basic_op{
+		reference_frame frame{};
+		reference_center center{};
 
-		struct op : basic_op{
-			reference_frame frame{};
-			reference_center center{};
-
-			void switch_frame(){
-				frame = reference_frame{(std::to_underlying(frame) + 1) % std::to_underlying(reference_frame::COUNT)};
-			}
-		private:
-			[[nodiscard]] math::vec2 get_move(const box_wrapper& wrap,
-			                                  const math::vec2 dst) const{
-				auto mov = get_num_from_cmd();
-				bool has_snap = this->has_snap();
-				if(has_clamp() && !has_snap && mov){
-					auto rst = math::vec2{}.set(mov.value());
-					switch(frame){
-					case reference_frame::local : rst.rotate_rad(-wrap.base.trans.rot);
-						rst *= constrain.as<float>();
-						rst.rotate_rad(wrap.base.trans.rot);
-						return rst;
-					default : return rst * constrain.as<float>();
-					}
-				}
-
-				math::vec2 rst{};
+		void switch_frame(){
+			frame = reference_frame{(std::to_underlying(frame) + 1) % std::to_underlying(reference_frame::COUNT)};
+		}
+	private:
+		[[nodiscard]] math::vec2 get_move(const box_wrapper& wrap,
+		                                  const math::vec2 dst) const{
+			auto mov = get_num_from_cmd();
+			bool has_snap = this->has_snap();
+			if(has_clamp() && !has_snap && mov){
+				auto rst = math::vec2{}.set(mov.value());
 				switch(frame){
-				case reference_frame::global :
-					rst = (dst - initial_pos) * constrain.as<float>() * get_scale();
-					if(mov && has_snap)rst.snap_to({*mov, *mov});
-					break;
-				case reference_frame::local :
-					rst = (dst - initial_pos).rotate_rad(-wrap.base.trans.rot);
-					rst *= constrain.as<float>() * get_scale();
-					if(mov && has_snap)rst.snap_to({*mov, *mov});
+				case reference_frame::local : rst.rotate_rad(-wrap.base.trans.rot);
+					rst *= constrain.as<float>();
 					rst.rotate_rad(wrap.base.trans.rot);
-					break;
-				default : break;
+					return rst;
+				default : return rst * constrain.as<float>();
 				}
-
-				return rst;
 			}
 
-		public:
-			void apply_eccentric_move(box_wrapper& wrap, const math::vec2 dst) const{
-				auto mov = get_move(wrap, dst);
-				wrap.edit.temp.box.offset = wrap.edit.base.box.offset + mov.rotate_rad(-wrap.base.trans.rot);
+			math::vec2 rst{};
+			switch(frame){
+			case reference_frame::global :
+				rst = (dst - initial_pos) * constrain.as<float>() * get_scale();
+				if(mov && has_snap)rst.snap_to({*mov, *mov});
+				break;
+			case reference_frame::local :
+				rst = (dst - initial_pos).rotate_rad(-wrap.base.trans.rot);
+				rst *= constrain.as<float>() * get_scale();
+				if(mov && has_snap)rst.snap_to({*mov, *mov});
+				rst.rotate_rad(wrap.base.trans.rot);
+				break;
+			default : break;
 			}
 
-			void apply_eccentric_center_move(box_wrapper& wrap, const math::vec2 dst) const{
-				auto mov = get_move(wrap, dst);
-				wrap.edit.temp.trans.vec = wrap.edit.base.trans.vec + mov;
-				wrap.edit.temp.box.offset = wrap.edit.base.box.offset - mov.rotate_rad(-wrap.base.trans.rot);
-			}
+			return rst;
+		}
 
-			void apply_move(box_wrapper& wrap, const math::vec2 dst) const noexcept{
-				auto mov = get_move(wrap, dst);
-				wrap.edit.temp.trans.vec = wrap.edit.base.trans.vec + mov; //.rotate_rad(wrap.base.trans.rot);
-			}
+	public:
+		void apply_eccentric_move(box_wrapper& wrap, const math::vec2 dst) const{
+			auto mov = get_move(wrap, dst);
+			wrap.edit.temp.box.offset = wrap.edit.base.box.offset + mov.rotate_rad(-wrap.base.trans.rot);
+		}
 
-			void apply_scale(box_wrapper& wrap,
-				const math::vec2 dst,
-				const math::vec2 avg) const noexcept{
-				wrap.edit.temp.scale = wrap.edit.base.scale * get_scale(dst, avg);
-			}
+		void apply_eccentric_center_move(box_wrapper& wrap, const math::vec2 dst) const{
+			auto mov = get_move(wrap, dst);
+			wrap.edit.temp.trans.vec = wrap.edit.base.trans.vec + mov;
+			wrap.edit.temp.box.offset = wrap.edit.base.box.offset - mov.rotate_rad(-wrap.base.trans.rot);
+		}
 
-			void apply_rotate(box_wrapper& wrap,
-				const math::vec2 dst,
-				const math::vec2 avg) const noexcept{
-				float ang = get_rotation(dst, avg);
+		void apply_move(box_wrapper& wrap, const math::vec2 dst) const noexcept{
+			auto mov = get_move(wrap, dst);
+			wrap.edit.temp.trans.vec = wrap.edit.base.trans.vec + mov; //.rotate_rad(wrap.base.trans.rot);
+		}
 
-				wrap.edit.temp.trans.rot = wrap.edit.base.trans.rot + ang;
-			}
-		};
+		void apply_scale(box_wrapper& wrap,
+			const math::vec2 dst,
+			const math::vec2 avg) const noexcept{
+			wrap.edit.temp.scale = wrap.edit.base.scale * get_scale(dst, avg);
+		}
+
+		void apply_rotate(box_wrapper& wrap,
+			const math::vec2 dst,
+			const math::vec2 avg) const noexcept{
+			float ang = get_rotation(dst, avg);
+
+			wrap.edit.temp.trans.rot = wrap.edit.base.trans.rot + ang;
+		}
+};
+
+	struct history_entry : editor_box_meta{
+		bool selected{};
+		bool main_selected{};
+	};
+
+	struct hitbox_edit_channel{
 
 		op operation{};
 
@@ -819,7 +822,11 @@ namespace mo_yanxi::game{
 				return box_wrapper{{static_cast<editor_box_meta>(v)}};
 			}), false);
 
-			for (const auto & [e, c] : std::views::zip(entry, comps)){
+			auto sz = std::min(comps.size(), entry.size());
+			for(auto i = 0uz; i < sz; ++i){
+				auto& e = entry[i];
+				auto& c = comps[i];
+
 				if(e.selected)add_select(c);
 				if(e.main_selected)main_selected = &c;
 			}
@@ -993,6 +1000,7 @@ namespace mo_yanxi::game{
 		}
 	};
 
+	/*
 	namespace ui{
 		export using namespace mo_yanxi::ui;
 
@@ -1278,5 +1286,5 @@ namespace mo_yanxi::game{
 			void load_from(const std::filesystem::path& path);
 		};
 
-	}
+	}*/
 }

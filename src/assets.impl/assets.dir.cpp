@@ -7,10 +7,10 @@ void mo_yanxi::assets::load_dir(const std::filesystem::path& root){
     prop_root = root;
     patch(prop_root);
 
-    assets = prop_root.sub_file("assets");
-    patch(assets);
+    dir::assets = prop_root.sub_file("assets");
+    patch(dir::assets);
 
-    shader = assets.sub_file("shader");
+    shader = dir::assets.sub_file("shader");
     patch(shader);
 
     shader_spv = shader.sub_file("spv");
@@ -19,19 +19,19 @@ void mo_yanxi::assets::load_dir(const std::filesystem::path& root){
     shader_src = shader.sub_file("src");
     patch(shader_src);
 
-    texture = assets.sub_file("texture");
+    texture = dir::assets.sub_file("texture");
     patch(texture);
 
-    font = assets.sub_file("fonts");
+    font = dir::assets.sub_file("fonts");
     patch(font);
 
-    sound = assets.sub_file("sounds");
+    sound = dir::assets.sub_file("sounds");
     patch(sound);
 
-    svg = assets.sub_file("svg");
+    svg = dir::assets.sub_file("svg");
     patch(svg);
 
-    bundle = assets.sub_file("bundles");
+    bundle = dir::assets.sub_file("bundles");
     patch(bundle);
 
 
@@ -41,7 +41,7 @@ void mo_yanxi::assets::load_dir(const std::filesystem::path& root){
     // texCache = cache.subFile("tex");
     // patch(texCache);
     //
-    // game = assets.subFile("game");
+    // game = dir::assets.subFile("game");
     // patch(game);
     //
     // data = files.findDir("resource").subFile("data");

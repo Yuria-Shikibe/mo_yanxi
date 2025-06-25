@@ -13,6 +13,8 @@ export import mo_yanxi.math;
 export import mo_yanxi.math.trans2;
 export import mo_yanxi.array_stack;
 
+import mo_yanxi.meta_programming;
+
 import std;
 
 namespace mo_yanxi::game{

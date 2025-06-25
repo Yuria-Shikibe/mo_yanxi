@@ -2,7 +2,7 @@
 // Created by Matrix on 2025/4/9.
 //
 
-export module mo_yanxi.game.ecs.quad_tree_interface;
+export module mo_yanxi.game.quad_tree_interface;
 
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.math.rect_ortho;

@@ -6,6 +6,8 @@ export module mo_yanxi.game.ecs.component.chamber.radar;
 
 export import mo_yanxi.game.ecs.component.chamber;
 export import mo_yanxi.math;
+
+
 namespace mo_yanxi::game::ecs{
 
 	namespace chamber{

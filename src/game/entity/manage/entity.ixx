@@ -21,14 +21,15 @@ module;
 export module mo_yanxi.game.ecs.component.manage:entity;
 
 import :serializer;
-export import mo_yanxi.strided_span;
-export import mo_yanxi.meta_programming;
 export import mo_yanxi.seq_chunk;
+import mo_yanxi.strided_span;
 
 import mo_yanxi.game.srl;
 
 import mo_yanxi.algo.hash;
 import mo_yanxi.basic_util;
+import mo_yanxi.concepts;
+import mo_yanxi.meta_programming;
 import mo_yanxi.heterogeneous.open_addr_hash;
 
 import mo_yanxi.type_register;
@@ -472,7 +473,7 @@ namespace mo_yanxi::game::ecs{
 		requires contained_in<Tgt, EntityChunkDesc>;
 		requires contained_in<std::remove_cvref_t<ChunkPartial>, EntityChunkDesc>;
 		}
-	constexpr [[nodiscard]] decltype(auto) chunk_neighbour_of(ChunkPartial& value) noexcept{
+	[[nodiscard]] constexpr decltype(auto) chunk_neighbour_of(ChunkPartial& value) noexcept{
 
 
 		using Tup = tuple_cat_t<std::tuple<chunk_meta>, EntityChunkDesc>;
@@ -494,7 +495,7 @@ namespace mo_yanxi::game::ecs{
 		requires is_tuple_v<EntityChunkDesc>;
 		requires contained_in<std::remove_cvref_t<ChunkPartial>, EntityChunkDesc>;
 		}
-	constexpr [[nodiscard]] decltype(auto) chunk_of(ChunkPartial& value) noexcept{
+	[[nodiscard]] constexpr decltype(auto) chunk_of(ChunkPartial& value) noexcept{
 		using Tup = tuple_to_comp_t<tuple_cat_t<std::tuple<chunk_meta>, EntityChunkDesc>>;
 		decltype(auto) rst = mo_yanxi::seq_chunk_cast<Tup>(&value);
 #if DEBUG_CHECK
@@ -700,7 +701,7 @@ namespace mo_yanxi::game::ecs{
 		using dump_types = all_apply_to<tuple_cat_t, unary_apply_to_tuple_t<dump_type_to_tuple_t, TypeDesc>>;
 		using dump_chunk = tuple_to_seq_chunk_t<dump_types>;
 
-		static [[nodiscard]] dump_chunk dump(const value_type& comp){
+		[[nodiscard]] static dump_chunk dump(const value_type& comp){
 			dump_chunk chunk{};
 			[&]<std::size_t... I>(std::index_sequence<I...>){
 				([&]<std::size_t Idx>(){
@@ -714,7 +715,7 @@ namespace mo_yanxi::game::ecs{
 			return chunk;
 		}
 
-		static [[nodiscard]] value_type load(const dump_chunk& comp){
+		[[nodiscard]] static value_type load(const dump_chunk& comp){
 			value_type chunk{};
 			[&]<std::size_t... I>(std::index_sequence<I...>){
 				([&]<std::size_t Idx>(){
@@ -1213,12 +1214,7 @@ namespace mo_yanxi::game::ecs{
 			}
 		}
 
-		std::unique_ptr<archetype_serializer> dump() const final{
-
-			constexpr auto b = ecs::archetype_serialize_info<TupleT>::is_transient;
-			constexpr auto c = std::tuple_size_v<typename ecs::archetype_serialize_info<TupleT>::dump_chunk>;
-			constexpr auto d = ecs::archetype_serialize_info<TupleT>::identity.index;
-
+		[[nodiscard]] std::unique_ptr<archetype_serializer> dump() const final{
 			if constexpr (trait::is_transient){
 				return {};
 			}else{

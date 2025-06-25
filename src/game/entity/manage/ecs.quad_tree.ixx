@@ -5,7 +5,7 @@ module;
 
 export module mo_yanxi.game.quad_tree;
 
-export import mo_yanxi.game.ecs.quad_tree_interface;
+export import mo_yanxi.game.quad_tree_interface;
 
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.math.rect_ortho;

@@ -32,7 +32,7 @@ namespace mo_yanxi::game::ecs::system{
 						ecs::chamber::building_data& data
 					){
 							if(inbound)for(auto&& damage_event : data.damage_events){
-								top_world.graphic_context.create_efx().set_data({
+								top_world.graphic_context.create_efx().set_data(fx::effect_data{
 										.style = fx::poly_outlined_out{
 											.radius = {5, 25, math::interp::pow3Out},
 											.stroke = {4},
