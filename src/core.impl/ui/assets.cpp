@@ -3,6 +3,7 @@ module mo_yanxi.ui.assets;
 import mo_yanxi.graphic.image_manage;
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.assets.directories;
+import mo_yanxi.ui.basic;
 
 mo_yanxi::ui::theme::icons::icon_raw_present load_svg(
 	mo_yanxi::graphic::image_page& ui_page,

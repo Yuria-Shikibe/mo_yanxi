@@ -2,6 +2,7 @@ module mo_yanxi.ui.basic;
 
 import :scene;
 
+import mo_yanxi.basic_util;
 
 void mo_yanxi::ui::dialog_manager::draw_all(rect clipspace) const{
 

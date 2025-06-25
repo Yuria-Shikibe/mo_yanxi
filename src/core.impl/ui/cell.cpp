@@ -32,10 +32,10 @@ void mo_yanxi::ui::basic_cell::apply_to_base(group& group, elem& elem, stated_ex
 
 void mo_yanxi::ui::mastering_cell::apply_to(
 	this const mastering_cell& self,
-	struct group& group,
-	struct elem& elem,
+	group& group_,
+	elem& elem,
 	ui::stated_extent real_cell_extent
 	){
-	self.basic_cell::apply_to(group, elem, real_cell_extent);
+	self.basic_cell::apply_to(group_, elem, real_cell_extent);
 	// if(self.stated_extent.dependent())elem.expandable = true;
 }

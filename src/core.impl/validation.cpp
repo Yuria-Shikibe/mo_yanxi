@@ -30,7 +30,7 @@ VkBool32 mo_yanxi::vk::validationCallback(
 VkResult mo_yanxi::vk::CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pCallback){
 
-	if(const auto* func = LoadFuncPtr(instance, vkCreateDebugUtilsMessengerEXT)){
+	if(auto* func = LoadFuncPtr(instance, vkCreateDebugUtilsMessengerEXT)){
 		return func(instance, pCreateInfo, pAllocator, pCallback);
 	} else{
 		return VK_ERROR_EXTENSION_NOT_PRESENT;
@@ -39,7 +39,7 @@ VkResult mo_yanxi::vk::CreateDebugUtilsMessengerEXT(VkInstance instance, const V
 
 void mo_yanxi::vk::DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT callback,
 	const VkAllocationCallbacks* pAllocator){
-	if(const auto* func = LoadFuncPtr(instance, vkDestroyDebugUtilsMessengerEXT)){
+	if(auto* func = LoadFuncPtr(instance, vkDestroyDebugUtilsMessengerEXT)){
 		func(instance, callback, pAllocator);
 	}
 }

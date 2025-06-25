@@ -1,6 +1,8 @@
-module mo_yanxi.vk.command_buffer;
+module;
 
-import mo_yanxi.vk.command_pool;
+#include <vulkan/vulkan.h>
+
+module mo_yanxi.vk.command_buffer;
 
 mo_yanxi::vk::command_buffer::command_buffer(const command_pool& command_pool, const VkCommandBufferLevel level)
 	: command_buffer(command_pool.get_device(), command_pool, level)
