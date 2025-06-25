@@ -1000,7 +1000,6 @@ namespace mo_yanxi::game{
 		}
 	};
 
-	/*
 	namespace ui{
 		export using namespace mo_yanxi::ui;
 
@@ -1075,7 +1074,7 @@ namespace mo_yanxi::game{
 
 
 				void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action,
-				               const core::ctrl::key_code_t mode) override{
+							   const core::ctrl::key_code_t mode) override{
 					using namespace core::ctrl;
 
 					channel_hitbox.input_key(key, action, mode, get_transferred_pos(get_scene()->get_cursor_pos()));
@@ -1270,7 +1269,7 @@ namespace mo_yanxi::game{
 				table::update(delta_in_ticks);
 
 				cmd_text->set_text(viewport->channel_hitbox.get_current_op_cmd());
-				viewport->channel_hitbox.operation.center = static_cast<hitbox_edit_channel::reference_center>(checkbox->
+				viewport->channel_hitbox.operation.center = static_cast<reference_center>(checkbox->
 					get_frame_index());
 			}
 
@@ -1285,6 +1284,5 @@ namespace mo_yanxi::game{
 			void write_to(const std::filesystem::path& path);
 			void load_from(const std::filesystem::path& path);
 		};
-
-	}*/
+	}
 }

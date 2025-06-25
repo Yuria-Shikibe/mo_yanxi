@@ -1,39 +1,24 @@
 #include <vulkan/vulkan.h>
-#include <cassert>
+// #include <cassert>
 
 // #define VMA_IMPLEMENTATION
-#include <vk_mem_alloc.h>
-#include <freetype/freetype.h>
+// #include <vk_mem_alloc.h>
+// #include <freetype/freetype.h>
 
 #include "../src/srl/srl.hpp"
 #include "../src/srl/srl.game.hpp"
-
+//
 import mo_yanxi.graphic.bitmap;
 
 import mo_yanxi.math;
 import mo_yanxi.math.angle;
 import mo_yanxi.math.vector2;
 import mo_yanxi.math.vector4;
+import mo_yanxi.math.rand;
 import mo_yanxi.math.quad;
 
-import mo_yanxi.vk.instance;
-import mo_yanxi.vk.sync;
 import mo_yanxi.vk.context;
-import mo_yanxi.vk.command_pool;
-import mo_yanxi.vk.command_buffer;
-import mo_yanxi.vk.resources;
-
-import mo_yanxi.vk.image_derives;
-import mo_yanxi.vk.shader;
-import mo_yanxi.vk.uniform_buffer;
-import mo_yanxi.vk.descriptor_buffer;
-import mo_yanxi.vk.pipeline.layout;
-import mo_yanxi.vk.pipeline;
-import mo_yanxi.vk.dynamic_rendering;
-import mo_yanxi.vk.util;
-import mo_yanxi.vk.util.uniform;
 import mo_yanxi.vk.batch;
-import mo_yanxi.vk.sampler;
 
 import mo_yanxi.vk.vertex_info;
 import mo_yanxi.vk.ext;
@@ -43,7 +28,6 @@ import mo_yanxi.assets.directories;
 import mo_yanxi.assets.ctrl;
 import mo_yanxi.graphic.shaderc;
 import mo_yanxi.graphic.color;
-import mo_yanxi.graphic.post_processor.bloom;
 
 import mo_yanxi.core.window;
 import mo_yanxi.allocator_2D;
@@ -59,7 +43,6 @@ import mo_yanxi.graphic.renderer;
 import mo_yanxi.graphic.renderer.world;
 import mo_yanxi.graphic.renderer.ui;
 import mo_yanxi.graphic.renderer.merger;
-import mo_yanxi.graphic.msdf;
 import mo_yanxi.graphic.draw;
 import mo_yanxi.graphic.draw.func;
 import mo_yanxi.graphic.draw.multi_region;
@@ -68,12 +51,8 @@ import mo_yanxi.graphic.image_multi_region;
 
 import mo_yanxi.graphic.layers.ui.grid_drawer;
 
-import mo_yanxi.font;
 import mo_yanxi.font.manager;
-import mo_yanxi.font.typesetting;
-
-import mo_yanxi.graphic.msdf;
-
+//
 import mo_yanxi.ui.root;
 import mo_yanxi.ui.basic;
 import mo_yanxi.ui.manual_table;
@@ -99,8 +78,6 @@ import mo_yanxi.game.world.hud;
 import mo_yanxi.game.ecs.world.top;
 
 import mo_yanxi.game.ecs.component.manage;
-import mo_yanxi.game.ecs.task_graph;
-import mo_yanxi.game.ecs.dependency_generator;
 
 import mo_yanxi.game.ecs.component_operation_task_graph;
 import mo_yanxi.game.ecs.component.manifold;
@@ -123,13 +100,12 @@ import mo_yanxi.game.ecs.component.chamber.turret;
 
 import mo_yanxi.game.meta.instancing;
 import mo_yanxi.game.content;
-
+//
 
 import mo_yanxi.game.ui.hitbox_editor;
 import mo_yanxi.game.ui.grid_editor;
 
 import test;
-import hive;
 
 
 import std;
@@ -153,18 +129,6 @@ void init_assets(){
 void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& atlas){
 	using namespace std::literals;
 	using namespace mo_yanxi;
-
-	auto& ui_page = *atlas.find_page("ui");
-
-	auto& line_svg = ui_page.register_named_region(
-		"line"s,
-		graphic::sdf_load{
-			graphic::msdf::msdf_generator{R"(D:\projects\mo_yanxi\prop\assets\svg\line.svg)"}, {40u, 24u}
-		}).first;
-
-	ui_page.mark_protected("line");
-
-	graphic::image_caped_region region{line_svg, line_svg.get_region(), 12, 12, graphic::msdf::sdf_image_boarder};
 
 	root.property.set_empty_drawer();
 	root.skip_inbound_capture = true;
@@ -416,7 +380,7 @@ void main_loop(){
 	core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()});
 	init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
 
-	game::world::hud hud{};
+	// game::world::hud hud{};
 	// hud.focus_hud();
 
 
@@ -425,11 +389,11 @@ void main_loop(){
 
 	game::world::entity_top_world world{renderer_world};
 
-	hud.bind_context({
-		.component_manager = &world.component_manager,
-		.collision_system = &world.collision_system,
-		.graphic_context = &world.graphic_context
-	});
+	// hud.bind_context({
+	// 	.component_manager = &world.component_manager,
+	// 	.collision_system = &world.collision_system,
+	// 	.graphic_context = &world.graphic_context
+	// });
 
 	auto& wgfx_input =
 		core::global::input.register_sub_input<
@@ -573,7 +537,7 @@ void main_loop(){
 						{
 							graphic::colors::white.create_lerp(graphic::colors::ORANGE, .65f).to_light().set_a(.5),
 							graphic::colors::white.to_light().set_a(0),
-							math::interp::linear_map<0., .55f>
+							math::interp::linear_map<0.f, .55f>
 						}, {
 							graphic::colors::aqua.to_light().set_a(0.95f),
 							graphic::colors::white.to_light().set_a(0),
@@ -820,38 +784,7 @@ int main(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
 
-
-	// test::foot();
-	//
-	// math::rect_box_posed rect{math::vec2{300, 100}, {125, 44, 3.14 / 4}};
-	// // auto pkg = io::loader<decltype(rect)>::pack(rect);
-	// // auto rect2 = io::loader<decltype(rect)>::extract(pkg);
-	//
-	// game::hitbox_meta meta{
-	// 	{
-	// 		hitbox_meta::meta{rect.get_identity(), rect.deduce_transform()},
-	// 		hitbox_meta::meta{{-10, -20, 20, 40}, {1, 2, 3}},
-	// 	}
-	// };
-	//
-	// auto pkg = io::pack(meta);
-	//
-	// auto meta2 = io::extract<hitbox_meta>(pkg);
-
-	// std::vector<std::vector<math::vec2>> vec{{{0, 1,}, {2, 3}}, {{4, 5}}};
-
-	// std::println("{}", vec);
-
-	// foo2();
-
-
-	game::content::load();
-	//
-	// content::content_manager.each_content<meta::chamber::chamber_types>(overload{
-	// 	// [](meta::chamber::radar& radar) static {std::println("radar: {}", radar.name);},
-	// 	// [](meta::chamber::turret_base& radar) static {std::println("turret: {}", radar.name);},
-	// 	[](meta::chamber::basic_chamber& basic) static {std::println("basic: {}", basic.name);},
-	// });
+	std::println("Hello World\n 123");
 
 	init_assets();
 	compile_shaders();
