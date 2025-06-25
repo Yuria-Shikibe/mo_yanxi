@@ -11,13 +11,14 @@ export module mo_yanxi.game.ecs.component.chamber:tile;
 
 export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.vector2;
-export import mo_yanxi.game.ecs.quad_tree_interface;
+export import mo_yanxi.game.quad_tree_interface;
 export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.component.damage;
 export import mo_yanxi.game.ecs.component.hit_point;
 
 import mo_yanxi.referenced_ptr;
-import mo_yanxi.game.ecs.component.ui.builder;
+export import mo_yanxi.game.ecs.component.ui.builder;
+export import mo_yanxi.graphic.renderer.ui;
 
 export import mo_yanxi.game.ecs.world.top;
 

@@ -9,6 +9,12 @@ export import mo_yanxi.game.meta.chamber;
 import mo_yanxi.game.meta.hitbox;
 import mo_yanxi.algo;
 
+
+//TODO?
+import mo_yanxi.graphic.renderer.ui;
+import mo_yanxi.graphic.renderer.world;
+
+
 namespace mo_yanxi::game::meta::chamber{
 	constexpr int tile_size_integral = 64;
 	constexpr float tile_size = tile_size_integral;

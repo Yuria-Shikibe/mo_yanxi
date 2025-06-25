@@ -8,6 +8,7 @@ export module mo_yanxi.game.ecs.component.manifold;
 export import mo_yanxi.game.ecs.component.hitbox;
 export import mo_yanxi.game.ecs.component.physical_property;
 export import mo_yanxi.game.ecs.component.manage;
+ import mo_yanxi.game.quad_tree_interface;
 
 export import mo_yanxi.array_stack;
 
@@ -238,5 +239,28 @@ namespace mo_yanxi::game::ecs{
 	template <>
 	struct component_custom_behavior<manifold> : component_custom_behavior_base<manifold, manifold_dump>{
 
+	};
+}
+
+
+namespace mo_yanxi::game{
+
+	template <>
+	struct quad_tree_trait_adaptor<ecs::collision_object, float> : quad_tree_adaptor_base<ecs::collision_object, float>{
+		[[nodiscard]] static rect_type get_bound(const_reference self) noexcept{
+			return self.manifold->hitbox.max_wrap_bound();
+		}
+
+		[[nodiscard]] static bool intersect_with(const_reference self, const_reference other){
+			return self.manifold->hitbox.collide_with_exact(other.manifold->hitbox);
+		}
+
+		[[nodiscard]] static bool contains(const_reference self, vector_type::const_pass_t point){
+			return self.manifold->hitbox.contains(point);
+		}
+
+		[[nodiscard]] static bool equals(const_reference self, const_reference other) noexcept{
+			return self.manifold == other.manifold;
+		}
 	};
 }
