@@ -5,31 +5,32 @@ module;
 export module mo_yanxi.core.window.callback;
 
 namespace mo_yanxi::core::glfw{
-	void windowRefreshCallback(GLFWwindow* window){}
+	using Wptr = GLFWwindow*;
+	void windowRefreshCallback(Wptr window){}
 
-	void dropCallback(GLFWwindow* window, int path_count, const char* paths[]) {}
+	void dropCallback(Wptr window, int path_count, const char* paths[]) {}
 
-	void charCallback(GLFWwindow* window, unsigned int codepoint);
+	// void charInputCallback(Wptr window, unsigned codepoint);
 
-	void charModCallback(GLFWwindow* window, unsigned int codepoint, int mods);
+	void charModCallback(Wptr window, unsigned int codepoint, int mods){}
 
-	void scaleCallback(GLFWwindow* window, const float xScale, const float yScale){}
+	void scaleCallback(Wptr window, const float xScale, const float yScale){}
 
-	void mouseBottomCallBack(GLFWwindow* window, int button, int action, int mods);
+	// void mouseBottomCallBack(Wptr window, int button, int action, int mods);
+	//
+	// void cursorPosCallback(Wptr window, double xPos, double yPos);
+	//
+	// void cursorEnteredCallback(Wptr window, int entered);
+	//
+	// void scrollCallback(Wptr window, double xOffset, double yOffset);
+	//
+	// void keyCallback(Wptr window, int key, int scanCode, int action, int mods);
 
-	void cursorPosCallback(GLFWwindow* window, double xPos, double yPos);
+	void monitorCallback(GLFWmonitor* monitor, int event){}
 
-	void cursorEnteredCallback(GLFWwindow* window, int entered);
+	void maximizeCallback(Wptr window, int maximized){}
 
-	void scrollCallback(GLFWwindow* window, double xOffset, double yOffset);
+	void winPosCallBack(Wptr window, int xpos, int ypos){}
 
-	void keyCallback(GLFWwindow* window, int key, int scanCode, int action, int mods);
-
-	void monitorCallback(GLFWmonitor* monitor, int event);
-
-	void maximizeCallback(GLFWwindow* window, int maximized);
-
-	void winPosCallBack(GLFWwindow* window, int xpos, int ypos);
-
-	export void set_call_back(GLFWwindow* window, void* user);
+	export void set_call_back(Wptr window, void* user);
 }

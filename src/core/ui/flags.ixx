@@ -110,7 +110,7 @@ namespace mo_yanxi::ui{
 		}
 
 		constexpr bool notify_children_changed(const bool force = false) noexcept{
-			if(force || acceptMask_context & spread_direction::child && acceptMask_inherent & spread_direction::child){
+			if(force || (acceptMask_context & spread_direction::child && acceptMask_inherent & spread_direction::child)){
 				children_changed = true;
 				return true;
 			}

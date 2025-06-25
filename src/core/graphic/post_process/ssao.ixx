@@ -34,10 +34,10 @@ namespace mo_yanxi::graphic{
 	        };
 
             static constexpr std::array SSAO_Params{
-                    kernal_info{16, 0.15702702700f},
-                    kernal_info{12, 0.32702702700f},
-                    kernal_info{8, 0.55062162162f},
-                    kernal_info{4, 0.83062162162f},
+                    kernal_info{16, 0.15702702700f, 0},
+                    kernal_info{12, 0.32702702700f, 0},
+                    kernal_info{8, 0.55062162162f, 0},
+                    kernal_info{4, 0.83062162162f, 0},
                 };
 
 	        static constexpr std::size_t def_kernal_size{[]{

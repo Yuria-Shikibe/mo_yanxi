@@ -52,13 +52,13 @@ namespace mo_yanxi::ui{
 			return self.margin.top_lft() + self.allocated_region.get_src();
 		}
 
-		void apply_to_base(struct group& group, struct elem& elem, stated_extent real_cell_extent) const;
+		void apply_to_base(group& group, elem& elem, stated_extent real_cell_extent) const;
 
 		template <std::derived_from<basic_cell> T>
 		void apply_to(
 			this const T& self,
-			struct group& group,
-			struct elem& elem,
+			group& group,
+			elem& elem,
 			stated_extent real_cell_extent
 			){
 			self.apply_to_base(group, elem, real_cell_extent);
@@ -176,8 +176,8 @@ namespace mo_yanxi::ui{
 
 		void apply_to(
 			this const mastering_cell& self,
-			struct group& group,
-			struct elem& elem,
+			group& group_,
+			elem& elem,
 			ui::stated_extent real_cell_extent);
 	};
 }

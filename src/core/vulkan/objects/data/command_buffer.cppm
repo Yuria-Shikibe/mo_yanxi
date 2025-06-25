@@ -32,6 +32,7 @@ namespace mo_yanxi::vk{
 	}
 
 
+	export
 	struct command_pool;
 
 	export
@@ -413,5 +414,54 @@ namespace mo_yanxi::vk{
 		[[nodiscard]] container_type::size_type size() const noexcept{
 			return units.size();
 		}
+	};
+
+
+	struct command_pool : exclusive_handle<VkCommandPool>{
+	protected:
+		exclusive_handle_member<VkDevice> device{};
+
+	public:
+		[[nodiscard]] command_pool() = default;
+
+		~command_pool(){
+			if(device)vkDestroyCommandPool(device, handle, nullptr);
+		}
+
+		command_pool(const command_pool& other) = delete;
+		command_pool(command_pool&& other) noexcept = default;
+		command_pool& operator=(const command_pool& other) = delete;
+		command_pool& operator=(command_pool&& other) = default;
+
+		command_pool(
+			VkDevice device,
+			const std::uint32_t queueFamilyIndex,
+			const VkCommandPoolCreateFlags flags
+		) : device{device}{
+			VkCommandPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+			poolInfo.queueFamilyIndex = queueFamilyIndex;
+			poolInfo.flags = flags; // Optional
+
+			if(auto rst = vkCreateCommandPool(device, &poolInfo, nullptr, &handle)){
+				throw vk_error(rst, "Failed to create command pool!");
+			}
+		}
+
+		[[nodiscard]] VkDevice get_device() const noexcept{
+			return device;
+		}
+
+		[[nodiscard]] command_buffer obtain(const VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY) const{
+			return {device, handle, level};
+		}
+
+		[[nodiscard]] transient_command get_transient(VkQueue targetQueue, VkFence fence = nullptr) const{
+			return transient_command{device, handle, targetQueue, fence};
+		}
+
+		void reset_all(const VkCommandPoolResetFlags resetFlags = 0) const{
+			vkResetCommandPool(device, handle, resetFlags);
+		}
+
 	};
 }

@@ -216,6 +216,8 @@ namespace mo_yanxi::font::typesetting{
 			bool reserve{false};
 		};
 
+		static constexpr token_sentinel default_sentinel{'#', '<', '>', false};
+
 		struct posed_token_argument : token_argument{
 			std::uint32_t pos{};
 
@@ -252,7 +254,7 @@ namespace mo_yanxi::font::typesetting{
 
 		[[nodiscard]] tokenized_text() = default;
 
-		[[nodiscard]] explicit(false) tokenized_text(const std::string_view string, const token_sentinel sentinel = {});
+		[[nodiscard]] explicit(false) tokenized_text(const std::string_view string, const token_sentinel sentinel = default_sentinel);
 	};
 
 	export struct parse_context{
@@ -593,41 +595,6 @@ namespace mo_yanxi::font::typesetting{
 			return !elements.empty();
 		}
 
-		[[nodiscard]] bool is_bound_compatible(const math::vec2 clip_size) const noexcept{
-			/*if(captured_size.within(clamp_size)){
-				return true;
-			}else */if((policy_ & layout_policy::auto_feed_line) == layout_policy::auto_feed_line){
-				if(clip){
-					if((policy_ & layout_policy::reserve) == layout_policy::reserve){
-						if((policy_ & layout_policy::vertical) == layout_policy::vertical){
-							if(clamp_size.y == clip_size.y){
-								return true;
-							}
-						}else{
-							if(clamp_size.x == clip_size.x){
-								return true;
-							}
-						}
-					}
-				}else{
-					return clamp_size.within_equal(clip_size) && row_size() == std::ranges::count(text, '\n');
-				}
-			}else if((policy_ & layout_policy::reserve) == layout_policy::reserve){
-				return true;
-			}
-			return false;
-		}
-
-		[[nodiscard]] bool is_layout_compatible(
-			const std::string_view text,
-			const math::vec2 clip_size,
-			layout_policy policy) const{
-			if(policy != policy_)return false;
-
-			const bool size_cpt{is_bound_compatible(clip_size)};
-
-			return size_cpt && this->text == text;
-		}
 
 		// bool resetSize(const math::vec2 size){
 		// 	if(is_size_compatible(size)){
@@ -699,6 +666,43 @@ namespace mo_yanxi::font::typesetting{
 		template <typename T>
 		auto& operator[](this T& self, layout_index_t row, layout_index_t column) noexcept{
 			return self[row][column];
+		}
+
+
+		[[nodiscard]] bool is_bound_compatible(const math::vec2 clip_size) const noexcept{
+			/*if(captured_size.within(clamp_size)){
+				return true;
+			}else */if((policy_ & layout_policy::auto_feed_line) == layout_policy::auto_feed_line){
+				if(clip){
+					if((policy_ & layout_policy::reserve) == layout_policy::reserve){
+						if((policy_ & layout_policy::vertical) == layout_policy::vertical){
+							if(clamp_size.y == clip_size.y){
+								return true;
+							}
+						}else{
+							if(clamp_size.x == clip_size.x){
+								return true;
+							}
+						}
+					}
+				}else{
+					return clamp_size.within_equal(clip_size) && row_size() == std::ranges::count(text, '\n');
+				}
+			}else if((policy_ & layout_policy::reserve) == layout_policy::reserve){
+				return true;
+			}
+			return false;
+		}
+
+		[[nodiscard]] bool is_layout_compatible(
+			const std::string_view text,
+			const math::vec2 clip_size,
+			layout_policy policy) const{
+			if(policy != policy_)return false;
+
+			const bool size_cpt{is_bound_compatible(clip_size)};
+
+			return size_cpt && this->text == text;
 		}
 
 		[[nodiscard]] const glyph_elem* find_valid_elem(const layout_index_t index) const noexcept{

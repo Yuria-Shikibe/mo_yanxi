@@ -258,7 +258,7 @@ namespace mo_yanxi::ui{
 			if(last_addr == cells.data()){
 				this->on_add(adaptor);
 			}else{
-				if(auto itr = std::ranges::find_last(cells, elem, &adaptor_type::element); itr.begin() != itr.end()){
+				if(auto itr = std::ranges::find_last(cells, elem, [](adaptor_type& a){return a.element;}); itr.begin() != itr.end()){
 					this->on_add(itr.front());
 				}
 			}

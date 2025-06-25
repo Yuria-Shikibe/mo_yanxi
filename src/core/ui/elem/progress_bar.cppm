@@ -63,6 +63,7 @@ namespace mo_yanxi::ui{
 
 	export struct progress_bar;
 
+	export
 	struct progress_bar_drawer{
 		virtual ~progress_bar_drawer() = default;
 		virtual void draw(const progress_bar& elem) const;
@@ -73,7 +74,6 @@ namespace mo_yanxi::ui{
 
 	constexpr progress_bar_drawer DefaultProgressBarDrawer{};
 
-	export
 	struct progress_bar : elem{
 	protected:
 

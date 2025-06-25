@@ -28,7 +28,7 @@ export namespace mo_yanxi::ui::util{
 			src = srcPos;
 		}
 
-		constexpr [[nodiscard]] bool is_selecting() const noexcept{
+		[[nodiscard]] constexpr bool is_selecting() const noexcept{
 			if constexpr (std::floating_point<T>){
 				return !src.is_NaN();
 			}else{

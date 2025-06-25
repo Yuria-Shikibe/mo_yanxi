@@ -272,7 +272,7 @@ namespace mo_yanxi::vk::cmd{
 			);
 		}
 
-		auto& push(
+		VkBufferMemoryBarrier2& push(
 			const VkBuffer buffer,
 			const VkPipelineStageFlags2 srcStageMask,
 			const VkAccessFlags2 srcAccessMask,

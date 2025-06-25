@@ -81,45 +81,6 @@ namespace mo_yanxi::graphic{
 				.set_storage_buffer(0, oit_buffer.begin() + sizeof(oit_statistic), oit_buffer.size - sizeof(oit_statistic));
 		}
 
-	public:
-		void set_input(const std::initializer_list<post_process_socket> sockets) override{
-			post_processor::set_input(sockets);
-			assert(inputs.size() == 4);
-
-			auto& heads = get_oit_head_image();
-			auto& depth = get_input_depth();
-			auto& color_base = get_input_color_base();
-			auto& color_light = get_input_color_light();
-
-			(void)vk::descriptor_mapper{descriptor_buffer}
-				.set_storage_image(1, heads.view)
-				.set_image(2, depth.view, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler)
-				.set_storage_image(3, color_base.view)
-				.set_storage_image(4, color_light.view);
-		}
-
-		void set_output(const std::initializer_list<post_process_socket> sockets) override{
-			post_processor::set_output(sockets);
-			assert(outputs.size() == 2);
-			auto& color_base =  get_output_color_base();
-			auto& color_light = get_output_color_light();
-
-			(void)vk::descriptor_mapper{descriptor_buffer}
-				.set_storage_image(4 + 1, color_base.view)
-				.set_storage_image(4 + 2, color_light.view);
-		}
-
-		void update(
-			math::usize2 size,
-			const vk::buffer_borrow& oit_buffer_range,
-			const std::initializer_list<post_process_socket> inputs,
-			const std::initializer_list<post_process_socket> outputs){
-			update_oit_buffer(oit_buffer_range);
-			set_input(inputs);
-			set_output(outputs);
-			resize(nullptr, size, true);
-		}
-
 	protected:
 		[[nodiscard]] auto& get_oit_head_image() const noexcept{
 			return inputs[0];
@@ -148,6 +109,48 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] auto& get_output_color_light() const noexcept{
 			return outputs[1];
 		}
+
+
+	public:
+		void set_input(const std::initializer_list<post_process_socket> sockets) override{
+			post_processor::set_input(sockets);
+			assert(inputs.size() == 4);
+
+			auto& heads = get_oit_head_image();
+			auto& depth = get_input_depth();
+			auto& color_base = get_input_color_base();
+			auto& color_light = get_input_color_light();
+
+			(void)vk::descriptor_mapper{descriptor_buffer}
+			.set_storage_image(1, heads.view)
+			.set_image(2, depth.view, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler)
+			.set_storage_image(3, color_base.view)
+			.set_storage_image(4, color_light.view);
+		}
+
+		void set_output(const std::initializer_list<post_process_socket> sockets) override{
+			post_processor::set_output(sockets);
+			assert(outputs.size() == 2);
+			auto& color_base =  get_output_color_base();
+			auto& color_light = get_output_color_light();
+
+			(void)vk::descriptor_mapper{descriptor_buffer}
+			.set_storage_image(4 + 1, color_base.view)
+			.set_storage_image(4 + 2, color_light.view);
+		}
+
+		void update(
+			math::usize2 size,
+			const vk::buffer_borrow& oit_buffer_range,
+			const std::initializer_list<post_process_socket> inputs,
+			const std::initializer_list<post_process_socket> outputs){
+			update_oit_buffer(oit_buffer_range);
+			set_input(inputs);
+			set_output(outputs);
+			resize(nullptr, size, true);
+		}
+
+	protected:
 
 		void record_commands() override{
 			vk::scoped_recorder recorder{main_command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};

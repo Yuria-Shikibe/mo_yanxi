@@ -220,9 +220,9 @@ namespace mo_yanxi::vk{
 			deallocate();
 		}
 
-		~resource_base() requires !requires{
+		~resource_base() requires (!requires{
 			deallocate();
-		} = default;
+		}) = default;
 
 		resource_base(const resource_base& other) = default;
 		resource_base(resource_base&& other) noexcept = default;

@@ -95,14 +95,14 @@ namespace mo_yanxi::core{
 		    timeReseter(0);
 		}
 
-		[[nodiscard]] constexpr Sec global_delta() const noexcept{return Sec{globalDelta};}
-		[[nodiscard]] constexpr Sec update_delta() const noexcept{return Sec{updateDelta};}
+		[[nodiscard]] constexpr Sec global_delta() const noexcept{return Sec{static_cast<T>(globalDelta)};}
+		[[nodiscard]] constexpr Sec update_delta() const noexcept{return Sec{static_cast<T>(updateDelta)};}
 
-		[[nodiscard]] constexpr Sec global_time() const noexcept{return Sec{globalTime};}
-		[[nodiscard]] constexpr Sec update_time() const noexcept{return Sec{updateTime};}
+		[[nodiscard]] constexpr Sec global_time() const noexcept{return Sec{static_cast<T>(globalTime)};}
+		[[nodiscard]] constexpr Sec update_time() const noexcept{return Sec{static_cast<T>(updateTime)};}
 
-		[[nodiscard]] constexpr Tick global_delta_tick() const noexcept{return Tick{globalDelta * tick_ratio::den};}
-		[[nodiscard]] constexpr Tick update_delta_tick() const noexcept{return Tick{updateDelta * tick_ratio::den};}
+		[[nodiscard]] constexpr Tick global_delta_tick() const noexcept{return Tick{static_cast<T>(globalDelta * tick_ratio::den)};}
+		[[nodiscard]] constexpr Tick update_delta_tick() const noexcept{return Tick{static_cast<T>(updateDelta * tick_ratio::den)};}
 
 	};
 	

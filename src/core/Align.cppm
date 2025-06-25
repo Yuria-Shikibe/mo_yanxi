@@ -161,7 +161,7 @@ namespace mo_yanxi{
 			bottom_right = bottom | right,
 		};
 
-		BITMASK_OPS(export, pos);
+		BITMASK_OPS(, pos);
 
 		constexpr pos operator-(const pos lhs) noexcept{
 			auto x = lhs & pos::mask_x;

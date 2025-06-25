@@ -54,7 +54,7 @@ namespace mo_yanxi::ui{
 			[[nodiscard]] graphic::color on_instance(const elem& element) const;
 		};
 
-		export constexpr palette general_palette{
+		constexpr palette general_palette{
 			graphic::colors::light_gray,
 			graphic::colors::white,
 			graphic::colors::aqua,

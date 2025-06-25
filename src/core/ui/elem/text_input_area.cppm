@@ -125,6 +125,22 @@ namespace mo_yanxi::ui{
 			}
 		}
 
+	private:
+
+
+		auto deleteRange(Layout& layout) const{
+			math::section rng{layout.at(range.src.pos).code.unit_index, layout.at(range.dst.pos).code.unit_index};
+			rng = rng.get_ordered();
+			const auto len = rng.length();
+			if(len){
+				layout.text.erase(layout.text.begin() + rng.from, layout.text.begin() + rng.to);
+			}
+			return len;
+		}
+
+
+	public:
+
 		bool deleteAt(Layout& layout) noexcept{
 			if(deleteRange(layout)){
 				const auto min = std::min(range.src, range.dst, caret_range::less);
@@ -371,16 +387,6 @@ namespace mo_yanxi::ui{
 			}else{
 				mergeTo(layout, range.dst.pos.x - 1, range.dst.pos.y, append);
 			}
-		}
-
-		auto deleteRange(Layout& layout) const{
-			math::section rng{layout.at(range.src.pos).code.unit_index, layout.at(range.dst.pos).code.unit_index};
-			rng = rng.get_ordered();
-			const auto len = rng.length();
-			if(len){
-				layout.text.erase(layout.text.begin() + rng.from, layout.text.begin() + rng.to);
-			}
-			return len;
 		}
 
 		void toLineAt(const Layout& layout,

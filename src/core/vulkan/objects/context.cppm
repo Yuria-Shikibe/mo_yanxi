@@ -19,7 +19,6 @@ import mo_yanxi.vk.swap_chain_info;
 import mo_yanxi.vk.concepts;
 import mo_yanxi.vk.vma;
 
-import mo_yanxi.vk.command_pool;
 import mo_yanxi.vk.command_buffer;
 
 import mo_yanxi.core.window;

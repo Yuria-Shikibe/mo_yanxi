@@ -129,10 +129,10 @@ namespace mo_yanxi::graphic{
 		FORCE_INLINE static constexpr rgba8_bits rgba8888(const float r, const float g, const float b,
 		                                                  const float a) noexcept{
 			return
-				static_cast<rgba8_bits>(r * max_val) << r_Offset & r_Mask |
-				static_cast<rgba8_bits>(g * max_val) << g_Offset & g_Mask |
-				static_cast<rgba8_bits>(b * max_val) << b_Offset & b_Mask |
-				static_cast<rgba8_bits>(a * max_val) << a_Offset & a_Mask;
+				((static_cast<rgba8_bits>(r * max_val) << r_Offset) & r_Mask) |
+				((static_cast<rgba8_bits>(g * max_val) << g_Offset) & g_Mask) |
+				((static_cast<rgba8_bits>(b * max_val) << b_Offset) & b_Mask) |
+				((static_cast<rgba8_bits>(a * max_val) << a_Offset) & a_Mask);
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr rgba8_bits to_rgb888() const noexcept{

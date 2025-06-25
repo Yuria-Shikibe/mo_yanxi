@@ -270,7 +270,7 @@ namespace mo_yanxi::vk{
 			std::uint32_t vertex_group_count{};
 			std::size_t identity{}; //TODO unordered draw
 
-			aligned_data host_vertices{};
+			aligned_data host_vertices{}; //TODO batch global buffer
 
 			semaphore device_vertex_semaphore{};
 			semaphore device_descriptor_semaphore{};
@@ -486,7 +486,10 @@ namespace mo_yanxi::vk{
 			VmaAllocationInfo info;
 			vmaGetAllocationInfo(context.get_allocator(), vertex_buffer.get_allocation(), &info);
 			mapped_data = static_cast<std::byte*>(info.pMappedData);
-			fan.resize(chunk_count);
+			fan.reserve(chunk_count);
+			for(std::size_t i = 0; i < chunk_count; ++i){
+				fan.push_back({});
+			}
 			pending_draw_calls.reserve(chunk_count);
 			for (auto && [idx, draw_region] : fan | std::views::enumerate){
 				draw_region = batch::draw_region{context, vertex_chunk_size, vertex_unit_size};
@@ -724,7 +727,7 @@ namespace mo_yanxi::vk{
 			}
 
 			auto constexpr operator<=>(const sentinel_impl& rhs) const noexcept{
-				return index <=> rhs.index;
+				return index <=> static_cast<size_type>(rhs.index);
 			}
 
 			constexpr value_type* operator->() const noexcept{

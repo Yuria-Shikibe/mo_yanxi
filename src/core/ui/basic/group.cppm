@@ -180,8 +180,8 @@ namespace mo_yanxi::ui{
 		std::vector<elem_ptr> children{};
 
 	public:
-		[[nodiscard]] basic_group(scene* scene, group* group, const std::string_view tyName)
-			: group(scene, group, tyName){
+		[[nodiscard]] basic_group(scene* scene, group* group_, const std::string_view tyName)
+			: group(scene, group_, tyName){
 			interactivity = interactivity::children_only;
 		}
 

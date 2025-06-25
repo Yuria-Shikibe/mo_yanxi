@@ -54,8 +54,8 @@ namespace mo_yanxi::ui{
 		// 	return property.content_bound_absolute().expand(margin, margin).contains_loose(absPos) && !region.expand(margin, margin).contains_loose(absPos);
 		// }
 
-		[[nodiscard]] scroll_pane(scene* scene, group* group)
-			: group(scene, group, "scroll_pane"){
+		[[nodiscard]] scroll_pane(scene* scene, group* group_)
+			: group(scene, group_, "scroll_pane"){
 
 			events().on<input_event::drag>([](const input_event::drag& e, elem& el){
 				auto& self = static_cast<scroll_pane&>(el);

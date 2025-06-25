@@ -106,14 +106,14 @@ namespace mo_yanxi::graphic{
 
 		template <std::derived_from<uniformed_rect_uv> Ty, typename N>
 		constexpr void fetch_into(this Ty& self, const math::vector2<N> bound_size, const math::rect_ortho<N>& region) noexcept{
-			uniformed_rect_uv::fetch_into(self, bound_size, region);
+			self.fetch_into(bound_size, region);
 			self.vert10 = region.vert_10().template as<float>() / bound_size.template as<float>();
 			self.vert01 = region.vert_01().template as<float>() / bound_size.template as<float>();
 		}
 
 		template <std::derived_from<uniformed_rect_uv> Ty>
 		constexpr void shrink(this Ty& self, const math::u32size2 bound_size, const math::vec2 shrink) noexcept{
-			uniformed_rect_uv::shrink(self, bound_size, shrink);
+			self.shrink(self, bound_size, shrink);
 
 			auto unitLen = ~bound_size.as<float>() * shrink;
 			unitLen.min((self.vert11 - self.vert00) / 2.f);
@@ -171,7 +171,7 @@ namespace mo_yanxi::graphic{
 		template <typename N>
 		constexpr void fetch_into(const math::vector2<N> bound_size, const math::rect_ortho<N>& region) noexcept{
 			this->Ty::fetch_into(bound_size, region);
-			size = bound_size.template as<decltype(size)::value_type>();
+			size = bound_size.template as<typename decltype(size)::value_type>();
 		}
 
 		using Ty::shrink;

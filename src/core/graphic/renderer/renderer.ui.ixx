@@ -20,6 +20,7 @@ export import mo_yanxi.graphic.post_processor.ssao;
 
 export import mo_yanxi.graphic.renderer.predecl;
 
+import mo_yanxi.math.matrix3;
 import mo_yanxi.vk.vma;
 
 import std;
@@ -53,8 +54,11 @@ namespace mo_yanxi::graphic{
 	 			return;
 	 		}
 
-		    auto src = mat * rect.get_src();
-		    auto dst = mat * rect.get_end();
+		    auto src = rect.get_src();
+		    auto dst = rect.get_end();
+			src *= mat;
+			dst *= mat;
+
 		    rect = {src, dst};
 		}
 
