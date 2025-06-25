@@ -32,7 +32,7 @@ import mo_yanxi.game.ecs.component.hitbox;
 import std;
 
 namespace mo_yanxi::game{
-	mo_yanxi::game::meta::hitbox_transed load_hitbox_from(const std::filesystem::path& path);
+	// static
 
 	template <typename T, std::invocable<math::vector2<T>> Fn>
 	void each_tile(const math::rect_ortho<T>& region, const math::vector2<T> stride, Fn fn){
@@ -45,6 +45,7 @@ namespace mo_yanxi::game{
 
 
 	using chamber_meta = const meta::chamber::basic_chamber*;
+
 	namespace ui{
 
 		export using namespace mo_yanxi::ui;

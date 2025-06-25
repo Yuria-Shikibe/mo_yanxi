@@ -14,7 +14,12 @@ import mo_yanxi.game.meta.grid.srl;
 
 import mo_yanxi.game.content;
 
-mo_yanxi::game::meta::hitbox_transed mo_yanxi::game::load_hitbox_from(const std::filesystem::path& path){
+import std;
+import mo_yanxi.game.meta.hitbox;
+
+mo_yanxi::game::meta::hitbox_transed load_hitbox_from(const std::filesystem::path& path){
+	using namespace mo_yanxi;
+	using namespace game;
 	meta::hitbox_transed meta{};
 	std::ifstream stream(path, std::ios::in | std::ios::binary);
 	io::loader<meta::hitbox_transed>::parse_from(stream, meta);
