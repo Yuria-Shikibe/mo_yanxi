@@ -1,5 +1,7 @@
 module mo_yanxi.game.content;
 
+import mo_yanxi.math;
+
 void mo_yanxi::game::content::load(){
 	auto& manager = chambers;
 	manager = meta::content_manager{};
