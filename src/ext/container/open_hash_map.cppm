@@ -139,14 +139,7 @@ template <typename K, typename V>
 struct std::tuple_element<1, mo_yanxi::kv_entry<K, V>> : std::type_identity<V>{};
 
 namespace mo_yanxi{
-	struct TestT{
-		long long first{};
-		float second{};
-	};
-
-	//Make sure the hash map's reinterpret_cast 'always' (in)valid
-	//TODO consider using kv struct after the tuple like is better supported
-	static_assert(std::is_layout_compatible_v<TestT, std::pair<long long, float>>);
+	//TODO remove the nonsense reinterpret cast
 
 		// static constexpr bool addConst = true;
 		/*template <bool addConst = false>

@@ -3,7 +3,7 @@ module;
 #include "../adapted_attributes.hpp"
 #include <cassert>
 
-#define MATH_ATTR [[nodiscard]] inline FORCE_INLINE
+#define MATH_ATTR inline FORCE_INLINE
 #define MATH_ASSERT(expr) CHECKED_ASSUME(expr)
 
 export module mo_yanxi.math;
@@ -1348,12 +1348,12 @@ namespace mo_yanxi::math {
 
 
 	export
-	long double operator"" _deg_to_rad(const long double val){
+	long double operator""_deg_to_rad(const long double val){
 		return val * deg_to_rad_v<long double>;
 	}
 
 	export
-	long double operator"" _rad_to_deg(const long double val){
+	long double operator""_rad_to_deg(const long double val){
 		return val * rad_to_deg_v<long double>;
 	}
 

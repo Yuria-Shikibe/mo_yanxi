@@ -150,7 +150,7 @@ export namespace mo_yanxi::math{
 		float z_offset;
 
 		using trans_t = transform2<AngTy>;
-		using transform2z::operator|=;
+		using transform2<AngTy>::operator|=;
 
 		[[nodiscard]] FORCE_INLINE constexpr trans_t get_trans() const noexcept{
 			return static_cast<trans_t>(*this);

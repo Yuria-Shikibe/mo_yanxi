@@ -13,6 +13,7 @@ export import mo_yanxi.math.trans2;
 export import mo_yanxi.math;
 
 namespace mo_yanxi::math{
+	export
 	struct matrix3{
 		using floating_point_t = float;
 		using value_type = floating_point_t;

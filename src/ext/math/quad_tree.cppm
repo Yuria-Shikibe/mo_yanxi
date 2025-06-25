@@ -584,7 +584,7 @@ namespace mo_yanxi::math{
 		}
 
 		template <typename Region, std::predicate<const rect_type&, const Region&> Pred, std::invocable<ItemTy&, const Region&> Func>
-			requires !std::same_as<Region, rect_type>
+			requires (!std::same_as<Region, rect_type>)
 		void intersect_then(const Region& region, Pred boundCheck, Func func) const{
 			if(isBranchEmpty() || !std::invoke(boundCheck, this->boundary, region)) return;
 

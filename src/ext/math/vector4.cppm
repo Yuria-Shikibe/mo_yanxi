@@ -132,10 +132,10 @@ namespace mo_yanxi::math{
 
 			template <std::derived_from<vector4> D>
 			friend constexpr FORCE_INLINE D& operator%=(const D& lhs, const T v) noexcept{
-				lhs.r = math::mod(r, v);
-				lhs.g = math::mod(g, v);
-				lhs.b = math::mod(b, v);
-				lhs.a = math::mod(a, v);
+				lhs.r = math::mod(lhs.r, v);
+				lhs.g = math::mod(lhs.g, v);
+				lhs.b = math::mod(lhs.b, v);
+				lhs.a = math::mod(lhs.a, v);
 				return lhs;
 			}
 

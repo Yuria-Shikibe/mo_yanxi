@@ -519,11 +519,11 @@ namespace mo_yanxi::math{
 
 
 		[[nodiscard]] constexpr explicit(false) quad_bounded(const base& base)
-			: base{base}, bounding_box{base::get_bound()}{
+			: quad<T>{base}, bounding_box{base::get_bound()}{
 		}
 
 		[[nodiscard]] constexpr explicit(false) quad_bounded(base::rect_t& rect)
-			: base{rect.vert_00(), rect.vert_10(), rect.vert_11(), rect.vert_01()}, bounding_box{rect}{
+			: quad<T>{rect.vert_00(), rect.vert_10(), rect.vert_11(), rect.vert_01()}, bounding_box{rect}{
 		}
 
 		[[nodiscard]] constexpr explicit(false) quad_bounded(
@@ -604,6 +604,10 @@ namespace mo_yanxi::math{
 		using base::v10;
 		using base::v11;
 		using base::v01;
+
+		using vec_t = base::vec_t;
+		using value_type = base::value_type;
+		using rect_t = base::rect_t;
 	};
 
 	export
@@ -679,10 +683,10 @@ namespace mo_yanxi::math{
 		[[nodiscard]] constexpr rect_box() = default;
 
 		[[nodiscard]] constexpr explicit(false) rect_box(const base& base)
-			: base(base), normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
+			: quad_bounded<T>(base), normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
 		}
 		[[nodiscard]] constexpr explicit(false) rect_box(const base::rect_t& rect)
-			: base(rect), normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
+			: quad_bounded<T>(rect), normalU((this->v0 - this->v3).normalize()), normalV((this->v1 - this->v0).normalize()){
 		}
 
 		// [[nodiscard]] RectBoxBrief() = default;
@@ -752,6 +756,7 @@ namespace mo_yanxi::math{
 		using rect_idt_t = rect_box_identity<float>;
 		using base = rect_box<float>;
 		using trans_t = trans2;
+		using vec_t = rect_box::vec_t;
 		/**
 		 * \brief Box Origin Point
 		 * Should Be Mass Center if possible!
@@ -777,7 +782,7 @@ namespace mo_yanxi::math{
 		}
 
 		[[nodiscard]] constexpr const rect_box_identity& get_identity() const noexcept{
-			return *this;
+			return static_cast<const rect_box_identity<float>&>(*this);
 		}
 
 		[[nodiscard]] constexpr float get_rotational_inertia(const float mass, const float scale = 1 / 12.0f, const float lengthRadiusRatio = 0.25f) const noexcept {

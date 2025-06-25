@@ -319,12 +319,12 @@ namespace mo_yanxi::math{
 	}
 
 	export
-	uniformed_angle<long double> operator"" _deg_to_uang(const long double val){
+	uniformed_angle<long double> operator""_deg_to_uang(const long double val){
 		return {tags::from_deg, val};
 	}
 
 	export
-	uniformed_angle<long double> operator"" _rad_to_uang(const long double val){
+	uniformed_angle<long double> operator""_rad_to_uang(const long double val){
 		return {tags::from_rad, val};
 	}
 

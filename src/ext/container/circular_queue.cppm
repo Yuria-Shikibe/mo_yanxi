@@ -165,7 +165,7 @@ namespace mo_yanxi{
 
 
 		[[nodiscard]] constexpr bool isReversed() const noexcept{
-			return head > tail || head == tail && size_ == capacity_;
+			return head > tail || (head == tail && size_ == capacity_);
 		}
 
 		constexpr void resetHeadTail(const size_type head, const size_type tail, const size_type size) noexcept{

@@ -35,11 +35,11 @@ namespace mo_yanxi::math{
 
 		using const_pass_t = mo_yanxi::conditional_pass_type<const vector2, sizeof(T) * 2>;
 
-		FORCE_INLINE [[nodiscard]] constexpr vector2 operator+(const_pass_t tgt) const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr vector2 operator+(const_pass_t tgt) const noexcept{
 			return {x + tgt.x, y + tgt.y};
 		}
 
-		FORCE_INLINE [[nodiscard]] constexpr vector2 operator-(const_pass_t tgt) const noexcept {
+		[[nodiscard]] FORCE_INLINE constexpr vector2 operator-(const_pass_t tgt) const noexcept {
 			if constexpr(std::same_as<bool, T>){
 				return {x && !tgt.x, y && !tgt.y};
 			}else{
@@ -47,7 +47,7 @@ namespace mo_yanxi::math{
 			}
 		}
 
-		FORCE_INLINE [[nodiscard]] constexpr vector2 operator*(const_pass_t tgt) const noexcept {
+		[[nodiscard]] FORCE_INLINE constexpr vector2 operator*(const_pass_t tgt) const noexcept {
 			return {x * tgt.x, y * tgt.y};
 		}
 
@@ -69,7 +69,7 @@ namespace mo_yanxi::math{
 			return Vector2D{x * val, y * val};
 		}*/
 
-		FORCE_INLINE [[nodiscard]] constexpr auto operator-() const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr auto operator-() const noexcept{
 			if constexpr (std::unsigned_integral<T>){
 				using S = std::make_signed_t<T>;
 				return vector2<std::make_signed_t<T>>{-static_cast<S>(x), -static_cast<S>(y)};
@@ -79,15 +79,15 @@ namespace mo_yanxi::math{
 
 		}
 
-		FORCE_INLINE [[nodiscard]] constexpr vector2 operator/(const T val) const noexcept {
+		[[nodiscard]] FORCE_INLINE constexpr vector2 operator/(const T val) const noexcept {
 			return {x / val, y / val};
 		}
 
-		FORCE_INLINE [[nodiscard]] constexpr vector2 operator/(const_pass_t tgt) const noexcept {
+		[[nodiscard]] FORCE_INLINE constexpr vector2 operator/(const_pass_t tgt) const noexcept {
 			return {x / tgt.x, y / tgt.y};
 		}
 
-		FORCE_INLINE [[nodiscard]] constexpr vector2 operator%(const_pass_t tgt) const noexcept {
+		[[nodiscard]] FORCE_INLINE constexpr vector2 operator%(const_pass_t tgt) const noexcept {
 			return {math::mod<T>(x, tgt.x), math::mod<T>(y, tgt.y)};
 		}
 
@@ -211,8 +211,10 @@ namespace mo_yanxi::math{
 			}else if constexpr (sizeof(T) == 2){
 				return hasher(std::bit_cast<std::uint16_t>(*this));
 			}else{
-				static constexpr std::hash<const std::span<std::uint8_t>> fallback{};
-				return fallback(std::span{reinterpret_cast<const std::uint8_t*>(this), sizeof(T) * 2});
+				static_assert(false);
+				// static constexpr std::hash<const std::span<std::uint8_t>> fallback{};
+				// //TODO start life time as
+				// return fallback(std::span{reinterpret_cast<const std::uint8_t*>(this), sizeof(T) * 2});
 			}
 		}
 
@@ -305,12 +307,15 @@ namespace mo_yanxi::math{
 			vector2 rst;
 
 			if constexpr (std::floating_point<T> && std::floating_point<Prog>){
-				rst.x = std::fma(other.x, scale, x);
-				rst.y = std::fma(other.y, scale, y);
-			}else{
-				rst.x = x + x * mul.x;
-				rst.y = y + y * mul.y;
+				if !consteval{
+					rst.x = std::fma(other.x, scale, x);
+					rst.y = std::fma(other.y, scale, y);
+					return rst;
+				}
 			}
+
+			rst.x = x + scale * other.x;
+			rst.y = y + scale * other.y;
 
 			return rst;
 		}

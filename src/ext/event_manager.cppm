@@ -446,34 +446,49 @@ namespace mo_yanxi::events{
 	struct drop_first<std::tuple<TupleTy...>> : drop_first<TupleTy...>{};
 
 	template <typename Fn>
-	struct unwrap_fn;
+	struct unwrap_fn{
+		static_assert(false, "unsupported function type");
+	};
 
 	template <template<typename > typename Wrap, typename Fn>
 	struct unwrap_fn<Wrap<Fn>>{
 		using funcTpe = Fn;
 	};
 
+	template <typename Fn>
+	struct unwrap_fn<std::move_only_function<Fn>>{
+		using funcTpe = Fn;
+	};
 
+	template <typename Fn>
+	struct unwrap_fn<std::function<Fn>>{
+		using funcTpe = Fn;
+	};
+
+
+	export
 	template <typename TupleTy>
 	using drop_first_t = typename drop_first<TupleTy>::type;
 
+	export
 	template <typename Wrap>
 	using unwrap_fn_t = typename unwrap_fn<Wrap>::funcTpe;
 
+	using A = unwrap_fn_t<std::move_only_function<void() const>>;
 
 	template <typename FnWrap>
 	auto getFnTy(){
 		using args = typename function_traits<FnWrap>::args_type;
 
 		if constexpr (std::tuple_size_v<args> == 1){
-			return std::type_identity_t<void(const void*)>();
+			return std::type_identity<void(const void*)>{};
 		}else{
-			return std::type_identity_t<void(const void*, const drop_first_t<args>&)>();
+			return std::type_identity<void(const void*, const drop_first_t<args>&)>{};
 		}
 	}
 
 	template <typename FnWrap>
-	using Fnty = decltype(events::getFnTy<FnWrap>());
+	using Fnty = decltype(events::getFnTy<FnWrap>())::type;
 
 	template <template<typename > typename Cont, typename FnWrap, typename Proj, typename ...Events>
 	using ebase = event_manager_base<

@@ -32,11 +32,19 @@ namespace mo_yanxi::math::interp::spec{
 		return result;
 	}
 
-	template <float power>
+	template <auto power>
 	struct Pow{
 		static constexpr float operator()(float a) noexcept{
-			if(a <= 0.5f) return std::powf(a * 2, power) * 0.5f;
-			return std::powf((a - 1.0f) * 2.0f, power) / (std::fmod(power, 2.0f) == 0.0f ? -2.0f : 2.0f) + 1;
+			if constexpr(std::floating_point<decltype(power)>){
+				if(a <= 0.5f) return std::powf(a * 2, power) * 0.5f;
+				return std::powf((a - 1.0f) * 2.0f, power) / (std::fmod(power, 2.0f) == 0.0f ? -2.0f : 2.0f) + 1;
+
+			} else{
+				if(a <= 0.5f) return math::pow_integral<power>(a * 2) * 0.5f;
+				return math::pow_integral<power>((a - 1.0f) * 2.0f) / ((power % 2 == 0) ? -2.0f : 2.0f) + 1;
+			}
+
+
 		}
 	};
 
@@ -428,7 +436,7 @@ namespace mo_yanxi::math::interp{
 
 		inline constexpr interp_func burst = spec::LinePow<math::sqr, 0.925f>{};
 
-		inline constexpr interp_func pow2 = spec::Pow<2>{};
+		inline constexpr interp_func pow2 = spec::Pow<2.f>{};
 		/** Slow, then fast. */
 		inline constexpr interp_func pow2In = spec::PowIn<2>{};
 		inline constexpr auto& slowFast = pow2In;
@@ -494,9 +502,9 @@ namespace mo_yanxi::math::interp{
 			return std::sqrtf(1 - a * a);
 		};
 
-		inline constexpr interp_func elastic = spec::Elastic<2, 10, 7, 1>{};
-		inline constexpr interp_func elasticIn = spec::ElasticIn<2, 10, 6, 1>{};
-		inline constexpr interp_func elasticOut = spec::ElasticOut<2, 10, 7, 1>{};
+		inline constexpr interp_func elastic = spec::Elastic<2.f, 10.f, 7.f, 1>{};
+		inline constexpr interp_func elasticIn = spec::ElasticIn<2.f, 10.f, 6.f, 1>{};
+		inline constexpr interp_func elasticOut = spec::ElasticOut<2.f, 10.f, 7.f, 1>{};
 		inline constexpr interp_func swing = spec::Swing<1.5f>();
 		inline constexpr interp_func swingIn = spec::SwingIn<2.0f>();
 		inline constexpr interp_func swingOut = spec::SwingOut<2.0f>();

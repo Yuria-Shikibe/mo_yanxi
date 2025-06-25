@@ -1,9 +1,8 @@
 module;
 
 #include <cassert>
-#include <Windows.h>
-
 #include "../adapted_attributes.hpp"
+
 export module mo_yanxi.referenced_ptr;
 
 import ext.cond_atomic;
@@ -18,8 +17,11 @@ namespace mo_yanxi{
 
 		[[nodiscard]] constexpr referenced_ptr() = default;
 
-		[[nodiscard]] constexpr explicit referenced_ptr(T* object);
-		[[nodiscard]] constexpr explicit(false) referenced_ptr(T& object);
+		[[nodiscard]] constexpr explicit referenced_ptr(T* object) : object{object}{
+			if(this->object)this->object->incr_ref();
+		}
+		[[nodiscard]] constexpr explicit(false) referenced_ptr(T& object) : referenced_ptr(std::addressof(object)){
+		}
 
 		template <typename ...Args>
 		[[nodiscard]] explicit constexpr referenced_ptr(std::in_place_t, Args&&... args) : referenced_ptr{
@@ -54,7 +56,18 @@ namespace mo_yanxi{
 			if(object)object->incr_ref();
 		}
 
-		constexpr ~referenced_ptr() noexcept;
+		constexpr ~referenced_ptr() noexcept{
+			if(object){
+				if constexpr (delete_on_release){
+					if(object->decr_ref()){
+						delete object;
+						object = nullptr;
+					}
+				}else{
+					object->decr_ref();
+				}
+			}
+		}
 
 		constexpr referenced_ptr(const referenced_ptr& other) noexcept
 			: object{other.object}{
@@ -176,31 +189,4 @@ namespace mo_yanxi{
 		template <typename T, bool b>
 		friend struct referenced_ptr;
 	};
-}
-
-module : private;
-
-
-template <typename T, bool delete_on_release>
-constexpr mo_yanxi::referenced_ptr<T, delete_on_release>::referenced_ptr(T* object): object{object}{
-	if(this->object)this->object->incr_ref();
-}
-
-template <typename T, bool delete_on_release>
-constexpr mo_yanxi::referenced_ptr<T, delete_on_release>::referenced_ptr(T& object) : referenced_ptr(&object){
-}
-
-template <typename T, bool delete_on_release>
-constexpr mo_yanxi::referenced_ptr<T, delete_on_release>::~referenced_ptr() noexcept{
-
-	if(object){
-		if constexpr (delete_on_release){
-			if(object->decr_ref()){
-				delete object;
-				object = nullptr;
-			}
-		}else{
-			object->decr_ref();
-		}
-	}
 }

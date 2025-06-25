@@ -104,15 +104,10 @@ namespace mo_yanxi{
 			return std::forward<S>(self).template get<std::tuple_element_t<Idx, tuple_type>>();
 		}
 
-		template <typename Ty, typename Chunk>
-		friend constexpr decltype(auto) get(Chunk&& chunk) noexcept{
-			return chunk.template get<Ty>();
-		}
-
-		template <std::size_t Idx, typename Chunk>
-		friend constexpr decltype(auto) get(Chunk&& chunk) noexcept{
-			return chunk.template get<Idx>();
-		}
+		// template <std::size_t Idx, typename Chunk>
+		// friend constexpr decltype(auto) get(Chunk&& chunk) noexcept{
+		// 	return chunk.template get<Idx>();
+		// }
 
 	};
 
@@ -140,7 +135,7 @@ namespace mo_yanxi{
 		requires contained_in<Tgt, typename ChunkTy::tuple_type>;
 		requires contained_in<std::remove_cvref_t<ChunkPartial>, typename ChunkTy::tuple_type>;
 		}
-	constexpr [[nodiscard]] decltype(auto) neighbour_of(ChunkPartial& value) noexcept{
+	[[nodiscard]] constexpr decltype(auto) neighbour_of(ChunkPartial& value) noexcept{
 		using CTy = copy_qualifier_t<ChunkPartial, std::remove_cvref_t<ChunkTy>>;
 		CTy* chunk = CTy::chunk_cast(std::addressof(value));
 		return chunk->template get<Tgt>();//std::forward_like<ChunkPartial>();
@@ -152,7 +147,7 @@ namespace mo_yanxi{
 		requires contained_in<Tgt, ChunkTy>;
 		requires contained_in<std::remove_cvref_t<ChunkPartial>, ChunkTy>;
 		}
-	constexpr [[nodiscard]] decltype(auto) neighbour_of(ChunkPartial& value) noexcept{
+	[[nodiscard]] constexpr decltype(auto) neighbour_of(ChunkPartial& value) noexcept{
 		using CTy = copy_qualifier_t<ChunkPartial, tuple_to_seq_chunk_t<std::remove_cvref_t<ChunkTy>>>;
 		CTy* chunk = CTy::chunk_cast(std::addressof(value));
 		return chunk->template get<Tgt>();//std::forward_like<ChunkPartial>();

@@ -98,7 +98,7 @@ namespace mo_yanxi{
 		using self_type = fixed_open_addr_hash_map<std::string, V, std::string_view, std::in_place, transparent::string_hasher, open_addr_equal/*, Prov*/>;
 
 	public:
-		using self_type::fixed_open_addr_hash_map;
+		using fixed_open_addr_hash_map<std::string, V, std::string_view, std::in_place, transparent::string_hasher, open_addr_equal/*, Prov*/>::fixed_open_addr_hash_map;
 
 		V& at(const std::string_view key){
 			return this->find(key)->second;

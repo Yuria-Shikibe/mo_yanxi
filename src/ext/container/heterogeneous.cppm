@@ -195,7 +195,7 @@ namespace mo_yanxi{
 
 	template <typename T, typename V, V T::* ptr>
 		requires (mo_yanxi::default_hashable<T> && mo_yanxi::default_hashable<typename mptr_info<decltype(ptr)>::value_type>)
-	[[deprecated]] struct projection_equal_to{
+	struct [[deprecated]] projection_equal_to{
 		using type = typename mptr_info<decltype(ptr)>::value_type;
 		using is_transparent = void;
 		static constexpr std::equal_to<type> equal{};
@@ -244,7 +244,7 @@ namespace mo_yanxi{
 		using self_type = std::unordered_map<std::string, V, transparent::string_hasher, transparent::string_equal_to>;
 
 	public:
-		using self_type::unordered_map;
+		using std::unordered_map<std::string, V, transparent::string_hasher, transparent::string_equal_to>::unordered_map;
 
 		V& at(const std::string_view key){
 			return this->find(key)->second;

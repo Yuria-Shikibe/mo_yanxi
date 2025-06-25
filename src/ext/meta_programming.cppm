@@ -246,7 +246,9 @@ namespace mo_yanxi{
 
 	export
 	template <typename T>
-	struct function_traits;
+	struct function_traits{
+
+	};
 
 	export
 	template <typename Ret, typename... Args>
