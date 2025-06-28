@@ -285,7 +285,7 @@ namespace mo_yanxi::math{
 				requires overlay_axis_keys<S>::count > 0;
 				requires overlay_axis_keys<O>::count > 0;
 			}
-		[[nodiscard]] constexpr FORCE_INLINE bool overlap_exact(this const S& sbj, const O& obj) noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr bool overlap_exact(this const S& sbj, const O& obj) noexcept{
 			using SbjKeys = overlay_axis_keys<S>;
 			using ObjKeys = overlay_axis_keys<O>;
 
@@ -536,7 +536,7 @@ namespace mo_yanxi::math{
 			: base{v0, v1, v2, v3}, bounding_box{base::get_bound()}{
 		}
 
-		[[nodiscard]] constexpr FORCE_INLINE base::rect_t get_bound() const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr base::rect_t get_bound() const noexcept{
 			return bounding_box;
 		}
 
@@ -703,7 +703,7 @@ namespace mo_yanxi::math{
 		/**
 		 * @brief normal at vtx[idx] - vtx[idx + 1]
 		 */
-		constexpr FORCE_INLINE base::vec_t edge_normal_at(const std::integral auto idx) const noexcept{
+		FORCE_INLINE constexpr base::vec_t edge_normal_at(const std::integral auto idx) const noexcept{
 			switch(idx & vertex_mask<decltype(idx)>) {
 				case 0 : return -normalU;
 				case 1 : return normalV;

@@ -162,9 +162,9 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] constexpr math::vector2<T> get_region_size() const noexcept{
 			auto sz = get_region().size();
 			if constexpr (std::floating_point<T>){
-				return sz.as<T>();
+				return sz.template as<T>();
 			}else{
-				return sz.round<T>();
+				return sz.template round<T>();
 			}
 		}
 

@@ -331,7 +331,7 @@ namespace mo_yanxi::font::typesetting{
 			goto scan;
 		}
 
-		if(codes.empty() || !codes.back().code == U'\0'){
+		if(codes.empty() || codes.back().code != U'\0'){
 			codes.push_back({U'\0', static_cast<code_point_index>(string.size())});
 			// rows++;
 		}

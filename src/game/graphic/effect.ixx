@@ -91,7 +91,7 @@ namespace mo_yanxi::game::fx{
 		math::frect viewport;
 
 
-		[[nodiscard]] constexpr static FORCE_INLINE graphic::combined_image_region<graphic::uniformed_rect_uv> get_default_image_region() noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr static graphic::combined_image_region<graphic::uniformed_rect_uv> get_default_image_region() noexcept{
 			return {};
 		}
 	};
@@ -167,8 +167,8 @@ namespace mo_yanxi::game::fx{
 		}
 
 	private:
-		static FORCE_INLINE float get_effect_prog(const effect& e) noexcept;
-		static FORCE_INLINE math::vec2 get_effect_pos(const effect& e) noexcept;
+		FORCE_INLINE static float get_effect_prog(const effect& e) noexcept;
+		FORCE_INLINE static math::vec2 get_effect_pos(const effect& e) noexcept;
 	};
 
 	export

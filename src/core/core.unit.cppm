@@ -13,7 +13,7 @@ export namespace mo_yanxi::core{
 	struct direct_access_time_unit : std::chrono::duration<T, Ratio>{
 		using std::chrono::duration<T, Ratio>::count;
 		using rep = std::chrono::duration<T, Ratio>::rep;
-		using duration = std::chrono::duration<T, Ratio>::duration;
+		using std::chrono::duration<T, Ratio>::duration;
 		[[nodiscard]] constexpr direct_access_time_unit() noexcept = default;
 
 		[[nodiscard]] constexpr explicit(false) direct_access_time_unit(const T Val) noexcept

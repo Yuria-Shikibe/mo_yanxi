@@ -339,6 +339,7 @@ namespace mo_yanxi::graphic{
 		~async_image_loader(){
 			working_thread.request_stop();
 			queue_cond.notify_one();
+			wait();
 			fence_.wait();
 		}
 	};

@@ -163,7 +163,6 @@ namespace mo_yanxi::vk{
 		}
 
 		template <texture_source_prov Prov>
-		[[nodiscard("Staging buffers must be reserved until the device has finished the command")]]
 		void write(VkCommandBuffer command_buffer,
 			VkRect2D region,
 			Prov prov,

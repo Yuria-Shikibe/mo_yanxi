@@ -38,47 +38,47 @@ namespace mo_yanxi::math{
 	public:
 		friend constexpr bool operator==(const matrix3& lhs, const matrix3& rhs) noexcept = default;
 
-		friend FORCE_INLINE constexpr vec2_t operator*(const matrix3& mat, const vec2_t vec) noexcept{
+		FORCE_INLINE friend constexpr vec2_t operator*(const matrix3& mat, const vec2_t vec) noexcept{
 			return vec.x * static_cast<vec2_t>(mat.c1) + vec.y * static_cast<vec2_t>(mat.c2) + static_cast<vec2_t>(mat.c3);
 		}
 
-		friend FORCE_INLINE constexpr matrix3& operator*(const vec2_t vec, matrix3& mat) noexcept{
+		FORCE_INLINE friend constexpr matrix3& operator*(const vec2_t vec, matrix3& mat) noexcept{
 			return mat.scale(vec);
 		}
 
-		friend FORCE_INLINE constexpr vec2_t& operator*=(vec2_t& vec, const matrix3& mat) noexcept{
+		FORCE_INLINE friend constexpr vec2_t& operator*=(vec2_t& vec, const matrix3& mat) noexcept{
 			return vec = vec.x * static_cast<vec2_t>(mat.c1) + vec.y * static_cast<vec2_t>(mat.c2) + static_cast<vec2_t>(mat.c3);
 		}
 
-		friend FORCE_INLINE constexpr matrix3& operator*=(matrix3& lhs, const matrix3& rhs) noexcept{
+		FORCE_INLINE friend constexpr matrix3& operator*=(matrix3& lhs, const matrix3& rhs) noexcept{
 			return lhs.apply(rhs);
 		}
 
-		friend FORCE_INLINE constexpr matrix3& operator+=(matrix3& lhs, const matrix3& rhs) noexcept{
+		FORCE_INLINE friend constexpr matrix3& operator+=(matrix3& lhs, const matrix3& rhs) noexcept{
 			lhs.c1 += rhs.c1;
 			lhs.c2 += rhs.c2;
 			lhs.c3 += rhs.c3;
 			return lhs;
 		}
 
-		friend FORCE_INLINE constexpr matrix3& operator-=(matrix3& lhs, const matrix3& rhs) noexcept{
+		FORCE_INLINE friend constexpr matrix3& operator-=(matrix3& lhs, const matrix3& rhs) noexcept{
 			lhs.c1 -= rhs.c1;
 			lhs.c2 -= rhs.c2;
 			lhs.c3 -= rhs.c3;
 			return lhs;
 		}
 
-		friend FORCE_INLINE constexpr matrix3 operator+(const matrix3& lhs, const matrix3& rhs) noexcept{
+		FORCE_INLINE friend constexpr matrix3 operator+(const matrix3& lhs, const matrix3& rhs) noexcept{
 			auto dcpy = lhs;
 			return dcpy += rhs;
 		}
 
-		friend FORCE_INLINE constexpr matrix3 operator-(const matrix3& lhs, const matrix3& rhs) noexcept{
+		FORCE_INLINE friend constexpr matrix3 operator-(const matrix3& lhs, const matrix3& rhs) noexcept{
 			auto dcpy = lhs;
 			return dcpy -= rhs;
 		}
 
-		friend FORCE_INLINE constexpr matrix3 operator*(const matrix3& lhs, const matrix3& rhs) noexcept{
+		FORCE_INLINE friend constexpr matrix3 operator*(const matrix3& lhs, const matrix3& rhs) noexcept{
 			auto dcpy = rhs;
 			return dcpy.apply(lhs);
 		}
@@ -410,7 +410,7 @@ namespace mo_yanxi::math{
 			return math::rad_to_deg_v<floating_point_t> * get_rotation_rad();
 		}
 
-		[[nodiscard]] constexpr FORCE_INLINE floating_point_t get_rotation_rad() const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr floating_point_t get_rotation_rad() const noexcept{
 			return math::atan2(c1.y, c1.x);
 		}
 		//

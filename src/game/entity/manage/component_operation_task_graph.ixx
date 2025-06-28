@@ -33,8 +33,8 @@ namespace mo_yanxi::game::ecs{
 				auto rst = archetype <=> o.archetype;
 				if(rst == std::strong_ordering::equal){
 					return std::compare_three_way{}(
-						static_cast<const void*>(archetype.get_slice_generator()),
-						static_cast<const void*>(o.archetype.get_slice_generator())
+						reinterpret_cast<const void*>(archetype.get_slice_generator()),
+						reinterpret_cast<const void*>(o.archetype.get_slice_generator())
 						);
 				}
 				return rst;

@@ -300,7 +300,7 @@ namespace mo_yanxi::graphic{
 
 			const auto external = imageRegion.uv.get_region();
 			internal_in_relative.src += external.src;
-			CHECKED_ASSUME(external.contains_loose(internal_in_relative));
+			assert(external.contains_loose(internal_in_relative));
 			this->nine_patch_brief::operator=(nine_patch_brief{external, internal_in_relative, centerSize, centerScale});
 
 

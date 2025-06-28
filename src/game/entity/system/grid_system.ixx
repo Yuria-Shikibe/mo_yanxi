@@ -9,6 +9,7 @@ export import mo_yanxi.game.ecs.component.physical_property;
 export import mo_yanxi.game.world.graphic;
 
 import mo_yanxi.math;
+import mo_yanxi.game.graphic.effect;
 
 import std;
 
@@ -27,7 +28,7 @@ namespace mo_yanxi::game::ecs::system{
 					chamber::building& building
 				){
 					for (auto && damage_event : data.damage_events){
-						graphic.create_efx().set_data({
+						graphic.create_efx().set_data(fx::effect_data{
 							.style = fx::poly_outlined_out{
 								.radius = {5, 25, math::interp::pow3Out},
 								.stroke = {4},
@@ -41,7 +42,7 @@ namespace mo_yanxi::game::ecs::system{
 									}
 								}
 							},
-							.trans = grid.local_to_global(damage_event.local_coord.as<int>() + data.region().src),
+							.trans = {grid.local_to_global(damage_event.local_coord.as<int>() + data.region().src)},
 							.depth = 0,
 							.duration = {60}
 						});

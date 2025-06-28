@@ -43,8 +43,8 @@ import mo_yanxi.graphic.renderer;
 import mo_yanxi.graphic.renderer.world;
 import mo_yanxi.graphic.renderer.ui;
 import mo_yanxi.graphic.renderer.merger;
-import mo_yanxi.graphic.draw;
 import mo_yanxi.graphic.draw.func;
+
 import mo_yanxi.graphic.draw.multi_region;
 import mo_yanxi.graphic.image_manage;
 import mo_yanxi.graphic.image_multi_region;
@@ -104,6 +104,7 @@ import mo_yanxi.game.content;
 
 import mo_yanxi.game.ui.hitbox_editor;
 import mo_yanxi.game.ui.grid_editor;
+import mo_yanxi.game.content;
 
 import test;
 
@@ -176,10 +177,10 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	//
 	// }
 	{
-		// auto pane = bed.emplace<game::ui::grid_editor>();
-		// pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 1.f}};
-		// pane.cell().align = align::pos::center_right;
-		// pane.cell().margin.set(4);
+		auto pane = bed.emplace<game::ui::grid_editor>();
+		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 1.f}};
+		pane.cell().align = align::pos::center_right;
+		pane.cell().margin.set(4);
 
 
 	}
@@ -563,13 +564,13 @@ void main_loop(){
 		context.window().poll_events();
 		core::global::timer.fetch_time();
 
-		count++;
-		dt += core::global::timer.global_delta();
-		if(dt > 1.f){
-			dt = 0.f;
-			// std::println(std::cerr, "{}", count);
-			count = 0;
-		}
+		// count++;
+		// dt += core::global::timer.global_delta();
+		// if(dt > 1.f){
+		// 	dt = 0.f;
+		// 	std::println(std::cerr, "{}", count);
+		// 	count = 0;
+		// }
 
 		core::global::input.update(core::global::timer.global_delta_tick());
 
@@ -784,10 +785,9 @@ int main(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
 
-	std::println("Hello World\n 123");
-
 	init_assets();
 	compile_shaders();
+	game::content::load();
 
 	core::glfw::init();
 	core::global::graphic::init_vk();

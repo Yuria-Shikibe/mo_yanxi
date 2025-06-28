@@ -43,7 +43,7 @@ namespace mo_yanxi::game::meta{
 				},
 				.trans = {trans.vec, radius},
 				.depth = trans.z_offset,
-				.duration = std::max<float>(30, trail.estimate_duration(object_speed)),
+				.duration = {std::max<float>(30, trail.estimate_duration(object_speed))},
 			});
 		}
 	};

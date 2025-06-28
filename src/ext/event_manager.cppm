@@ -383,7 +383,7 @@ namespace mo_yanxi::events{
 		using mapping_type = type_map<containerTpe, EventsTuple>;
 
 	protected:
-		using context_type = typename decltype(decay<ContextTuple>());
+		using context_type = decltype(decay<ContextTuple>());
 		context_type context{};
 		mapping_type events{};
 

@@ -63,7 +63,7 @@ namespace mo_yanxi::math{
 			return std::fmod(a, Pi_mod);
 		}
 
-		MATH_ATTR CONSTEXPR_26 void clampInternal() noexcept{
+		FORCE_INLINE CONSTEXPR_26 void clampInternal() noexcept{
 			ang_ = uniformed_angle::getAngleInPi2(ang_);
 		}
 
@@ -87,7 +87,7 @@ namespace mo_yanxi::math{
 			// }
 		}
 
-		MATH_ATTR constexpr void simpleClamp() noexcept{
+		FORCE_INLINE constexpr void simpleClamp() noexcept{
 			ang_ = uniformed_angle::simpleClamp(ang_);
 		}
 

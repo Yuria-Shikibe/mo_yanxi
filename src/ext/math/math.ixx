@@ -3,7 +3,7 @@ module;
 #include "../adapted_attributes.hpp"
 #include <cassert>
 
-#define MATH_ATTR inline FORCE_INLINE
+#define MATH_ATTR PURE_FN FORCE_INLINE inline
 #define MATH_ASSERT(expr) CHECKED_ASSUME(expr)
 
 export module mo_yanxi.math;
@@ -243,7 +243,7 @@ namespace mo_yanxi::math {
 
 	export
 	template <typename T>
-	constexpr MATH_ATTR bool zero(const T value, const T tolerance = std::numeric_limits<T>::epsilon()) noexcept {
+	MATH_ATTR constexpr bool zero(const T value, const T tolerance = std::numeric_limits<T>::epsilon()) noexcept {
 		return abs(value) <= tolerance;
 	}
 
@@ -255,7 +255,7 @@ namespace mo_yanxi::math {
 	 */
 	export
 	template <typename T, arithmetic V = T>
-	constexpr MATH_ATTR bool equal(const T& a, const T& b, const V& margin = std::numeric_limits<V>::epsilon()) noexcept {
+	MATH_ATTR constexpr bool equal(const T& a, const T& b, const V& margin = std::numeric_limits<V>::epsilon()) noexcept {
 		return math::zero(distance(a, b), margin);
 	}
 
@@ -286,7 +286,7 @@ namespace mo_yanxi::math {
 	export
 	template <typename T>
 		requires (std::is_arithmetic_v<T>)
-	constexpr MATH_ATTR T snap_to(T value, T step, T base_offset = {}) noexcept {
+	MATH_ATTR constexpr T snap_to(T value, T step, T base_offset = {}) noexcept {
 
 		if (step == T(0)) {
 			return value; // 避免除以零
@@ -321,7 +321,7 @@ namespace mo_yanxi::math {
 	 * @param i any finite float
 	 * @return an output from the inverse tangent function, from pi/-2.0 to pi/2.0 inclusive
 	 * */
-	export constexpr MATH_ATTR double atn(const double i) noexcept{
+	export MATH_ATTR constexpr double atn(const double i) noexcept{
 		if consteval{
 			// We use double precision internally, because some constants need double precision.
 			const double n = math::abs(i);
@@ -386,7 +386,7 @@ namespace mo_yanxi::math {
 	 * @return the angle to the given point, in radians as a float; ranges from [-pi to pi] */
 	export
 	template <std::floating_point T>
-	constexpr MATH_ATTR T atan2(const T y, T x) noexcept {
+	MATH_ATTR constexpr T atan2(const T y, T x) noexcept {
 		T n = y / x;
 
 		if(math::isnan(n)) [[unlikely]] {
@@ -799,7 +799,7 @@ namespace mo_yanxi::math {
 
 	export
 	template <mo_yanxi::small_object T, typename Prog>
-	MATH_ATTR constexpr void lerp_inplace(T& fromValue, const T toValue, const Prog progress) noexcept {
+	FORCE_INLINE constexpr void lerp_inplace(T& fromValue, const T toValue, const Prog progress) noexcept {
 		if constexpr (std::floating_point<T> && std::floating_point<Prog>){
 			if (!std::is_constant_evaluated()){
 				fromValue = std::fma((toValue - fromValue), progress, fromValue);
@@ -973,7 +973,7 @@ namespace mo_yanxi::math {
 	 */
 	export
 	template <typename T>
-	constexpr MATH_ATTR float lerp_span(const std::span<T> values, float time) noexcept {
+	MATH_ATTR constexpr float lerp_span(const std::span<T> values, float time) noexcept {
 		if constexpr (values.size() == 0){
 			return T{};
 		}
@@ -992,7 +992,7 @@ namespace mo_yanxi::math {
 
 	export
 	template <typename T, std::size_t size>
-	constexpr MATH_ATTR float lerp_span(const std::array<T, size>& values, float time) noexcept{
+	MATH_ATTR constexpr float lerp_span(const std::array<T, size>& values, float time) noexcept{
 		if constexpr (size == 0){
 			return T{};
 		}
@@ -1009,14 +1009,14 @@ namespace mo_yanxi::math {
 
 	export
 	/** @return the input 0-1 value scaled to 0-1-0. */
-	constexpr MATH_ATTR float slope(const float fin) noexcept {
+	MATH_ATTR constexpr float slope(const float fin) noexcept {
 		return 1.0f - math::abs(fin - 0.5f) * 2.0f;
 	}
 
 	/**Converts a 0-1 value to 0-1 when it is in [offset, 1].*/
 	export
 	template <std::floating_point Fp>
-	constexpr MATH_ATTR Fp curve(const Fp f, const Fp offset) noexcept {
+	MATH_ATTR constexpr Fp curve(const Fp f, const Fp offset) noexcept {
 		if(f < offset) {
 			return 0.0f;
 		}
@@ -1026,7 +1026,7 @@ namespace mo_yanxi::math {
 	/**Converts a 0-1 value to 0-1 when it is in [offset, to].*/
 	export
 	template <std::floating_point Fp>
-	constexpr MATH_ATTR Fp curve(const Fp f, const Fp from, const Fp to) noexcept {
+	MATH_ATTR constexpr Fp curve(const Fp f, const Fp from, const Fp to) noexcept {
 		if(f < from) {
 			return 0.0f;
 		}
@@ -1219,12 +1219,14 @@ namespace mo_yanxi::math {
 
 	export
 	template <small_object T>
-	MATH_ATTR T fma(const T x, const T y, const T z) noexcept {
+	MATH_ATTR constexpr T fma(const T x, const T y, const T z) noexcept {
 		if constexpr (std::floating_point<T>){
-			return  std::fma(x, y, z);
-		}else{
-			return x * y + z;
+			if !consteval{
+				return  std::fma(x, y, z);
+			}
 		}
+
+		return x * y + z;
 	}
 
 
@@ -1341,7 +1343,7 @@ namespace mo_yanxi::math {
 
 	export
 	template <std::floating_point T>
-	[[deprecated]] constexpr MATH_ATTR T snap(T value, T step) {
+	[[deprecated]] MATH_ATTR constexpr T snap(T value, T step) {
 		MATH_ASSERT(step > 0);
 		return std::round(value / step) * step;
 	}
@@ -1360,7 +1362,7 @@ namespace mo_yanxi::math {
 
 	export
 	template <typename T>
-	[[nodiscard]] constexpr MATH_ATTR T get_normalized(const T& val) noexcept{
+	[[nodiscard]] MATH_ATTR constexpr T get_normalized(const T& val) noexcept{
 		if constexpr (arithmetic<T>){
 			if consteval{
 				return T{val == 0 ? 0 : val > 0 ? 1 : -1};
@@ -1377,7 +1379,7 @@ namespace mo_yanxi::math {
 
 	export
 	template <typename T, arithmetic V>
-	[[nodiscard]] constexpr MATH_ATTR T get_normalized(const T& val, const V scl) noexcept{
+	[[nodiscard]] MATH_ATTR constexpr T get_normalized(const T& val, const V scl) noexcept{
 		if constexpr (arithmetic<T>){
 			if consteval{
 				return T{val == 0 ? 0 : val > 0 ? scl : -scl};

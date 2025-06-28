@@ -290,7 +290,7 @@ namespace mo_yanxi::vk{
 				host_vertices = aligned_data{chunk_size, unit_size * 4};
 			}
 
-			void FORCE_INLINE advance_and_reset() noexcept{
+			FORCE_INLINE void advance_and_reset() noexcept{
 				auto span = views.get();
 				last_image_count = span.size();
 				std::ranges::copy(span, last_images.data());
@@ -300,7 +300,7 @@ namespace mo_yanxi::vk{
 				state = region_state::valid;
 			}
 
-			[[nodiscard]] bool FORCE_INLINE is_image_compatitble() const noexcept{
+			[[nodiscard]] FORCE_INLINE bool is_image_compatitble() const noexcept{
 				auto span = views.get();
 				if(last_image_count < span.size())return false;
 
@@ -313,7 +313,7 @@ namespace mo_yanxi::vk{
 				return true;
 			}
 
-			[[nodiscard]] constexpr bool FORCE_INLINE saturate(const std::size_t group_capacity) const noexcept{
+			[[nodiscard]] FORCE_INLINE constexpr bool saturate(const std::size_t group_capacity) const noexcept{
 				return vertex_group_count == group_capacity;
 			}
 

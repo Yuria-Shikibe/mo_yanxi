@@ -259,7 +259,7 @@ namespace mo_yanxi::vk{
 				std::this_thread::sleep_for(std::chrono::microseconds(10));
 #if DEBUG_CHECK
 				if(std::chrono::high_resolution_clock::now() - src > std::chrono::seconds{1}){
-					throw std::runtime_error{"Wait Time Excess 1 second"};
+					std::terminate();
 				}
 #endif
 			}

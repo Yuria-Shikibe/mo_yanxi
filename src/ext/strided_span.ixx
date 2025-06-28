@@ -228,130 +228,10 @@ namespace mo_yanxi{
 		}
 
 
-		// template <std::size_t Sz>
-		// 	requires (Extent == std::dynamic_extent || Extent == Sz)
-		// constexpr strided_span(std::type_identity_t<element_type> (&arr)[Sz], difference_type stride = 0) noexcept requires (!std::is_abstract_v<Ty>)
-		// 	: ptr_(arr), extent_(Sz), stride_(stride){
-		// }
-
 		strided_span(const strided_span& other) = default;
 		strided_span(strided_span&& other) noexcept = default;
 		strided_span& operator=(const strided_span& other) = default;
 		strided_span& operator=(strided_span&& other) noexcept = default;
-
-		/*
-		template <class _OtherTy, size_t _Size>
-			requires (Extent == std::dynamic_extent || Extent == _Size) && is_convertible_v<
-				_OtherTy (*)[], element_type (*)[]>
-		constexpr span(array<_OtherTy, _Size>& _Arr) noexcept : _Mybase(_Arr.data(), _Size){
-		}
-
-		template <class _OtherTy, size_t _Size>
-			requires (Extent == std::dynamic_extent || Extent == _Size)
-			&& is_convertible_v<const _OtherTy (*)[], element_type (*)[]>
-		constexpr span(const array<_OtherTy, _Size>& _Arr) noexcept : _Mybase(_Arr.data(), _Size){
-		}
-
-		template <_Span_compatible_range<element_type> _Rng>
-		constexpr explicit(Extent != std::dynamic_extent) span(_Rng&& _Range)
-			: _Mybase(_RANGES data(_Range), static_cast<size_type>(_RANGES size(_Range))) {
-#if _CONTAINER_DEBUG_LEVEL > 0
-			if constexpr (_Extent != std::dynamic_extent) {
-				_STL_VERIFY(_RANGES size(_Range) == _Extent,
-					"Cannot construct span with static extent from range r as std::ranges::size(r) != extent");
-			}
-#endif // _CONTAINER_DEBUG_LEVEL > 0
-		}
-
-		template <class _OtherTy, size_t _OtherExtent>
-			requires (Extent == std::dynamic_extent || _OtherExtent == std::dynamic_extent || Extent == _OtherExtent)
-			&& is_convertible_v<_OtherTy (*)[], element_type (*)[]>
-		constexpr explicit(Extent != std::dynamic_extent && _OtherExtent == std::dynamic_extent)
-		span(const span<_OtherTy, _OtherExtent>& _Other) noexcept
-			: _Mybase(_Other.data(), _Other.size()){
-#if _CONTAINER_DEBUG_LEVEL > 0
-			if constexpr (_Extent != std::dynamic_extent) {
-				_STL_VERIFY(_Other.size() == _Extent,
-					"Cannot construct span with static extent from other span as other.size() != extent");
-			}
-#endif // _CONTAINER_DEBUG_LEVEL > 0
-		}
-
-		// [span.sub] Subviews
-		template <size_t _Count>
-	[[nodiscard]] constexpr auto first() const noexcept /* strengthened #1#{
-			if constexpr(Extent != std::dynamic_extent){
-				static_assert(_Count <= Extent, "Count out of range in span::first()");
-			}
-#if _CONTAINER_DEBUG_LEVEL > 0
-			else {
-				_STL_VERIFY(_Count <= _Mysize, "Count out of range in span::first()");
-			}
-#endif // _CONTAINER_DEBUG_LEVEL > 0
-			return span<element_type, _Count>{_Mydata, _Count};
-		}
-
-		[[nodiscard]] constexpr auto first(const size_type _Count) const noexcept
-			/* strengthened #1#{
-#if _CONTAINER_DEBUG_LEVEL > 0
-			_STL_VERIFY(_Count <= _Mysize, "Count out of range in span::first(count)");
-#endif // _CONTAINER_DEBUG_LEVEL > 0
-			return span<element_type, std::dynamic_extent>{_Mydata, _Count};
-		}
-
-		template <size_t _Count>
-	[[nodiscard]] constexpr auto last() const noexcept /* strengthened #1#{
-			if constexpr(Extent != std::dynamic_extent){
-				static_assert(_Count <= Extent, "Count out of range in span::last()");
-			}
-#if _CONTAINER_DEBUG_LEVEL > 0
-			else {
-				_STL_VERIFY(_Count <= _Mysize, "Count out of range in span::last()");
-			}
-#endif // _CONTAINER_DEBUG_LEVEL > 0
-			return span<element_type, _Count>{_Mydata + (_Mysize - _Count), _Count};
-		}
-
-		[[nodiscard]] constexpr auto last(const size_type _Count) const noexcept /* strengthened #1#{
-#if _CONTAINER_DEBUG_LEVEL > 0
-			_STL_VERIFY(_Count <= _Mysize, "Count out of range in span::last(count)");
-#endif // _CONTAINER_DEBUG_LEVEL > 0
-			return span<element_type, std::dynamic_extent>{_Mydata + (_Mysize - _Count), _Count};
-		}
-
-		template <size_t _Offset, size_t _Count = std::dynamic_extent>
-	[[nodiscard]] constexpr auto subspan() const noexcept /* strengthened #1#{
-			if constexpr(Extent != std::dynamic_extent){
-				static_assert(_Offset <= Extent, "Offset out of range in span::subspan()");
-				static_assert(
-					_Count == std::dynamic_extent || _Count <= Extent - _Offset, "Count out of range in span::subspan()");
-			}
-#if _CONTAINER_DEBUG_LEVEL > 0
-			else {
-				_STL_VERIFY(_Offset <= _Mysize, "Offset out of range in span::subspan()");
-
-				if constexpr (_Count != std::dynamic_extent) {
-					_STL_VERIFY(_Count <= _Mysize - _Offset, "Count out of range in span::subspan()");
-				}
-			}
-#endif // _CONTAINER_DEBUG_LEVEL > 0
-			using _ReturnType = span<element_type,
-									 _Count != std::dynamic_extent
-										 ? _Count
-										 : (Extent != std::dynamic_extent ? Extent - _Offset : std::dynamic_extent)>;
-			return _ReturnType{_Mydata + _Offset, _Count == std::dynamic_extent ? _Mysize - _Offset : _Count};
-		}
-
-		[[nodiscard]] constexpr auto subspan(const size_type _Offset, const size_type _Count = std::dynamic_extent) const noexcept
-			/* strengthened #1#{
-#if _CONTAINER_DEBUG_LEVEL > 0
-			_STL_VERIFY(_Offset <= _Mysize, "Offset out of range in span::subspan(offset, count)");
-			_STL_VERIFY(_Count == std::dynamic_extent || _Count <= _Mysize - _Offset,
-				"Count out of range in span::subspan(offset, count)");
-#endif // _CONTAINER_DEBUG_LEVEL > 0
-			using _ReturnType = span<element_type, std::dynamic_extent>;
-			return _ReturnType{_Mydata + _Offset, _Count == std::dynamic_extent ? _Mysize - _Offset : _Count};
-		}*/
 
 		constexpr explicit(false) operator strided_span<std::byte, Extent, Stride>() noexcept{
 			return {reinterpret_cast<std::byte*>(data()), extent_  * sizeof(value_type), stride_};
@@ -601,11 +481,13 @@ namespace mo_yanxi{
 				(const_cast<std::byte*>(reinterpret_cast<const std::byte*>(spans.data())) - data_) ...
 			},
 			size_(std::min(std::initializer_list<std::size_t>{spans.size() ...})),
-			stride_((spans.stride(), ...))
+			stride_(spans...[0].stride())
 		{
 			if(((stride_ != spans.stride()) || ...)){
-				throw std::invalid_argument{"spans must have same stride"};
+				std::terminate();
 			}
+
+
 		}
 
 		[[nodiscard]] constexpr strided_multi_span(const unary_apply_to_tuple_t<strided_span, tuple_const_to_inner_t<ValueTuple>>& spans) noexcept{

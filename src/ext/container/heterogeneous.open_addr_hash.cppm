@@ -16,23 +16,23 @@ namespace mo_yanxi{
 
 		using is_transparent = void;
 		using is_direct = void;
-		static FORCE_INLINE bool operator()(std::nullptr_t, const std::type_index b) noexcept {
+		FORCE_INLINE static bool operator()(std::nullptr_t, const std::type_index b) noexcept {
 			return b == typeid(std::nullptr_t);
 		}
 
-		static FORCE_INLINE bool operator()(const std::type_index b, std::nullptr_t) noexcept {
+		FORCE_INLINE static bool operator()(const std::type_index b, std::nullptr_t) noexcept {
 			return b == typeid(std::nullptr_t);
 		}
 
-		static FORCE_INLINE bool operator()(const std::type_index a, const std::type_index b) noexcept {
+		FORCE_INLINE static bool operator()(const std::type_index a, const std::type_index b) noexcept {
 			return a == b;
 		}
 
-		static FORCE_INLINE constexpr bool operator()(std::nullptr_t, std::nullptr_t) noexcept {
+		FORCE_INLINE static constexpr bool operator()(std::nullptr_t, std::nullptr_t) noexcept {
 			return true;
 		}
 
-		static FORCE_INLINE constexpr bool operator()(std::nullptr_t) noexcept {
+		FORCE_INLINE static constexpr bool operator()(std::nullptr_t) noexcept {
 			return true;
 		}
 	};
@@ -41,11 +41,11 @@ namespace mo_yanxi{
 		using is_transparent = void;
 		static constexpr std::hash<std::type_index> hasher{};
 
-		static FORCE_INLINE std::size_t operator()(const std::type_index val) noexcept {
+		FORCE_INLINE static std::size_t operator()(const std::type_index val) noexcept {
 			return hasher(val);
 		}
 
-		static FORCE_INLINE std::size_t operator()(std::nullptr_t) noexcept {
+		FORCE_INLINE static std::size_t operator()(std::nullptr_t) noexcept {
 			return hasher(typeid(std::nullptr_t));
 		}
 	};
@@ -73,7 +73,7 @@ namespace mo_yanxi{
 			type_index_hasher, type_index_equal_to__not_null>;
 
 	struct Prov{
-		static FORCE_INLINE std::string operator ()(std::nullptr_t) noexcept{
+		FORCE_INLINE static std::string operator ()(std::nullptr_t) noexcept{
 			return std::string();
 		}
 	};
