@@ -103,10 +103,8 @@ namespace mo_yanxi::graphic{
         [[nodiscard]] explicit bitmap(const std::filesystem::path& path) : bitmap(path.string()) {}
 
         [[nodiscard]] constexpr extent_type extent() const noexcept{
-            return tile::extent<extent_type>();
+            return tile::extent();
         }
-
-        using tile::extent;
 
         void write(std::string_view path, bool autoCreateFile = false) const;
 

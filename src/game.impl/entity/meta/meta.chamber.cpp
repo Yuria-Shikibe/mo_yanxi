@@ -34,12 +34,24 @@ namespace mo_yanxi::io{
 	};
 }
 
-template <std::derived_from<mo_yanxi::game::ecs::chamber::building> T>
-T& add_build(mo_yanxi::game::ecs::chamber::manifold_ref grid, mo_yanxi::math::point2 where, mo_yanxi::math::usize2 extent){
-	using namespace mo_yanxi;
-	using namespace game;
-	auto& g = ecs::chamber::to_manifold(grid);
-	return g.add_building<T>(ecs::chamber::tile_region{tags::from_extent, where, extent.as<int>()});
+namespace mo_yanxi::game{
+	template <std::derived_from<ecs::chamber::building> T, std::derived_from<meta::chamber::basic_chamber> C>
+	T& add_build(
+		const C& self,
+		ecs::chamber::manifold_ref grid,
+		math::point2 where,
+		math::usize2 extent){
+		using namespace mo_yanxi;
+		using namespace game;
+		auto& g = ecs::chamber::to_manifold(grid);
+		auto& chunk = g.add_building<T>(ecs::chamber::tile_region{tags::from_extent, where, extent.as<int>()});
+		ecs::chamber::building_data& data = chunk.template get<ecs::chamber::building_data>();
+		if(std::derived_from<C, ecs::chamber::energy_status>){
+			auto& s = static_cast<const ecs::chamber::energy_status&>(self);
+			data.set_energy_status(s);
+		}
+		return chunk;
+	}
 }
 
 void energy_bar_drawer(const mo_yanxi::ui::elem& e, const mo_yanxi::ui::rect& r, int consumption){
@@ -185,7 +197,7 @@ void mo_yanxi::game::meta::chamber::basic_chamber::build_ui(ui::table& table) co
 mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::basic_chamber::create_instance_chamber(
 	ecs::chamber::manifold_ref grid, math::point2 where) const{
 	auto& g = ecs::chamber::to_manifold(grid);
-	g.add_building<std::tuple<ecs::chamber::empty_building>>(ecs::chamber::tile_region{tags::from_extent, where, extent.as<int>()});
+	g.add_building<std::tuple<>>(ecs::chamber::tile_region{tags::from_extent, where, extent.as<int>()});
 	return nullptr;
 }
 
@@ -218,9 +230,14 @@ void mo_yanxi::game::meta::chamber::radar::radar_instance_data::read(std::ispans
 }
 
 
+mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::energy_generator::create_instance_chamber(
+	ecs::chamber::manifold_ref grid, math::point2 where) const{
+	return add_build<ecs::chamber::building>(*this, grid, where, extent);
+}
+
 mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::turret_base::create_instance_chamber(
 	ecs::chamber::manifold_ref grid, math::point2 where) const{
-	return add_build<ecs::chamber::turret_build>(grid, where, extent);
+	return add_build<ecs::chamber::turret_build>(*this, grid, where, extent);
 }
 
 void mo_yanxi::game::meta::chamber::radar::draw(math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const{
@@ -230,7 +247,7 @@ void mo_yanxi::game::meta::chamber::radar::draw(math::frect region, graphic::ren
 
 mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::radar::create_instance_chamber(
 	ecs::chamber::manifold_ref grid, math::point2 where) const{
-	return add_build<ecs::chamber::radar_build>(grid, where, extent);
+	return add_build<ecs::chamber::radar_build>(*this, grid, where, extent);
 }
 
 void mo_yanxi::game::meta::chamber::radar::install(ecs::chamber::build_ref build_ref) const{

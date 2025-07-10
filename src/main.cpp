@@ -16,6 +16,7 @@ import mo_yanxi.math.vector2;
 import mo_yanxi.math.vector4;
 import mo_yanxi.math.rand;
 import mo_yanxi.math.quad;
+import mo_yanxi.math.constrained_system;
 
 import mo_yanxi.vk.context;
 import mo_yanxi.vk.batch;
@@ -105,6 +106,7 @@ import mo_yanxi.game.content;
 import mo_yanxi.game.ui.hitbox_editor;
 import mo_yanxi.game.ui.grid_editor;
 import mo_yanxi.game.content;
+import mo_yanxi.game.meta.grid.srl;
 
 import test;
 
@@ -177,7 +179,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	//
 	// }
 	{
-		auto pane = bed.emplace<game::ui::grid_editor>();
+		auto pane = bed.emplace<game::ui::hitbox_editor>();
 		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 1.f}};
 		pane.cell().align = align::pos::center_right;
 		pane.cell().margin.set(4);
@@ -336,7 +338,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	}*/
 }
 
-auto projectile_meta = [](){
+mo_yanxi::game::meta::projectile projectile_meta = [](){
 	using namespace mo_yanxi;
 
 	return game::meta::projectile{
@@ -374,27 +376,30 @@ void main_loop(){
 	auto& renderer_ui = core::global::graphic::ui;
 	auto& merger = core::global::graphic::merger;
 
-	auto& g = renderer_ui.batch.emplace_batch_layer<graphic::layers::grid_drawer>();
-	g.data.current = graphic::layers::default_grid_style;
+	{
+		auto& g = renderer_ui.batch.emplace_batch_layer<graphic::layers::grid_drawer>();
+		g.data.current = graphic::layers::default_grid_style;
+	}
 
-	core::global::ui::root->add_scene(ui::scene{"main", new ui::loose_group{nullptr, nullptr}, &renderer_ui}, true);
-	core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()});
-	init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
+	{
+		core::global::ui::root->add_scene(ui::scene{"main", new ui::loose_group{nullptr, nullptr}, &renderer_ui}, true);
+		core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()});
+		init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
+	}
 
-	// game::world::hud hud{};
+	game::world::hud hud{};
 	// hud.focus_hud();
-
 
 	game::ecs::system::motion_system motion_system{};
 	game::ecs::system::renderer ecs_renderer{};
 
 	game::world::entity_top_world world{renderer_world};
 
-	// hud.bind_context({
-	// 	.component_manager = &world.component_manager,
-	// 	.collision_system = &world.collision_system,
-	// 	.graphic_context = &world.graphic_context
-	// });
+	hud.bind_context({
+		.component_manager = &world.component_manager,
+		.collision_system = &world.collision_system,
+		.graphic_context = &world.graphic_context
+	});
 
 	auto& wgfx_input =
 		core::global::input.register_sub_input<
@@ -452,18 +457,23 @@ void main_loop(){
 	using projectile_entity_desc = game::ecs::decl::projectile_entity_desc;
 
 
+	game::meta::chamber::grid grid{};
+	{
+		std::ifstream stream{R"(D:\projects\mo_yanxi\build\windows\x64\debug\test_grid.metagrid)", std::ios::binary};
+		game::meta::srl::read_grid(stream, grid);
+	}
 	{
 
 
 
 		{
 			math::rand rand{};
-			for(int i = 0; i < 10; ++i){
+			for(int i = 0; i < 1; ++i){
 				using namespace game::ecs;
 
 				manifold mf{};
-				math::trans2 trs = {{rand(4000.f), rand(2000.f)}, rand(180.f)};
-				mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 18, chamber::tile_size * 18}}}};
+				math::trans2 trs = {{rand(40.f), rand(20.f)}, rand(180.f)};
+				mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 4, chamber::tile_size * 4}}}};
 
 				faction_data faction_data{};
 				if(i & 1){
@@ -472,36 +482,29 @@ void main_loop(){
 					faction_data.faction = game::faction_1;
 				}
 
-				using build_tuple = std::tuple<chamber::building>;
+				chamber::chamber_manifold cmf{};
+				grid.dump(cmf);
 
-				chamber::chamber_manifold grid{};
-				grid.add_building<std::tuple<chamber::turret_build>>(
-					{tags::from_extent, chamber::tile_coord{-8, -9}, 4, 18},
-					chamber::turret_build{
-						// chamber::turret_meta{
-						// .range = {0, 3000},
-						// // .rotation_speed = ,
-						// // .default_angle = ,
-						// // .shooting_field_angle = ,
-						// // .shoot_cone_tolerance = ,
-						// .mode = {
-						// 	.reload_duration = 200,
-						// 	.burst_count = 3,
-						// 	.burst_spacing = 15,
-						// 	.inaccuracy = 6 * math::deg_to_rad,
-						// 	.projectile_type = &projectile_meta
-						// }
-					});
-				grid.add_building<std::tuple<chamber::radar_build>>(
-					{tags::from_extent, chamber::tile_coord{5, -8}, 4, 18}, chamber::radar_build{chamber::radar_meta{
-						// .local_center = {20, 20},
-						// .targeting_range = {400, 2000},
-						.reload_duration = 120
-					}});
+				// {
+				// 	using namespace math;
+				// 	auto& chunk = grid.add_building<chamber::turret_build>({tags::from_extent, chamber::tile_coord{-8, -9}, 4, 18});
+				// 	auto& body = chunk.get<chamber::turret_build>().body;
+				// 	body.shoot_type.projectile = &projectile_meta;
+				// 	body.shoot_type.burst = {.count = 6, .spacing = 5, .angular_spacing = float(15._deg_to_rad)};
+				// 	body.shoot_type.salvo = {.count = 3};
+				// 	chunk.get<chamber::turret_build>().rotate_torque = 30;
+				// }
+				//
+				// grid.add_building<std::tuple<chamber::radar_build>>(
+				// 	{tags::from_extent, chamber::tile_coord{5, -8}, 4, 18}, chamber::radar_build{chamber::radar_meta{
+				// 		.targeting_range_radius = {400, 2000},
+				// 		.targeting_range_angular = math::full_circle_rad<float>,
+				// 		.reload_duration = 120
+				// 	}});
 
 				world.component_manager.create_entity_deferred<grided_entity_desc>(mech_motion{.trans = trs},
 					std::move(mf),
-					std::move(grid),
+					std::move(cmf),
 					std::move(faction_data),
 					physical_rigid{
 					.inertial_mass = 500000
@@ -554,12 +557,13 @@ void main_loop(){
 	}
 
 	world.component_manager.do_deferred();
-	game::ecs::component_pack pack{world.component_manager};
+
 
 	std::size_t count{};
 	float dt{};
-	core::global::timer.reset_time();
+	std::future<void> async_collide{};
 
+	core::global::timer.reset_time();
 	while(!context.window().should_close()){
 		context.window().poll_events();
 		core::global::timer.fetch_time();
@@ -714,14 +718,14 @@ void main_loop(){
 
 					draw::line::quad(acquirer, grid.local_grid.get_wrap_bound(), 3, colors::AQUA_SKY.to_light());
 
-				grid.local_grid.each_tile([&](const chamber::tile& tile){
-						if(!tile.building) return;
-
-						draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
-						draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-						                       (colors::red_dusted.create_lerp(colors::pale_green, tile.building.data().hit_point.get_capability_factor())).to_light(1.5f).set_a(
-							                       tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
-					});
+				// grid.local_grid.each_tile([&](const chamber::tile& tile){
+				// 		if(!tile.building) return;
+				//
+				// 		draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
+				// 		draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
+				// 		                       (colors::red_dusted.create_lerp(colors::pale_green, tile.building.data().hit_point.get_capability_factor())).to_light(1.5f).set_a(
+				// 			                       tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
+				// 	});
 
 					grid.manager.sliced_each([&](const chamber::building_data& building_data){
 						draw::line::rect_ortho(acquirer, building_data.get_bound(), 3, colors::CRIMSON.to_light());
@@ -750,17 +754,45 @@ void main_loop(){
 					renderer_world.batch.pop_proj();
 				});
 
+			if(async_collide.valid()){
+				async_collide.get();
+			}
+
 			if(!core::global::timer.is_paused()){
-				game::ecs::system::chamber{}.run(world);
+				world.component_manager.do_deferred();
+
+				world.component_manager.sliced_each([&](
+					game::ecs::move_command& cmd,
+					game::ecs::mech_motion& motion
+					){
+
+					constexpr float accelMax = .85f;
+					auto overhead = std::max(motion.overhead(accelMax), 12.f);
+					cmd.update(motion.trans, overhead * 1.65f, math::pi_2);
+					if(auto next = cmd.get_next(motion.trans, 0)){
+						const auto v_accel = math::constrain_resolve::smooth_approach(next->vec - motion.pos(), motion.vel.vec, accelMax, 32.f);
+						const auto a_accel = math::constrain_resolve::smooth_approach(motion.pos().angle_to_rad(next->vec) - motion.trans.rot, motion.vel.rot, 0.001f, 0.f);
+						motion.accel += {v_accel, a_accel};
+					}else{
+						motion.accel += motion.get_stop_accel(accelMax, 0.001f);
+						//TODO make it stop
+					}
+					motion.vel.vec.limit_max_length(15);
+				});
 				motion_system.run(world.component_manager);
+				world.collision_system.insert_all(world.component_manager);
+
+				game::ecs::system::chamber{}.run(world);
 				game::ecs::system::projectile{}.run(world.component_manager, world.graphic_context);
-				world.collision_system.run_collision_test(world.component_manager);
+
+				async_collide = std::async(std::launch::async, [&]{
+					world.collision_system.run_collision_test(world.component_manager);
+				});
 			}
 
 			ecs_renderer.filter_screen_space(world.component_manager, renderer_world.camera.get_viewport());
 			ecs_renderer.draw(world.graphic_context);
 
-			world.component_manager.do_deferred();
 		}
 
 		world.graphic_context.render_efx();
@@ -775,6 +807,7 @@ void main_loop(){
 
 		context.flush();
 	}
+	async_collide.get();
 
 	context.wait_on_device();
 

@@ -57,7 +57,7 @@ namespace mo_yanxi::core::ctrl{
 
 		[[nodiscard]] constexpr key_pack() noexcept = default;
 
-		[[nodiscard]] constexpr explicit(false) key_pack(const packed_key_t code)
+		[[nodiscard]] constexpr explicit key_pack(const packed_key_t code)
 			noexcept : code{code}{}
 
 		[[nodiscard]] constexpr explicit(false) key_pack(const key_code_t keyCode, const key_code_t act, const key_code_t mode = mode::ignore)
@@ -94,8 +94,14 @@ namespace mo_yanxi::core::ctrl{
 			auto [ok, oa, om] = expected_state.unpack();
 			return key::matched(tk, ok) && act::matched(ta, oa) && mode::matched(tm, om);
 		}
+
 	};
 
+	export
+	template <key_pack ...packs>
+	[[nodiscard]] constexpr bool matches_any(const key_pack toCheck) noexcept{
+		return (toCheck.matches(packs) || ...);
+	}
 
 	export constexpr inline key_pack lmb_click{mouse::LMB, act::release, mode::ignore};
 	export constexpr inline key_pack lmb_click_no_mode{mouse::LMB, act::release, mode::none};

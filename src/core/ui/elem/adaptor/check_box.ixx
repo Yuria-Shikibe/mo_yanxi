@@ -23,6 +23,7 @@ namespace mo_yanxi::ui{
 
 		}
 
+	protected:
 		input_event::click_result on_click(const input_event::click click_event) override{
 			if(drawables_.empty())return input_event::click_result::intercepted;
 
@@ -48,6 +49,7 @@ namespace mo_yanxi::ui{
 			return input_event::click_result::intercepted;
 		}
 
+	public:
 		void add_multi_select_tooltip(tooltip_layout_info layout){
 			set_tooltip_state({
 				.layout_info = layout,

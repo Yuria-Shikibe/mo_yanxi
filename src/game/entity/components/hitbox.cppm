@@ -236,7 +236,7 @@ namespace mo_yanxi::game{
 		}
 
 		[[nodiscard]] std::span<const hitbox_comp> get_comps() const noexcept{
-			return components;
+			return {components.data(), components.size()};
 		}
 
 		[[nodiscard]] auto get_trans() const noexcept{
@@ -402,12 +402,12 @@ namespace mo_yanxi::game{
 			gch::small_vector<rect_comp, 8> tempHitboxes{};
 			hitbox_span rangeSubject{};
 			hitbox_span rangeObject{};
-
+			using spn = std::span<rect_comp>;
 			//add comp to temp array or directly observe it
 			{
 				if(sbj_is_static && obj_is_static){
-					rangeSubject.components = components;
-					rangeObject.components = other.components;
+					std::construct_at(&rangeSubject.components, get_comps());
+					std::construct_at(&rangeObject.components, other.get_comps());
 				}else if(!sbj_is_static && obj_is_static){
 					tempHitboxes.reserve(components.size());
 
@@ -415,8 +415,8 @@ namespace mo_yanxi::game{
 						tempHitboxes.push_back(component.box);
 					}
 
-					rangeSubject.temporary = tempHitboxes;
-					rangeObject.components = other.components;
+					std::construct_at(&rangeSubject.temporary, spn{tempHitboxes.data(), tempHitboxes.size()});
+					std::construct_at(&rangeObject.components, other.get_comps());
 				}else if(sbj_is_static && !obj_is_static){
 					tempHitboxes.reserve(other.components.size());
 
@@ -424,8 +424,8 @@ namespace mo_yanxi::game{
 						tempHitboxes.push_back(component.box);
 					}
 
-					rangeSubject.components = components;
-					rangeObject.temporary = tempHitboxes;
+					std::construct_at(&rangeSubject.components, get_comps());
+					std::construct_at(&rangeObject.temporary, spn{tempHitboxes.data(), tempHitboxes.size()});
 				}else{
 					tempHitboxes.reserve(components.size() + other.components.size());
 
@@ -437,8 +437,8 @@ namespace mo_yanxi::game{
 						tempHitboxes.push_back(component.box);
 					}
 
-					rangeSubject.temporary = std::span{tempHitboxes.begin(), size()};;
-					rangeObject.temporary = std::span{tempHitboxes.begin() + size(), tempHitboxes.end()};
+					std::construct_at(&rangeSubject.temporary, spn{tempHitboxes.data(), size()});
+					std::construct_at(&rangeObject.temporary, spn{tempHitboxes.data() + size(), tempHitboxes.size() - size()});
 				}
 			}
 

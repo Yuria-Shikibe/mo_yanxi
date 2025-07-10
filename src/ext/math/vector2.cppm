@@ -304,19 +304,19 @@ namespace mo_yanxi::math{
 		 * @return other * scale + self
 		 */
 		template <typename Prog>
-		PURE_FN FORCE_INLINE constexpr vector2 fma(const_pass_t other, const Prog scale) const noexcept {
+		PURE_FN FORCE_INLINE constexpr vector2 fma(const_pass_t other, const Prog scale_to_other) const noexcept {
 			vector2 rst;
 
 			if constexpr (std::floating_point<T> && std::floating_point<Prog>){
 				if !consteval{
-					rst.x = std::fma(other.x, scale, x);
-					rst.y = std::fma(other.y, scale, y);
+					rst.x = std::fma(other.x, scale_to_other, x);
+					rst.y = std::fma(other.y, scale_to_other, y);
 					return rst;
 				}
 			}
 
-			rst.x = x + scale * other.x;
-			rst.y = y + scale * other.y;
+			rst.x = x + scale_to_other * other.x;
+			rst.y = y + scale_to_other * other.y;
 
 			return rst;
 		}
@@ -499,7 +499,7 @@ namespace mo_yanxi::math{
 			return this->rotate_rad(degree * math::deg_to_rad_v<Fp>);
 		}
 
-		FORCE_INLINE constexpr vector2& lerp(const_pass_t tgt, const floating_point_t alpha) noexcept{
+		FORCE_INLINE constexpr vector2& lerp_inplace(const_pass_t tgt, const floating_point_t alpha) noexcept{
 			return this->set(math::lerp(x, tgt.x, alpha), math::lerp(y, tgt.y, alpha));
 		}
 
@@ -1093,6 +1093,23 @@ namespace mo_yanxi::math{
 		[[nodiscard]] PURE_FN FORCE_INLINE constexpr bool axis_greater(vector2<N>::const_pass_t other) const noexcept{
 			return this->axis_greater(other.x, other.y);
 		}
+
+
+		FORCE_INLINE friend constexpr value_type distance(const vector2& lhs, const vector2& rhs) noexcept{
+			return lhs.dst(rhs);
+		}
+
+		FORCE_INLINE friend constexpr value_type abs(const vector2& v) noexcept{
+			return v.length();
+		}
+
+		FORCE_INLINE friend constexpr value_type sqr(const vector2& v) noexcept{
+			return v.length2();
+		}
+		FORCE_INLINE friend constexpr value_type dot(const vector2& l, const vector2& r) noexcept{
+			return l.dot(r);
+		}
+
 	};
 
 	export
@@ -1136,7 +1153,26 @@ namespace mo_yanxi::math{
 			this->set_NaN();
 		}
 
+		[[nodiscard]] PURE_FN FORCE_INLINE constexpr vector2<T> value_or(vector2<T>::const_pass_t v) const noexcept{
+			if(*this){
+				return *this;
+			}else{
+				return v;
+			}
+		}
+
+		[[nodiscard]] PURE_FN FORCE_INLINE constexpr vector2<T> value_or() const noexcept{
+			if(*this){
+				return *this;
+			}else{
+				return {};
+			}
+		}
+
 		using vector2<T>::operator=;
+
+
+
 	};
 
 
@@ -1197,21 +1233,6 @@ namespace mo_yanxi::math{
 			static constexpr vector2<T> SNaN{std::numeric_limits<T>::signaling_NaN(), std::numeric_limits<T>::signaling_NaN()};
 			static constexpr vector2<T> QNaN_vec2{std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::quiet_NaN()};
 		};
-	}
-
-	template <typename T>
-	FORCE_INLINE constexpr vector2<T>::value_type distance(const vector2<T>& lhs, const vector2<T>& rhs) noexcept{
-		return lhs.dst(rhs);
-	}
-
-	template <typename T>
-	FORCE_INLINE constexpr vector2<T>::value_type abs(const vector2<T>& v) noexcept{
-		return v.length();
-	}
-
-	template <typename T>
-	FORCE_INLINE constexpr vector2<T>::value_type sqr(const vector2<T>& v) noexcept{
-		return v.length2();
 	}
 
 

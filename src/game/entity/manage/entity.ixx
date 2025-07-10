@@ -45,35 +45,11 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-
-	template <typename T>
-	struct alignas(T) type_replacement{
-		std::byte _[sizeof(T)];
-	};
-
-	template <std::size_t I, typename Tuple>
-	consteval std::size_t element_offset() noexcept {
-		using Tpl = tuple_to_seq_chunk_t<unary_apply_to_tuple_t<type_replacement, Tuple>>;
-		union {
-			char a[sizeof(Tpl)];
-			Tpl t{};
-		};
-		auto* p = std::addressof(t.template get<I>());
-		t.~Tpl();
-		for (std::size_t i = 0;; ++i) {
-			if (static_cast<void*>(a + i) == p) return i;
-		}
-	}
-
-	template <std::size_t Index, typename Tuple>
-	inline constexpr std::size_t chunk_tuple_offset_at_v = element_offset<Index, Tuple>();
-
-	template <typename T, typename Tuple>
-	inline constexpr std::size_t chunk_tuple_offset_of_v = element_offset<tuple_index_v<T, Tuple>, Tuple>();
-	
 	export using entity_id = struct entity*;
 	export using entity_data_chunk_index = std::vector<int>::size_type;
 	export auto invalid_chunk_idx = std::numeric_limits<entity_data_chunk_index>::max();
+
+	export struct component_manager;
 
 	export
 	template <typename TupleT>
@@ -84,6 +60,7 @@ namespace mo_yanxi::game::ecs{
 
 		template <typename TupleT>
 		friend struct archetype;
+		friend component_manager;
 
 	private:
 		entity_id eid_{};
@@ -313,7 +290,6 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-
 	struct entity_ref{
 	private:
 		entity_id id_{};
@@ -464,8 +440,6 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-
-
 	export
 	template <typename Tgt, typename EntityChunkDesc, typename ChunkPartial>
 		requires requires{
@@ -553,50 +527,13 @@ namespace mo_yanxi::game::ecs{
 		static void on_relocate(const chunk_meta& meta, const value_type& comp) = delete;
 	};
 
-
 	export
 	template <typename T>
 	struct component_custom_behavior : component_custom_behavior_base<T>{};
 
-
-
 	template <>
 	struct component_custom_behavior<chunk_meta> : component_custom_behavior_base<chunk_meta, void>{
 
-	};
-
-	template <typename T, typename ToJoin>
-	struct tuple_push_back;
-
-	template <typename ToJoin, typename ...TS>
-	struct tuple_push_back<std::tuple<TS...>, ToJoin> : std::type_identity<std::tuple<TS..., ToJoin>>{};
-
-	template <typename T, typename ToJoin>
-	using tuple_push_back_t = tuple_push_back<T, ToJoin>::type;
-
-	using A = tuple_push_back_t<std::tuple<int, float>, double>;
-
-
-	template <typename Prev, typename ...Args>
-		requires (is_tuple_v<Prev>)
-	struct join_to_tuple_if_not_monostate;
-
-	template <typename Prev, typename Cur, typename ...Args>
-		requires (is_tuple_v<Prev>)
-	struct join_to_tuple_if_not_monostate<Prev, Cur, Args...>{
-		using type = join_to_tuple_if_not_monostate<tuple_push_back_t<Prev, Cur>, Args...>::type;
-	};
-
-	template <typename Prev>
-		requires (is_tuple_v<Prev>)
-	struct join_to_tuple_if_not_monostate<Prev>{
-		using type = Prev;
-	};
-
-	template <typename Prev, typename ...Args>
-		requires (is_tuple_v<Prev>)
-	struct join_to_tuple_if_not_monostate<Prev, std::monostate, Args...>{
-		using type = join_to_tuple_if_not_monostate<Prev, Args...>::type;
 	};
 
 	template <typename T>
@@ -690,7 +627,6 @@ namespace mo_yanxi::game::ecs{
 
 		}
 	};
-
 
 	export
 	template <typename TypeDesc, typename SrlIdx = int, SrlIdx = SrlIdx{}>
@@ -854,7 +790,6 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-
 	struct type_index_to_convertor{
 		type_identity_index type{};
 		type_comp_convert convertor{};
@@ -874,11 +809,8 @@ namespace mo_yanxi::game::ecs{
 		// }
 	}())::type;
 
-	// export
 	template <typename Pair, typename Ty>
 	struct find_if_first_equal : std::bool_constant<std::same_as<typename Pair::first_type, Ty>>{};
-
-
 
 	template <typename TupleT>
 	struct archetype : archetype_base{
@@ -980,9 +912,13 @@ namespace mo_yanxi::game::ecs{
 			void load(component_manager& target) const final;
 		};
 
+		using hashder_array_type = std::array<
+				type_index_to_convertor,
+				std::bit_ceil(type_hash_map_size * 2)>;
+
 		//believe that this is faster than static
-		const std::array<type_index_to_convertor, type_hash_map_size * 2> type_convertor_hash_map = [] {
-			std::array<type_index_to_convertor, type_hash_map_size * 2> hash_array{};
+		const hashder_array_type type_convertor_hash_map = [] {
+			hashder_array_type hash_array{};
 
 			std::array<type_index_to_convertor, type_hash_map_size> temp{};
 			[&] <std::size_t ...Idx>(std::index_sequence<Idx...>){
@@ -1004,9 +940,10 @@ namespace mo_yanxi::game::ecs{
 		std::vector<components> chunks{};
 
 		std::mutex staging_mutex_{};
-		std::vector<components> staging{};
-		std::mutex staging_expire_mutex_{};
-		std::vector<entity_id> staging_expires{};
+		plf::hive<components> staging{};
+
+		// std::mutex staging_expire_mutex_{};
+		// std::vector<entity_id> staging_expires{};
 
 	protected:
 		template <typename ...Ts>
@@ -1160,57 +1097,35 @@ namespace mo_yanxi::game::ecs{
 			return chunks[idx];
 		}
 
-		template <typename ...T>
-			requires (contained_in<std::decay_t<T>, raw_tuple> && ...)
-		void push_staging(const entity_id e, T&& ...args){
-			assert(e);
-
-			using raw_tuple_type = std::tuple<T&& ...>;
-			raw_tuple_type ref_tuple{std::forward<T>(args)...};
-
-			using in_tuple = std::tuple<std::decay_t<T>...>;
-			constexpr std::size_t in_tuple_size = sizeof...(T);
-
-			e->id()->archetype_ = this;
-
-			std::lock_guard _{staging_mutex_};
-			[&] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-				staging.emplace_back(e, [&] <std::size_t I> (){
-					using cur_type = std::tuple_element_t<I, raw_tuple>;
-					constexpr std::size_t mapped_cur_idx = tuple_index_v<cur_type, in_tuple>;
-
-					if constexpr (mapped_cur_idx == in_tuple_size){
-						return cur_type{};
-					}else{
-						using param_type = std::tuple_element_t<mapped_cur_idx, raw_tuple_type>;
-						return cur_type{std::forward<param_type>(std::get<mapped_cur_idx>(ref_tuple))};
-					}
-				}.template operator()<Idx>() ...);
-			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>{});
-		}
-
-		void push_staging(const entity_id e, components&& comp) noexcept {
+		components& push_staging(const entity_id e, components&& comp){
 			assert(e);
 			e->id()->archetype_ = this;
 			chunk_meta& meta = get<chunk_meta>(comp);
 			meta.eid_ = e;
 
 			std::lock_guard _{staging_mutex_};
-			staging.push_back(std::move(comp));
+			return *staging.insert(std::move(comp));
 		}
 
 		void dump_staging() final {
-			auto sz = chunks.size();
-			chunks.reserve(sz + staging.size());
+			auto sz = chunks.size() + staging.size();
+			if(sz > chunks.capacity()){
+				chunks.reserve(sz);
+				for(components& prev_comp : chunks){
+					[&] <std::size_t... I>(std::index_sequence<I...>){
+						(component_trait<std::tuple_element_t<I, raw_tuple>>::on_relocate(get<0>(prev_comp), get<I + 1>(prev_comp)), ...);
+					}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
+				}
+			}
+
 			for (auto && data : staging){
 				this->insert<false>(std::move(data));
 			}
 
-			if(staging.size() > 128){
-				staging = decltype(staging){};
-				staging.reserve(32);
-			}else{
-				staging.clear();
+			staging.clear();
+
+			if(staging.capacity() > 128){
+				staging.trim_capacity(32);
 			}
 		}
 
@@ -1279,11 +1194,6 @@ namespace mo_yanxi::game::ecs{
 		entity->archetype_ = nullptr;
 	}
 
-	// void archetype_base::set_expired(entity_id entity_id){
-	// 	entity_id->archetype_ = nullptr;
-	// }
-
-
 	template <typename T>
 	T* archetype_base::try_get_comp(const entity_id id) noexcept{
 		return try_get_comp<T>(id->chunk_index());
@@ -1319,10 +1229,6 @@ namespace mo_yanxi::game::ecs{
 		return &unchecked_get<Tuple>();
 	}
 
-
-}
-
-namespace mo_yanxi::game::ecs{
 	export
 	struct archetype_slice{
 		using acquirer_type = std::add_pointer_t<strided_span<std::byte>(void*) noexcept>;
@@ -1379,7 +1285,7 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	export struct component_manager{
+	struct component_manager{
 		template <typename T>
 		using small_vector_of = gch::small_vector<T>;
 		using archetype_map_type = fixed_open_hash_map<type_identity_index, std::unique_ptr<archetype_base>>;
@@ -1389,7 +1295,36 @@ namespace mo_yanxi::game::ecs{
 		//manager should always moved thread safely
 		no_propagation_mutex<> to_expire_mutex{};
 		no_propagation_mutex<> entity_mutex{};
-		no_propagation_mutex<std::shared_mutex> archetype_mutex{};
+		// no_propagation_mutex<std::shared_mutex> archetype_mutex{};
+
+		struct staging_add_base{
+			virtual ~staging_add_base() = default;
+			[[nodiscard]] virtual type_identity_index get_idx() const noexcept = 0;
+			virtual void add_archetype(component_manager& manager) const noexcept = 0;
+			virtual void push_entity(component_manager& manager) noexcept = 0;
+		};
+
+		template <typename Tup>
+		struct staging_add final : staging_add_base{
+			tuple_to_comp_t<Tup> comp{};
+
+			[[nodiscard]] explicit(false) staging_add(tuple_to_comp_t<Tup>&& comp)
+				: comp(std::move(comp)){
+			}
+
+			type_identity_index get_idx() const noexcept override final{
+				return unstable_type_identity_of<Tup>();
+			}
+
+			void add_archetype(component_manager& manager) const noexcept override{
+				manager.add_archetype<Tup>();
+			}
+
+			void push_entity(component_manager& manager) noexcept override{
+				auto& a = manager.archetypes.at(unstable_type_identity_of<Tup>());
+				static_cast<archetype<Tup>&>(*a).push_staging(static_cast<const chunk_meta&>(get<chunk_meta>(comp)).id(), std::move(comp));
+			}
+		};
 
 		pointer_hash_map<entity_id, int> to_expire{};
 		std::vector<entity_id> expired{};
@@ -1399,6 +1334,9 @@ namespace mo_yanxi::game::ecs{
 
 		fixed_open_hash_map<type_identity_index, std::vector<archetype_slice>> type_to_archetype{};
 		// std::unordered_map<type_identity, std::vector<archetype_slice>> type_to_archetype{};
+
+		no_propagation_mutex<> staging_adds_mutex{};
+		std::vector<std::unique_ptr<staging_add_base>> staging_adds{};
 
 	public:
 		float update_delta;
@@ -1417,32 +1355,26 @@ namespace mo_yanxi::game::ecs{
 		 */
 		template <typename Tuple, typename... Args>
 			requires (is_tuple_v<Tuple> && (contained_in<std::decay_t<Args>, Tuple> && ...))
-		entity_id create_entity_deferred(Args&& ...args){
-			//TODO add lock?
-			static constexpr type_identity_index idx = unstable_type_identity_of<Tuple>();
-			entity* ent;
-			{
-				std::lock_guard _{entity_mutex};
-				ent = std::to_address(entities.emplace(idx));
-			}
-			{
-				std::shared_lock g{archetype_mutex};
-				if(auto itr = archetypes.find(idx); itr != archetypes.end()){
-					auto& a = static_cast<archetype<Tuple>&>(*itr->second);
-					g.unlock();
-					a.push_staging(ent->id(), std::forward<Args>(args) ...);
-				}else{
-					archetype<Tuple>* atype;
-					{
-						std::unique_lock _{(g.unlock(), *g.release())};
-						atype = &add_archetype<Tuple>();
+		auto& create_entity_deferred(Args&& ...args){
+			using raw_tuple_type = std::tuple<Args&& ...>;
+			raw_tuple_type ref_tuple{std::forward<Args>(args)...};
+
+			using in_tuple = std::tuple<std::decay_t<Args>...>;
+			constexpr std::size_t in_tuple_size = sizeof...(Args);
+
+			return [&] <std::size_t ...Idx>(std::index_sequence<Idx...>) -> auto& {
+				return this->create_entity_deferred<Tuple>(tuple_to_comp_t<Tuple>{chunk_meta{}, [&] <std::size_t I> (){
+					using cur_type = std::tuple_element_t<I, Tuple>;
+					constexpr std::size_t mapped_cur_idx = tuple_index_v<cur_type, in_tuple>;
+
+					if constexpr (mapped_cur_idx == in_tuple_size){
+						return cur_type{};
+					}else{
+						using param_type = std::tuple_element_t<mapped_cur_idx, raw_tuple_type>;
+						return cur_type{std::forward<param_type>(std::get<mapped_cur_idx>(ref_tuple))};
 					}
-
-					atype->push_staging(ent->id(), std::forward<Args>(args) ...);
-				}
-			}
-
-			return ent;
+				}.template operator()<Idx>() ...});
+			}(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
 		}
 
 		/**
@@ -1450,40 +1382,37 @@ namespace mo_yanxi::game::ecs{
 		 * @return entity handle
 		 */
 		template <typename Tuple>
-		entity_id create_entity_deferred(tuple_to_comp_t<Tuple>&& comps){
-			//TODO add lock?
+		auto& create_entity_deferred(tuple_to_comp_t<Tuple>&& comps){
 			static constexpr type_identity_index idx = unstable_type_identity_of<Tuple>();
-			entity* ent;
-			{
-				std::lock_guard _{entity_mutex};
-				ent = std::to_address(entities.emplace(idx));
-			}
 
-			{
-				std::shared_lock g{archetype_mutex};
+			entity* ent = acquire_entity<Tuple>();
 
-				if(auto itr = archetypes.find(idx); itr != archetypes.end()){
-					auto& a = static_cast<archetype<Tuple>&>(*itr->second);
-					g.unlock();
-					a.push_staging(ent->id(), std::move(comps));
-				}else{
-					archetype<Tuple>* atype;
-					{
-						std::unique_lock _{(g.unlock(), *g.release())};
-						atype = &add_archetype<Tuple>();
-					}
+			if(auto itr = archetypes.find(idx); itr != archetypes.end()){
+				auto& a = static_cast<archetype<Tuple>&>(*itr->second);
+				return a.push_staging(ent->id(), std::move(comps));
+			}else{
+				chunk_meta& meta = get<chunk_meta>(comps);
+				meta.eid_ = ent;
+				auto ptr = std::make_unique<staging_add<Tuple>>(std::move(comps));
+				auto& comp = ptr->comp;
 
-					atype->push_staging(ent->id(), std::move(comps));
+				{
+					std::lock_guard _{staging_adds_mutex};
+					staging_adds.push_back(std::move(ptr));
 				}
+
+				return comp;
 			}
 
-			return ent;
 		}
 
 		template <typename Tuple, std::derived_from<archetype<Tuple>> Archetype = archetype<Tuple>, typename ... Args>
 			requires (is_tuple_v<Tuple>)
 		auto& add_archetype(Args&& ...args){
 			static constexpr type_identity_index idx = unstable_type_identity_of<Tuple>();
+			if(const auto itr = archetypes.find(idx); itr != archetypes.end()){
+				return static_cast<Archetype&>(*itr->second);
+			}
 
 			return static_cast<Archetype&>(*archetypes.try_emplace(idx, this->create_new_archetype_map<Tuple, Archetype>(std::forward<Args>(args) ...)).first->second);
 		}
@@ -1506,11 +1435,12 @@ namespace mo_yanxi::game::ecs{
 			requires (is_tuple_v<Tuple>)
 		entity_id acquire_entity(){
 			static constexpr type_identity_index idx = unstable_type_identity_of<Tuple>();
-			auto& ent = *entities.emplace(idx);
 
-			return std::addressof(ent);
+			std::lock_guard _{entity_mutex};
+			return std::to_address(entities.emplace(idx));
 		}
 
+	private:
 		template <typename Tuple>
 			requires (is_tuple_v<Tuple>)
 		entity_id create_entity(){
@@ -1532,6 +1462,7 @@ namespace mo_yanxi::game::ecs{
 		entity_id create_entity(){
 			return create_entity<std::tuple<Ts ...>>();
 		}
+	public:
 
 		bool mark_expired(entity_id entity){
 			std::lock_guard _{to_expire_mutex};
@@ -1544,12 +1475,31 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		void do_deferred_add(){
+			if(!staging_adds.empty()){
+				gch::small_vector<type_identity_index> indices{};
+
+				assert_unlocked(staging_adds_mutex);
+
+				for (auto & staging_add_base : staging_adds){
+					if(auto itr = std::ranges::find(indices, staging_add_base->get_idx()); itr == indices.end()){
+						indices.push_back(staging_add_base->get_idx());
+						staging_add_base->add_archetype(*this);
+					}
+
+					staging_add_base->push_entity(*this);
+				}
+
+				staging_adds.clear();
+			}
+
 			for (const auto & [type, archetype] : archetypes){
 				archetype->dump_staging();
 			}
 		}
 
 		void do_deferred_destroy(){
+			assert_unlocked(to_expire_mutex);
+
 			modifiable_erase_if(expired, [this](entity_id e){
 				if(e->get_ref_count() == 0){
 					//TODO should this always true?
@@ -1576,6 +1526,9 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		void deferred_destroy_no_reference_entities(){
+			assert_unlocked(to_expire_mutex);
+			assert_unlocked(entity_mutex);
+
 			for (auto& entity : entities){
 				if(entity.get_ref_count() == 0){
 					to_expire.try_emplace(entity.id());
@@ -1629,17 +1582,17 @@ namespace mo_yanxi::game::ecs{
 				using params = unary_apply_to_tuple_t<std::decay_t, raw_params>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				this->slice_and_then<params, Exclusives>([f = std::move(fn)](const span_tuple& p){
+				this->slice_and_then<params, Exclusives>([f = std::move(fn)](const span_tuple& p) FORCE_INLINE {
 					auto count = std::ranges::size(std::get<0>(p));
 
 					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
 
-					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
 						((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
 					}(std::make_index_sequence<std::tuple_size_v<params>>{});
 
 					for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
-						[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+						[&] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
 							std::invoke(f, (assert(std::get<Idx>(iterators) != std::ranges::end(std::get<Idx>(p))), *(std::get<Idx>(iterators)++)) ...);
 						}(std::make_index_sequence<std::tuple_size_v<params>>{});
 					}
@@ -1656,16 +1609,14 @@ namespace mo_yanxi::game::ecs{
 
 
 
-		template <typename Tuple = std::tuple<int>>
+		template <typename Tuple>
 		tuple_to_seq_chunk_t<Tuple>* get_entity_full_chunk(const entity& entity) const noexcept{
 			if(entity.is_expired())return nullptr;
 			static constexpr type_identity_index idx = unstable_type_identity_of<Tuple>();
 			if(idx != entity.type())return nullptr;
 			//TODO should this a must event? so at() directly?
 			archetype<Tuple>& aty = static_cast<archetype<Tuple>&>(entity.get_archetype());
-			return &aty[entity.chunk_index()];
-
-			return nullptr;
+			return std::addressof(aty[entity.chunk_index()]);
 		}
 
 		template <typename T>
@@ -1691,33 +1642,34 @@ namespace mo_yanxi::game::ecs{
 		struct subrange{
 			using value_type = const archetype_slice;
 			using rng = std::span<value_type>;
-			using itr = rng::iterator;
+			using itr = rng::pointer;
 
 		// private:
 			itr begin_itr;
 			itr end_itr;
 		public:
 
-			[[nodiscard]] constexpr subrange() noexcept = default;
+			[[nodiscard]] FORCE_INLINE constexpr subrange() noexcept = default;
 
-			[[nodiscard]] constexpr explicit(false) subrange(rng range) noexcept : begin_itr(range.begin()),
-				end_itr(range.end()){
+			[[nodiscard]] FORCE_INLINE constexpr explicit(false) subrange(rng range) noexcept :
+				begin_itr(std::to_address(range.begin())),
+				end_itr(std::to_address(range.end())){
 			}
 
-			constexpr bool empty() const noexcept{
+			[[nodiscard]] FORCE_INLINE constexpr bool empty() const noexcept{
 				return begin_itr == end_itr;
 			}
 
-			value_type& front() const noexcept{
+			[[nodiscard]] FORCE_INLINE value_type& front() const noexcept{
 				return *begin_itr;
 			}
 
-			itr begin() const noexcept{
+			[[nodiscard]] FORCE_INLINE itr begin() const noexcept{
 				return begin_itr;
 			}
 
-			itr end() const noexcept{
-				return begin_itr;
+			[[nodiscard]] FORCE_INLINE itr end() const noexcept{
+				return end_itr;
 			}
 		};
 

@@ -138,4 +138,24 @@ namespace mo_yanxi::game::ui{
 
 		void draw_content(mo_yanxi::ui::rect clipSpace) const override;
 	};
+
+	export
+	struct energy_bar : mo_yanxi::ui::elem{
+	private:
+		int power{};
+		float current_draw_value{};
+		float reload_progress{};
+		float current_draw_reload_progress{};
+	public:
+		void set_bar_state(int power, float progress) noexcept {
+			this->power = power;
+			reload_progress = progress;
+		}
+
+		void update(float delta_in_ticks) override{
+			elem::update(delta_in_ticks);
+
+			math::lerp_inplace<float>(current_draw_value, math::abs(power), delta_in_ticks * 0.075f);
+		}
+	};
 }

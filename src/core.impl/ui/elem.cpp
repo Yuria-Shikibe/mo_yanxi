@@ -208,6 +208,8 @@ namespace mo_yanxi{
 	}
 
 	void ui::elem::update(const float delta_in_ticks){
+		if(is_sleep())return;
+
 		if(checkers.disableProv)[[unlikely]] {
 			disabled = checkers.disableProv(*this);
 		}

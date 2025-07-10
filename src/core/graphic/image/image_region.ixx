@@ -89,12 +89,22 @@ namespace mo_yanxi::graphic{
 			self.shrink(bound_size, math::vec2{shrink, shrink});
 		}
 
+		constexpr void flip_y() noexcept{
+			std::swap(vert00.y, vert11.y);
+		}
+
+		constexpr void flip_x() noexcept{
+			std::swap(vert00.x, vert11.x);
+		}
 	};
 
 	export
 	struct uniformed_uv : uniformed_rect_uv{
 		math::vec2 vert01;
 		math::vec2 vert10;
+
+		constexpr void flip_y() = delete;
+		constexpr void flip_x() = delete;
 
 		[[nodiscard]] FORCE_INLINE constexpr math::vec2 v10() const noexcept{
 			return vert10;

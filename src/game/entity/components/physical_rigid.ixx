@@ -30,8 +30,20 @@ export namespace mo_yanxi::game::ecs{
 			accel = {};
 		}
 
+		[[nodiscard]] float overhead(float maximum_accel) const noexcept{
+			return vel.vec.length2() / (maximum_accel * 2);
+		}
+
+		[[nodiscard]] math::trans2 get_stop_accel(float maxAccel, float maxAngularAccel) const noexcept{
+			auto curVel = vel.vec.length();
+			auto curRot = vel.rot.radians();
+			auto vA = curVel > 0 ? vel.vec * (-maxAccel * std::tanh(curVel / 20) / curVel) : math::vec2{};
+			auto vW = curRot > 0 ? -maxAngularAccel * std::tanh(curRot * 4) : 0;
+			return {vA, vW};
+		}
+
 		void apply_drag(const update_tick tick, float drag = 0.05f){
-			vel.vec.lerp({}, drag * tick);
+			vel.vec.lerp_inplace({}, drag * tick);
 			vel.rot.slerp(0, drag * tick);
 		}
 

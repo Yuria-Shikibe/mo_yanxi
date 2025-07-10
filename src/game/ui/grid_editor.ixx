@@ -239,7 +239,7 @@ namespace mo_yanxi::game{
 				return viewport::on_esc();
 			}
 
-			void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
+			void on_key_input(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
 				if(action == core::ctrl::act::release){
 					if(key == core::ctrl::key::M){
 						overview = !overview;

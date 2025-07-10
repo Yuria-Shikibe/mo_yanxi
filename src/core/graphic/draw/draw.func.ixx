@@ -20,6 +20,46 @@ namespace mo_yanxi::graphic::draw{
 		return math::clamp(static_cast<int>(radius * math::pi / CircleVertPrecision), 12, 512);
 	}
 
+	/*
+	 * TODO circle table
+	constexpr std::size_t CircleTableSize = 125;
+
+	constexpr std::size_t MinCircleVertices = 12;
+	constexpr std::size_t CircleTableStride = 4;
+
+
+	template <typename T>
+	constexpr T getSeqSumAt(T idx) noexcept{
+		return MinCircleVertices * idx + CircleTableStride * idx * (idx - 1) / 2;
+	}
+	constexpr std::size_t CircleVertices = getSeqSumAt(CircleTableSize);
+
+	constexpr std::array<math::vec2, CircleVertices> CircleTable = []{
+		std::array<math::vec2, CircleVertices> arr{};
+
+		std::size_t offset{};
+		for (std::size_t i = 0; i < CircleTableSize; ++i){
+			const std::size_t count = MinCircleVertices + i * CircleTableStride;
+
+			for (std::size_t j = 0; j < count; ++j){
+				const double angle = std::numbers::pi * 2. * static_cast<double>(j) / static_cast<double>(count);
+				arr[offset + j] = math::vector2<double>::from_polar_rad(angle).as<float>();
+			}
+
+			offset += count;
+		}
+
+		return arr;
+	}();
+
+	constexpr std::span<const math::vec2> getCircleRange(const float radius) noexcept{
+		auto index = math::clamp<unsigned>(static_cast<unsigned>(radius * math::pi / CircleVertPrecision), 0, CircleTableSize - 1);
+		auto sz = MinCircleVertices + index * CircleTableStride;
+		auto srcIdx = getSeqSumAt(index);
+		return {CircleTable.data() + srcIdx, sz};
+	}
+	*/
+
 	template <typename Proj, typename Vtx>
 	void try_proj(Proj& proj, Vtx& vtx){
 		if constexpr (std::invocable<Proj, Vtx&>){
@@ -247,6 +287,7 @@ namespace mo_yanxi::graphic::draw{
 			const float radius,
 			const col color = colors::white
 			){
+
 			fill::poly(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, color);
 		}
 	}

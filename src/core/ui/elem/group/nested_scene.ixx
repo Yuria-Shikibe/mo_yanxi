@@ -393,7 +393,7 @@ namespace mo_yanxi::ui{
 			return input_event::click_result::intercepted;
 		}
 
-		void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
+		void on_key_input(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
 			scene_.on_key_action(key, action, mode);
 		}
 

@@ -3,7 +3,7 @@ module;
 #include "../adapted_attributes.hpp"
 #include <cassert>
 
-#define MATH_ATTR PURE_FN FORCE_INLINE inline
+#define MATH_ATTR CONST_FN FORCE_INLINE inline
 #define MATH_ASSERT(expr) CHECKED_ASSUME(expr)
 
 export module mo_yanxi.math;
@@ -23,7 +23,7 @@ namespace mo_yanxi::math{
 
 		struct impl {
 			template <arithmetic T>
-			[[nodiscard]] FORCE_INLINE static constexpr T operator()(T v) noexcept{
+			[[nodiscard]] CONST_FN FORCE_INLINE static constexpr T operator()(T v) noexcept{
 				if constexpr (std::unsigned_integral<T>)return v;
 				if consteval{
 					return v < 0 ? -v : v;
@@ -36,7 +36,7 @@ namespace mo_yanxi::math{
 					requires !arithmetic<T>;
 					{ abs(v) } noexcept -> arithmetic;
 				}
-			[[nodiscard]] FORCE_INLINE static constexpr auto operator()(const T& val) noexcept{
+			[[nodiscard]] CONST_FN  FORCE_INLINE static constexpr auto operator()(const T& val) noexcept{
 				return abs(val);
 			}
 		};
@@ -48,7 +48,7 @@ namespace mo_yanxi::math{
 
 		struct impl {
 			template <arithmetic T>
-			[[nodiscard]] FORCE_INLINE static constexpr T operator()(T v) noexcept{
+			[[nodiscard]] CONST_FN FORCE_INLINE static constexpr T operator()(T v) noexcept{
 				return v * v;
 			}
 
@@ -57,7 +57,7 @@ namespace mo_yanxi::math{
 					requires !arithmetic<T>;
 					{ sqr(v) } -> arithmetic;
 				}
-			[[nodiscard]] FORCE_INLINE static constexpr auto operator()(const T& val) noexcept{
+			[[nodiscard]] CONST_FN FORCE_INLINE static constexpr auto operator()(const T& val) noexcept{
 				return sqr(val);
 			}
 		};
@@ -235,6 +235,18 @@ namespace mo_yanxi::math {
 		return {cos_deg(degree), sin_deg(degree)};
 	}
 
+
+	export
+	template <typename T>
+	MATH_ATTR constexpr T copysign(T val, T sgn) noexcept{
+		if consteval{
+			return sgn < 0 ? -val : val;
+		}else{
+			return std::copysign(val, sgn);
+		}
+	}
+
+
 	/**
 	 * Returns true if the value is zero.
 	 * @param value N/A
@@ -267,18 +279,29 @@ namespace mo_yanxi::math {
 		 * @return the given angle wrapped to the range [-pi, pi] */
 		export
 		template <std::floating_point T>
-		MATH_ATTR T uniform_rad(const T angle_in_rad) noexcept{
-			static constexpr auto pi = std::numbers::pi_v<T>;
-			static constexpr auto pi2 = pi_2_v<T>;
-			if(angle_in_rad >= 0){
-				T rotation = std::fmod(angle_in_rad, pi2);
-				if(rotation > pi) rotation -= pi2;
-				return rotation;
+		MATH_ATTR constexpr T uniform_rad(T rad) noexcept{
+			if consteval{
+				while(rad >= std::numbers::pi_v<T>){
+					rad -= pi_2_v<T>;
+				}
+				while(rad < -std::numbers::pi_v<T>){
+					rad += pi_2_v<T>;
+				}
+				return rad;
+			}else{
+				return std::remainder(rad, pi_2_v<T>);
 			}
+		}
 
-			T rotation = std::fmod(-angle_in_rad, pi2);
-			if(rotation > pi) rotation -= pi2;
-			return -rotation;
+		export
+		template <std::floating_point T>
+		MATH_ATTR constexpr T angle_distance(const T from, const T to){
+			return angles::uniform_rad<T>(to - from);
+		}
+		export
+		template <std::floating_point T>
+		MATH_ATTR constexpr T angle_distance_abs(const T from, const T to){
+			return abs(angles::uniform_rad<T>(to - from));
 		}
 	}
 
@@ -545,14 +568,16 @@ namespace mo_yanxi::math {
 		}*/
 	MATH_ATTR constexpr T2 map(
 		const T1 value,
-		const T1 fromA, const T1 toa,
-		const T2 fromB, const T2 tob
+		const T1 from, const T1 to,
+		const T2 mappedFrom, const T2 mappedTo
 	) noexcept/*nvm*/ {
-		const auto prog = (value - fromA) / (toa - fromA);
+		const auto rng = (to - from);
+		if(math::zero(rng))return mappedFrom;
+		const auto prog = (value - from) / rng;
 		if constexpr (std::floating_point<T2> && std::floating_point<decltype(prog)>){
-			return std::fma(prog, tob - fromB, fromB);
+			return std::fma(prog, mappedTo - mappedFrom, mappedFrom);
 		}else{
-			return prog * (tob - fromB) + fromB;
+			return prog * (mappedTo - mappedFrom) + mappedFrom;
 		}
 	}
 
@@ -666,7 +691,7 @@ namespace mo_yanxi::math {
 
 	export
 	template <mo_yanxi::arithmetic T>
-	MATH_ATTR T clamp_range(const T v, const T absMax) noexcept{
+	[[nodiscard]] MATH_ATTR constexpr T clamp_range(const T v, const T absMax) noexcept{
 		MATH_ASSERT(absMax >= 0);
 
 		if(math::abs(v) > absMax){
@@ -726,11 +751,11 @@ namespace mo_yanxi::math {
 		T rst;
 		bool reached;
 
-		FORCE_INLINE constexpr explicit operator bool() const noexcept{
+		CONST_FN FORCE_INLINE constexpr explicit operator bool() const noexcept{
 			return reached;
 		}
 
-		FORCE_INLINE constexpr explicit(false) operator const T&() const noexcept{
+		CONST_FN FORCE_INLINE constexpr explicit(false) operator const T&() const noexcept{
 			return rst;
 		}
 	};
@@ -759,7 +784,8 @@ namespace mo_yanxi::math {
 			return rst;
 		}
 	}
-		namespace cpo_lerp {
+
+	namespace cpo_lerp {
 		template <typename T, typename Prog>
 		void lerp(const T&, const T&, Prog) noexcept = delete;
 
@@ -795,6 +821,42 @@ namespace mo_yanxi::math {
 
 	inline namespace cpo{
 		export constexpr inline cpo_lerp::impl lerp{};
+	}
+
+
+	namespace cpo_dot {
+		template <typename T, typename Prog>
+		void dot(const T&, const T&) noexcept = delete;
+
+		struct impl {
+			template <arithmetic T>
+			[[nodiscard]] FORCE_INLINE static constexpr T operator()(const T l, const T r) noexcept{
+				return l * r;
+			}
+
+			template <std::convertible_to<float> T>
+			[[nodiscard]] FORCE_INLINE static constexpr T operator()(const T& l, const T& r) noexcept{
+				return l * r;
+			}
+
+			template <std::convertible_to<double> T>
+			[[nodiscard]] FORCE_INLINE static constexpr T operator()(const T& l, const T& r) noexcept{
+				return l * r;
+			}
+
+			template <typename T>
+				requires (!arithmetic<T> && requires(const T& v){
+					{ dot(v, v) } noexcept -> arithmetic;
+				})
+			[[nodiscard]] FORCE_INLINE static constexpr auto operator()(const T& fromValue, const T& toValue) noexcept{
+				return dot(fromValue, toValue);
+			}
+
+		};
+	}
+
+	inline namespace cpo{
+		export constexpr inline cpo_dot::impl dot{};
 	}
 
 	export
@@ -936,6 +998,12 @@ namespace mo_yanxi::math {
 	}
 
 	export
+	template <std::integral T = int>
+	MATH_ATTR constexpr T floor(const float value) noexcept {
+		return static_cast<T>(value);
+	}
+
+	export
 	template <mo_yanxi::arithmetic T>
 	MATH_ATTR T round(const T num, const T step) {
 		if constexpr (std::floating_point<T>){
@@ -966,29 +1034,29 @@ namespace mo_yanxi::math {
 		}
 	}
 
-	/**
-	 * @return a sampled value based on position in an array of float values.
-	 * @param values toLerp
-	 * @param time [0, 1]
-	 */
 	export
-	template <typename T>
-	MATH_ATTR constexpr float lerp_span(const std::span<T> values, float time) noexcept {
-		if constexpr (values.size() == 0){
-			return T{};
+	template <std::ranges::random_access_range Rng, std::floating_point V>
+	[[nodiscard]] MATH_ATTR constexpr std::ranges::range_value_t<Rng> lerp_span(const Rng& values, const V time) noexcept {
+		assert(!std::ranges::empty(values));
+
+		if(time >= 1){
+			return *std::ranges::rbegin(values);
 		}
 
-		time             = clamp(time);
+		if(time <= 0){
+			return *std::ranges::begin(values);
+		}
 
-		const auto sizeF = static_cast<float>(values.size() - 1ull);
+		auto cur = time * static_cast<V>(std::ranges::size(values));
+		V idxv;
+		auto rem = std::modf(cur, &idxv);
 
-		const float pos = time * sizeF;
+		auto idx = static_cast<std::ranges::range_size_t<Rng>>(idxv);
 
-		const auto cur  = static_cast<std::size_t>(pos);
-		const auto next = math::min(cur + 1ULL, values.size() - 1ULL);
-		const float mod = pos - static_cast<float>(cur);
-		return math::lerp(values[cur], values[next], mod);
+		return lerp(values[idx], values[idx + std::ranges::range_size_t<Rng>{1}], rem);
 	}
+
+
 
 	export
 	template <typename T, std::size_t size>
@@ -1050,9 +1118,9 @@ namespace mo_yanxi::math {
 		return curve_margin(f, margin, margin);
 	}
 
-	export MATH_ATTR constexpr float dot(const float x1, const float y1, const float x2, const float y2) noexcept {
-		return x1 * x2 + y1 * y2;
-	}
+	// export MATH_ATTR constexpr float dot(const float x1, const float y1, const float x2, const float y2) noexcept {
+	// 	return x1 * x2 + y1 * y2;
+	// }
 
 	export
 	template <typename T>
@@ -1108,114 +1176,6 @@ namespace mo_yanxi::math {
 		return (x1 * x1 + y1 * y1) < dst * dst;
 	}
 
-	// template<ext::number auto cycle, auto trigger = cycle / 2>
-	// export MATH_ATTR bool cycleStep(ext::number auto cur){
-	// 	return math::mod<decltype(cur)>(cur, cycle) < trigger;
-	// }
-
-	namespace [[deprecated]] angles{
-		/**
-		 * @return Angle in [0, 360] degree
-		 */
-		export MATH_ATTR float remove_deg_cycles(float a) noexcept {
-			a = math::mod<float>(a, circle_deg_full);
-			if(a < 0)a += circle_deg_full;
-			return a;
-		}
-
-		/**
-		 * @return Angle in [-180, 180] degree
-		 */
-		export MATH_ATTR float uniform_deg(float a) noexcept {
-			a = remove_deg_cycles(a);
-			if(a > circle_deg_half){
-				return a - circle_deg_full;
-			}
-			return a;
-		}
-
-		export MATH_ATTR float forward_distance(const float angle1, const float angle2) noexcept {
-			return math::abs(angle1 - angle2);
-		}
-
-		export MATH_ATTR float backward_distance(const float angle1_in_deg, const float angle2_in_deg) noexcept {
-			return circle_deg_full - math::abs(angle1_in_deg - angle2_in_deg);
-		}
-
-		export MATH_ATTR float dst_with_sign(float a_in_deg, float b_in_deg) noexcept {
-			a_in_deg = remove_deg_cycles(a_in_deg);
-			b_in_deg = remove_deg_cycles(b_in_deg);
-
-			float dst = -(a_in_deg - b_in_deg);
-
-			if(abs(dst) > 180){
-				dst *= -1;
-			}
-
-			return std::copysign(math::min((a_in_deg - b_in_deg) < 0 ? a_in_deg - b_in_deg + circle_deg_full : a_in_deg - b_in_deg, (b_in_deg - a_in_deg) < 0 ? b_in_deg - a_in_deg + circle_deg_full : b_in_deg - a_in_deg), dst);
-		}
-
-		export MATH_ATTR float dst(float a_in_deg, float b_in_deg) noexcept {
-			a_in_deg = remove_deg_cycles(a_in_deg);
-			b_in_deg = remove_deg_cycles(b_in_deg);
-			return math::min((a_in_deg - b_in_deg) < 0 ? a_in_deg - b_in_deg + circle_deg_full : a_in_deg - b_in_deg, (b_in_deg - a_in_deg) < 0 ? b_in_deg - a_in_deg + circle_deg_full : b_in_deg - a_in_deg);
-		}
-
-		/**
-		 * @brief
-		 * @param a Angle A
-		 * @param b Angle B
-		 * @return A incounter-clockwise to B -> 1 or -1, 0
-		 */
-		export MATH_ATTR float sign_of_dst(float a, float b) noexcept {
-			a = remove_deg_cycles(a);
-			b = remove_deg_cycles(b);
-
-			float dst = -(a - b);
-
-			if(abs(dst) > 180){
-				dst *= -1;
-			}
-
-			return sign(dst);
-		}
-
-		export MATH_ATTR float move_toward_unsigned(float angle, float to, const float speed_in_positive) noexcept {
-			MATH_ASSERT(speed_in_positive >= 0);
-			if(math::abs(angles::dst(angle, to)) < speed_in_positive) return to;
-			angle = remove_deg_cycles(angle);
-			to = remove_deg_cycles(to);
-
-			if((angle > to) == (backward_distance(angle, to) > forward_distance(angle, to))){
-				angle -= speed_in_positive;
-			}else{
-				angle += speed_in_positive;
-			}
-
-			return angle;
-		}
-
-		export MATH_ATTR approach_result<float> move_toward_signed(
-			const float angle,
-			const float to,
-			const float speed,
-			const float margin) noexcept {
-			if(const float adst = angles::dst(angle, to), absSpeed = std::abs(speed); adst < absSpeed && absSpeed < margin){
-				return {to, true};
-			}
-
-			return {angle + speed, false};
-		}
-
-		export MATH_ATTR bool within(const float a, const float b, const float margin) noexcept {
-			return dst(a, b) <= margin;
-		}
-
-		export MATH_ATTR float clamp_range(const float angle, const float dest, const float range) noexcept {
-			const float dst = angles::dst(angle, dest);
-			return dst <= range ? angle : move_toward_unsigned(angle, dest, dst - range);
-		}
-	}
 
 	export
 	template <small_object T>
@@ -1321,6 +1281,13 @@ namespace mo_yanxi::math {
 	export
 	using range = section<float>;
 
+	export
+	template <std::floating_point T>
+	constexpr inline section<T> full_circle_rad{-std::numbers::pi_v<T>, std::numbers::pi_v<T>};
+
+	export
+	template <std::floating_point T>
+	constexpr inline section<T> full_circle_deg{-180, 180};
 
 	export
 	template <typename T>
@@ -1364,11 +1331,7 @@ namespace mo_yanxi::math {
 	template <typename T>
 	[[nodiscard]] MATH_ATTR constexpr T get_normalized(const T& val) noexcept{
 		if constexpr (arithmetic<T>){
-			if consteval{
-				return T{val == 0 ? 0 : val > 0 ? 1 : -1};
-			}else{
-				return T{val == 0 ? 0 : std::copysign(val, 1)};
-			}
+			return T{val == 0 ? 0 : math::copysign(1, val)};
 		}else{
 			const auto abs = math::abs(val);
 			if(math::zero(abs))return T{};
@@ -1381,12 +1344,7 @@ namespace mo_yanxi::math {
 	template <typename T, arithmetic V>
 	[[nodiscard]] MATH_ATTR constexpr T get_normalized(const T& val, const V scl) noexcept{
 		if constexpr (arithmetic<T>){
-			if consteval{
-				return T{val == 0 ? 0 : val > 0 ? scl : -scl};
-			}else{
-				return T{val == 0 ? 0 : std::copysign(scl, val)};
-			}
-
+			return T{val == 0 ? 0 : math::copysign(scl, val)};
 		}else{
 			const auto abs = math::abs(val);
 			if(math::zero(abs))return T{};
@@ -1394,6 +1352,31 @@ namespace mo_yanxi::math {
 			return val * (scl / abs);
 		}
 	}
+
+
+	export
+	template <typename T>
+	[[nodiscard]] MATH_ATTR constexpr T get_normalized_nonzero(const T& val) noexcept{
+		if constexpr (arithmetic<T>){
+			return math::copysign<T>(1, val);
+		}else{
+			const auto abs = math::abs(val);
+			return val * (1 / abs);
+		}
+	}
+
+	export
+	template <typename T, arithmetic V>
+	[[nodiscard]] MATH_ATTR constexpr T get_normalized_nonzero(const T& val, const V scl) noexcept{
+		if constexpr (arithmetic<T>){
+			return math::copysign<T>(scl, val);
+		}else{
+			const auto abs = math::abs(val);
+			return val * (scl / abs);
+		}
+	}
+
+
 }
 //
 // template <std::size_t N, typename T>

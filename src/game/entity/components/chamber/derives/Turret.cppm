@@ -1,5 +1,7 @@
 module;
 
+#include <cassert>
+#include "../src/ext/adapted_attributes.hpp"
 
 export module mo_yanxi.game.ecs.component.chamber.turret;
 
@@ -8,18 +10,21 @@ export import mo_yanxi.game.meta.content_ref;
 export import mo_yanxi.game.meta.projectile;
 export import mo_yanxi.game.meta.chamber;
 export import mo_yanxi.game.meta.turret;
+
 import mo_yanxi.math;
+import mo_yanxi.math.constrained_system;
 
 import std;
 
 namespace mo_yanxi::game::ecs{
 	namespace chamber{
 
+		constexpr float stand_by_reload = 120;
+
 		export
 		enum struct turret_state{
-			standby,
-			will_standby,
 			reloading,
+			shoot_staging,
 			shooting
 		};
 
@@ -37,20 +42,26 @@ namespace mo_yanxi::game::ecs{
 			float shooting_field_angle{};
 
 			math::angle rotation{};
+			float rotate_speed{};
 			float standby_reload{};
 
 
 			float reload{};
-			unsigned burst_progress{};
+			unsigned shoot_index{};
 			float burst_reload{};
 			target target{};
 
 		private:
+			turret_state state_{};
 			turret_cache cache_{};
 
 		public:
 
 			[[nodiscard]] turret_build() = default;
+
+			[[nodiscard]] explicit turret_build(const meta::turret::turret_body& body)
+				: body(body){
+			}
 
 			void reset_body(const meta::turret::turret_body& body) noexcept{
 				this->body = body;
@@ -67,88 +78,141 @@ namespace mo_yanxi::game::ecs{
 
 		private:
 			[[nodiscard]] bool is_shooting() const noexcept{
-				return burst_progress > 0;
+				return state_ == turret_state::shoot_staging;
 			}
 
-			void begin_shoot() noexcept{
-				burst_progress = 1;
+			// void begin_shoot() noexcept{
+			// 	burst_progress = 1;
+			// }
+
+			void shoot(math::trans2 shoot_offset, const chunk_meta& chunk_meta, world::entity_top_world& top_world) const;
+
+			[[nodiscard]] std::optional<float> get_estimate_target_rotation() const noexcept{
+				assert(target);
+
+				const auto& motion = target.entity->at<mech_motion>();
+				const auto pos = get_local_to_global_trans(transform.vec);
+
+				if(const auto rst =
+					estimate_shoot_hit_delay(
+						target.local_pos(),
+						motion.vel.vec,
+						cache_.projectile_speed,
+						body.shoot_type.offset.trunk.x)){
+
+					const auto tgt_pos = pos.apply_inv_to(motion.pos().fma(motion.vel.vec, rst));
+					const auto ang = tgt_pos.angle_rad();
+					return std::optional{ang};
+				}
+
+				return std::nullopt;
 			}
 
-			void shoot(const chunk_meta& chunk_meta, world::entity_top_world& top_world) const;
+			void shoot_until(unsigned current_count, const chunk_meta& chunk_meta, world::entity_top_world& top_world){
+				for(; shoot_index < current_count; ++shoot_index){
+					auto idx = body.shoot_type.get_shoot_index(shoot_index);
 
-			void rotate(){
-				if(target){
-					const auto& motion = target.entity->at<mech_motion>();
-					const auto pos = get_local_to_global_trans(transform.vec);
+					for(unsigned i = 0; i < body.shoot_type.offset.count; ++i){
+						auto off = body.shoot_type[idx, i];
 
-					if(const auto rst =
-						estimate_shoot_hit_delay(
-							target.local_pos,
-							motion.vel.vec,
-							cache_.projectile_speed,
-							body.shoot_type.offset.trunk.x)){
-						const auto tgt = pos.apply_inv_to(motion.pos() + motion.vel.vec * rst);
-						const auto ang = tgt.angle_rad();
-						rotation.rotate_toward(ang, get_update_delta());
+						shoot(off, chunk_meta, top_world);
 					}
 				}
 			}
 
-			void reload_turret(const chunk_meta& chunk_meta, world::entity_top_world& top_world){
-				if(!is_shooting()){
-					if(const auto rst = math::forward_approach_then(reload, body.reload_duration, get_update_delta())){
+			void reload_turret(const float delta, const chunk_meta& chunk_meta, world::entity_top_world& top_world){
+				bool has_target = static_cast<bool>(target);
+				switch(state_){
+				case turret_state::reloading: if(has_target || body.actively_reload){
+					if(const auto rst = math::forward_approach_then(reload, body.reload_duration, delta)){
+						state_ = turret_state::shoot_staging;
 						reload = 0;
-						begin_shoot();
 					}else{
 						reload = rst;
 					}
-				}else{
-					if(const auto rst = math::forward_approach_then(burst_reload, body.shoot_type.burst.spacing, get_update_delta())){
-						burst_reload = 0;
-						if(burst_progress <= body.shoot_type.burst.count){
-							++burst_progress;
-							shoot(chunk_meta, top_world);
-						}else{
-							burst_progress = 0;
-						}
+					break;
+				}
+
+				case turret_state::shoot_staging:{
+					if(has_target){
+						state_ = turret_state::shooting;
 					}else{
-						burst_reload = rst;
+						break;
 					}
 				}
+
+				case turret_state::shooting:{
+					//TODO break on target lost?
+					if(!has_target){
+						state_ = turret_state::shoot_staging;
+						break;
+					}
+
+					burst_reload += delta;
+					auto total = body.shoot_type.get_total_shoots();
+					auto next = body.shoot_type.get_current_shoot_index(burst_reload);
+					auto nextIdx = math::min(next.salvo_index * body.shoot_type.burst.count + next.burst_index, total);
+					shoot_until(nextIdx, chunk_meta, top_world);
+					if(nextIdx == total){
+						burst_reload = 0;
+						shoot_index = 0;
+						state_ = turret_state::reloading;
+					}
+
+					break;
+				}
+				}
+
 			}
+
+			void rotate_to(const float target, const float update_delta_tick) noexcept{
+				const auto torque = rotate_torque * data().get_efficiency();
+				const auto angular_accel_max = torque / body.rotational_inertia;
+
+				const auto angular_accel = math::constrain_resolve::smooth_approach(target - rotation, rotate_speed, angular_accel_max);
+				rotate_speed += angular_accel.radians() * update_delta_tick;
+				rotate_speed = math::clamp_range(rotate_speed, body.max_rotate_speed);
+				rotation += rotate_speed;
+			}
+
+			bool update_target() noexcept{
+				if(target){
+					if(
+						!target.update(transform.get_trans() | data().get_trans()) ||
+						!validate_target(target.local_pos())){
+						target = nullptr;
+					}else{
+						return true;
+					}
+				}
+				return false;
+			}
+
+
 
 		public:
 			void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world) override{
+				if(!update_target()){
+					//TODO fetch target and update;
+					//update instantly
+					target = data().grid().targets_primary.get_optimal();
+					update_target();
+				}
+
+				const auto dlt = top_world.component_manager.get_update_delta();
+				reload_turret(dlt, chunk_meta, top_world);
+
 				if(target){
-					target.update(transform.get_trans() | data().get_trans());
-					if(!validate_target(target.local_pos)){
-						target = nullptr;
+					standby_reload = 0;
+					rotate_to(get_estimate_target_rotation().value_or(target.local_pos().angle_rad()), dlt);
+				}else {
+					if(standby_reload >= stand_by_reload){
+						rotate_to(0, dlt);
 					}else{
-						reload_turret(chunk_meta, top_world);
+						standby_reload += dlt;
 					}
-				}else if(auto tgt = data().grid().targets_primary.get_optimal()){
-					if(validate_target(data().get_trans().apply_inv_to((*tgt->*&mech_motion::pos)()))){
-						target = tgt;
-					}else{
-						target = nullptr;
-					}
-
-				}else{
-					target = nullptr;
 				}
 
-
-				rotate();
-
-				/*if(target && !target.update(turret_center_local_trans | data().get_trans())){
-					return;
-				}
-
-				auto& motion = target.entity->at<mech_motion>();
-				auto target_trs = turret_center_local_trans.apply_inv_to(motion.trans);
-				if(!validate_target(target_trs.vec)){
-					target.entity.reset(nullptr);
-				}*/
 			}
 		};
 

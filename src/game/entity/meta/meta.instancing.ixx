@@ -28,7 +28,6 @@ namespace mo_yanxi::game::meta{
 			ecs::component_manager& manager;
 			const meta_info& meta;
 			component_chunk_type* components{};
-			ecs::entity_id result{};
 
 			[[nodiscard]] promise_type() = default;
 
@@ -51,8 +50,8 @@ namespace mo_yanxi::game::meta{
 				return {};
 			}
 
-			void return_value(ecs::entity_id rst) noexcept{
-				result = rst;
+			static void return_void() noexcept{
+
 			}
 
 			[[noreturn]] static void unhandled_exception() noexcept{
@@ -102,11 +101,6 @@ namespace mo_yanxi::game::meta{
 		[[nodiscard]] const meta_info& get_meta() const noexcept{
 			return hdl.promise().meta;
 		}
-
-		[[nodiscard]] ecs::entity_id get_result_entity() const noexcept{
-			return hdl.promise().result;
-		}
-
 
 	private:
 		void dstry() noexcept{
@@ -168,10 +162,7 @@ namespace mo_yanxi::game::meta{
 		comp.set_damage(metainfo.damage);
 		comp.duration.set(metainfo.lifetime);
 
-		co_yield comp;
 
-		//TODO support cancel maybe
-
-		co_return manager.create_entity_deferred<ecs::decl::projectile_entity_desc>(std::move(comp));
+		co_yield manager.create_entity_deferred<ecs::decl::projectile_entity_desc>(std::move(comp));
 	}
 }

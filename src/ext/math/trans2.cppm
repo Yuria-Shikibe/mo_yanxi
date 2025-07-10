@@ -78,6 +78,12 @@ export namespace mo_yanxi::math{
 			return *this;
 		}
 
+		FORCE_INLINE constexpr transform2& operator+=(const vec_t other) noexcept{
+			vec += other;
+
+			return *this;
+		}
+
 		FORCE_INLINE constexpr transform2& operator-=(const transform2 other) noexcept{
 			vec -= other.vec;
 			rot -= other.rot;
@@ -132,10 +138,21 @@ export namespace mo_yanxi::math{
 		}
 
 
-		friend bool operator==(const transform2& lhs, const transform2& rhs) noexcept = default;
+		constexpr friend bool operator==(const transform2& lhs, const transform2& rhs) noexcept = default;
 
 		[[nodiscard]] constexpr cos_sin_result rot_cos_sin() const noexcept{
 			return math::cos_sin(rot);
+		}
+
+		[[nodiscard]] constexpr bool within(const transform2& rhs, float dst_margin, float ang_margin) const noexcept{
+			return vec.within(rhs.vec, dst_margin) && math::angles::angle_distance_abs(rot, rhs.rot) < ang_margin;
+		}
+
+		friend constexpr transform2 lerp(const transform2& lhs, const transform2& rhs, float p){
+			return {
+				lerp(lhs.vec, rhs.vec, p),
+				static_cast<angle_t>(lerp(uniformed_angle{lhs.rot}, uniformed_angle{rhs.rot}, p))
+				};
 		}
 	};
 
@@ -231,6 +248,8 @@ export namespace mo_yanxi::math{
 		FORCE_INLINE constexpr pos_transform2z friend operator+(pos_transform2z lhs, const pos_transform2z& rhs) noexcept{
 			return lhs += rhs;
 		}
+
+
 	};
 
 

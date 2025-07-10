@@ -244,7 +244,12 @@ namespace mo_yanxi::game{
 	struct reference_image_channel{
 		graphic::allocated_image_region image_region{};
 
+	private:
 		box_wrapper wrapper{};
+
+	public:
+
+		float scale{1.f};
 		edit_op op{};
 
 		void set_region(graphic::allocated_image_region&& region) noexcept{
@@ -253,6 +258,12 @@ namespace mo_yanxi::game{
 				.box = {region.uv.size.as<float>().scl(-.5f), region.uv.size.as<float>()},
 				.trans = {}
 			}};
+			wrapper.base.scale.set(scale);
+		}
+
+		void update_scale(float scl) noexcept{
+			scale = scl;
+			wrapper.base.scale.set(scale);
 		}
 
 		void draw(mo_yanxi::ui::draw_acquirer& acquirer) const{
@@ -260,7 +271,9 @@ namespace mo_yanxi::game{
 				auto last = acquirer.get_region();
 				auto mode = acquirer.proj;
 
-				acquirer << static_cast<const mo_yanxi::ui::draw_acquirer::region_type&>(image_region);
+				auto region = static_cast<const mo_yanxi::ui::draw_acquirer::region_type&>(image_region);
+				region.uv.flip_y();
+				acquirer << region;
 
 				acquirer.proj.set_layer(mo_yanxi::ui::draw_layers::base);
 				graphic::draw::fill::quad(acquirer.get(), wrapper.base.crop().view_as_quad());
@@ -1073,7 +1086,7 @@ namespace mo_yanxi::game{
 				}
 
 
-				void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action,
+				void on_key_input(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action,
 							   const core::ctrl::key_code_t mode) override{
 					using namespace core::ctrl;
 
@@ -1093,146 +1106,7 @@ namespace mo_yanxi::game{
 			button<icon_frame>* origin_point_modify{};
 			check_box* checkbox{};
 
-			void build_menu(){
-				menu->clear_children();
-				menu->template_cell.set_external({false, true}).set_pad({.bottom = 8});
-
-				{
-					auto box = menu->end_line().emplace<button<icon_frame>>();
-					box.cell().set_height(60);
-					box->set_style(ui::theme::styles::no_edge);
-					box->set_drawable(ui::theme::icons::blender_icon_pivot_cursor);
-					box->set_tooltip_state({
-						.layout_info = tooltip_layout_info{
-							.follow = tooltip_follow::owner,
-							.align_owner = align::pos::top_right,
-							.align_tooltip = align::pos::top_left,
-						},
-						.use_stagnate_time = false,
-						.auto_release = false,
-						.min_hover_time = tooltip_create_info::disable_auto_tooltip
-					}, [this](ui::table& table){
-						table.prop().size.set_minimum_size({400, 0});
-						table.set_entire_align(align::pos::top_left);
-						table.template_cell.set_external({true, true});
-						table.template_cell.pad.top = 12;
-
-						table.end_line().function_init([this](label& area){
-							area.set_style();
-							area.set_scale(.6f);
-							area.set_text("x  ");
-						});
-						table.function_init([this](numeric_input_area& area){
-							area.set_style();
-							area.set_scale(.6f);
-							area.set_target(viewport->channel_hitbox.origin_trans.vec.x);
-						});
-
-						table.end_line().function_init([this](label& area){
-							area.set_style();
-							area.set_scale(.6f);
-							area.set_text("y  ");
-						});
-						table.function_init([this](numeric_input_area& area){
-							area.set_style();
-							area.set_scale(.6f);
-							area.set_target(viewport->channel_hitbox.origin_trans.vec.y);
-						});
-
-						table.end_line().function_init([this](label& area){
-							area.set_style();
-							area.set_scale(.6f);
-							area.set_text("rot");
-						});
-						table.function_init([this](numeric_input_area& area){
-							area.set_style();
-							area.set_scale(.6f);
-							area.set_target(ui::edit_target{&viewport->channel_hitbox.origin_trans.rot, math::deg_to_rad_v<float>, math::pi_2});
-
-						});
-						table.set_edge_pad(0);
-					});
-					box->set_button_callback_build_tooltip();
-
-					origin_point_modify = std::to_address(box);
-				}
-
-				{
-					auto box = menu->end_line().emplace<ui::check_box>();
-					box.cell().set_height(60);
-					box->set_style(ui::theme::styles::no_edge);
-					box->set_drawable<ui::icon_drawable>(0, ui::theme::icons::blender_icon_pivot_individual);
-					box->set_drawable<ui::icon_drawable>(1, ui::theme::icons::blender_icon_pivot_median);
-					box->set_drawable<ui::icon_drawable>(2, ui::theme::icons::blender_icon_pivot_active);
-					box->add_multi_select_tooltip({
-							.follow = tooltip_follow::owner,
-							.align_owner = align::pos::top_right,
-							.align_tooltip = align::pos::top_left,
-						});
-
-					checkbox = std::to_address(box);
-				}
-
-
-				{
-					auto b = menu->end_line().emplace<ui::button<ui::label>>();
-
-					b->set_style(ui::theme::styles::no_edge);
-					b->set_scale(.6f);
-					b->set_text("save");
-					b->set_button_callback(ui::button_tags::general, [this]{
-						auto& selector = creation::create_file_selector(creation::file_selector_create_info{
-							.requester = *this,
-							.checker = [](const creation::file_selector& s, const ui::hitbox_editor&){
-								return s.get_current_main_select().has_value();
-							},
-							.yielder = [](const creation::file_selector& s, ui::hitbox_editor& self){
-								self.write_to(s.get_current_main_select().value());
-								return true;
-							},
-							.add_file_create_button = true
-						});
-						selector.set_cared_suffix({".hbox"});
-					});
-				}
-
-
-				{
-					auto b = menu->end_line().emplace<ui::button<ui::label>>();
-
-					b->set_style(ui::theme::styles::no_edge);
-					b->set_scale(.6f);
-					b->set_text("load");
-					b->set_button_callback(ui::button_tags::general, [this]{
-						auto& selector = creation::create_file_selector(creation::file_selector_create_info{
-							*this, [](const creation::file_selector& s, const ui::hitbox_editor&){
-								return s.get_current_main_select().has_value();
-							}, [](const creation::file_selector& s, ui::hitbox_editor& self){
-								self.load_from(s.get_current_main_select().value());
-								return true;
-							}});
-						selector.set_cared_suffix({".hbox"});
-					});
-				}
-
-				{
-					auto b = menu->end_line().emplace<ui::button<ui::label>>();
-
-					b->set_style(ui::theme::styles::no_edge);
-					b->set_scale(.6f);
-					b->set_text("set ref");
-					b->set_button_callback(ui::button_tags::general, [this]{
-						auto& selector = creation::create_file_selector(creation::file_selector_create_info{
-							*this, [](const creation::file_selector& s, const ui::hitbox_editor&){
-								return s.get_current_main_select().has_value();
-							}, [](const creation::file_selector& s, ui::hitbox_editor& self){
-								self.set_image_ref(s.get_current_main_select().value());
-								return true;
-							}});
-						selector.set_cared_suffix({".png"});
-					});
-				}
-			}
+			void build_menu();
 
 		public:
 			[[nodiscard]] hitbox_editor(scene* scene, group* group)

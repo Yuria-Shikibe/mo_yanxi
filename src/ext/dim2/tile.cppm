@@ -6,6 +6,7 @@ module;
 export module mo_yanxi.dim2.tile;
 
 import ext.dim2.plane_concept;
+import mo_yanxi.math.vector2;
 import std;
 
 export namespace mo_yanxi::dim2{
@@ -252,7 +253,7 @@ export namespace mo_yanxi::dim2{
 			return width() * y + x;
 		}
 
-		template <position_constructable<size_type> Rst = std::pair<size_type, size_type>>
+		template <position_constructable<size_type> Rst = math::vector2<size_type>>
 		[[nodiscard]] constexpr Rst from_index(const size_type idx) const noexcept{
 			return Rst{idx % width(), idx / width()};
 		}
@@ -264,7 +265,7 @@ export namespace mo_yanxi::dim2{
 			return rst;
 		}
 
-		template <position_constructable<size_type> Rst = std::pair<size_type, size_type>>
+		template <position_constructable<size_type> Rst = math::vector2<size_type>>
 		[[nodiscard]] static constexpr Rst unpack(const packed_index_type pos) noexcept{
 			const auto y = static_cast<size_type>(pos & static_cast<packed_index_type>(std::numeric_limits<size_type>::max()));
 			const auto x = static_cast<size_type>((pos ^ static_cast<packed_index_type>(y)) >> sizeof(size_type) * 8);
@@ -353,9 +354,8 @@ export namespace mo_yanxi::dim2{
 			return static_cast<const Impl&>(*this).height();
 		}
 
-		template <position_constructable<size_type> Rst = std::pair<size_type, size_type>>
-		[[nodiscard]] constexpr Rst extent() const noexcept{
-			return Rst{width(), height()};
+		[[nodiscard]] constexpr math::vector2<size_type> extent() const noexcept{
+			return {width(), height()};
 		}
 
 		explicit constexpr operator bool() const noexcept{

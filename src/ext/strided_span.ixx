@@ -481,7 +481,7 @@ namespace mo_yanxi{
 				(const_cast<std::byte*>(reinterpret_cast<const std::byte*>(spans.data())) - data_) ...
 			},
 			size_(std::min(std::initializer_list<std::size_t>{spans.size() ...})),
-			stride_(spans...[0].stride())
+			stride_((spans.stride(), ...))
 		{
 			if(((stride_ != spans.stride()) || ...)){
 				std::terminate();

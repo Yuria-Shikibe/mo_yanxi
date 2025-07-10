@@ -24,9 +24,12 @@ namespace mo_yanxi::graphic{
 			vec_t pos;
 			float scale;
 
-			constexpr friend node lerp(node lhs, const node rhs, const float p) noexcept{
-				return node_type{lhs.pos.lerp(rhs.pos, p), math::lerp(lhs.scale, rhs.scale, p)};
+			FORCE_INLINE constexpr friend node lerp(const node lhs, const node rhs, const float p) noexcept{
+				return node_type{
+					math::lerp(lhs.pos, rhs.pos, p),
+					math::lerp(lhs.scale, rhs.scale, p)};
 			}
+
 		};
 
 		using node_type = node;

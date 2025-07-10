@@ -340,6 +340,7 @@ namespace mo_yanxi::game::ecs::system{
 				mech_motion& motion,
 				physical_rigid& rigid
 			){
+				manifold.hitbox.update_hitbox_with_ccd(motion.trans);
 				tree->insert({meta.id(), &manifold, &motion, &rigid});
 			});
 		}
@@ -395,14 +396,7 @@ namespace mo_yanxi::game::ecs::system{
 		}
 
 		void run_collision_test(component_manager& component_manager){
-			component_manager.sliced_each([&](
-			   manifold& manifold,
-			   const mech_motion& motion
-			){
-				manifold.hitbox.update_hitbox_with_ccd(motion.trans);
-			});
 
-			insert_all(component_manager);
 			run_collision_test_pre(component_manager);
 
 			auto rng = passed_entites.locked_range();

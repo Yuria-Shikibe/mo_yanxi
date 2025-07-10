@@ -109,7 +109,7 @@ namespace mo_yanxi::ui{
 
 				math::vec2 content_size{};
 				if(get_interped_progress() >= std::numeric_limits<float>::epsilon()){
-					content_size.lerp(content_->pre_acquire_size(ext).value_or(content_->get_size()).add_y(pad), get_interped_progress());
+					content_size.lerp_inplace(content_->pre_acquire_size(ext).value_or(content_->get_size()).add_y(pad), get_interped_progress());
 				}
 				return table_size.value().add_y(content_size.y) + property.boarder.get_size();
 			}else{

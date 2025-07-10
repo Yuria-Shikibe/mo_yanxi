@@ -14,6 +14,7 @@ import mo_yanxi.func_initialzer;
 
 
 namespace mo_yanxi::ui{
+	//TODO allocator?
 
 	export
 	template <typename Fn>
@@ -45,7 +46,7 @@ namespace mo_yanxi::ui{
 		}
 
 		template <typename T, typename ...Args>
-			requires (std::constructible_from<T, scene*, group*, Args...>)
+			requires (std::constructible_from<T, scene*, group*, Args&&...>)
 		[[nodiscard]] elem_ptr(scene* scene, group* group, std::in_place_type_t<T>, Args&& ...args)
 			: element{new T{scene, group, std::forward<Args>(args)...}}{
 			if(group){

@@ -59,13 +59,13 @@ namespace mo_yanxi{
 		template <typename Tuple>
 			requires (is_tuple_v<Tuple>)
 		[[nodiscard]] constexpr explicit(false) seq_chunk(Tuple&& args)
-		: chunk_partial<T>{mo_yanxi::try_get<T>(args)} ...{
+		: chunk_partial<T>{mo_yanxi::try_get<T>(std::forward<Tuple>(args))} ...{
 
 		}
 
 		template <typename ...Args>
-			requires (sizeof...(Args) < sizeof...(T))
-		[[nodiscard]] constexpr explicit(false) seq_chunk(Args&& ...args)
+			requires (sizeof...(Args) < sizeof...(T) && sizeof...(Args) > 0)
+		[[nodiscard]] constexpr explicit(sizeof...(Args) == 1) seq_chunk(Args&& ...args)
 		: seq_chunk{std::make_tuple(std::forward<Args>(args)...)}{
 
 		}

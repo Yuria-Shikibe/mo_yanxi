@@ -216,8 +216,8 @@ namespace mo_yanxi::game::meta::chamber{
 
 		}
 
-		virtual int get_energy_usage() const noexcept{
-			return get_energy_consumption().transform([](ecs::chamber::energy_status&& c){return -c.power;}).value_or(0);
+		[[nodiscard]] int get_energy_usage() const noexcept{
+			return get_energy_consumption().transform([](ecs::chamber::energy_status&& c){return c.power;}).value_or(0);
 		}
 
 		virtual void install(ecs::chamber::build_ref build_ref) const;
@@ -248,6 +248,7 @@ namespace mo_yanxi::game::meta::chamber{
 
 	export constexpr basic_chamber empty_chamber{[]{
 		basic_chamber c{};
+		c.hit_point = {.max = 100, .capability_range = {50, 100}};
 		c.extent = {1, 1};
 		return c;
 	}()};
@@ -258,12 +259,13 @@ namespace mo_yanxi::game::meta::chamber{
 	};
 
 	export
-	struct energy_generator : basic_chamber{
-		unsigned max_energy_generation{};
+	struct energy_generator : basic_chamber, ecs::chamber::energy_status{
 
-		[[nodiscard]] int get_energy_usage() const noexcept override{
-			return max_energy_generation;
+		[[nodiscard]] std::optional<ecs::chamber::energy_status> get_energy_consumption() const noexcept override{
+			return deduced_get_energy_consumption();
 		}
+
+		ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::manifold_ref grid, math::point2 where) const override;
 	};
 
 	template <std::derived_from<basic_chamber> T>

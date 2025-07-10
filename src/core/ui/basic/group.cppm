@@ -228,10 +228,7 @@ namespace mo_yanxi::ui{
 			return add_children(std::move(elem), std::numeric_limits<std::size_t>::max());
 		}
 
-		template <typename E, typename ...Args>
-		requires requires{
-			requires std::is_base_of_v<elem, E>;
-		}
+		template <std::derived_from<elem> E, typename ...Args>
 		E& emplace_children_at(std::size_t index, Args&&... args){
 			auto& elem = add_children(elem_ptr{get_scene(), this, std::in_place_type<E>, std::forward<Args>(args) ...}, index);
 			return static_cast<E&>(elem);
@@ -246,6 +243,7 @@ namespace mo_yanxi::ui{
 
 			elem::update(delta_in_ticks);
 
+			if(is_sleep())return;
 			update_children(delta_in_ticks);
 		}
 

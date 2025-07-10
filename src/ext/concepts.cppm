@@ -107,9 +107,42 @@ namespace mo_yanxi {
 	export
 	template <typename T>
 	concept tuple_spec = spec_of<T, std::tuple>;
+	static_assert(tuple_spec<std::tuple<>>);
 
     template <typename T>
     concept complete_type = requires{
         sizeof(T);
     };
+
+
+	export
+	template <typename T>
+	struct is_statically_sized_range_size : std::integral_constant<std::size_t, 0> {};
+
+	template <typename T>
+	struct is_statically_sized_range_size<std::ranges::single_view<T>> : std::integral_constant<std::size_t, 1> {};
+
+	template <typename T, std::size_t sz>
+	struct is_statically_sized_range_size<std::array<T, sz>> : std::integral_constant<std::size_t, sz> {};
+
+	template <typename T, std::size_t sz>
+	struct is_statically_sized_range_size<T[sz]> : std::integral_constant<std::size_t, sz> {};
+
+	template <typename T, std::size_t sz>
+		requires (sz != std::dynamic_extent)
+	struct is_statically_sized_range_size<std::span<T, sz>> : std::integral_constant<std::size_t, sz> {};
+
+
+	export
+	template<class R>
+	concept statically_sized_range = std::ranges::sized_range<R> && (is_statically_sized_range_size<R>::value > 0uz);
+
+
+	static_assert(statically_sized_range<int[2]>);
+	static_assert(statically_sized_range<std::array<int, 2>>);
+	static_assert(statically_sized_range<std::span<int, 2>>);
+	static_assert(!statically_sized_range<std::span<int>>);
+	static_assert(!statically_sized_range<std::vector<int>>);
+
+
 }

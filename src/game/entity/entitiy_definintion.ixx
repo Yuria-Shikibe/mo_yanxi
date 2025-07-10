@@ -8,6 +8,7 @@ export import mo_yanxi.game.ecs.component.chamber.ui_builder;
 export import mo_yanxi.game.ecs.component.projectile.manifold;
 export import mo_yanxi.game.ecs.component.hitbox;
 export import mo_yanxi.game.ecs.component.faction;
+export import mo_yanxi.game.ecs.component.command;
 
 export import mo_yanxi.game.ecs.component.projectile.drawer;
 export import mo_yanxi.game.ecs.component.projectile.ui_builder;
@@ -22,6 +23,7 @@ namespace mo_yanxi::game::ecs{
 			manifold,
 			physical_rigid,
 			faction_data,
+			move_command,
 			chamber::chamber_manifold,
 			chamber::chamber_ui_builder
 		>;

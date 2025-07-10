@@ -95,6 +95,9 @@ namespace mo_yanxi::core{
 		    timeReseter(0);
 		}
 
+		[[nodiscard]] constexpr double raw_global_time() const noexcept{return globalTime;}
+
+
 		[[nodiscard]] constexpr Sec global_delta() const noexcept{return Sec{static_cast<T>(globalDelta)};}
 		[[nodiscard]] constexpr Sec update_delta() const noexcept{return Sec{static_cast<T>(updateDelta)};}
 

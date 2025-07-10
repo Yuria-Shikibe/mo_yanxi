@@ -1,12 +1,54 @@
 module;
 
 #include <cassert>
+#include "adapted_attributes.hpp"
 
 export module mo_yanxi.basic_util;
 
 import std;
 
 namespace mo_yanxi{
+
+
+	template <class Ty>
+	concept Boolean_testable_impl = std::convertible_to<Ty, bool>;
+
+	export
+	template <class Ty>
+	concept boolean_testable = Boolean_testable_impl<Ty> && requires(Ty&& t) {
+		{ !static_cast<Ty&&>(t) } -> Boolean_testable_impl;
+	};
+
+	export
+	template <typename T>
+		requires requires(T& t){
+			{ t.try_lock() } noexcept -> boolean_testable;
+			{ t.unlock() } noexcept;
+		}
+	FORCE_INLINE constexpr void assert_unlocked(T& mutex) noexcept{
+#if DEBUG_CHECK
+		if(mutex.try_lock()){
+			mutex.unlock();
+			return;
+		}
+		std::println(std::cerr, "Unlocked mutex assertion failed");
+		std::terminate();
+#endif
+	}
+
+	export
+	template <typename T>
+		requires requires(T& t){
+			{ t.try_lock() } noexcept -> boolean_testable;
+		}
+	FORCE_INLINE constexpr void assert_locked(T& mutex) noexcept{
+#if DEBUG_CHECK
+		if(mutex.try_lock()){
+			std::println(std::cerr, "Unlocked mutex assertion failed");
+			std::terminate();
+		}
+#endif
+	}
 
 	export
 	template<typename... Fs>
@@ -20,6 +62,30 @@ namespace mo_yanxi{
 	export
 	template<typename... Fs>
 	overload(Fs&&...) -> overload<std::decay_t<Fs>...>;
+
+	export
+	template<typename Ret, typename... Fs>
+		requires (std::is_void_v<Ret> || std::is_default_constructible_v<Ret>)
+	struct overload_def_noop : private Fs... {
+		template <typename V, typename ...Args>
+		constexpr explicit(false) overload_def_noop(std::in_place_type_t<V>, Args&&... fs) : Fs{std::forward<Args>(fs)}... {}
+
+		using Fs::operator()...;
+
+		template <typename ...T>
+			requires (!std::invocable<Fs, T...> && ...)
+		static Ret operator()(T&& ...) noexcept{
+			if constexpr (std::is_void_v<Ret>){
+				return ;
+			}else{
+				return Ret{};
+			}
+		}
+	};
+
+	export
+	template<typename V, typename... Fs>
+	overload_def_noop(std::in_place_type_t<V>, Fs&&...) -> overload_def_noop<V, std::decay_t<Fs>...>;
 
 
 	export

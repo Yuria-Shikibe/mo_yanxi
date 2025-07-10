@@ -181,10 +181,10 @@ namespace mo_yanxi::game{
 
 	FORCE_INLINE trivial_optional_float resolve(const float a, const float b, const float c) noexcept{
 		static constexpr auto INF = std::numeric_limits<float>::infinity();
-		if(std::fabs(a) < std::numeric_limits<decltype(a)>::epsilon()){
+		if(std::abs(a) < std::numeric_limits<decltype(a)>::epsilon()){
 			const auto val = -c / b;
 			return {
-					std::fabs(b) > std::numeric_limits<decltype(a)>::epsilon() && val >= 0
+					std::abs(b) > std::numeric_limits<decltype(a)>::epsilon() && val >= 0
 						? val
 						: INF
 				};
@@ -236,7 +236,7 @@ namespace mo_yanxi::game{
 		const math::vec2 target_vel,
 		const float bullet_speed,
 		const float bullet_initial_displacement) noexcept{
-		if(std::isinf(bullet_speed)){
+		if(math::isinf(bullet_speed)){
 			return {bullet_speed > 0 ? 0 : std::numeric_limits<float>::infinity()};
 		}
 
@@ -251,7 +251,24 @@ namespace mo_yanxi::game{
 	export
 	struct target{
 		ecs::entity_ref entity{};
-		math::vec2 local_pos{};
+
+	protected:
+		math::vec2 local_pos_{};
+
+	public:
+		[[nodiscard]] target() = default;
+
+		[[nodiscard]] explicit(false) target(const ecs::entity_ref& entity) noexcept
+			: entity(entity){
+		}
+
+		[[nodiscard]] explicit(false) target(ecs::entity_ref&& entity) noexcept
+			: entity(std::move(entity)){
+		}
+
+		[[nodiscard]] PURE_FN FORCE_INLINE math::vec2 local_pos() const noexcept{
+			return local_pos_;
+		}
 
 		template <typename T>
 		auto& operator=(this T& self, const ecs::entity_id eid) noexcept{
@@ -269,7 +286,7 @@ namespace mo_yanxi::game{
 				return false;
 			}
 
-			local_pos = self_transform.apply_inv_to((entity->*&ecs::mech_motion::pos)());
+			local_pos_ = self_transform.apply_inv_to((entity->*&ecs::mech_motion::pos)());
 			return true;
 		}
 	};
@@ -281,7 +298,7 @@ namespace mo_yanxi::game{
 		using target::operator=;
 
 		bool update(math::trans2 self_transform) noexcept{
-			last = local_pos;
+			last = local_pos_;
 			return target::update(self_transform);
 		}
 	};

@@ -700,7 +700,7 @@ namespace mo_yanxi::ui{
 			return pre_acquire_size_impl(extent).transform([this](const math::vec2 v){return property.size.clamp(v);});
 		}
 
-		virtual void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode){
+		virtual void on_key_input(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode){
 
 		}
 

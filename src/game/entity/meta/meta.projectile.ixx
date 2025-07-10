@@ -38,8 +38,8 @@ namespace mo_yanxi::game::meta{
 		ecs::drawer::local_drawer drawer{};
 		meta::trail_meta_style trail_style{};
 
-		graphic::color_gradient palette{};
-		flat_seq_map<effect_usage, fx::effect_meta> shoot_effect{};
+		// graphic::color_gradient palette{};
+		// flat_seq_map<effect_usage, fx::effect_meta> shoot_effect{};
 	};
 
 }

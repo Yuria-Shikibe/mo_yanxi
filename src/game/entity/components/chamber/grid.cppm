@@ -390,32 +390,34 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 
 		template <tuple_spec Tuple, typename ...Args>
-		building_ref add_building(tile_region region, Args&& ...args){
+		auto& add_building(tile_region region, Args&& ...args){
 			if(region.area() == 0){
 				throw std::invalid_argument("invalid region");
 			}
-
-			if constexpr (std::same_as<building_data, std::tuple_element_t<0, Tuple>>){
-				return manager.create_entity_deferred<Tuple>(building_data{
-					region, this
-				}, std::forward<Args>(args)...);
-			}else{
-				using building_ty = tuple_cat_t<std::tuple<building_data>, Tuple>;
-				return manager.create_entity_deferred<building_ty>(building_data{
-					region, this
-				}, std::forward<Args>(args)...);
-			}
-		}
-		template <std::derived_from<building> Building, typename ...Args>
-		Building& add_building(tile_region region, Args&& ...args){
-			if(region.area() == 0){
-				throw std::invalid_argument("invalid region");
+			if constexpr (std::tuple_size_v<Tuple> > 0){
+				if constexpr (std::same_as<building_data, std::tuple_element_t<0, Tuple>>){
+					return manager.create_entity_deferred<Tuple>(building_data{
+						region, this
+					}, std::forward<Args>(args)...);
+				}
 			}
 
-			const entity_id ent = manager.create_entity_deferred<std::tuple<building_data, Building>>(building_data{
+			using building_ty = tuple_cat_t<std::tuple<building_data>, Tuple>;
+			return manager.create_entity_deferred<building_ty>(building_data{
 				region, this
 			}, std::forward<Args>(args)...);
-			return ent->at<Building>();
+
+		}
+
+		template <std::derived_from<building> Building, typename ...Args>
+		auto& add_building(tile_region region, Args&& ...args){
+			if(region.area() == 0){
+				throw std::invalid_argument("invalid region");
+			}
+
+			return manager.create_entity_deferred<std::tuple<building_data, Building>>(building_data{
+				region, this
+			}, std::forward<Args>(args)...);
 		}
 
 		void draw_hud(graphic::renderer_ui& renderer){
@@ -525,7 +527,7 @@ namespace mo_yanxi::game::ecs{
 
 		static void on_relocate(const chunk_meta& meta, value_type& comp){
 			comp.component_head_ = std::addressof(meta);
-			meta.id()->at<building>().data_ = std::addressof(comp);
+			if(auto b = meta.id()->try_get<building>())b->data_ = std::addressof(comp);
 		}
 	};
 

@@ -1,12 +1,21 @@
-//
-// Created by Matrix on 2025/5/9.
-//
+module;
+
+#include "adapted_attributes.hpp"
 
 export module mo_yanxi.algo.hash;
 
 import std;
+import mo_yanxi.concepts;
 
 namespace mo_yanxi::algo{
+	//TODO power of two optimization
+
+	template <typename Rng>
+	consteval bool is_constexpr_range_with_power_of_2_size() noexcept{
+		static constexpr auto b = is_statically_sized_range_size<Rng>::value;
+		return std::has_single_bit(b);
+	}
+
 	export
 	template <
 	std::ranges::random_access_range Rng,
@@ -27,6 +36,7 @@ namespace mo_yanxi::algo{
 		std::ranges::range_const_reference_t<Rng> empty = std::ranges::range_value_t<Rng>{},
 		Hash hash = {}
 		){
+
 		const auto size = std::ranges::distance(range);
 		if(size < std::ranges::distance(begin, sentinel)){
 			throw std::out_of_range{"Insufficient Hashmap Size"};
@@ -97,7 +107,16 @@ namespace mo_yanxi::algo{
 		Proj proj = {}, Hash hash = {}, EmptyCheck empty_check = {}){
 
 		const auto size = std::ranges::distance(range);
-		const auto initial_pos = hash(value) % size;
+		static constexpr bool is_pow2 = is_constexpr_range_with_power_of_2_size<Rng&&>();
+		static constexpr auto modder = [](auto index, auto sz) static constexpr noexcept FORCE_INLINE {
+			if constexpr (is_pow2){
+				return index & (sz - 1);
+			}else{
+				return index % sz;
+			}
+		};
+
+		const auto initial_pos = modder(hash(value), size);
 		auto pos = initial_pos;
 
 		do{
@@ -111,7 +130,7 @@ namespace mo_yanxi::algo{
 				return std::ranges::end(range);
 			}
 
-			pos = (pos + decltype(pos){1}) % size;
+			pos = modder(pos + decltype(pos){1}, size);
 		}while(pos != initial_pos);
 
 		return std::ranges::end(range);
@@ -128,9 +147,18 @@ namespace mo_yanxi::algo{
 		const std::remove_cvref_t<std::indirect_result_t<Proj, std::ranges::iterator_t<Rng>>>& value,
 		decltype(value) empty,
 		Proj proj = {}, Hash hash = {}){
-
 		const auto size = std::ranges::distance(range);
-		const auto initial_pos = hash(value) % size;
+
+		static constexpr bool is_pow2 = is_constexpr_range_with_power_of_2_size<Rng&&>();
+		static constexpr auto modder = [](auto index, auto sz) static constexpr noexcept FORCE_INLINE {
+			if constexpr (is_pow2){
+				return index & (sz - 1);
+			}else{
+				return index % sz;
+			}
+		};
+
+		const auto initial_pos = modder(hash(value), size);
 		auto pos = initial_pos;
 
 		do{
@@ -145,7 +173,7 @@ namespace mo_yanxi::algo{
 				return std::ranges::end(range);
 			}
 
-			pos = (pos + decltype(pos){1}) % size;
+			pos = modder(pos + decltype(pos){1}, size);
 		}while(pos != initial_pos);
 
 		return std::ranges::end(range);

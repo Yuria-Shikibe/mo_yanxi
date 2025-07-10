@@ -94,8 +94,8 @@ namespace mo_yanxi::ui{
 
 
 			{//scroll update
-				scrollVelocity.lerp(scrollTargetVelocity, delta_in_ticks * VelocitySensitivity);
-				scrollTargetVelocity.lerp({}, delta_in_ticks * VelocityDragSensitivity);
+				scrollVelocity.lerp_inplace(scrollTargetVelocity, delta_in_ticks * VelocitySensitivity);
+				scrollTargetVelocity.lerp_inplace({}, delta_in_ticks * VelocityDragSensitivity);
 
 
 				if(util::try_modify(

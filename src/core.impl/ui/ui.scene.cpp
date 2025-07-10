@@ -43,7 +43,7 @@ void mo_yanxi::ui::scene::root_draw() const{
 }
 
 double mo_yanxi::ui::scene::get_global_time() const noexcept{
-	return core::global::timer.global_time();
+	return core::global::timer.raw_global_time();
 }
 
 
@@ -192,7 +192,7 @@ void mo_yanxi::ui::scene::on_key_action(const core::ctrl::key_code_t key, const 
 		elem* focus = currentKeyFocus;
 		if(!focus) focus = currentCursorFocus;
 		if(!focus) return;
-		focus->input_key(key, action, mode);
+		focus->on_key_input(key, action, mode);
 	}
 }
 

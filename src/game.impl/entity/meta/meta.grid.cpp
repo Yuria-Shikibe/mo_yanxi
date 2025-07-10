@@ -1,3 +1,7 @@
+module;
+
+#include <cassert>
+
 module mo_yanxi.game.meta.grid;
 
 import mo_yanxi.game.ecs.component.hitbox;
@@ -84,22 +88,32 @@ void mo_yanxi::game::meta::chamber::grid::draw(graphic::renderer_ui& renderer, c
 }
 
 void mo_yanxi::game::meta::chamber::grid::dump(ecs::chamber::manifold_ref clear_grid_manifold) const{
+
+	auto& mf = ecs::chamber::to_manifold(clear_grid_manifold);
+	//TODO assert mf is empty?
 	for(unsigned y = 0; y < extent_.y; ++y){
 		for(unsigned x = 0; x < extent_.x; ++x){
 			auto& tile = (*this)[x, y];
 
-			if(tile.building){
-				auto build = tile.building->get_meta_info().create_instance_chamber(clear_grid_manifold, math::vector2{x, y}.as<int>() + get_origin_offset());
-				if(build){
-					tile.building->get_meta_info().install(*build);
-					if(auto ist = tile.building->get_instance_data()){
-						ist->install(*build);
-					}
-
-				}
+			if(tile.is_building_identity({x, y})){
+				tile.building->get_meta_info().create_instance_chamber(clear_grid_manifold, math::vector2{x, y}.as<int>() + get_origin_offset());
 			}else if(tile.is_idle()){
 				empty_chamber.create_instance_chamber(clear_grid_manifold, math::vector2{x, y}.as<int>() + get_origin_offset());
 			}
 		}
 	}
+
+	mf.manager.do_deferred();
+
+	mf.manager.sliced_each([this](ecs::chamber::building& building){
+		const auto pos = coord_to_index(building.data().region().src).value();
+		const auto build = (*this)[pos].building;
+
+		assert(build != nullptr);
+
+		build->get_meta_info().install(building);
+		if(auto ist = build->get_instance_data()){
+			ist->install(building);
+		}
+	});
 }

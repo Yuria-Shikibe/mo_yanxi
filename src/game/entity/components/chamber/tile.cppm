@@ -1,10 +1,7 @@
-//
-// Created by Matrix on 2024/4/18.
-//
-
-// ReSharper disable CppDFAUnreachableCode
 module;
 
+//#define GCH_DISABLE_CONCEPTS //otherwise clang ice...
+#include <gch/small_vector.hpp>
 #include <cassert>
 
 export module mo_yanxi.game.ecs.component.chamber:tile;
@@ -29,8 +26,7 @@ import std;
 namespace mo_yanxi::game::ecs{
 
 	namespace chamber{
-		export constexpr int tile_size_integral = 64;
-		export constexpr float tile_size = tile_size_integral;
+
 
 		export struct tile;
 		export class tile_grid;
@@ -203,6 +199,8 @@ namespace mo_yanxi::game::ecs{
 
 			//TODO should this be public?
 			//TODO uses unique ptr to save bytes?
+
+			//
 			std::vector<tile_status> tile_states{};
 			float building_damage_take{};
 			float structural_damage_take{};
@@ -210,10 +208,24 @@ namespace mo_yanxi::game::ecs{
 			energy_status energy_status{};
 
 		private:
+			energy_dynamic_status energy_dynamic_status_{};
 
 		public:
+			void set_energy_status(const chamber::energy_status& status) noexcept{
+				energy_status = status;
+				energy_dynamic_status_ = {};
+			}
+
+			[[nodiscard]] const energy_dynamic_status& get_energy_dynamic_status() const noexcept{
+				return energy_dynamic_status_;
+			}
+
 			[[nodiscard]] float get_capability_factor() const noexcept{
 				return hit_point.get_capability_factor();
+			}
+
+			[[nodiscard]] float get_efficiency() const noexcept{
+				return energy_status ? energy_dynamic_status_.get_energy_factor(energy_status) : 1;
 			}
 
 			[[nodiscard]] int get_max_usable_energy() const noexcept{
@@ -282,6 +294,10 @@ namespace mo_yanxi::game::ecs{
 				}else{
 					return damage_consume_result::hitpoint_exhaust;
 				}
+			}
+
+			void update(float update_delta_tick) noexcept{
+				if(energy_status)energy_dynamic_status_.update(energy_status, get_capability_factor(), update_delta_tick);
 			}
 
 		public:

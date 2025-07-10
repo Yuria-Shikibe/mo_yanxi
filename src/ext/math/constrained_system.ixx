@@ -10,25 +10,25 @@ import std;
 
 namespace mo_yanxi::math::constrain_resolve{
 	template <typename T, typename V>
-	FORCE_INLINE [[nodiscard]] constexpr T get_normalized(const T& val, const V abs) noexcept{
+	FORCE_INLINE [[nodiscard]] constexpr T get_normalized_(const T& val, const V abs, const V scl) noexcept{
 		if constexpr (std::is_arithmetic_v<T>){
 			if consteval{
-				return T{val == 0 ? 0 : val > 0 ? 1 : -1};
+				return T{val == 0 ? 0 : val > 0 ? scl : -scl};
 			}else{
-				return T{val == 0 ? 0 : std::copysign(val, 1)};
+				return T{val == 0 ? 0 : std::copysign(scl, val)};
 			}
 		}else{
 			if(math::zero(abs))return T{};
 
-			return val * (1 / abs);
+			return val * (scl / abs);
 		}
 	}
 
 	export
-	template <typename T, std::floating_point M>
-	constexpr T smooth_approach_lerp(
-		const T& approach,
-		const T& initial_first_derivative,
+	template <typename T0, typename T1, std::floating_point M>
+	[[nodiscard]] CONST_FN constexpr T0 smooth_approach_lerp(
+		const T0& approach,
+		const T1& initial_first_derivative,
 		const M max_second_derivative,
 		const M margin,
 		const M yaw_correction_factor = M{0.5}
@@ -38,8 +38,8 @@ namespace mo_yanxi::math::constrain_resolve{
 		assert(margin > 0);
 
 		const auto idvLen = math::sqr(initial_first_derivative);
-		const auto idvAbs = [&]{
-			if constexpr (std::is_arithmetic_v<T>){
+		const auto idvAbs = [&] FORCE_INLINE {
+			if constexpr (std::is_arithmetic_v<T1>){
 				return math::abs(initial_first_derivative);
 			}else{
 				return math::sqrt(idvLen);
@@ -50,7 +50,7 @@ namespace mo_yanxi::math::constrain_resolve{
 		const auto overhead = idvLen / (2 * max_second_derivative);
 		if(math::zero(idvAbs)){
 			if(dst <= margin){
-				return T{};
+				return T0{};
 			}
 		}else{
 			if(dst <= overhead + margin){
@@ -59,25 +59,29 @@ namespace mo_yanxi::math::constrain_resolve{
 		}
 
 
-		const auto instruction = math::lerp(approach, constrain_resolve::get_normalized(initial_first_derivative, idvAbs / -overhead), yaw_correction_factor);
+		const auto yaw = constrain_resolve::get_normalized_(initial_first_derivative, idvAbs, -overhead);
+		const auto instruction = math::lerp(
+			approach,
+			math::lerp(approach, yaw, math::map<M, M>(math::dot(approach, yaw), 0, -overhead * dst, 0, 1)), yaw_correction_factor);
 		return math::get_normalized(instruction, max_second_derivative);
 	}
 
 	export
-	template <typename T, std::floating_point M>
-	constexpr T smooth_approach(
-		const T& approach,
-		const T& initial_first_derivative,
+	template <typename T0, typename T1, std::floating_point M>
+	[[nodiscard]] CONST_FN constexpr T0 smooth_approach(
+		const T0& approach,
+		const T1& initial_first_derivative,
 		const M max_second_derivative,
-		const M margin
+		const M margin = std::numeric_limits<M>::epsilon()
 		) noexcept{
 
-		assert(max_second_derivative > 0);
-		assert(margin > 0);
+		if(max_second_derivative <= 0)return T0{};
+
+		assert(margin >= 0);
 
 		const auto idvLen = math::sqr(initial_first_derivative);
-		const auto idvAbs = [&]{
-			if constexpr (std::is_arithmetic_v<T>){
+		const auto idvAbs = [&] FORCE_INLINE {
+			if constexpr (std::is_arithmetic_v<T1>){
 				return math::abs(initial_first_derivative);
 			}else{
 				return math::sqrt(idvLen);
@@ -88,7 +92,7 @@ namespace mo_yanxi::math::constrain_resolve{
 		const auto overhead = idvLen / (2 * max_second_derivative);
 		if(math::zero(idvAbs)){
 			if(dst <= margin){
-				return T{};
+				return T0{};
 			}
 		}else{
 			if(dst <= overhead + margin){
@@ -96,7 +100,7 @@ namespace mo_yanxi::math::constrain_resolve{
 			}
 		}
 
-		const auto instruction = approach + constrain_resolve::get_normalized(initial_first_derivative, idvAbs / -overhead);
+		const auto instruction = approach + constrain_resolve::get_normalized_(initial_first_derivative, idvAbs, -overhead);
 		return math::get_normalized(instruction, max_second_derivative);
 	}
 }

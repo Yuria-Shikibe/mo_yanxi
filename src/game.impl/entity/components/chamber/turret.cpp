@@ -69,14 +69,14 @@ namespace mo_yanxi::game::ecs::chamber{
 		draw::line::circle(acquirer, pos, body.range.to, 5, ui::theme::colors::pale_green, ui::theme::colors::pale_green);
 
 		auto offset_dir = math::vec2::from_polar_rad(rotation.radians() + trs.rot);
-		draw::line::line(acquirer.get(), pos + offset_dir * 32, pos + offset_dir * 96, 4, ui::theme::colors::accent, ui::theme::colors::accent);
+		draw::line::line(acquirer.get(), pos + offset_dir * 32, pos + offset_dir * 96, 12, ui::theme::colors::accent, ui::theme::colors::accent);
 
 
 		if(target){
 			auto& motion = target.entity->at<mech_motion>();
 			draw::line::line(acquirer.get(), pos, motion.pos(), 4, ui::theme::colors::theme, ui::theme::colors::accent);
 
-			if(auto rst = estimate_shoot_hit_delay(target.local_pos, motion.vel.vec, cache_.projectile_speed, body.shoot_type.offset.trunk.x)){
+			if(auto rst = estimate_shoot_hit_delay(target.local_pos(), motion.vel.vec, cache_.projectile_speed, body.shoot_type.offset.trunk.x)){
 				auto mov = rst * motion.vel.vec;
 				draw::line::line(acquirer.get(), pos, motion.pos() + mov, 4, ui::theme::colors::clear, ui::theme::colors::accent);
 				draw::line::square(acquirer, {motion.pos() + mov, 45 * math::deg_to_rad}, 32, 3, ui::theme::colors::accent);
@@ -86,14 +86,17 @@ namespace mo_yanxi::game::ecs::chamber{
 
 	}
 
-	void turret_build::shoot(const chunk_meta& chunk_meta, world::entity_top_world& top_world) const{
+	void turret_build::shoot(math::trans2 shoot_offset, const chunk_meta& chunk_meta, world::entity_top_world& top_world) const{
 		if(body.shoot_type.projectile){
 			auto hdl = meta::create(top_world.component_manager, *body.shoot_type.projectile);
-			auto trs = get_local_to_global_trans(transform);
+			auto& comp = hdl.get_components();
+			shoot_offset.rot += rotation;
+			const auto trs = get_local_to_global_trans(shoot_offset | transform);
 
-			hdl.set_initial_trans(math::trans2{body.shoot_type.offset.trunk} | trs);
+			hdl.set_initial_trans(trs);
 			hdl.set_initial_vel(trs.rot + math::rand{}(body.shoot_type.angular_inaccuracy));
 			hdl.set_faction(chunk_meta.id()->at<faction_data>().faction);
 		}
+
 	}
 }

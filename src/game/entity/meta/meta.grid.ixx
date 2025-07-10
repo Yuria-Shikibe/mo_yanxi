@@ -16,8 +16,8 @@ import mo_yanxi.graphic.renderer.world;
 
 
 namespace mo_yanxi::game::meta::chamber{
-	constexpr int tile_size_integral = 64;
-	constexpr float tile_size = tile_size_integral;
+	constexpr inline int tile_size_integral = ecs::chamber::tile_size_integral;
+	constexpr inline float tile_size = tile_size_integral;
 
 
 	using chamber_meta = const basic_chamber*;
@@ -161,10 +161,10 @@ namespace mo_yanxi::game::meta::chamber{
 		[[nodiscard]] explicit grid(const hitbox& hitbox);
 
 
-		[[nodiscard]] grid(math::usize2 extent, math::point2 origin_coord, std::span<const grid_tile> tiles) :
+		[[nodiscard]] grid(const math::usize2 extent, const math::point2 origin_coord, std::span<const grid_tile> tiles) :
 			origin_coord_(origin_coord), extent_(extent), tiles_(std::from_range, tiles){}
 
-		[[nodiscard]] grid(math::usize2 extent, math::point2 origin_coord, std::vector<grid_tile>&& tiles) noexcept :
+		[[nodiscard]] grid(const math::usize2 extent, const math::point2 origin_coord, std::vector<grid_tile>&& tiles) noexcept :
 			origin_coord_(origin_coord), extent_(extent), tiles_(std::move(tiles)){}
 
 		const energy_status& get_energy_status() const noexcept{
@@ -211,7 +211,7 @@ namespace mo_yanxi::game::meta::chamber{
 			return world_tile_region.as<unsigned>();
 		}
 
-		grid_building* try_place_building_at(index_coord indexed_pos, const basic_chamber& info){
+		grid_building* try_place_building_at(const index_coord indexed_pos, const basic_chamber& info){
 			if(!is_building_placeable_at(indexed_pos, info))return nullptr;
 
 			const auto ext = info.extent;
@@ -221,14 +221,14 @@ namespace mo_yanxi::game::meta::chamber{
 
 			energy_status_.update_energy_status_on_add(b);
 
-			region.each([&](math::upoint2 p){
+			region.each([&](const math::upoint2 p){
 				tile_at(p).building = std::addressof(b);
 			});
 
 			return &b;
 		}
 
-		bool erase_building_at(math::upoint2 indexed_pos) noexcept {
+		bool erase_building_at(const math::upoint2 indexed_pos) noexcept {
 			if(indexed_pos.beyond_equal(extent_))return false;
 
 			auto& tile = tile_at(indexed_pos);
@@ -237,7 +237,7 @@ namespace mo_yanxi::game::meta::chamber{
 
 			energy_status_.update_energy_status_on_erase(*b);
 
-			tile.building->get_indexed_region().each([this](math::upoint2 p){
+			tile.building->get_indexed_region().each([this](const math::upoint2 p){
 				tile_at(p).building = nullptr;
 			});
 
@@ -247,7 +247,7 @@ namespace mo_yanxi::game::meta::chamber{
 			return true;
 		}
 
-		bool is_building_placeable_at(index_coord indexed_pos, const basic_chamber& info) const noexcept{
+		bool is_building_placeable_at(const index_coord indexed_pos, const basic_chamber& info) const noexcept{
 			auto ext = info.extent;
 			math::urect region{tags::from_extent, indexed_pos, ext};
 			if(!math::urect{extent_}.contains_loose(region))return false;
@@ -262,7 +262,7 @@ namespace mo_yanxi::game::meta::chamber{
 			return true;
 		}
 
-		[[nodiscard]] bool is_placeable_at(math::urect region_in_index) const noexcept{
+		[[nodiscard]] bool is_placeable_at(const math::urect region_in_index) const noexcept{
 			for(unsigned y = 0; y < region_in_index.height(); ++y){
 				for(unsigned x = 0; x < region_in_index.width(); ++x){
 					if(!tile_at(region_in_index.src + math::vector2{x, y}).placeable)return false;
@@ -272,12 +272,12 @@ namespace mo_yanxi::game::meta::chamber{
 			return true;
 		}
 
-		[[nodiscard]] grid_tile& tile_at(math::upoint2 index_pos) noexcept{
+		[[nodiscard]] grid_tile& tile_at(const math::upoint2 index_pos) noexcept{
 			assert(index_pos.within(extent_));
 			return tiles_[extent_.x * index_pos.y + index_pos.x];
 		}
 
-		[[nodiscard]] const grid_tile& tile_at(math::upoint2 index_pos) const noexcept{
+		[[nodiscard]] const grid_tile& tile_at(const math::upoint2 index_pos) const noexcept{
 			assert(index_pos.within(extent_));
 			return tiles_[extent_.x * index_pos.y + index_pos.x];
 		}
@@ -286,6 +286,7 @@ namespace mo_yanxi::game::meta::chamber{
 		decltype(auto) operator[](this S&& self, math::upoint2 index_pos) noexcept{
 			return self.tile_at(index_pos);
 		}
+
 		template <typename S>
 		decltype(auto) operator[](this S&& self, unsigned x, unsigned y) noexcept{
 			return self.tile_at({x, y});

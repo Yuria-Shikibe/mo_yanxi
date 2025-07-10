@@ -635,7 +635,7 @@ namespace mo_yanxi::game{
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
 				for (auto& node : children){
-					node.intersect_all(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter));
+					node.template intersect_all<Func, Filter>(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter));
 				}
 			}
 		}
@@ -655,7 +655,7 @@ namespace mo_yanxi::game{
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
 			if(this->has_valid_children()){
 				for (auto& node : children){
-					node.intersect_all(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter));
+					node.template intersect_all<Func, Filter>(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter));
 				}
 			}
 		}

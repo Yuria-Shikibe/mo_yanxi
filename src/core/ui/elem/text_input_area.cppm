@@ -620,7 +620,7 @@ namespace mo_yanxi::ui{
 			return elem::on_click(click_event);;
 		}
 
-		void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
+		void on_key_input(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
 			using namespace core::ctrl;
 			if(caret_ && action == act::press || action == act::repeat){
 				bool shift = mode & mode::shift;
@@ -1003,11 +1003,7 @@ namespace mo_yanxi::ui{
 		}
 	};
 
-	export struct numeric_input_area : text_input_area{
-		// bool using_floating_point{true};
-
-	private:
-		std::variant<
+	export using edit_target_variant = std::variant<
 			monostate,
 			edit_target<int>,
 			edit_target<unsigned>,
@@ -1027,7 +1023,13 @@ namespace mo_yanxi::ui{
 			edit_target_predicate_constrained<unsigned long long>,
 			edit_target_predicate_constrained<float>,
 			edit_target_predicate_constrained<double>
-		> target{};
+		>;
+
+	export struct numeric_input_area : text_input_area{
+		// bool using_floating_point{true};
+
+	private:
+		edit_target_variant target{};
 
 		bool value_changed{};
 		bool external_check{};
@@ -1062,7 +1064,7 @@ namespace mo_yanxi::ui{
 
 
 		template <typename T>
-			requires std::constructible_from<decltype(target), T&&>
+			requires std::constructible_from<edit_target_variant, T&&>
 		void set_target(T&& target) noexcept{
 			this->target = std::forward<T>(target);
 			fetch_target();
@@ -1083,13 +1085,13 @@ namespace mo_yanxi::ui{
 			target = monostate{};
 		}
 
-		void input_key(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
+		void on_key_input(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
 			if(action == core::ctrl::act::press && key == core::ctrl::key::Enter){
 				external_check = true;
 				return;
 			}
 
-			text_input_area::input_key(key, action, mode);
+			text_input_area::on_key_input(key, action, mode);
 
 			if(key == core::ctrl::key::Delete || key == core::ctrl::key::Backspace){
 				value_changed = true;
@@ -1167,6 +1169,33 @@ namespace mo_yanxi::ui{
 		}
 
 		virtual void on_target_updated(){}
+	};
+
+	export struct numeric_input_area_with_callback : numeric_input_area{
+		using numeric_input_area::numeric_input_area;
+
+	private:
+		std::move_only_function<void(numeric_input_area_with_callback& self)> callback;
+
+	public:
+		void on_target_updated() override{
+			if(callback)callback(*this);
+		}
+
+		template <std::invocable<edit_target_variant&> Fn>
+		void set_callback(Fn&& fn){
+			this->callback = [f = std::forward<Fn>(fn)](numeric_input_area_with_callback& self){
+				std::invoke(f, self.get_edit_target());
+			};
+		}
+
+		template <std::invocable<> Fn>
+		void set_callback(Fn&& fn) {
+			this->callback = [f = std::forward<Fn>(fn)](numeric_input_area_with_callback& self){
+				std::invoke(f);
+			};
+		}
+
 	};
 
 	// export
