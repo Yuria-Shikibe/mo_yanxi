@@ -6,7 +6,7 @@ export module mo_yanxi.ui.style;
 
 export import mo_yanxi.ui.comp.drawer;
 
-import mo_yanxi.ui.basic;
+import mo_yanxi.ui.primitives;
 import mo_yanxi.graphic.image_region;
 import mo_yanxi.graphic.image_multi_region;
 export import mo_yanxi.graphic.color;

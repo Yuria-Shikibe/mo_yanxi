@@ -123,4 +123,8 @@ namespace mo_yanxi::game{
 				palette.center_out[prog]);
 		}
 	}
+
+	math::frect fx::virtual_effect_drawer_base::get_clip_region(const effect& e, float min_clip) const noexcept{
+		return {e.trans.vec, min_clip};
+	}
 }

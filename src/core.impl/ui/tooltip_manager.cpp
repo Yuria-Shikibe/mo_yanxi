@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-module mo_yanxi.ui.basic;
+module mo_yanxi.ui.primitives;
 
 import mo_yanxi.ui.action;
 import mo_yanxi.ui.action.generic;
@@ -24,12 +24,12 @@ void mo_yanxi::ui::tooltip_instance::update_layout(const tooltip_manager& manage
 		auto [fx, fy] = element->property.fill_parent;
 		if(fx){
 			fsz.x = manager.scene->region.width();
-			element->context_size_restriction.width = {size_category::mastering, fsz.x};
+			element->context_size_restriction.set_width(fsz.x);
 		}
 
 		if(fy){
 			fsz.y = manager.scene->region.height();
-			element->context_size_restriction.height = {size_category::mastering, fsz.y};
+			element->context_size_restriction.set_height(fsz.y);
 		}
 	}
 

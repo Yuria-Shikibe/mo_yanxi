@@ -4,15 +4,17 @@
 
 export module mo_yanxi.ui.elem.collapser;
 
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.primitives;
 
-export import mo_yanxi.ui.table;
+export import mo_yanxi.ui.elem.table;
 export import mo_yanxi.ui.elem.button;
 export import mo_yanxi.math.interpolation;
 
 import std;
 
 namespace mo_yanxi::ui{
+	//TODO support vert_major layout
+
 	export
 	struct collapser : basic_group{
 		using head_type = button<table>;
@@ -100,18 +102,18 @@ namespace mo_yanxi::ui{
 			return *content_;
 		}
 
-		std::optional<math::vec2> pre_acquire_size_impl(stated_extent extent) override{
+		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{
 			auto ext = clip_boarder_from(extent);
 			auto table_size = head_->pre_acquire_size(ext);
 
 			if(policy == layout_policy::hori_major){
-				extent.height = {size_category::dependent};
+				extent.set_height_dependent();
 
 				math::vec2 content_size{};
 				if(get_interped_progress() >= std::numeric_limits<float>::epsilon()){
 					content_size.lerp_inplace(content_->pre_acquire_size(ext).value_or(content_->get_size()).add_y(pad), get_interped_progress());
 				}
-				return table_size.value().add_y(content_size.y) + property.boarder.get_size();
+				return table_size.value().add_y(content_size.y) + property.boarder.extent();
 			}else{
 				return std::nullopt;
 			}
@@ -131,14 +133,15 @@ namespace mo_yanxi::ui{
 
 		void draw_content(const rect clipSpace) const override;
 
-
-		void layout_children() override{
+		void layout() override{
+			elem::layout();
 			set_fillparent();
 
 			head_->try_layout();
 			content_->try_layout();
 			update_item_src();
 		}
+
 
 		void update(float delta_in_ticks) override{
 			basic_group::update(delta_in_ticks);

@@ -7,7 +7,7 @@ import mo_yanxi.graphic.draw;
 import mo_yanxi.ui.assets;
 import mo_yanxi.ui.graphic;
 import mo_yanxi.ui.creation.generic;
-import mo_yanxi.ui.elem.text_elem;
+import mo_yanxi.ui.elem.label;
 import mo_yanxi.ui.elem.image_frame;
 import mo_yanxi.ui.elem.progress_bar;
 import mo_yanxi.game.ui.bars;
@@ -21,6 +21,7 @@ import std;
 namespace mo_yanxi::game::ecs::chamber{
 	struct turret_ui : entity_info_table{
 		ui::progress_bar* reload_progress_bar{};
+		ui::energy_bar* energy_bar{};
 
 		[[nodiscard]] turret_ui(ui::scene* scene, group* group, const entity_ref& ref)
 			: entity_info_table(scene, group, ref){
@@ -41,6 +42,13 @@ namespace mo_yanxi::game::ecs::chamber{
 
 				reload_progress_bar = std::to_address(bar);
 			}
+			{
+				auto bar = end_line().emplace<ui::energy_bar>();
+				bar.cell().set_pad(4);
+				bar.cell().set_height(50);
+
+				energy_bar = &bar.elem();
+			}
 		}
 
 		void update(float delta_in_ticks) override{
@@ -48,8 +56,18 @@ namespace mo_yanxi::game::ecs::chamber{
 
 			if(!ref)return;
 			auto& build = ref->at<turret_build>();
+			auto& build_data = build.data();
 
 			reload_progress_bar->update_progress(build.reload / build.body.reload_duration, delta_in_ticks);
+			energy_bar->drawer.set_bar_state({
+				.power_current = build_data.get_energy_dynamic_status().power,
+				.power_total = build_data.energy_status.power,
+				.power_assigned = build_data.assigned_energy,
+				.charge = build_data.get_energy_dynamic_status().charge,
+				.charge_duration = build_data.energy_status.charge_duration
+			});
+			energy_bar->drawer.update(delta_in_ticks);
+
 		}
 	};
 

@@ -4,15 +4,15 @@
 
 export module mo_yanxi.ui.creation.file_selector;
 
-export import mo_yanxi.ui.table;
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.elem.table;
+export import mo_yanxi.ui.primitives;
 
 import mo_yanxi.ui.elem.scroll_pane;
 import mo_yanxi.ui.elem.image_frame;
 
 import mo_yanxi.core.platform;
 
-import mo_yanxi.ui.elem.text_elem;
+import mo_yanxi.ui.elem.label;
 import mo_yanxi.ui.elem.text_input_area;
 import mo_yanxi.ui.elem.button;
 

@@ -7,7 +7,7 @@ import mo_yanxi.graphic.draw;
 
 import mo_yanxi.ui.assets;
 import mo_yanxi.ui.creation.generic;
-import mo_yanxi.ui.elem.text_elem;
+import mo_yanxi.ui.elem.label;
 import mo_yanxi.ui.elem.image_frame;
 import mo_yanxi.ui.elem.progress_bar;
 import mo_yanxi.ui.elem.collapser;

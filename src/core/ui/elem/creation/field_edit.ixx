@@ -4,12 +4,12 @@
 
 export module mo_yanxi.ui.creation.field_edit;
 
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.primitives;
 import mo_yanxi.ui.elem.slider;
 export import mo_yanxi.ui.elem.text_input_area;
-import mo_yanxi.ui.manual_table;
+import mo_yanxi.ui.elem.manual_table;
 import mo_yanxi.ui.assets;
-import mo_yanxi.ui.table;
+import mo_yanxi.ui.elem.table;
 
 import std;
 

@@ -13,8 +13,5 @@ import std;
 namespace mo_yanxi::game::content{
 	export inline meta::content_manager chambers{};
 
-	using T = remove_mfptr_this_args<decltype([](){})>;
-
-
 	export void load();
 }

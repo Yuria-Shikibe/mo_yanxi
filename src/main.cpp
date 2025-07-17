@@ -1,3 +1,7 @@
+#ifndef __AVX2__
+#error "Requires __AVX2__"
+#endif
+
 #include <vulkan/vulkan.h>
 // #include <cassert>
 
@@ -55,10 +59,11 @@ import mo_yanxi.graphic.layers.ui.grid_drawer;
 import mo_yanxi.font.manager;
 //
 import mo_yanxi.ui.root;
-import mo_yanxi.ui.basic;
-import mo_yanxi.ui.manual_table;
-import mo_yanxi.ui.table;
-import mo_yanxi.ui.elem.text_elem;
+import mo_yanxi.ui.primitives;
+import mo_yanxi.ui.elem.manual_table;
+import mo_yanxi.ui.elem.table;
+import mo_yanxi.ui.elem.list;
+import mo_yanxi.ui.elem.label;
 import mo_yanxi.ui.elem.scroll_pane;
 import mo_yanxi.ui.elem.text_input_area;
 import mo_yanxi.ui.elem.slider;
@@ -142,6 +147,8 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	e->skip_inbound_capture = true;
 	auto& bed = static_cast<ui::manual_table&>(root.add_children(std::move(e)));
 
+	using namespace math;
+
 	// {
 	// 	auto pane = bed.emplace<ui::button<>>();
 	// 	pane->set_button_callback(ui::button_tags::general, [](ui::elem& elem){
@@ -178,14 +185,14 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	// 	}
 	//
 	// }
-	{
-		auto pane = bed.emplace<game::ui::hitbox_editor>();
-		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 1.f}};
-		pane.cell().align = align::pos::center_right;
-		pane.cell().margin.set(4);
-
-
-	}
+	// {
+	// 	auto pane = bed.emplace<game::ui::hitbox_editor>();
+	// 	pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 1.f}};
+	// 	pane.cell().align = align::pos::center_right;
+	// 	pane.cell().margin.set(4);
+	//
+	//
+	// }
 	// {
 	// 	static int t = 0;
 	// 	auto pane = bed.emplace<game::ui::field_editor>();
@@ -206,8 +213,33 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	// 	pane->set_name_height(50);
 	// 	pane->set_editor_height(80);
 	// }
+	//
+	auto pane = bed.emplace<ui::scroll_pane>();
+	pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.5f, .5f}};
+	pane.cell().align = align::pos::center;
+	pane.cell().margin.set(16);
+	//
+	pane->set_layout_policy(ui::layout_policy::vert_major);
+	//
+	pane->set_elem([](ui::list& t){
+		t.template_cell.set_size(120);
+		t.template_cell.pad.set(5);
+		t.set_layout_policy(ui::layout_policy::vert_major);
 
+		{
+			auto p = t.emplace<ui::elem>();
+			p.cell().set_size(60);
+		}
 
+		t.emplace<ui::elem>();
+		t.emplace<ui::elem>();
+		t.function_init([](ui::label& label){
+			label.set_text("asdasdasdasdasdasdasdasd");
+		}).cell().set_external();
+		t.emplace<ui::elem>();
+		t.emplace<ui::elem>();
+	});
+	//
 
 	// auto pane = bed.emplace<ui::creation::file_selector>();
 	// pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.6f, .9f}};
@@ -819,7 +851,7 @@ int main(){
 	using namespace mo_yanxi::game;
 
 	init_assets();
-	compile_shaders();
+	// compile_shaders();
 	game::content::load();
 
 	core::glfw::init();
@@ -827,6 +859,9 @@ int main(){
 	core::global::assets::init(&core::global::graphic::context);
 	assets::graphic::load(core::global::graphic::context);
 	core::global::ui::init();
+
+
+	// std::terminate();
 
 	main_loop();
 

@@ -13,11 +13,15 @@ import std;
 namespace mo_yanxi::game::ecs::system{
 	export
 	struct renderer{
+	private:
 		struct draw_data{
 			const drawer::entity_drawer* drawer;
 		};
 		shared_stack<draw_data> drawers{};
-		std::vector<draw_data> overflow_drawers{};
+		std::size_t last_draw_size{};
+		std::atomic_size_t failed{};
+
+	public:
 
 		void draw(const world::graphic_context& graphic_context) const {
 			for (const auto & drawer : drawers.locked_range()){
@@ -25,32 +29,29 @@ namespace mo_yanxi::game::ecs::system{
 				drawer.drawer->post_effect(graphic_context);
 			}
 
-			for (const auto & drawer : overflow_drawers){
-				drawer.drawer->draw(graphic_context);
-				drawer.drawer->post_effect(graphic_context);
-			}
 		}
 
 		void filter_screen_space(component_manager& manager, math::frect viewport){
-			if(overflow_drawers.empty() && (drawers.capacity() - drawers.size()) > 256){
+			auto cursz = drawers.size();
+			if(failed.load(std::memory_order_relaxed) == 0 && (drawers.capacity() - cursz) > 128 && (cursz - last_draw_size < -32)){
 				drawers.reset();
 			}
 
-			drawers.clear_and_reserve(std::max<std::size_t>(128, drawers.size() + overflow_drawers.size()));
-			overflow_drawers.clear();
+			last_draw_size = cursz;
+			drawers.clear_and_reserve(std::max<std::size_t>(128, drawers.size() + failed.exchange(0, std::memory_order_relaxed)));
 
+			//TODO parallel
 			manager.sliced_each([&](const manifold& manifold, const drawer::entity_drawer& drawer){
 				if(drawer.clip.value_or(manifold.hitbox.max_wrap_bound()).expand(drawer.clipspace_margin).overlap_inclusive(viewport)){
 					if(auto ptr = drawers.try_push_uninitialized()){
 						std::construct_at(ptr, &drawer);
-						drawers.release_on_write();
 					}else{
-						overflow_drawers.push_back({&drawer});
+						failed.fetch_add(1, std::memory_order_relaxed);
 					}
 				}
 			});
 
-			(void)drawers.locked_range();
+			drawers.release_on_write();
 		}
 	};
 }

@@ -4,7 +4,7 @@ module;
 
 export module mo_yanxi.ui.elem.nested_scene;
 
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.primitives;
 export import mo_yanxi.graphic.camera;
 export import mo_yanxi.math.quad_tree;
 
@@ -217,7 +217,8 @@ namespace mo_yanxi::ui{
 		// 	}
 		// }
 	protected:
-		void layout_children() override{
+		void layout() override{
+			elem::layout();
 			for(const auto& element : children){
 				element->update_abs_src({});
 
@@ -302,16 +303,6 @@ namespace mo_yanxi::ui{
 				self.get_scene()->set_camera_focus(nullptr);
 				self.set_focused_scroll(false);
 			});
-
-			register_event([](input_event::scroll e, nested_scene& self){
-
-				if(self.scene_.has_scroll_focus()){
-					self.scene_.on_scroll(e.delta);
-				}else{
-					self.camera_.set_scale_by_delta(e.delta.y * 0.05f);
-				}
-
-			});
 		}
 
 		[[nodiscard]] group_type& get_group(){
@@ -330,6 +321,14 @@ namespace mo_yanxi::ui{
 		void draw_content(rect clipSpace) const override;
 
 		void draw_post(rect clipSpace) const override;
+
+		void on_scroll(const input_event::scroll e) override{
+			if(scene_.has_scroll_focus()){
+				scene_.on_scroll(e.delta);
+			}else{
+				camera_.set_scale_by_delta(e.delta.y * 0.05f);
+			}
+		}
 
 		void update(float delta_in_ticks) override{
 			// scene_.resize(property.content_bound_absolute().move_x(math::absin(get_scene()->get_global_time(), 10, property.content_width())));
@@ -410,7 +409,7 @@ namespace mo_yanxi::ui{
 			return elem;
 		}
 
-		void input_unicode(const char32_t val) override{
+		void on_unicode_input(const char32_t val) override{
 			scene_.on_unicode_input(val);
 		}
 	};

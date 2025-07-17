@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.basic:tooltip_interface;
+export module mo_yanxi.ui.primitives:tooltip_interface;
 
 import :pre_decl;
 import :elem_ptr;

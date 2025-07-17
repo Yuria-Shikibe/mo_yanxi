@@ -765,12 +765,21 @@ namespace mo_yanxi::graphic{
 		}
 
 	public:
-		explicit(false) operator renderer_ui_ref () noexcept{
-			return reinterpret_cast<renderer_ui_ref>(this);
+		explicit(false) operator renderer_ui_ptr () noexcept{
+			return reinterpret_cast<renderer_ui_ptr>(this);
+		}
+		explicit(false) operator renderer_ui_ref() noexcept{
+			return reinterpret_cast<renderer_ui_ref>(*this);
 		}
 	};
 
-	export renderer_ui& renderer_from_erased(renderer_ui_ref ref){
-		return *reinterpret_cast<renderer_ui*>(ref);
+	export
+	[[nodiscard]] renderer_ui* renderer_from_erased(renderer_ui_ptr ptr) noexcept{
+		return reinterpret_cast<renderer_ui*>(ptr);
+	}
+
+	export
+	[[nodiscard]] renderer_ui& renderer_from_erased(renderer_ui_ref ref) noexcept{
+		return reinterpret_cast<renderer_ui&>(ref);
 	}
 }

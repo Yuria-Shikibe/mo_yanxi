@@ -2,7 +2,7 @@
 // Created by Matrix on 2025/4/17.
 //
 
-export module mo_yanxi.ui.basic;
+export module mo_yanxi.ui.primitives;
 
 export import :pre_decl;
 export import :tooltip_interface;

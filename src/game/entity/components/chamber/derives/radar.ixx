@@ -44,8 +44,9 @@ namespace mo_yanxi::game::ecs{
 	}
 
 	template <>
-	struct component_custom_behavior<chamber::radar_build> : component_custom_behavior_base<chamber::radar_build>, chamber::building_trait_base<>{
-
+	struct component_custom_behavior<chamber::radar_build> :
+		component_custom_behavior_base<chamber::radar_build>,
+		chamber::building_trait_base<>{
 	};
 }
 

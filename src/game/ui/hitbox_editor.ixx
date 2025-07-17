@@ -2,11 +2,11 @@
 
 export module mo_yanxi.game.ui.hitbox_editor;
 
-import mo_yanxi.ui.basic;
-import mo_yanxi.ui.table;
+import mo_yanxi.ui.primitives;
+import mo_yanxi.ui.elem.table;
 import mo_yanxi.ui.elem.button;
-import mo_yanxi.ui.manual_table;
-import mo_yanxi.ui.elem.text_elem;
+import mo_yanxi.ui.elem.manual_table;
+import mo_yanxi.ui.elem.label;
 import mo_yanxi.ui.creation.file_selector;
 
 export import mo_yanxi.game.meta.hitbox;
@@ -125,7 +125,7 @@ namespace mo_yanxi::game{
 		math::bool2 constrain{true, true};
 
 		bool precision_mode{};
-		std::string cmd{};
+		std::string string_cmd{};
 
 
 		void reset(){
@@ -159,13 +159,13 @@ namespace mo_yanxi::game{
 
 
 		[[nodiscard]] bool has_snap() const noexcept{
-			return cmd.contains('S');
+			return string_cmd.contains('S');
 		}
 
 		std::optional<float> get_num_from_cmd() const{
 			float val{};
-			auto ptr = cmd.c_str();
-			auto end = cmd.data() + cmd.size();
+			auto ptr = string_cmd.c_str();
+			auto end = string_cmd.data() + string_cmd.size();
 
 			while(ptr != end){
 				auto rst = std::from_chars(ptr, end, val);
@@ -183,9 +183,9 @@ namespace mo_yanxi::game{
 		}
 
 	protected:
-		float get_rotation(
+		[[nodiscard]] float get_rotation(
 				const math::vec2 dst,
-				const math::vec2 avg) const noexcept{
+				const math::vec2 center) const noexcept{
 			float ang;
 
 			auto cmdv = get_num_from_cmd().transform([](const float f){ return math::deg_to_rad * -f; });
@@ -194,8 +194,8 @@ namespace mo_yanxi::game{
 			if(!snap && cmdv){
 				ang = cmdv.value();
 			} else{
-				const auto approach_src = initial_pos - avg;
-				const auto approach_dst = dst - avg;
+				const auto approach_src = initial_pos - center;
+				const auto approach_dst = dst - center;
 
 				ang = approach_src.angle_between_rad(approach_dst) * get_scale();
 				if(snap && cmdv){
@@ -308,7 +308,7 @@ namespace mo_yanxi::game{
 
 	struct op : basic_op{
 		reference_frame frame{};
-		reference_center center{};
+		reference_center frame_center{};
 
 		void switch_frame(){
 			frame = reference_frame{(std::to_underlying(frame) + 1) % std::to_underlying(reference_frame::COUNT)};
@@ -366,8 +366,17 @@ namespace mo_yanxi::game{
 
 		void apply_scale(box_wrapper& wrap,
 			const math::vec2 dst,
-			const math::vec2 avg) const noexcept{
-			wrap.edit.temp.scale = wrap.edit.base.scale * get_scale(dst, avg);
+			const math::vec2 ref_center) const noexcept{
+			auto scl = get_scale(dst, ref_center);
+			wrap.edit.temp.scale = wrap.edit.base.scale * scl;
+
+			switch(frame_center){
+				case reference_center::local : break;
+				case reference_center::average : [[fallthrough]];
+				case reference_center::selected :
+					wrap.edit.temp.trans.vec = (wrap.edit.base.trans.vec - ref_center) * scl + ref_center;
+				default: break;
+			}
 		}
 
 		void apply_rotate(box_wrapper& wrap,
@@ -626,8 +635,8 @@ namespace mo_yanxi::game{
 
 		ui::esc_flag on_esc(){
 			if(operation){
-				if(!operation.cmd.empty()){
-					operation.cmd.clear();
+				if(!operation.string_cmd.empty()){
+					operation.string_cmd.clear();
 				} else if(operation.has_clamp()){
 					operation.constrain.set(true);
 				} else{
@@ -647,7 +656,7 @@ namespace mo_yanxi::game{
 
 
 		std::string_view get_current_op_cmd() const noexcept{
-			return operation ? operation.cmd : std::string_view{};
+			return operation ? operation.string_cmd : std::string_view{};
 		}
 
 
@@ -684,7 +693,7 @@ namespace mo_yanxi::game{
 					==
 					act::press
 				){
-					if(!operation.cmd.empty()) operation.cmd.pop_back();
+					if(!operation.string_cmd.empty()) operation.string_cmd.pop_back();
 					return;
 				}
 				break;
@@ -809,7 +818,7 @@ namespace mo_yanxi::game{
 			auto v = static_cast<char>(val);
 			if(v != val) return;
 			if(!cmd_filter[v]) return;
-			operation.cmd.push_back(std::toupper(static_cast<char>(val)));
+			operation.string_cmd.push_back(std::toupper(static_cast<char>(val)));
 		}
 
 		void push_history(){
@@ -950,12 +959,17 @@ namespace mo_yanxi::game{
 
 
 			// const auto main_pos = main_selected->edit.temp.trans.vec;
-			const auto avg_pos = selected.empty()
-				                     ? math::vec2{}
-				                     : (std::ranges::fold_left(selected | std::views::transform(
-					                                               [](const box_wrapper* w){
-						                                               return w->base.trans.vec;
-					                                               }), math::vec2{}, std::plus<>{}) / selected.size());
+			const auto avg_pos =
+				selected.empty()
+					? math::vec2{}
+					: operation.frame_center == reference_center::selected
+					? main_selected
+						  ? main_selected->base.trans.vec
+						  : math::vec2{}
+					: (std::ranges::fold_left(selected | std::views::transform(
+						                          [](const box_wrapper* w){
+							                          return w->base.trans.vec;
+						                          }), math::vec2{}, std::plus<>{}) / selected.size());
 
 			switch(operation.operation){
 			case edit_op::move :{
@@ -1093,7 +1107,7 @@ namespace mo_yanxi::game{
 					channel_hitbox.input_key(key, action, mode, get_transferred_pos(get_scene()->get_cursor_pos()));
 				}
 
-				void input_unicode(const char32_t val) override{
+				void on_unicode_input(const char32_t val) override{
 					channel_hitbox.input_unicode(val);
 				}
 
@@ -1143,7 +1157,7 @@ namespace mo_yanxi::game{
 				table::update(delta_in_ticks);
 
 				cmd_text->set_text(viewport->channel_hitbox.get_current_op_cmd());
-				viewport->channel_hitbox.operation.center = static_cast<reference_center>(checkbox->
+				viewport->channel_hitbox.operation.frame_center = static_cast<reference_center>(checkbox->
 					get_frame_index());
 			}
 

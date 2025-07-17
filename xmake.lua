@@ -1,6 +1,7 @@
 add_rules("mode.debug", "mode.release")
 set_arch("x64")
 set_encodings("utf-8")
+set_project("mo_yanxi")
 
 
 set_toolchains("msvc")
@@ -12,9 +13,10 @@ else
 end
 
 
-add_requires("glfw", {configs = {
+add_requires("glfw")
+--[[ , {configs = {
                              toolchains = "clang-cl"
-                         }}) --If not using debug, it throws exception when > 1 input by IME
+                         }}) ]]
 
 add_requires("msdfgen", {
     configs = {
@@ -33,13 +35,9 @@ add_requires("protobuf-cpp", {
 })
 
 
--- if is_mode("debug") then
--- add_requireconfs("glfw", {configs = {debug = true}})
--- end
-
 target("protobuf_gen")
     set_kind("static")
-    set_languages("c++17")
+    set_languages("cxx17")
     add_packages("protobuf-cpp", {public = true})
     add_rules("protobuf.cpp")
     add_files("generate/srl/*.cc")
@@ -48,28 +46,36 @@ target_end()
 target("mo_yanxi")
     set_kind("binary")
     set_extension(".exe")
-    set_languages("c++23")
+    set_languages("cxx23")
     set_policy("build.c++.modules", true)
 
     if is_mode("debug") then
+        add_cxflags("/RTCsu")
         add_defines("DEBUG_CHECK=1")
     else
         set_symbols("debug")
+        add_cxflags("/GL")
+        add_ldflags("/LTCG")
+
         add_defines("DEBUG_CHECK=0")
     end
 
     add_deps("protobuf_gen")
 
---     add_defines("_MSVC_STL_HARDENING=1")
---     add_defines("_MSVC_STL_DESTRUCTOR_TOMBSTONES=1")
+    add_defines("_MSVC_STL_HARDENING=1")
+    add_defines("_MSVC_STL_DESTRUCTOR_TOMBSTONES=1")
 
 
     set_warnings("all")
     set_warnings("pedantic")
-    add_vectorexts("avx", "avx2", "avx512")
-    add_vectorexts("sse", "sse2", "sse3", "ssse3", "sse4.2")
+--     add_vectorexts("avx", "avx2", "avx512")
+    add_vectorexts("avx", "avx2"--[[ , "avx512" ]])
+--     add_vectorexts("sse", "sse2", "sse3", "ssse3", "sse4.2")
 
---     add_cxxflags("-Wno-comment")
+    add_cxflags("/diagnostics:column")
+    add_cxflags("/FC")
+    add_cxxflags("/Zc:__cplusplus")
+    add_cxxflags("/permissive-")
 
     add_files("src/**.cppm")
     add_files("src/**.ixx")
@@ -117,7 +123,7 @@ task("gen_ide_hintonly_cmake")
                                :gsub("set_source_files_properties%(%s-.-%)%s*\n", "")
                                :gsub("set_source_files_properties%(%s-.-%b())%s*\n", "")
                                 :gsub("target_compile_features%(%s-.-cxx_std_26%s-%)%s*\n", "")
-                                :gsub("target_compile_options%(%s-.-%)%s*\n", "")
+--                                 :gsub("target_compile_options%(%s-.-%)%s*\n", "")
 
         -- 在 project() 后插入 C++ 标准设置
         local found_project = false

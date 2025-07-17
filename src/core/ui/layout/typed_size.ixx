@@ -3,6 +3,7 @@ export module mo_yanxi.ui.layout.policies;
 export import align;
 import std;
 import mo_yanxi.math.vector2;
+import mo_yanxi.math;
 
 namespace mo_yanxi::ui{
 	export struct illegal_layout : std::exception{
@@ -14,11 +15,10 @@ namespace mo_yanxi::ui{
 	};
 
 	export enum class layout_policy{
+		none,
 		hori_major,
 		vert_major,
-		none,
 	};
-
 
 	export enum class size_category{
 		passive,
@@ -105,8 +105,8 @@ namespace mo_yanxi::ui{
 		}
 
 		[[nodiscard]] constexpr stated_extent(const float width, const float height) noexcept
-			: width(std::isinf(width) ? size_category::dependent : size_category::mastering, width),
-			  height(std::isinf(height) ? size_category::dependent : size_category::mastering, height){
+			: width(math::isinf(width) ? size_category::dependent : size_category::mastering, width),
+			  height(math::isinf(height) ? size_category::dependent : size_category::mastering, height){
 		}
 
 		constexpr void try_add(math::vec2 extent) noexcept{
@@ -157,6 +157,104 @@ namespace mo_yanxi::ui{
 
 	export constexpr stated_extent extent_by_external{{size_category::dependent}, {size_category::dependent}};
 
+	export struct optional_mastering_extent{
+	private:
+		float width_{};
+		float height_{};
+	public:
+
+		[[nodiscard]] constexpr optional_mastering_extent() noexcept = default;
+
+		[[nodiscard]] constexpr optional_mastering_extent(const float x, const float y) noexcept
+			: width_(x),
+			  height_(y){
+		}
+
+		[[nodiscard]] constexpr explicit(false) optional_mastering_extent(const math::vec2 vec2) noexcept
+			: width_(vec2.x),
+			  height_(vec2.y){
+		}
+
+		[[nodiscard]] constexpr explicit(false) optional_mastering_extent(const stated_extent vec2) noexcept
+			: width_(
+				  vec2.width.dependent()
+					  ? std::numeric_limits<float>::infinity()
+					  : vec2.width.mastering()
+					  ? vec2.width.value
+					  : std::numeric_limits<float>::signaling_NaN()),
+			  height_(vec2.height.dependent()
+				    ? std::numeric_limits<float>::infinity()
+				    : vec2.height.mastering()
+				    ? vec2.height.value
+				    : std::numeric_limits<float>::signaling_NaN()){
+		}
+
+
+		[[nodiscard]] constexpr bool fully_dependent() const noexcept{
+			return math::isinf(width_) && math::isinf(height_);
+		}
+		[[nodiscard]] constexpr bool fully_mastering() const noexcept{
+			return !math::isinf(width_) && !math::isinf(height_);
+		}
+
+		[[nodiscard]] constexpr math::bool2 get_dependent() const noexcept{
+			return {math::isinf(width_), math::isinf(height_)};
+		}
+
+		[[nodiscard]] constexpr math::bool2 get_mastering() const noexcept{
+			return {!math::isinf(width_), !math::isinf(height_)};
+		}
+
+		[[nodiscard]] constexpr bool width_dependent() const noexcept{
+			return math::isinf(width_);
+		}
+
+		[[nodiscard]] constexpr bool height_dependent() const noexcept{
+			return math::isinf(height_);
+		}
+
+		[[nodiscard]] constexpr bool width_mastering() const noexcept{
+			return !math::isinf(width_);
+		}
+
+		[[nodiscard]] constexpr bool height_mastering() const noexcept{
+			return !math::isinf(height_);
+		}
+
+		[[nodiscard]] constexpr math::vec2 potential_extent() const noexcept{
+			return {width_, height_};
+		}
+
+		[[nodiscard]] constexpr float potential_width() const noexcept{
+			return width_;
+		}
+
+		[[nodiscard]] constexpr float potential_height() const noexcept{
+			return height_;
+		}
+
+		constexpr void set_width(const float width) noexcept{
+			this->width_ = width;
+		}
+
+		constexpr void set_height(const float height) noexcept{
+			this->height_ = height;
+		}
+
+		constexpr void set_width_dependent() noexcept{
+			width_ = std::numeric_limits<float>::infinity();
+		}
+
+		constexpr void set_height_dependent() noexcept{
+			height_ = std::numeric_limits<float>::infinity();
+		}
+
+		constexpr void collapse(const math::vec2 size) noexcept{
+			auto [dx, dy] = get_dependent();
+			if(!dx) width_ = size.x;
+			if(!dy) height_ = size.y;
+		}
+	};
 
 	export {
 		[[nodiscard]] constexpr std::array<float align::spacing::*, 4> get_pad_ptr(layout_policy policy) noexcept{
@@ -179,7 +277,13 @@ namespace mo_yanxi::ui{
 			}
 		}
 
-		[[nodiscard]] constexpr std::array<stated_size stated_extent::*, 2> get_extent_ptr(layout_policy policy) noexcept{
+		template<typename T>
+		struct paired_target{
+			T major;
+			T minor;
+		};
+
+		[[nodiscard]] constexpr paired_target<stated_size stated_extent::*> get_extent_ptr(layout_policy policy) noexcept{
 			if(policy == layout_policy::vert_major){
 				return {
 					&stated_extent::height,
@@ -196,16 +300,30 @@ namespace mo_yanxi::ui{
 		template <typename T = float>
 		[[nodiscard]] constexpr auto get_vec_ptr(layout_policy policy) noexcept{
 			if(policy == layout_policy::vert_major){
-				return std::array{
+				return paired_target{
 					&math::vector2<T>::y,
 					&math::vector2<T>::x,
 				};
 			}else{
-				return std::array{
+				return paired_target{
 					&math::vector2<T>::x,
 					&math::vector2<T>::y,
 				};
 			}
 		}
+
+
+		paired_target<float> get_pad_extent(layout_policy policy, const align::spacing& boarder) noexcept{
+			const auto [
+				pad_major_src,
+				pad_major_dst,
+				pad_minor_src,
+				pad_minor_dst] = get_pad_ptr(policy);
+
+			return {
+				boarder.*pad_major_src + boarder.*pad_major_dst,
+				boarder.*pad_minor_src + boarder.*pad_minor_dst};
+		}
+
 	}
 }

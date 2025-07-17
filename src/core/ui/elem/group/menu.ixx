@@ -4,7 +4,7 @@
 
 export module mo_yanxi.ui.menu;
 
-import mo_yanxi.ui.table;
+import mo_yanxi.ui.elem.table;
 import mo_yanxi.ui.elem.scroll_pane;
 import mo_yanxi.ui.elem.button;
 import std;

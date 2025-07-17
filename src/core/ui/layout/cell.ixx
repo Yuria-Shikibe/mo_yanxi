@@ -4,7 +4,7 @@
 
 export module mo_yanxi.ui.layout.cell;
 
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.primitives;
 export import mo_yanxi.ui.layout.policies;
 
 export import mo_yanxi.math.rect_ortho;
@@ -52,22 +52,49 @@ namespace mo_yanxi::ui{
 			return self.margin.top_lft() + self.allocated_region.get_src();
 		}
 
-		void apply_to_base(group& group, elem& elem, stated_extent real_cell_extent) const;
+		void apply_to(group& group, elem& elem, optional_mastering_extent real_cell_extent) const;
 
-		template <std::derived_from<basic_cell> T>
-		void apply_to(
-			this const T& self,
-			group& group,
-			elem& elem,
-			stated_extent real_cell_extent
-			){
-			self.apply_to_base(group, elem, real_cell_extent);
-		}
 	};
 
 	export
 	struct scaled_cell : basic_cell{
 		math::frect region_scale{};
+	};
+
+	export
+	struct partial_mastering_cell : basic_cell{
+		stated_size stated_size{size_category::passive, 1};
+		align::padding1d<float> pad{};
+
+		auto& set_size(const ui::stated_size stated_size){
+			this->stated_size = stated_size;
+			return *this;
+		}
+
+		auto& set_size(const float size){
+			this->stated_size = {size_category::mastering, size};
+			return *this;
+		}
+
+		auto& set_external(){
+			this->stated_size = {size_category::dependent, 1};
+			return *this;
+		}
+
+		auto& set_passive(float weight){
+			this->stated_size = {size_category::passive, weight};
+			return *this;
+		}
+
+		auto& set_from_ratio(float ratio){
+			this->stated_size = {size_category::scaling, ratio};
+			return *this;
+		}
+
+		auto& set_pad(const align::padding1d<float> pad){
+			this->pad = pad;
+			return *this;
+		}
 	};
 
 	export
@@ -174,10 +201,5 @@ namespace mo_yanxi::ui{
 			return set_external({true, true});
 		}
 
-		void apply_to(
-			this const mastering_cell& self,
-			group& group_,
-			elem& elem,
-			ui::stated_extent real_cell_extent);
 	};
 }

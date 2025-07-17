@@ -31,7 +31,23 @@ namespace mo_yanxi{
 	export namespace align{
 		template <typename T>
 			requires (std::is_arithmetic_v<T>)
-		struct padding{
+		struct padding1d{
+			T pre;
+			T post;
+
+			constexpr T length() const noexcept{
+				return post + pre;
+			}
+
+			constexpr void set(T val) noexcept{
+				pre = val;
+				post = val;
+			}
+		};
+
+		template <typename T>
+			requires (std::is_arithmetic_v<T>)
+		struct padding2d{
 			/**@brief Left Spacing*/
 			T left{};
 			/**@brief Right Spacing*/
@@ -57,9 +73,9 @@ namespace mo_yanxi{
 				return {right, bottom};
 			}
 
-			[[nodiscard]] friend constexpr bool operator==(const padding& lhs, const padding& rhs) noexcept = default;
+			[[nodiscard]] friend constexpr bool operator==(const padding2d& lhs, const padding2d& rhs) noexcept = default;
 
-			constexpr padding& expand(T x, T y) noexcept{
+			constexpr padding2d& expand(T x, T y) noexcept{
 				x = align::floating_mul(x, 0.5f);
 				y = align::floating_mul(y, 0.5f);
 
@@ -70,7 +86,7 @@ namespace mo_yanxi{
 				return *this;
 			}
 
-			constexpr padding& expand(const T val) noexcept{
+			constexpr padding2d& expand(const T val) noexcept{
 				return this->expand(val, val);
 			}
 
@@ -82,7 +98,7 @@ namespace mo_yanxi{
 				return bottom + top;
 			}
 
-			[[nodiscard]] constexpr math::vector2<T> get_size() const noexcept{
+			[[nodiscard]] constexpr math::vector2<T> extent() const noexcept{
 				return {width(), height()};
 			}
 
@@ -94,22 +110,22 @@ namespace mo_yanxi{
 				return total - height();
 			}
 
-			constexpr padding& set(const T val) noexcept{
+			constexpr padding2d& set(const T val) noexcept{
 				bottom = top = left = right = val;
 				return *this;
 			}
 
-			constexpr padding& set_hori(const T val) noexcept{
+			constexpr padding2d& set_hori(const T val) noexcept{
 				left = right = val;
 				return *this;
 			}
 
-			constexpr padding& set_vert(const T val) noexcept{
+			constexpr padding2d& set_vert(const T val) noexcept{
 				bottom = top = val;
 				return *this;
 			}
 
-			constexpr padding& set(const T l, const T r, const T b, const T t) noexcept{
+			constexpr padding2d& set(const T l, const T r, const T b, const T t) noexcept{
 				left = l;
 				right = r;
 				bottom = b;
@@ -117,14 +133,14 @@ namespace mo_yanxi{
 				return *this;
 			}
 
-			constexpr padding& setZero() noexcept{
+			constexpr padding2d& set_zero() noexcept{
 				return set(0);
 			}
 		};
 
 		template <typename T>
-		padding<T> padBetween(const math::rect_ortho<T>& internal, const math::rect_ortho<T>& external) noexcept {
-			return padding<T>{
+		padding2d<T> padBetween(const math::rect_ortho<T>& internal, const math::rect_ortho<T>& external) noexcept {
+			return padding2d<T>{
 					internal.get_src_x() - external.get_src_x(),
 					external.get_end_x() - internal.get_end_x(),
 					internal.get_src_y() - external.get_src_y(),
@@ -132,7 +148,7 @@ namespace mo_yanxi{
 				};
 		}
 
-		using spacing = padding<float>;
+		using spacing = padding2d<float>;
 
 		enum class pos : unsigned char{
 			none,

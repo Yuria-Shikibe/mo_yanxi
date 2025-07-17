@@ -1,6 +1,6 @@
 module mo_yanxi.ui.image_drawable;
 
-import mo_yanxi.ui.basic;
+import mo_yanxi.ui.primitives;
 import mo_yanxi.ui.graphic;
 
 void mo_yanxi::ui::image_drawable::draw(

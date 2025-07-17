@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-module mo_yanxi.ui.basic;
+module mo_yanxi.ui.primitives;
 
 import mo_yanxi.ui.util;
 import mo_yanxi.ui.graphic;

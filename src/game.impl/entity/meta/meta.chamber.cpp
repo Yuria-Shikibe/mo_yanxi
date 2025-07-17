@@ -7,7 +7,7 @@ module;
 module mo_yanxi.game.meta.chamber;
 
 import mo_yanxi.ui.graphic;
-import mo_yanxi.ui.elem.text_elem;
+import mo_yanxi.ui.elem.label;
 import mo_yanxi.ui.elem.canvas;
 import mo_yanxi.ui.creation.field_edit;
 import mo_yanxi.ui.creation.generic;
@@ -19,6 +19,7 @@ import mo_yanxi.math.fancy;
 import mo_yanxi.game.ecs.component.chamber;
 import mo_yanxi.game.ecs.component.chamber.radar;
 import mo_yanxi.game.ecs.component.chamber.turret;
+import mo_yanxi.game.ecs.component.chamber.power_generator;
 
 
 namespace mo_yanxi::io{
@@ -232,7 +233,7 @@ void mo_yanxi::game::meta::chamber::radar::radar_instance_data::read(std::ispans
 
 mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::energy_generator::create_instance_chamber(
 	ecs::chamber::manifold_ref grid, math::point2 where) const{
-	return add_build<ecs::chamber::building>(*this, grid, where, extent);
+	return add_build<ecs::chamber::power_generator_build>(*this, grid, where, extent);
 }
 
 mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::turret_base::create_instance_chamber(

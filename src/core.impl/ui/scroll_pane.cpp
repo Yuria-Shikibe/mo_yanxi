@@ -59,12 +59,11 @@ void mo_yanxi::ui::scroll_pane::update_item_layout(){
 			switch(layout_policy_){
 			case layout_policy::hori_major :{
 				if(sz->y > property.content_height()){
-					bound.width.value -= scroll_bar_stroke_;
-					bound.width.value = math::clamp_positive(bound.width.value);
+					bound.set_width(math::clamp_positive(bound.potential_width() - scroll_bar_stroke_));
 					need_elem_relayout = true;
 				}
 
-				if(context_size_restriction.width.dependent() && sz->x > property.content_width()){
+				if(context_size_restriction.width_dependent() && sz->x > property.content_width()){
 					need_self_relayout = true;
 				}
 
@@ -72,12 +71,11 @@ void mo_yanxi::ui::scroll_pane::update_item_layout(){
 			}
 			case layout_policy::vert_major :{
 				if(sz->x > property.content_width()){
-					bound.height.value -= scroll_bar_stroke_;
-					bound.height.value = math::clamp_positive(bound.height.value);
+					bound.set_height(math::clamp_positive(bound.potential_height() - scroll_bar_stroke_));
 					need_elem_relayout = true;
 				}
 
-				if(context_size_restriction.height.dependent() && sz->y > property.content_height()){
+				if(context_size_restriction.height_dependent() && sz->y > property.content_height()){
 					need_self_relayout = true;
 				}
 				break;
@@ -115,7 +113,7 @@ void mo_yanxi::ui::scroll_pane::update_item_layout(){
 			default: break;
 			}
 
-			elemSz += property.boarder.get_size();
+			elemSz += property.boarder.extent();
 			resize(elemSz);
 		}
 	}

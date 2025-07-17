@@ -8,12 +8,12 @@ export module mo_yanxi.game.ui.grid_editor;
 
 export import mo_yanxi.game.meta.grid;
 
-import mo_yanxi.ui.basic;
-import mo_yanxi.ui.table;
+import mo_yanxi.ui.primitives;
+import mo_yanxi.ui.elem.table;
 import mo_yanxi.game.ui.viewport;
 import mo_yanxi.ui.elem.button;
-import mo_yanxi.ui.manual_table;
-import mo_yanxi.ui.elem.text_elem;
+import mo_yanxi.ui.elem.manual_table;
+import mo_yanxi.ui.elem.label;
 import mo_yanxi.ui.elem.scroll_pane;
 import mo_yanxi.ui.menu;
 import mo_yanxi.ui.creation.generic;

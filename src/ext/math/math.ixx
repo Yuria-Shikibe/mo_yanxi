@@ -82,6 +82,12 @@ namespace mo_yanxi::math{
 		}
 	}
 
+	export
+	template <arithmetic T>
+	MATH_ATTR T constexpr dst_abs(const T src, const T dst) noexcept{
+		return src > dst ? src - dst : dst - src;
+	}
+
 	namespace cpo_distance {
 		template <class T>
 		void distance(const T&, const T&) noexcept = delete;
@@ -312,7 +318,7 @@ namespace mo_yanxi::math {
 	MATH_ATTR constexpr T snap_to(T value, T step, T base_offset = {}) noexcept {
 
 		if (step == T(0)) {
-			return value; // 避免除以零
+			return value;
 		}
 
 		if constexpr (std::integral<T>) {
@@ -325,7 +331,6 @@ namespace mo_yanxi::math {
 				return value + (step - remainder) + base_offset;
 			}
 		} else {
-			// 浮点数类型的处理
 			return std::round(value / step) * step + base_offset;
 		}
 	}
@@ -345,30 +350,16 @@ namespace mo_yanxi::math {
 	 * @return an output from the inverse tangent function, from pi/-2.0 to pi/2.0 inclusive
 	 * */
 	export MATH_ATTR constexpr double atn(const double i) noexcept{
-		if consteval{
-			// We use double precision internally, because some constants need double precision.
-			const double n = math::abs(i);
-			// c uses the "equally-good" formulation that permits n to be from 0 to almost infinity.
-			const double c = (n - 1.0) / (n + 1.0);
-			// The approximation needs 6 odd powers of c.
-			const double c2 = c * c, c3 = c * c2, c5 = c3 * c2, c7 = c5 * c2, c9 = c7 * c2, c11 = c9 * c2;
-			return
-			std::numbers::pi * 0.25
-							  + (0.99997726 * c - 0.33262347 * c3 + 0.19354346 * c5 - 0.11643287 * c7 + 0.05265332 * c9 -
-								  0.0117212 * c11) * (i < 0 ? -1 : 1);
-		}else{
-			// We use double precision internally, because some constants need double precision.
-			const double n = std::abs(i);
-			// c uses the "equally-good" formulation that permits n to be from 0 to almost infinity.
-			const double c = (n - 1.0) / (n + 1.0);
-			// The approximation needs 6 odd powers of c.
-			const double c2 = c * c, c3 = c * c2, c5 = c3 * c2, c7 = c5 * c2, c9 = c7 * c2, c11 = c9 * c2;
-			return
-				std::copysign(std::numbers::pi * 0.25
-							  + (0.99997726 * c - 0.33262347 * c3 + 0.19354346 * c5 - 0.11643287 * c7 + 0.05265332 * c9 -
-								  0.0117212 * c11), i);
-		}
-
+		// We use double precision internally, because some constants need double precision.
+		const double n = abs(i);
+		// c uses the "equally-good" formulation that permits n to be from 0 to almost infinity.
+		const double c = (n - 1.0) / (n + 1.0);
+		// The approximation needs 6 odd powers of c.
+		const double c2 = c * c, c3 = c * c2, c5 = c3 * c2, c7 = c5 * c2, c9 = c7 * c2, c11 = c9 * c2;
+		return
+			copysign(std::numbers::pi * 0.25
+			         + (0.99997726 * c - 0.33262347 * c3 + 0.19354346 * c5 - 0.11643287 * c7 + 0.05265332 * c9 -
+				         0.0117212 * c11), i);
 	}
 
 	export
@@ -447,13 +438,13 @@ namespace mo_yanxi::math {
 
 
 	export
-	template <mo_yanxi::small_object T>
+	template <small_object T>
 		requires requires(T t){
 		{t < t} -> std::convertible_to<bool>;
 		}
 	MATH_ATTR constexpr T max(const T v1, const T v2) noexcept(noexcept(v2 < v1)) {
 		if constexpr (std::floating_point<T>){
-			if (!std::is_constant_evaluated()){
+			if !consteval{
 				return std::fmax(v1, v2);
 			}
 		}
@@ -462,13 +453,13 @@ namespace mo_yanxi::math {
 	}
 
 	export
-	template <mo_yanxi::small_object T>
+	template <small_object T>
 		requires requires(T t){
 		{t < t} -> std::convertible_to<bool>;
 		}
 	MATH_ATTR constexpr T min(const T v1, const T v2) noexcept(noexcept(v1 < v2)) {
 		if constexpr (std::floating_point<T>){
-			if (!std::is_constant_evaluated()){
+			if !consteval{
 				return std::fmin(v1, v2);
 			}
 		}
@@ -494,7 +485,7 @@ namespace mo_yanxi::math {
 	export
 	template <std::integral T>
 		requires (sizeof(T) <= 4)
-	MATH_ATTR constexpr int digits(const T n_positive) noexcept {
+	[[deprecated]] MATH_ATTR constexpr int digits(const T n_positive) noexcept {
 		return n_positive < 100000
 			       ? n_positive < 100
 				         ? n_positive < 10
@@ -518,7 +509,7 @@ namespace mo_yanxi::math {
 
 	export
 		template <mo_yanxi::arithmetic T>
-	MATH_ATTR int digits(const T n_positive) noexcept {
+	[[deprecated]] MATH_ATTR int digits(const T n_positive) noexcept {
 		return n_positive == 0 ? 1 : static_cast<int>(std::log10(n_positive) + 1);
 	}
 
@@ -581,19 +572,18 @@ namespace mo_yanxi::math {
 		}
 	}
 
-	MATH_ATTR
-	constexpr /** Map value from [0, 1].*/
-	float map(const float value, const float from, const float to) noexcept {
+	/** Map value from [0, 1].*/
+	MATH_ATTR constexpr float map(const float value, const float from, const float to) noexcept {
 		return map(value, 0.f, 1.f, from, to);
 	}
 
 	/**Returns -1 if f<0, 1 otherwise.*/
-	MATH_ATTR constexpr bool diff_sign(const mo_yanxi::arithmetic auto a, const  auto b) noexcept {
+	MATH_ATTR constexpr bool diff_sign(const arithmetic auto a, const arithmetic auto b) noexcept {
 		return a * b < 0;
 	}
 
 	export
-	template <mo_yanxi::arithmetic T>
+	template <arithmetic T>
 	MATH_ATTR constexpr T sign(const T f) noexcept{
 		if constexpr (std::floating_point<T>){
 			if(f == static_cast<T>(0.0)) [[unlikely]] {
@@ -695,7 +685,7 @@ namespace mo_yanxi::math {
 		MATH_ASSERT(absMax >= 0);
 
 		if(math::abs(v) > absMax){
-			return std::copysign(absMax, v);
+			return math::copysign(absMax, v);
 		}
 
 		return v;
@@ -863,7 +853,7 @@ namespace mo_yanxi::math {
 	template <mo_yanxi::small_object T, typename Prog>
 	FORCE_INLINE constexpr void lerp_inplace(T& fromValue, const T toValue, const Prog progress) noexcept {
 		if constexpr (std::floating_point<T> && std::floating_point<Prog>){
-			if (!std::is_constant_evaluated()){
+			if !consteval{
 				fromValue = std::fma((toValue - fromValue), progress, fromValue);
 				return;
 			}
@@ -871,37 +861,9 @@ namespace mo_yanxi::math {
 		
 		fromValue += (toValue - fromValue) * progress;
 	}
-	
-	/**
-	 * Linearly interpolates between two angles in radians. Takes into account that angles wrap at two pi and always takes the
-	 * direction with the smallest delta angle.
-	 * @param fromRadians start angle in radians
-	 * @param toRadians target angle in radians
-	 * @param progress interpolation value in the range [0, 1]
-	 * @return the interpolated angle in the range [0, pi2]
-	 */
-	export
-	template <std::floating_point T>
-	MATH_ATTR T slerp_rad(const T fromRadians, const T toRadians, const T progress) noexcept {
-		using namespace std::numbers;
-		const float delta = std::fmod(toRadians - fromRadians + pi_2_v<T> + pi_v<T>, pi_2_v<T>) - pi_v<T>;
-		return std::fmod(fromRadians + delta * progress + pi_2_v<T>, pi_2_v<T>);
-	}
 
 	/**
-	 * Linearly interpolates between two angles in degrees. Takes into account that angles wrap at 360 degrees and always takes
-	 * the direction with the smallest delta angle.
-	 * @param fromDegrees start angle in degrees
-	 * @param toDegrees target angle in degrees
-	 * @param progress interpolation value in the range [0, 1]
-	 * @return the interpolated angle in the range [0, 360[
-	 */
-	export [[deprecated]] MATH_ATTR float slerp(const float fromDegrees, const float toDegrees, const float progress) noexcept {
-		const float delta = std::fmod(toDegrees - fromDegrees + circle_deg_full + 180.0f, circle_deg_full) - 180.0f;
-		return std::fmod(fromDegrees + delta * progress + circle_deg_full, circle_deg_full);
-	}
-
-	/**
+	 * TODO transition
 	 * Returns the largest integer less than or equal to the specified float. This method will only properly floor floats from
 	 * -(2^14) to (Float.MAX_VALUE - 2^14).
 	 */
@@ -909,21 +871,6 @@ namespace mo_yanxi::math {
 	template <std::integral T = int>
 	MATH_ATTR constexpr T floorLEqual(const float value) noexcept {
 		return static_cast<T>(value + BIG_ENOUGH_FLOOR) - BIG_ENOUGH_INT;
-	}
-
-	/**
-	 * Returns the largest integer less than or equal to the specified float. This method will only properly floor floats that are
-	 * positive. Note this method simply casts the float to int.
-	 */
-	export
-	template <std::integral T = int>
-	[[deprecated]] MATH_ATTR constexpr T trunc_right(const float value) noexcept {
-		T val = static_cast<T>(value);
-		if constexpr (mo_yanxi::signed_number<T>){
-			if(value < 0)--val;
-		}
-
-		return val;
 	}
 
 	export
@@ -956,7 +903,7 @@ namespace mo_yanxi::math {
 	export
 	template <typename T = int>
 	MATH_ATTR constexpr T ceil(const float value) noexcept {
-		if (std::is_constant_evaluated()){
+		if consteval{
 			return BIG_ENOUGH_INT - static_cast<T>(BIG_ENOUGH_FLOOR - value);
 		}else{
 			return static_cast<T>(std::ceil(value));
@@ -964,21 +911,8 @@ namespace mo_yanxi::math {
 
 	}
 
-	/**
-	 * Returns the smallest integer greater than or equal to the specified float. This method will only properly ceil floats that
-	 * are positive.
-	 */
 	export
-	template <std::integral T = int>
-	MATH_ATTR constexpr T ceil_positive(const float value) noexcept {
-		MATH_ASSERT(value >= 0);
-		return static_cast<T>(value + CEIL);
-	}
-
-
-	export
-	template <typename T, typename T0>
-		requires (std::is_integral_v<T>)
+	template <std::integral T, typename T0>
 	MATH_ATTR constexpr T round(const T0 value) noexcept {
 		if constexpr (std::floating_point<T0>){
 			return std::lround(value);
@@ -1025,7 +959,7 @@ namespace mo_yanxi::math {
 	}
 
 	export
-	template <mo_yanxi::arithmetic T>
+	template <arithmetic T>
 	MATH_ATTR T mod(const T x, const T n) noexcept {
 		if constexpr(std::floating_point<T>) {
 			return std::fmod(x, n);
@@ -1078,7 +1012,7 @@ namespace mo_yanxi::math {
 	export
 	/** @return the input 0-1 value scaled to 0-1-0. */
 	MATH_ATTR constexpr float slope(const float fin) noexcept {
-		return 1.0f - math::abs(fin - 0.5f) * 2.0f;
+		return 1.0f - abs(fin - 0.5f) * 2.0f;
 	}
 
 	/**Converts a 0-1 value to 0-1 when it is in [offset, 1].*/
@@ -1095,6 +1029,8 @@ namespace mo_yanxi::math {
 	export
 	template <std::floating_point Fp>
 	MATH_ATTR constexpr Fp curve(const Fp f, const Fp from, const Fp to) noexcept {
+		MATH_ASSERT(from < to);
+
 		if(f < from) {
 			return 0.0f;
 		}
@@ -1117,10 +1053,6 @@ namespace mo_yanxi::math {
 	export MATH_ATTR constexpr float curve_margin(const float f, const float margin) noexcept {
 		return curve_margin(f, margin, margin);
 	}
-
-	// export MATH_ATTR constexpr float dot(const float x1, const float y1, const float x2, const float y2) noexcept {
-	// 	return x1 * x2 + y1 * y2;
-	// }
 
 	export
 	template <typename T>
@@ -1158,7 +1090,7 @@ namespace mo_yanxi::math {
 	export
 	template <typename T>
 	MATH_ATTR constexpr T dst_mht(const T x1, const T y1, const T x2, const T y2) noexcept {
-		return math::abs(x1 - x2) + math::abs(y1 - y2);
+		return math::dst_abs(x1, x2) + math::dst_abs(y1, y2);
 	}
 
 
@@ -1182,7 +1114,7 @@ namespace mo_yanxi::math {
 	MATH_ATTR constexpr T fma(const T x, const T y, const T z) noexcept {
 		if constexpr (std::floating_point<T>){
 			if !consteval{
-				return  std::fma(x, y, z);
+				return std::fma(x, y, z);
 			}
 		}
 

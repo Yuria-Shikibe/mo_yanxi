@@ -4,7 +4,7 @@
 
 export module mo_yanxi.game.ui.viewport;
 
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.primitives;
 export import mo_yanxi.graphic.camera;
 
 import std;

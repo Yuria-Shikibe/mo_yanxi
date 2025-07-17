@@ -4,7 +4,7 @@ module;
 
 export module mo_yanxi.ui.elem.text_input_area;
 
-export import mo_yanxi.ui.elem.text_elem;
+export import mo_yanxi.ui.elem.label;
 
 import mo_yanxi.font.typesetting;
 import mo_yanxi.graphic.color;
@@ -522,26 +522,6 @@ namespace mo_yanxi::ui{
 				}
 			});*/
 
-			events().on<input_event::drag>([](const input_event::drag& event, elem& e){
-				auto& self = static_cast<text_input_area&>(e);
-
-				auto layoutSrc = self.get_layout_pos(event.pos);
-
-				if(!layoutSrc)return;
-
-				auto layoutDst = self.get_layout_pos(event.dst);
-
-				if(!layoutDst)return;
-
-				self.caret_ = caret{
-					{
-						{layoutSrc.value(), self.glyph_layout.at(layoutSrc.value()).index()},
-						{layoutDst.value(), self.glyph_layout.at(layoutDst.value()).index()}
-					}};
-
-				self.set_focused_key(true);
-			});
-
 			property.maintain_focus_until_mouse_drop = true;
 			parser = &font::typesetting::global_empty_parser;
 		}
@@ -557,6 +537,25 @@ namespace mo_yanxi::ui{
 		InputHistoryStack history{};
 		std::optional<caret> caret_{};
 		std::u32string buffer{};
+
+		void on_drag(const input_event::drag event) override{
+
+			auto layoutSrc = this->get_layout_pos(event.pos);
+
+			if(!layoutSrc)return;
+
+			auto layoutDst = this->get_layout_pos(event.dst);
+
+			if(!layoutDst)return;
+
+			this->caret_ = caret{
+						{
+							{layoutSrc.value(), this->glyph_layout.at(layoutSrc.value()).index()},
+							{layoutDst.value(), this->glyph_layout.at(layoutDst.value()).index()}
+						}};
+
+			this->set_focused_key(true);
+		}
 
 		void update(const float delta_in_ticks) override{
 			label::update(delta_in_ticks);
@@ -709,7 +708,7 @@ namespace mo_yanxi::ui{
 			}
 		}
 
-		void input_unicode(const char32_t val) override{
+		void on_unicode_input(const char32_t val) override{
 			if(bannedCodePoints.contains(val)){
 				set_input_invalid();
 				return;
@@ -1103,7 +1102,7 @@ namespace mo_yanxi::ui{
 
 		}
 
-		void input_unicode(const char32_t val) override{
+		void on_unicode_input(const char32_t val) override{
 			static constexpr char_filter filter{
 				"1234567890.Ee-"
 			};

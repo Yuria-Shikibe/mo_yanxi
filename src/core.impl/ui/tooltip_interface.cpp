@@ -1,4 +1,4 @@
-module mo_yanxi.ui.basic;
+module mo_yanxi.ui.primitives;
 
 
 void mo_yanxi::ui::tooltip_owner::tooltip_notify_drop(){

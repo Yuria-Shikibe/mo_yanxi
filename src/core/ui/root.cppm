@@ -4,7 +4,7 @@ module;
 
 export module mo_yanxi.ui.root;
 
-import mo_yanxi.ui.basic;
+import mo_yanxi.ui.primitives;
 
 import mo_yanxi.math.vector2;
 import mo_yanxi.math.rect_ortho;
@@ -17,6 +17,12 @@ namespace mo_yanxi::ui{
 		constexpr std::string_view Main{"main"};
 	}
 
+	export
+	template <typename T>
+	struct scene_add_result{
+		scene& scene;
+		T& root_group;
+	};
 
 	export
 	struct root{
@@ -53,6 +59,24 @@ namespace mo_yanxi::ui{
 			}
 
 			return itr.first->second;
+		}
+
+		template <std::derived_from<basic_group> T, typename ...Args>
+			requires (std::constructible_from<T, scene*, group*, Args&&...>)
+		scene_add_result<T> add_scene(
+			std::string_view name,
+			const rect region,
+			graphic::renderer_ui_ptr renderer_ui,
+			Args&&... args){
+			auto& scene = this->add_scene(
+				ui::scene{
+					name, new T{nullptr, nullptr, std::forward<Args>(args)...},
+					graphic::renderer_from_erased(renderer_ui)
+				});
+
+			this->resize(region, name);
+			auto& root = this->root_of<T>(name);
+			return {scene, root};
 		}
 
 		bool erase_scene(std::string_view name) /*noexcept*/ {

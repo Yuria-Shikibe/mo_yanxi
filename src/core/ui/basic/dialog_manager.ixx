@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.basic:dialog_manager;
+export module mo_yanxi.ui.primitives:dialog_manager;
 
 import :elem;
 import mo_yanxi.basic_util;

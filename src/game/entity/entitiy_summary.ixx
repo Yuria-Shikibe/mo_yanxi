@@ -69,6 +69,8 @@ namespace mo_yanxi::game::ecs{
 	template <>
 	struct ecs::archetype_custom_behavior<decl::projectile_entity_desc> : archetype_custom_behavior_base<decl::projectile_entity_desc>{
 		static void on_init(value_type& comps){
+
+
 			auto [motion, mf, dmg] = get_unwrap_of<mech_motion, manifold, projectile_manifold>(comps);
 			mf.hitbox.set_trans_unchecked(motion.trans);
 			mf.hitbox.update(motion.trans);

@@ -5,7 +5,7 @@ module;
 export module mo_yanxi.ui.celled_group;
 
 export import mo_yanxi.ui.layout.cell;
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.primitives;
 export import mo_yanxi.handle_wrapper;
 
 import std;
@@ -117,7 +117,7 @@ namespace mo_yanxi::ui{
 			: element{element},
 			  cell{cell}{}
 
-		void apply(group& group, stated_extent extent = {{size_category::dependent}, {size_category::dependent}}) const{
+		void apply(group& group, optional_mastering_extent extent = {math::vectors::constant2<float>::inf_positive_vec2}) const{
 			cell.apply_to(group, *element, extent);
 		}
 	// protected:

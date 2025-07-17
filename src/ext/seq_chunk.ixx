@@ -191,10 +191,8 @@ namespace mo_yanxi{
 }
 
 
-namespace std{
-	template <typename ...T>
-	struct tuple_size<mo_yanxi::seq_chunk<T...>> : std::integral_constant<std::size_t, sizeof...(T)>{};
+template <typename ...T>
+struct std::tuple_size<mo_yanxi::seq_chunk<T...>> : std::integral_constant<std::size_t, sizeof...(T)>{};
 
-	template <std::size_t Idx, typename ...T>
-	struct tuple_element<Idx, mo_yanxi::seq_chunk<T...>> : std::tuple_element<Idx, std::tuple<T...>>{};
-}
+template <std::size_t Idx, typename ...T>
+struct std::tuple_element<Idx, mo_yanxi::seq_chunk<T...>> : std::tuple_element<Idx, std::tuple<T...>>{};

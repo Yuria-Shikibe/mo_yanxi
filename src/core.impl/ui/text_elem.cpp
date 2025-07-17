@@ -1,4 +1,4 @@
-module mo_yanxi.ui.elem.text_elem;
+module mo_yanxi.ui.elem.label;
 
 import mo_yanxi.graphic.renderer.ui;
 import mo_yanxi.ui.graphic;

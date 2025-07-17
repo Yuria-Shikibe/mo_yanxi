@@ -4,7 +4,7 @@
 
 export module mo_yanxi.ui.elem.button;
 
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.primitives;
 export import mo_yanxi.core.ctrl.key_pack;
 import std;
 

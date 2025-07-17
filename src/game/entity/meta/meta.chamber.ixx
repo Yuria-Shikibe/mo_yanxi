@@ -9,7 +9,7 @@ export import mo_yanxi.game.ecs.component.chamber.general;
 import mo_yanxi.math.rect_ortho;
 import mo_yanxi.game.ecs.component.hit_point;
 import mo_yanxi.game.ecs.component.drawer;
-import mo_yanxi.ui.table;
+import mo_yanxi.ui.elem.table;
 
 // import mo_yanxi.graphic.renderer.predecl;
 

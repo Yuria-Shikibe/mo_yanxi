@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.basic:tooltip_manager;
+export module mo_yanxi.ui.primitives:tooltip_manager;
 
 export import mo_yanxi.ui.flags;
 

@@ -206,6 +206,7 @@ namespace mo_yanxi::game::ecs{
 			float structural_damage_take{};
 
 			energy_status energy_status{};
+			unsigned assigned_energy{};
 
 		private:
 			energy_dynamic_status energy_dynamic_status_{};
@@ -214,6 +215,8 @@ namespace mo_yanxi::game::ecs{
 			void set_energy_status(const chamber::energy_status& status) noexcept{
 				energy_status = status;
 				energy_dynamic_status_ = {};
+
+				assigned_energy = energy_status.power < 0 ? -energy_status.power / 2 : 0;
 			}
 
 			[[nodiscard]] const energy_dynamic_status& get_energy_dynamic_status() const noexcept{
@@ -297,7 +300,9 @@ namespace mo_yanxi::game::ecs{
 			}
 
 			void update(float update_delta_tick) noexcept{
-				if(energy_status)energy_dynamic_status_.update(energy_status, get_capability_factor(), update_delta_tick);
+				if(energy_status){
+					energy_dynamic_status_.update(energy_status, assigned_energy, get_capability_factor(), update_delta_tick);
+				}
 			}
 
 		public:

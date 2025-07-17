@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.basic:group;
+export module mo_yanxi.ui.primitives:group;
 
 import :pre_decl;
 import :elem_ptr;
@@ -29,17 +29,19 @@ namespace mo_yanxi::ui{
 		//TODO using explicit this
 
 
+	protected:
 		virtual void update_children(const float delta_in_ticks){
 			for(const auto& element : get_children()){
 				element->update(delta_in_ticks);
 			}
 		}
 
-		virtual void layout_children(/*Direction*/){
+		void layout_children(){
 			for(const auto& element : get_children()){
 				element->try_layout();
 			}
 		}
+	public:
 
 		void draw_content(const rect clipSpace) const override{
 			const auto space = property.content_bound_absolute().intersection_with(clipSpace);
@@ -107,20 +109,22 @@ namespace mo_yanxi::ui{
 
 			using ss = stated_size;
 
-			if(fx)item.context_size_restriction.width = {size_category::mastering, boundSize.x};
+			if(fx)item.context_size_restriction.set_width(boundSize.x);
 			else{
-				item.context_size_restriction.width =
-					set_restriction_to_mastering
-						? ss{size_category::mastering, boundSize.x}
-						: ss{size_category::dependent};
+				if(set_restriction_to_mastering){
+					item.context_size_restriction.set_width(boundSize.x);
+				}else{
+					item.context_size_restriction.set_width_dependent();
+				}
 			}
 
-			if(fy) item.context_size_restriction.height = {size_category::mastering, boundSize.y};
+			if(fy) item.context_size_restriction.set_height(boundSize.y);
 			else{
-				item.context_size_restriction.height =
-					set_restriction_to_mastering
-						? ss{size_category::mastering, boundSize.y}
-						: ss{size_category::dependent};
+				if(set_restriction_to_mastering){
+					item.context_size_restriction.set_height(boundSize.y);
+				}else{
+					item.context_size_restriction.set_height_dependent();
+				}
 			}
 
 			item.resize_masked({
@@ -142,8 +146,8 @@ namespace mo_yanxi::ui{
 			const auto [ox, oy] = item.get_size();
 
 
-			if(fx)item.context_size_restriction.width = {size_category::mastering, vx};
-			if(fy)item.context_size_restriction.height = {size_category::mastering, vy};
+			if(fx)item.context_size_restriction.set_width(vx);
+			if(fy)item.context_size_restriction.set_height(vy);
 
 			item.resize({
 					fx ? vx : ox,
@@ -160,8 +164,8 @@ namespace mo_yanxi::ui{
 			const auto [vx, vy] = boundSize;
 			const auto [ox, oy] = item.get_size();
 
-			if(fx)item.context_size_restriction.width = {size_category::mastering, vx};
-			if(fy)item.context_size_restriction.height = {size_category::mastering, vy};
+			if(fx)item.context_size_restriction.set_width(vx);
+			if(fy)item.context_size_restriction.set_height(vy);
 
 			item.resize_masked({
 					fx ? vx : ox,

@@ -4,7 +4,7 @@
 
 export module mo_yanxi.ui.elem.scroll_pane;
 
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.primitives;
 export import mo_yanxi.ui.layout.policies;
 
 import mo_yanxi.snap_shot;
@@ -57,26 +57,6 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] scroll_pane(scene* scene, group* group_)
 			: group(scene, group_, "scroll_pane"){
 
-			events().on<input_event::drag>([](const input_event::drag& e, elem& el){
-				auto& self = static_cast<scroll_pane&>(el);
-
-				self.scrollTargetVelocity = self.scrollVelocity = {};
-				const auto trans = e.trans() * self.get_vel_clamp();
-				const auto blank = self.get_viewport_size() - math::vec2{self.bar_hori_length(), self.bar_vert_length()};
-
-				auto rst = self.scroll.base + (trans / blank) * self.get_scrollable_size();
-
-				//clear NaN
-				if(!self.enable_hori_scroll())rst.x = 0;
-				if(!self.enable_vert_scroll())rst.y = 0;
-
-				rst.clamp_xy({}, self.get_scrollable_size());
-
-				if(util::try_modify(self.scroll.temp, rst)){
-					self.updateChildrenAbsSrc();
-				}
-			});
-
 			events().on<input_event::inbound>([](const auto& e, elem& el){
 				el.set_focused_scroll(true);
 			});
@@ -120,7 +100,28 @@ namespace mo_yanxi::ui{
 		void draw_post(rect clipSpace) const override;
 
 		void layout() override{
-			group::layout();
+			elem::layout();
+			update_item_layout();
+		}
+
+		void on_drag(const input_event::drag e) override{
+			auto& self = *this;
+
+			self.scrollTargetVelocity = self.scrollVelocity = {};
+			const auto trans = e.trans() * self.get_vel_clamp();
+			const auto blank = self.get_viewport_size() - math::vec2{self.bar_hori_length(), self.bar_vert_length()};
+
+			auto rst = self.scroll.base + (trans / blank) * self.get_scrollable_size();
+
+			//clear NaN
+			if(!self.enable_hori_scroll())rst.x = 0;
+			if(!self.enable_vert_scroll())rst.y = 0;
+
+			rst.clamp_xy({}, self.get_scrollable_size());
+
+			if(util::try_modify(self.scroll.temp, rst)){
+				self.updateChildrenAbsSrc();
+			}
 		}
 	public:
 
@@ -205,10 +206,6 @@ namespace mo_yanxi::ui{
 		// 	}
 		// }
 
-		void layout_children() override{
-			update_item_layout();
-		}
-
 		void update_item_layout();
 
 		void modifyChildren(elem& element) const{
@@ -216,12 +213,12 @@ namespace mo_yanxi::ui{
 			switch(layout_policy_){
 			case layout_policy::hori_major :{
 				element.property.fill_parent = {true, false};
-				element.context_size_restriction.width = {size_category::mastering, property.content_width()};
+				element.context_size_restriction.set_width(property.content_width());
 				break;
 			}
 			case layout_policy::vert_major :{
 				element.property.fill_parent = {false, true};
-				element.context_size_restriction.height = {size_category::mastering, property.content_height()};
+				element.context_size_restriction.set_height(property.content_height());
 				break;
 			}
 			case layout_policy::none:

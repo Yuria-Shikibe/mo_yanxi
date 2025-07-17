@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.basic:elem_ptr;
+export module mo_yanxi.ui.primitives:elem_ptr;
 
 import :pre_decl;
 

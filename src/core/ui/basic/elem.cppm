@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.ui.basic:elem;
+export module mo_yanxi.ui.primitives:elem;
 
 export import mo_yanxi.math;
 export import mo_yanxi.math.vector2;
@@ -82,15 +82,10 @@ namespace mo_yanxi::ui{
 	export using elem_event_manager =
 	mo_yanxi::events::event_manager<
 		std::move_only_function<void(elem&) const>,
-		// events::GeneralCodeEvent,
-		// events::ElementConnection,
-		// events::click,
-		input_event::drag,
 		input_event::exbound,
 		input_event::inbound,
 		input_event::focus_begin,
 		input_event::focus_end,
-		input_event::scroll,
 		input_event::cursor_moved>;
 
 	const style_drawer<elem>* getDefaultStyleDrawer(){
@@ -296,7 +291,7 @@ namespace mo_yanxi::ui{
 			return
 				rawSize.clamp_xy(
 					size.get_minimum_size(),
-					size.get_maximum_size()).sub(boarder.get_size()
+					size.get_maximum_size()).sub(boarder.extent()
 				).max({});
 		}
 
@@ -309,7 +304,7 @@ namespace mo_yanxi::ui{
 		}
 
 		[[nodiscard]] constexpr math::vec2 content_size() const noexcept{
-			return (size.get_size() - boarder.get_size()).max({});
+			return (size.get_size() - boarder.extent()).max({});
 		}
 
 		[[nodiscard]] constexpr math::vec2 get_size() const noexcept{
@@ -325,7 +320,7 @@ namespace mo_yanxi::ui{
 
 
 		//TODO using variant<type, float> instead?
-		stated_extent context_size_restriction{};
+		optional_mastering_extent context_size_restriction{};
 		/**
 		 * @brief size restriction in a layout context, usually is gain from a cell
 		 */
@@ -447,15 +442,20 @@ namespace mo_yanxi::ui{
 			return property.content_size();
 		}
 
-		[[nodiscard]] constexpr math::vec2 content_potential_size() const noexcept{
+		[[nodiscard]] /*constexpr*/ math::vec2 content_potential_size() const noexcept{
 			return content_potential_size(context_size_restriction);
 		}
-		[[nodiscard]] constexpr math::vec2 content_potential_size(stated_extent extent) const noexcept{
+
+		[[nodiscard]] /*constexpr*/ math::vec2 content_potential_size(optional_mastering_extent extent) const noexcept{
+			//TODO directly return extent.size?
 			auto sz = property.content_size();
-			if(extent.width.dependent()){
+
+			auto [depX, depY] = extent.get_dependent();
+
+			if(depX){
 				sz.x = std::numeric_limits<float>::infinity();
 			}
-			if(extent.height.dependent()){
+			if(depY){
 				sz.y = std::numeric_limits<float>::infinity();
 			}
 			return sz;
@@ -683,6 +683,14 @@ namespace mo_yanxi::ui{
 			return extent;
 		}
 
+		[[nodiscard]] optional_mastering_extent clip_boarder_from(optional_mastering_extent extent) const noexcept{
+			auto [dx, dy] = extent.get_dependent();
+			if(dx)extent.set_width(math::clamp_positive(extent.potential_width() - property.boarder.width()));
+			if(dy)extent.set_height(math::clamp_positive(extent.potential_height() - property.boarder.height()));
+
+			return extent;
+		}
+
 	protected:
 
 		/**
@@ -690,13 +698,13 @@ namespace mo_yanxi::ui{
 		 * @param extent : any tag of the length should be within {mastering, external}
 		 * @return expected size, or nullopt
 		 */
-		virtual std::optional<math::vec2> pre_acquire_size_impl(stated_extent extent){
+		virtual std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent){
 			return std::nullopt;
 		}
 
 	public:
 
-		std::optional<math::vec2> pre_acquire_size(stated_extent extent){
+		std::optional<math::vec2> pre_acquire_size(optional_mastering_extent extent){
 			return pre_acquire_size_impl(extent).transform([this](const math::vec2 v){return property.size.clamp(v);});
 		}
 
@@ -704,7 +712,7 @@ namespace mo_yanxi::ui{
 
 		}
 
-		virtual void input_unicode(const char32_t val){
+		virtual void on_unicode_input(const char32_t val){
 
 		}
 
@@ -793,14 +801,15 @@ namespace mo_yanxi::ui{
 
 
 		template <std::derived_from<action::action<elem>> ActionType, typename... T>
+			requires (std::constructible_from<ActionType, T&&...>)
 		void push_action(T&&... args){
 			actions.push(std::make_unique<ActionType>(std::forward<T>(args)...));
 		}
 
 		template <typename... ActionType>
-			requires (std::derived_from<std::decay_t<ActionType>, action::action<elem>> && ...)
+			requires (std::derived_from<std::remove_cvref_t<ActionType>, action::action<elem>> && ...)
 		void push_action(ActionType&&... args){
-			(actions.push(std::make_unique<std::decay_t<ActionType>>(std::forward<ActionType>(args))), ...);
+			(actions.push(std::make_unique<std::remove_cvref_t<ActionType>>(std::forward<ActionType>(args))), ...);
 		}
 
 		std::vector<elem*> dfs_find_deepest_element(math::vec2 cursorPos);
@@ -810,6 +819,7 @@ namespace mo_yanxi::ui{
 		}
 
 
+	protected:
 		[[nodiscard]] tooltip_align tooltip_align_policy() const override{
 			switch(tooltip_prop_.layout_info.follow){
 			case tooltip_follow::owner :{
@@ -838,6 +848,7 @@ namespace mo_yanxi::ui{
 				&& cursor_state.time_tooltip > tooltip_prop_.min_hover_time;
 		}
 
+	public:
 		void build_tooltip(bool belowScene = false, bool fade_in = true);
 
 

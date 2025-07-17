@@ -3,7 +3,7 @@
 export module mo_yanxi.ui.elem.check_box;
 
 export import mo_yanxi.ui.elem.image_frame;
-import mo_yanxi.ui.table;
+import mo_yanxi.ui.elem.table;
 import mo_yanxi.ui.elem.button;
 import std;
 

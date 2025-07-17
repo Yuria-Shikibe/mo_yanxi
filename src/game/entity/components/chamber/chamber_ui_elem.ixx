@@ -5,7 +5,7 @@
 export module mo_yanxi.game.ui.chamber_ui_elem;
 
 export import mo_yanxi.game.ecs.component.chamber;
-export import mo_yanxi.ui.table;
+export import mo_yanxi.ui.elem.table;
 export import mo_yanxi.game.ui.bars;
 
 import std;
@@ -33,7 +33,7 @@ namespace mo_yanxi::game::ui{
 			: elem(scene, group, "tile_status"){
 		}
 
-		std::optional<math::vec2> pre_acquire_size_impl(stated_extent extent) override{
+		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{
 			auto size = clip_boarder_from(extent);
 
 			auto region = building_data.data().region().size();
@@ -45,18 +45,18 @@ namespace mo_yanxi::game::ui{
 				return region.scl(chunk_max_draw_size).as<float>();
 			}else{
 				math::vec2 sz;
-				if(size.width.mastering()){
-					sz = {size.width, size.width * region.as<float>().slope()};
+				if(size.width_mastering()){
+					sz = {size.potential_width(), size.potential_width() * region.as<float>().slope()};
 				}else{
-					sz = {size.height * region.as<float>().slope_inv(), size.height};
+					sz = {size.potential_height() * region.as<float>().slope_inv(), size.potential_height()};
 				}
 
 				auto usz = region.as<float>() * get_unit_size(sz, region);
 
-				if(size.width.mastering()){
-					return math::vec2{size.width, usz.y} + prop().boarder.get_size();
+				if(size.width_mastering()){
+					return math::vec2{size.potential_width(), usz.y} + prop().boarder.extent();
 				}else{
-					return math::vec2{usz.x, size.height} + prop().boarder.get_size();
+					return math::vec2{usz.x, size.potential_height()} + prop().boarder.extent();
 				}
 			}
 		}

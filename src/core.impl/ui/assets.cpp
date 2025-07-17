@@ -3,7 +3,7 @@ module mo_yanxi.ui.assets;
 import mo_yanxi.graphic.image_manage;
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.assets.directories;
-import mo_yanxi.ui.basic;
+import mo_yanxi.ui.primitives;
 
 mo_yanxi::ui::theme::icons::icon_raw_present load_svg(
 	mo_yanxi::graphic::image_page& ui_page,
@@ -70,14 +70,14 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 		graphic::allocated_image_region& boarder = page.register_named_region(
 			"edge"s,
 			graphic::sdf_load{
-				graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f, 2.5f), 8.}, math::usize2{96, 96}, 2
+				graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f, 3.f), 4.}, math::usize2{96, 96}, 2
 			}, true
 		).first;
 
 		graphic::allocated_image_region& boarder_thin = page.register_named_region(
 			"edge_thin"s,
 			graphic::sdf_load{
-				graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f, 1.85f), 8.}, math::usize2{96, 96}, 2
+				graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f, 2.f), 4.}, math::usize2{96, 96}, 2
 			},
 			true
 		).first;
@@ -85,7 +85,7 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 		graphic::allocated_image_region& base = page.register_named_region(
 			"base"s,
 			graphic::sdf_load{
-				graphic::msdf::msdf_generator{graphic::msdf::create_solid_boarder(12.f), 8.},
+				graphic::msdf::msdf_generator{graphic::msdf::create_solid_boarder(12.f), 4.},
 				math::usize2{96, 96}, 3
 			},
 			true
@@ -109,25 +109,25 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 
 		shapes::edge = {
 				boarder,
-				align::padding<std::uint32_t>{}.set(12).expand(graphic::msdf::sdf_image_boarder),
+				align::padding2d<std::uint32_t>{}.set(12).expand(graphic::msdf::sdf_image_boarder),
 				graphic::msdf::sdf_image_boarder
 			};
 
 		shapes::edge_thin = {
 				boarder_thin,
-				align::padding<std::uint32_t>{}.set(12).expand(graphic::msdf::sdf_image_boarder),
+				align::padding2d<std::uint32_t>{}.set(12).expand(graphic::msdf::sdf_image_boarder),
 				graphic::msdf::sdf_image_boarder
 			};
 
 		shapes::base = {
 				base,
-				align::padding<std::uint32_t>{}.set(12).expand(graphic::msdf::sdf_image_boarder),
+				align::padding2d<std::uint32_t>{}.set(12).expand(graphic::msdf::sdf_image_boarder),
 				graphic::msdf::sdf_image_boarder
 			};
 
 		shapes::side_bar = {
 				side_bar,
-				align::padding<std::uint32_t>{32, 0, 16, 16}.expand(graphic::msdf::sdf_image_boarder),
+				align::padding2d<std::uint32_t>{32, 0, 16, 16}.expand(graphic::msdf::sdf_image_boarder),
 				graphic::msdf::sdf_image_boarder
 			};
 

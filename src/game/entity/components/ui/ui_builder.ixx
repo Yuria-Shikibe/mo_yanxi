@@ -5,7 +5,7 @@
 export module mo_yanxi.game.ecs.component.ui.builder;
 
 export import mo_yanxi.game.ecs.component.manage;
-export import mo_yanxi.ui.table;
+export import mo_yanxi.ui.elem.table;
 import mo_yanxi.ui.action.generic;
 
 import std;

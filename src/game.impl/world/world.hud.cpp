@@ -333,9 +333,12 @@ mo_yanxi::math::vec2 mo_yanxi::game::world::hud::hud_viewport::get_transed(math:
 }
 
 mo_yanxi::game::world::hud::hud(){
-	scene = &core::global::ui::root->add_scene(ui::scene{"hud", new ui::loose_group{nullptr, nullptr}, &core::global::graphic::ui});
-	core::global::ui::root->resize(math::frect{math::vector2{core::global::graphic::context.get_extent().width, core::global::graphic::context.get_extent().height}.as<float>()}, "hud");
-	auto& root = core::global::ui::root->root_of<ui::loose_group>("hud");
+	auto [add_scene, root] = core::global::ui::root->add_scene<ui::loose_group>(
+		"hud",
+		math::frect{math::vector2{core::global::graphic::context.get_extent().width, core::global::graphic::context.get_extent().height}.as<float>()},
+		core::global::graphic::ui);
+
+	this->scene = std::addressof(add_scene);
 
 	ui::elem_ptr e{root.get_scene(), &root, std::in_place_type<hud_viewport>};
 	e->set_style();

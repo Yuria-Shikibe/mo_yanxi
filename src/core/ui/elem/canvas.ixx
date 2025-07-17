@@ -4,7 +4,7 @@
 
 export module mo_yanxi.ui.elem.canvas;
 
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.primitives;
 import std;
 
 namespace mo_yanxi::ui{

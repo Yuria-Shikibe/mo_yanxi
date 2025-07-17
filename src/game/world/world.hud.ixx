@@ -4,10 +4,10 @@
 
 export module mo_yanxi.game.world.hud;
 
-import mo_yanxi.ui.basic;
+import mo_yanxi.ui.primitives;
 import mo_yanxi.ui.root;
-import mo_yanxi.ui.manual_table;
-import mo_yanxi.ui.table;
+import mo_yanxi.ui.elem.manual_table;
+import mo_yanxi.ui.elem.table;
 
 import mo_yanxi.game.ecs.component.manage;
 import mo_yanxi.game.path_sequence;

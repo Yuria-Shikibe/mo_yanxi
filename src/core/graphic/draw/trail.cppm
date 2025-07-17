@@ -139,7 +139,7 @@ namespace mo_yanxi::graphic{
 				const float prevProg,
 				const float nextProg
 
-			) -> float{
+			) FORCE_INLINE -> float{
 				const auto dst = next.pos - prev.pos;
 				const auto scl = math::curve(dst.length(), 0.f, 0.5f) * radius * prev.scale / capSize;
 				const float z2 = -(dst).angle_rad();

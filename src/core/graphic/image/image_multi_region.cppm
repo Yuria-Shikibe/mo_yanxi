@@ -155,7 +155,7 @@ namespace mo_yanxi::graphic{
 					})
 			}{}
 
-		[[nodiscard]] constexpr nine_patch_raw(align::padding<T> edge, const rect external) noexcept
+		[[nodiscard]] constexpr nine_patch_raw(align::padding2d<T> edge, const rect external) noexcept
 			{
 			constexpr T err = std::numeric_limits<T>::epsilon() * 32;
 
@@ -254,7 +254,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		[[nodiscard]] constexpr math::vec2 get_recommended_size() const noexcept{
-			return inner_size + edge.get_size();
+			return inner_size + edge.extent();
 		}
 
 		[[nodiscard]] nine_patch_brief() = default;
@@ -273,7 +273,7 @@ namespace mo_yanxi::graphic{
 
 
 		[[nodiscard]] math::vec2 get_size() const noexcept{
-			return inner_size + edge.get_size();
+			return inner_size + edge.extent();
 		}
 
 	};
@@ -327,15 +327,15 @@ namespace mo_yanxi::graphic{
 
 		image_nine_region(
 			const region_type& imageRegion,
-			const align::padding<std::uint32_t> margin,
+			const align::padding2d<std::uint32_t> margin,
 			const float external_margin = 0.f,
 			const math::usize2 centerSize = {},
 			const align::scale centerScale = DefaultScale,
 			const float edgeShrinkScale = 0.25f
 		) : image_nine_region{imageRegion, math::urect{
-			tags::from_extent, margin.bot_lft(), imageRegion.uv.get_region().size().sub(margin.get_size())
+			tags::from_extent, margin.bot_lft(), imageRegion.uv.get_region().size().sub(margin.extent())
 		}, external_margin, centerSize, centerScale, edgeShrinkScale}{
-			assert(margin.get_size().within(imageRegion.uv.get_region().size()));
+			assert(margin.extent().within(imageRegion.uv.get_region().size()));
 		}
 
 		// ImageViewNineRegion(

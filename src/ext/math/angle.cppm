@@ -304,7 +304,7 @@ namespace mo_yanxi::math{
 			clampInternal();
 		}
 
-		[[nodiscard]] ANGLE_PURE FORCE_INLINE constexpr uniformed_angle abs(this uniformed_angle self) noexcept{
+		[[nodiscard]] ANGLE_PURE FORCE_INLINE constexpr uniformed_angle as_abs(this uniformed_angle self) noexcept{
 			self.ang_ = math::abs(self.ang_);
 			return self;
 		}

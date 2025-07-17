@@ -540,7 +540,6 @@ namespace mo_yanxi::game::ecs{
 	using dump_type_to_tuple_t = std::conditional_t<
 		std::same_as<typename component_custom_behavior<T>::dump_type, void>, std::tuple<>, std::tuple<
 			typename component_custom_behavior<T>::dump_type>>;
-	using B = dump_type_to_tuple_t<int>;
 
 	template <typename T>
 	using unwrap_type = T::type;
@@ -1593,7 +1592,9 @@ namespace mo_yanxi::game::ecs{
 
 					for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
 						[&] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
-							std::invoke(f, (assert(std::get<Idx>(iterators) != std::ranges::end(std::get<Idx>(p))), *(std::get<Idx>(iterators)++)) ...);
+							std::invoke(f,
+								(assert(std::get<Idx>(iterators) != std::ranges::end(std::get<Idx>(p))),
+									*(std::get<Idx>(iterators)++)) ...);
 						}(std::make_index_sequence<std::tuple_size_v<params>>{});
 					}
 				});

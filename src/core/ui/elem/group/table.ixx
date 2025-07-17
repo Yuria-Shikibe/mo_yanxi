@@ -1,5 +1,5 @@
 
-export module mo_yanxi.ui.table;
+export module mo_yanxi.ui.elem.table;
 
 export import mo_yanxi.ui.layout.policies;
 export import mo_yanxi.ui.layout.cell;
@@ -343,7 +343,7 @@ namespace mo_yanxi::ui{
 					dst_off.*minor_target = head_minor.max_pad_dst;
 
 					if(elem.cell.saturate && std::ranges::size(line) == 1){
-						size.*major_target = region.size().*major_target - (src_off).*major_target - (dst_off).*major_target;
+						size.*major_target = region.size().*major_target - (src_off.*major_target + dst_off.*major_target);
 					}
 
 					stated_extent ext;
@@ -394,7 +394,7 @@ namespace mo_yanxi::ui{
 			return entire_align;
 		}
 
-		void set_policy(layout_policy policy){
+		void set_layout_policy(layout_policy policy){
 			if(policy != layout_policy){
 				notify_layout_changed(spread_direction::from_content);
 				layout_policy = policy;
@@ -476,11 +476,10 @@ namespace mo_yanxi::ui{
 		}
 
 	public:
-		std::optional<math::vec2> pre_acquire_size_impl(stated_extent extent) override{
+		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{
 			const auto grid = util::countRowAndColumn_toVector(cells, &table_cell_adaptor::line_feed);
 			if(grid.empty()) return std::nullopt;
 
-			// elem::resize_quiet(get_size().min(extent.potential_max_size()));
 			table_layout_context context{layout_policy, std::ranges::max(grid), static_cast<table_size_t>(grid.size())};
 
 			auto size = pre_layout(context, clip_boarder_from(extent), true);
@@ -490,11 +489,11 @@ namespace mo_yanxi::ui{
 
 
 	protected:
-		math::vec2 pre_layout(table_layout_context& context, stated_extent constrain, bool size_to_constrain){
-			auto size = context.allocate_cells(cells, constrain.potential_max_size());
+		math::vec2 pre_layout(table_layout_context& context, optional_mastering_extent constrain, bool size_to_constrain){
+			auto size = context.allocate_cells(cells, constrain.potential_extent());
 
-			const auto [extent_major, extent_minor] = get_extent_ptr(layout_policy);
 			const auto [major_target, minor_target] = get_vec_ptr<>(layout_policy);
+			const auto [dep_major_target, dep_minor_target] = get_vec_ptr<bool>(layout_policy);
 			const auto [
 							pad_major_src,
 							pad_major_dst,
@@ -504,16 +503,19 @@ namespace mo_yanxi::ui{
 			auto pad_major = property.boarder.*pad_major_src + property.boarder.*pad_major_dst;
 			auto pad_minor = property.boarder.*pad_minor_src + property.boarder.*pad_minor_dst;
 
-			if((constrain.*extent_major).dependent()){
+			auto dep = constrain.get_dependent();
+			auto sz = constrain.potential_extent();
+
+			if(dep.*dep_major_target){
 				size.*major_target += pad_major;
 			}else{
-				size.*major_target = size_to_constrain ? (constrain.*extent_major) + pad_major : get_size().*major_target;
+				size.*major_target = size_to_constrain ? (sz.*major_target) + pad_major : get_size().*major_target;
 			}
 
-			if((constrain.*extent_minor).dependent()){
+			if(dep.*dep_minor_target){
 				size.*minor_target += pad_minor;
 			}else{
-				size.*minor_target = size_to_constrain ? (constrain.*extent_minor) + pad_minor : get_size().*minor_target;
+				size.*minor_target = size_to_constrain ? (sz.*minor_target) + pad_minor : get_size().*minor_target;
 			}
 
 			return size;
@@ -529,10 +531,10 @@ namespace mo_yanxi::ui{
 			extent.collapse(content_size());
 
 			auto size = pre_layout(context, extent, false);
-			size.min(context_size_restriction.potential_max_size());
+			size.min(context_size_restriction.potential_extent());
 			elem::resize_masked(size);
 
-			size -= property.boarder.get_size();
+			size -= property.boarder.extent();
 			size.max({});
 
 			auto off = align::get_offset_of(entire_align, size, rect{tags::from_extent, {}, content_size()});

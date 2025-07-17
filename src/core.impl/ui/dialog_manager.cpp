@@ -1,4 +1,4 @@
-module mo_yanxi.ui.basic;
+module mo_yanxi.ui.primitives;
 
 import :scene;
 

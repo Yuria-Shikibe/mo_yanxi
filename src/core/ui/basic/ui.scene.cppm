@@ -1,6 +1,6 @@
 module;
 
-export module mo_yanxi.ui.basic:scene;
+export module mo_yanxi.ui.primitives:scene;
 
 import :pre_decl;
 import :elem;

@@ -2,7 +2,7 @@
 // Created by Matrix on 2025/3/13.
 //
 
-export module mo_yanxi.ui.manual_table;
+export module mo_yanxi.ui.elem.manual_table;
 
 export import mo_yanxi.ui.celled_group;
 import std;
@@ -39,7 +39,7 @@ namespace mo_yanxi::ui{
 			region.src = align::transform_offset(adaptor.cell.align, bound, region);
 			adaptor.cell.allocated_region = region;
 
-			adaptor.apply(*this, {{size_category::mastering, region.width()}, {size_category::mastering, region.height()}});
+			adaptor.apply(*this, {region.width(), region.height()});
 		}
 	};
 }

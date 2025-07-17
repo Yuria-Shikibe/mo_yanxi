@@ -2,9 +2,9 @@
 // Created by Matrix on 2025/3/14.
 //
 
-export module mo_yanxi.ui.elem.text_elem;
+export module mo_yanxi.ui.elem.label;
 
-export import mo_yanxi.ui.basic;
+export import mo_yanxi.ui.primitives;
 export import mo_yanxi.font;
 export import mo_yanxi.font.typesetting;
 import std;
@@ -33,14 +33,14 @@ namespace mo_yanxi::ui{
 			: elem(scene, group, tyName){
 		}
 
-		std::optional<math::vec2> pre_acquire_size_impl(stated_extent extent) override{
-			math::vec2 bound{extent.potential_max_size()};
+		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{
+			math::vec2 bound{extent.potential_extent()};
 
-			bound -= property.boarder.get_size();
+			bound -= property.boarder.extent();
 			bound.max({});
 
 			auto rst = layout_text(bound);
-			return (rst + property.boarder.get_size());
+			return (rst + property.boarder.extent());
 		}
 
 		void set_text(std::string_view text){
@@ -94,7 +94,7 @@ namespace mo_yanxi::ui{
 			elem::layout();
 
 			if(text_expired){
-				const auto maxSz = context_size_restriction.potential_max_size();
+				const auto maxSz = context_size_restriction.potential_extent();
 				const auto resutlSz = layout_text(property.evaluate_valid_size(maxSz));
 				if(!resutlSz.equals(content_size())){
 					notify_layout_changed(spread_direction::all_visible);

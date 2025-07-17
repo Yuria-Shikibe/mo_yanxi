@@ -2,7 +2,7 @@ module;
 
 //TODO this should be the impl file of :scene
 //Anyway the highlight breakdown when using module mo_yanxi.ui.basic:scene;
-module mo_yanxi.ui.basic;
+module mo_yanxi.ui.primitives;
 
 
 import mo_yanxi.concepts;
@@ -198,13 +198,12 @@ void mo_yanxi::ui::scene::on_key_action(const core::ctrl::key_code_t key, const 
 
 void mo_yanxi::ui::scene::on_unicode_input(char32_t val) const{
 	if(currentKeyFocus){
-		currentKeyFocus->input_unicode(val);
+		currentKeyFocus->on_unicode_input(val);
 	}
 }
 
 void mo_yanxi::ui::scene::on_scroll(const math::vec2 scroll, core::ctrl::key_code_t mode) const{
 	if(currentScrollFocus){
-		currentScrollFocus->events().fire(input_event::scroll{scroll, mode});
 		currentScrollFocus->on_scroll(input_event::scroll{scroll, mode});
 	}
 }
@@ -254,7 +253,6 @@ void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos, bool for
 		if(!state.pressed) continue;
 
 		dragEvent = {state.src, newPos, core::ctrl::key_pack{static_cast<core::ctrl::key_code_t>(i), core::ctrl::act::ignore, mode}};
-		currentCursorFocus->events().fire(dragEvent);
 		currentCursorFocus->on_drag(dragEvent);
 	}
 

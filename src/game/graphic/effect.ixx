@@ -260,24 +260,108 @@ namespace mo_yanxi::game::fx{
 		}
 	};
 
+	export
+	struct virtual_effect_drawer_base{
+		virtual ~virtual_effect_drawer_base() = default;
+
+		virtual math::frect get_clip_region(const effect& e, float min_clip) const noexcept;
+
+		virtual void operator()(const effect& e, const effect_draw_context& ctx) const noexcept = 0;
+
+		virtual std::unique_ptr<virtual_effect_drawer_base> clone() const{
+			return {};
+		}
+	};
 
 	export
-	struct dynamic_drawer : effect_drawer_base{
-		void operator()(const effect&, const effect_draw_context&) const noexcept{
+	struct dynamic_owner_drawer : effect_drawer_base{
+	private:
+		std::unique_ptr<virtual_effect_drawer_base> drawer{};
+
+	public:
+		[[nodiscard]] dynamic_owner_drawer() = default;
+
+		[[nodiscard]] explicit(false) dynamic_owner_drawer(std::unique_ptr<virtual_effect_drawer_base>&& drawer)
+			: drawer(std::move(drawer)){
+		}
+
+		template <std::derived_from<virtual_effect_drawer_base> T, typename ...Args>
+			requires (std::constructible_from<T, Args&& ...>)
+		[[nodiscard]] explicit(false) dynamic_owner_drawer(
+			std::in_place_type_t<T>,
+			Args&& ...args)
+			: drawer(std::make_unique<T>(std::forward<Args>(args) ...)){
+		}
+
+
+		template <typename T>
+			requires (std::derived_from<std::remove_cvref_t<T>, virtual_effect_drawer_base>)
+		[[nodiscard]] explicit(false) dynamic_owner_drawer(
+			T&& t)
+			: drawer(std::make_unique<T>(std::move(t))){
+		}
+
+		[[nodiscard]] math::frect get_clip_region(const effect& e, float min_clip) const noexcept{
+			return drawer->get_clip_region(e, min_clip);
+		}
+
+		void operator()(const effect& e, const effect_draw_context& c) const noexcept{
+			(*drawer)(e, c);
+		}
+
+		dynamic_owner_drawer(const dynamic_owner_drawer& other)
+			: effect_drawer_base{other},
+			  drawer{other.drawer->clone()}{
+			assert(drawer != nullptr);
+		}
+
+		dynamic_owner_drawer(dynamic_owner_drawer&& other) noexcept = default;
+
+		dynamic_owner_drawer& operator=(const dynamic_owner_drawer& other){
+			if(this == &other) return *this;
+			effect_drawer_base::operator =(other);
+			drawer = other.drawer->clone();
+			assert(drawer != nullptr);
+			return *this;
+		}
+
+		dynamic_owner_drawer& operator=(dynamic_owner_drawer&& other) noexcept = default;
+	};
+	export
+	struct dynamic_ref_drawer : effect_drawer_base{
+	private:
+		const virtual_effect_drawer_base* drawer{};
+	public:
+		[[nodiscard]] dynamic_ref_drawer() = default;
+
+		[[nodiscard]] explicit(false) dynamic_ref_drawer(const virtual_effect_drawer_base& drawer)
+			: drawer(std::addressof(drawer)){
+		}
+
+		[[nodiscard]] math::frect get_clip_region(const effect& e, float min_clip) const noexcept{
+			return drawer->get_clip_region(e, min_clip);
+		}
+
+		void operator()(const effect& e, const effect_draw_context& c) const noexcept{
+			(*drawer)(e, c);
 		}
 	};
 
 	using styles = std::variant<
-		dynamic_drawer,
 		shape_rect_ortho,
 		line_splash,
 		poly_outlined_out,
 		poly_line_out,
-		trail_effect
+		trail_effect,
+
+		dynamic_owner_drawer,
+		dynamic_ref_drawer
 	>;
 
 	export
 	using effect_id_type = std::size_t;
+
+	//TODO optional discard beyond viewport?
 
 	export
 	struct effect_meta{
