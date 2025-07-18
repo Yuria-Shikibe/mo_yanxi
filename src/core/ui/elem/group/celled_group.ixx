@@ -183,9 +183,9 @@ namespace mo_yanxi::ui{
 
 		using basic_group::add_children;
 
-		template <typename E, std::derived_from<universal_group> G, typename ...Args>
+		template <std::derived_from<elem> E, std::derived_from<universal_group> G, typename ...Args>
 			requires requires{
-				requires std::is_base_of_v<elem, E>;
+				// requires std::is_base_of_v<elem, E>;
 				requires std::constructible_from<E, scene*, group*, Args...>;
 		}
 		create_handle<E, cell_type> emplace(this G& self, Args&&... args){

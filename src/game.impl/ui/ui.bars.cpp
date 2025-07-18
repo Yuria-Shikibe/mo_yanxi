@@ -84,12 +84,12 @@ void mo_yanxi::game::ui::reload_bar_drawer::draw(math::frect region, float opaci
 		auto gradient = reload_color;
 		gradient.from.set_a(opacity);
 		gradient.to.set_a(opacity);
-		const math::frect reload_progress{tags::from_extent, src, {w * current_value, h * (1 - efficiency_bar_scale)}};
+		const math::frect reload_progress{tags::from_extent, src, {w * current_reload_value, h * (1 - efficiency_bar_scale)}};
 
 		draw::fill::fill(acq.get(),
 			reload_progress.vert_00(), reload_progress.vert_01(),  reload_progress.vert_11(),  reload_progress.vert_10(),
 			gradient.from, gradient.from,
-			gradient[current_value], gradient[current_value]
+			gradient[current_reload_value], gradient[current_reload_value]
 		);
 	}
 
@@ -107,6 +107,8 @@ void mo_yanxi::game::ui::reload_bar_drawer::draw(math::frect region, float opaci
 }
 
 void mo_yanxi::game::ui::reload_bar::draw_content(mo_yanxi::ui::rect clipSpace) const{
+	draw_background();
+
 	auto acq = mo_yanxi::ui::get_draw_acquirer(get_renderer());
 	using namespace graphic;
 
@@ -119,12 +121,12 @@ void mo_yanxi::game::ui::reload_bar::draw_content(mo_yanxi::ui::rect clipSpace) 
 		auto gradient = reload_color;
 		gradient.from.set_a(opacity);
 		gradient.to.set_a(opacity);
-		const math::frect reload_progress{tags::from_extent, src, {w * current_value, h * (1 - efficiency_bar_scale)}};
+		const math::frect reload_progress{tags::from_extent, src, {w * current_reload_value, h * (1 - efficiency_bar_scale)}};
 
 		draw::fill::fill(acq.get(),
 			reload_progress.vert_00(), reload_progress.vert_01(),  reload_progress.vert_11(),  reload_progress.vert_10(),
 			gradient.from, gradient.from,
-			gradient[current_value], gradient[current_value]
+			gradient[current_reload_value], gradient[current_reload_value]
 		);
 	}
 
@@ -142,6 +144,8 @@ void mo_yanxi::game::ui::reload_bar::draw_content(mo_yanxi::ui::rect clipSpace) 
 }
 
 void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opacity, graphic::renderer_ui_ref renderer_ref) const{
+	region.expand(2, 2);
+
 	int abs_power_total = math::abs(state_.power_total);
 	if(abs_power_total == 0)return;
 	int abs_current_power = math::abs(state_.power_current);

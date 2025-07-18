@@ -4,6 +4,9 @@ import mo_yanxi.ui.graphic;
 
 void mo_yanxi::ui::text_input_area::draw_content(const rect clipSpace) const{
 	using namespace graphic;
+
+	draw_background();
+
 	if(caret_){
 		auto off2 = get_glyph_abs_src();
 
@@ -64,6 +67,5 @@ void mo_yanxi::ui::text_input_area::draw_content(const rect clipSpace) const{
 
 	drawBase:
 	
-	label::draw_content(clipSpace);
-	
+	draw_text();
 }

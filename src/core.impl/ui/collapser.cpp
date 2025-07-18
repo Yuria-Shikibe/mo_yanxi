@@ -2,11 +2,10 @@ module mo_yanxi.ui.elem.collapser;
 
 import mo_yanxi.ui.graphic;
 
-void mo_yanxi::ui::collapser::draw_pre(const rect clipSpace) const{
-	basic_group::draw_pre(clipSpace);
-}
 
 void mo_yanxi::ui::collapser::draw_content(const rect clipSpace) const{
+	draw_background();
+
 	const auto space = property.content_bound_absolute().intersection_with(clipSpace);
 	head_->draw(space);
 

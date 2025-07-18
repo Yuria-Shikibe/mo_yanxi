@@ -170,14 +170,42 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	// 	}
 	//
 	// }
-	// {
-	// 	auto pane = bed.emplace<game::ui::hitbox_editor>();
-	// 	pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 1.f}};
-	// 	pane.cell().align = align::pos::center_right;
-	// 	pane.cell().margin.set(4);
-	//
-	//
-	// }
+	{
+		auto pane = bed.emplace<game::ui::grid_editor>();
+		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 0.75f}};
+		pane.cell().align = align::pos::top_left;
+		pane.cell().margin.set(4);
+	}
+
+	{
+		auto pane = bed.emplace<ui::scroll_pane>();
+		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, .25f}};
+		pane.cell().align = align::pos::bottom_left;
+		pane.cell().margin.set(4);
+
+		pane->set_layout_policy(ui::layout_policy::vert_major);
+
+		pane->set_elem([](ui::list& t){
+			t.template_cell.set_size(120);
+			t.template_cell.pad.set(5);
+			t.set_layout_policy(ui::layout_policy::vert_major);
+
+			{
+				auto p = t.emplace<ui::elem>();
+				p.cell().set_size(60);
+			}
+
+			t.emplace<ui::elem>();
+			t.emplace<ui::elem>();
+			t.function_init([](ui::label& label){
+				label.set_text("#<[s.75>楼上的下来搞#<[s2>核算#<[s>\nsdasdasd");
+			}).cell().set_external();
+			t.emplace<ui::elem>();
+			t.emplace<ui::elem>();
+		});
+	}
+
+
 	// {
 	// 	static int t = 0;
 	// 	auto pane = bed.emplace<game::ui::field_editor>();
@@ -199,31 +227,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	// 	pane->set_editor_height(80);
 	// }
 	//
-	auto pane = bed.emplace<ui::scroll_pane>();
-	pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.5f, .5f}};
-	pane.cell().align = align::pos::center;
-	pane.cell().margin.set(16);
-	//
-	pane->set_layout_policy(ui::layout_policy::vert_major);
-	//
-	pane->set_elem([](ui::list& t){
-		t.template_cell.set_size(120);
-		t.template_cell.pad.set(5);
-		t.set_layout_policy(ui::layout_policy::vert_major);
 
-		{
-			auto p = t.emplace<ui::elem>();
-			p.cell().set_size(60);
-		}
-
-		t.emplace<ui::elem>();
-		t.emplace<ui::elem>();
-		t.function_init([](ui::label& label){
-			label.set_text("asdasdasdasdasdasdasdasd");
-		}).cell().set_external();
-		t.emplace<ui::elem>();
-		t.emplace<ui::elem>();
-	});
 	//
 
 	// auto pane = bed.emplace<ui::creation::file_selector>();

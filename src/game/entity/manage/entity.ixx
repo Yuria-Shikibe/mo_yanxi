@@ -45,7 +45,8 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	export using entity_id = struct entity*;
+	export struct entity;
+	export using entity_id = entity*;
 	export using entity_data_chunk_index = std::vector<int>::size_type;
 	export auto invalid_chunk_idx = std::numeric_limits<entity_data_chunk_index>::max();
 
@@ -160,7 +161,6 @@ namespace mo_yanxi::game::ecs{
 		tuple_to_seq_chunk_t<tuple_cat_t<std::tuple<chunk_meta>, Tuple>>
 	>;
 	
-	export
 	struct entity{
 
 	private:

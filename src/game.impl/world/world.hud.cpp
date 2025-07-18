@@ -262,6 +262,8 @@ void mo_yanxi::game::world::hud::hud_viewport::build_entity_info(){
 }
 
 void mo_yanxi::game::world::hud::hud_viewport::draw_content(const ui::rect clipSpace) const{
+	draw_background();
+
 	using namespace graphic;
 	auto draw_acquirer = ui::get_draw_acquirer(get_renderer());
 

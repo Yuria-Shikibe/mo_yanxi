@@ -34,11 +34,8 @@ mo_yanxi::ui::rect mo_yanxi::ui::progress_bar_drawer::get_region(const progress_
 }
 
 void mo_yanxi::ui::progress_bar::draw_content(const rect clipSpace) const{
-	elem::draw_content(clipSpace);
+	draw_background();
 
 	assert(drawer != nullptr);
 	drawer->draw(*this);
-
-
-
 }

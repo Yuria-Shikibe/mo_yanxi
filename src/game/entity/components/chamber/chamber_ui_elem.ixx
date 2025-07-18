@@ -59,7 +59,7 @@ namespace mo_yanxi::game::ui{
 	};
 
 	struct build_tile_status_elem : ui::elem{
-		ecs::chamber::building_ref entity{};
+		ecs::chamber::building_entity_ref entity{};
 
 		[[nodiscard]] build_tile_status_elem(scene* scene, group* group)
 			: elem(scene, group){
@@ -70,6 +70,7 @@ namespace mo_yanxi::game::ui{
 		}
 
 		void draw_content(const rect clipSpace) const override{
+			draw_background();
 			build_tile_status_drawer::draw(get_content_bound(), gprop().get_opacity(), get_renderer(), entity.data());
 		}
 	};

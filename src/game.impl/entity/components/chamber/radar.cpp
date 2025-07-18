@@ -64,7 +64,7 @@ namespace mo_yanxi::game::ecs::chamber{
 			if(!ref)return;
 			auto& build = ref->at<radar_build>();
 
-			reload_progress_bar->current_value = build.reload / build.meta.reload_duration;
+			reload_progress_bar->current_reload_value = build.reload / build.meta.reload_duration;
 			reload_progress_bar->current_target_efficiency = build.data().hit_point.get_capability_factor();
 
 			reload_progress_bar->efficiency_color = {graphic::colors::power.to_neutralize_light(), graphic::colors::power.to_neutralize_light()};

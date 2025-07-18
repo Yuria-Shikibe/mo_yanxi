@@ -172,12 +172,12 @@ namespace mo_yanxi::game::ui{
 	public:
 		float approach_speed{0.105f};
 
-		float current_value{};
+		float current_reload_value{};
 		float current_target_efficiency{};
 
 		float efficiency_bar_scale = .25f;
-		math::section<graphic::color> reload_color{};
-		math::section<graphic::color> efficiency_color{};
+		math::section<graphic::color> reload_color{graphic::colors::dark_gray.to_neutralize_light(), graphic::colors::gray.to_neutralize_light()};
+		math::section<graphic::color> efficiency_color{graphic::colors::power.to_neutralize_light(), graphic::colors::power.to_neutralize_light()};
 
 		void update(float delta_in_ticks) noexcept{
 			math::lerp_inplace(current_efficiency, current_target_efficiency, delta_in_ticks * approach_speed);
@@ -195,7 +195,7 @@ namespace mo_yanxi::game::ui{
 	public:
 		float approach_speed{0.105f};
 
-		float current_value{};
+		float current_reload_value{};
 		float current_target_efficiency{};
 
 		float efficiency_bar_scale = .25f;
@@ -235,6 +235,10 @@ namespace mo_yanxi::game::ui{
 		float charge_smooth_{};
 
 	public:
+		explicit operator bool() const noexcept{
+			return state_.power_total != 0;
+		}
+
 		void set_bar_state(const energy_bar_state& state) noexcept {
 			this->state_ = state;
 		}
@@ -265,6 +269,7 @@ namespace mo_yanxi::game::ui{
 		}
 
 		void draw_content(const rect clipSpace) const override{
+			draw_background();
 			drawer.draw(this->prop().content_bound_absolute(), gprop().get_opacity(), get_renderer());
 		}
 	};

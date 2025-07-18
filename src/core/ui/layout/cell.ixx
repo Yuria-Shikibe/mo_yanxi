@@ -86,7 +86,7 @@ namespace mo_yanxi::ui{
 			return *this;
 		}
 
-		auto& set_from_ratio(float ratio){
+		auto& set_from_ratio(float ratio = 1){
 			this->stated_size = {size_category::scaling, ratio};
 			return *this;
 		}

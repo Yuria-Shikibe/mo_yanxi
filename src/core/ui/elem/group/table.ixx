@@ -499,11 +499,11 @@ namespace mo_yanxi::ui{
 			const auto sz = constrain.potential_extent();
 
 			if(!(dep.*dep_major_target)){
-				size.*major_target = size_to_constrain ? (sz.*major_target) : get_size().*major_target;
+				size.*major_target = size_to_constrain ? (sz.*major_target) : content_size().*major_target;
 			}
 
 			if(!(dep.*dep_minor_target)){
-				size.*minor_target = size_to_constrain ? (sz.*minor_target) : get_size().*minor_target;
+				size.*minor_target = size_to_constrain ? (sz.*minor_target) : content_size().*minor_target;
 			}
 
 			return size;

@@ -88,13 +88,7 @@ namespace mo_yanxi::ui{
 			if(item)item->update(delta_in_ticks);
 		}
 
-		void draw_content(const rect clipSpace) const override{
-			if(item)item->draw(clipSpace);
-		}
-
-		void draw_pre(rect clipSpace) const override;
-
-		void draw_post(rect clipSpace) const override;
+		void draw_content(const rect clipSpace) const override;
 
 		void layout() override{
 			elem::layout();

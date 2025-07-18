@@ -313,11 +313,7 @@ namespace mo_yanxi::ui{
 
 		}
 
-		void draw_pre(rect clipSpace) const override;
-
 		void draw_content(rect clipSpace) const override;
-
-		void draw_post(rect clipSpace) const override;
 
 		void on_scroll(const input_event::scroll e) override{
 			if(scene_.has_scroll_focus()){

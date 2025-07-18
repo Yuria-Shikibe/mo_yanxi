@@ -900,6 +900,13 @@ namespace mo_yanxi::font::typesetting{
 					func::begin_subscript(layout, context);
 				}else if(name.starts_with('/')){
 					func::end_script(layout, context);
+				}else if(name.starts_with('s')){
+					if(name.size() == 1){
+						context.pop_size();
+					}else{
+						context.push_scaled_current_size(func::string_cast(name.substr(1), 1));
+					}
+
 				}else{
 					if(auto* font = default_font_manager->find_face(name)){
 						context.font_history.push(font);

@@ -614,7 +614,7 @@ namespace mo_yanxi::ui{
 		}
 
 		[[nodiscard]] optional_mastering_extent clip_boarder_from(optional_mastering_extent extent) const noexcept{
-			auto [dx, dy] = extent.get_dependent();
+			auto [dx, dy] = extent.get_mastering();
 			if(dx)extent.set_width(std::fdim(extent.potential_width(), property.boarder.width()));
 			if(dy)extent.set_height(std::fdim(extent.potential_height(), property.boarder.height()));
 
@@ -633,6 +633,12 @@ namespace mo_yanxi::ui{
 		}
 
 	public:
+
+		std::optional<math::vec2> pre_acquire_size_no_boarder_clip(optional_mastering_extent extent){
+			return pre_acquire_size_impl(extent).transform([&, this](const math::vec2 v){
+				return property.size.clamp(v + prop().boarder.extent()).min(extent.potential_extent());
+			});
+		}
 
 		std::optional<math::vec2> pre_acquire_size(optional_mastering_extent extent){
 			return pre_acquire_size_impl(clip_boarder_from(extent)).transform([&, this](const math::vec2 v){
@@ -714,21 +720,16 @@ namespace mo_yanxi::ui{
 		}
 
 		void draw(const rect clipSpace) const{
-			draw_pre(clipSpace);
 			draw_content(clipSpace);
-			draw_post(clipSpace);
 		}
 
 		void dialog_notify_drop() const;
 
 	protected:
-		virtual void draw_pre(const rect clipSpace) const;
+		void draw_background() const;
 
 		virtual void draw_content(const rect clipSpace) const{
-
-		}
-		virtual void draw_post(const rect clipSpace) const{
-
+			draw_background();
 		}
 
 		void tooltip_on_drop() override{

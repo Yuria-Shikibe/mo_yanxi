@@ -52,8 +52,7 @@ namespace mo_yanxi::ui{
 				auto [majorTarget, minorTarget] = get_vec_ptr(policy_);
 				auto [minor_length, _] = get_list_layout_minor_mastering_length(potential.*majorTarget);
 
-				auto bsize = get_pad_extent(policy_, prop().boarder);
-				potential.*minorTarget = minor_length + bsize.minor;
+				potential.*minorTarget = minor_length;
 			}
 
 			return potential;

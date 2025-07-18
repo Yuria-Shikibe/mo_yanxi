@@ -24,10 +24,10 @@ namespace mo_yanxi::font::typesetting{
 			context.get_glyph(code.code)
 		);
 
-		const auto font_region_scale = context.get_current_correction_scale();
-		float advance = current.glyph.metrics().advance.x * font_region_scale.x;
-
 		bool emptyChar = code.code == real_code && (code.code == U'\0' || code.code == U'\n');
+
+		const auto font_region_scale = emptyChar ? math::vec2{} : context.get_current_correction_scale();;
+		float advance = current.glyph.metrics().advance.x * font_region_scale.x;
 
 
 		const auto placementPos = context.get_current_offset().add_x(pen_advance);
@@ -69,7 +69,8 @@ namespace mo_yanxi::font::typesetting{
 		const math::vec2 line_region{line_bound.width, upper_pad + line_bound.descender};
 		const math::vec2 captured = layout.captured_size.copy().max_x(line_region.x).add_y(line_region.y);
 
-		if(!terminate && !end_line && captured.beyond(layout.get_clamp_size())){
+		bool size_excessive = captured.beyond(layout.get_clamp_size());
+		if(!terminate && !end_line && size_excessive){
 			//buffer is too big in extent
 			if(line.size() == 0 || (line.is_append_line() && line.size() == 1)){
 				//the largest line can't place it, failed, pop the append line

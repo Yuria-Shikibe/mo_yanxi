@@ -248,7 +248,7 @@ namespace mo_yanxi{
 		}
 	}
 
-	void ui::elem::draw_pre(const rect clipSpace) const{
+	void ui::elem::draw_background() const{
 		if(property.graphic_data.drawer)property.graphic_data.drawer->draw(*this, get_bound(), property.graphic_data.get_opacity());
 	}
 

@@ -69,6 +69,7 @@ namespace mo_yanxi::ui{
 		}
 
 		void draw_content(const rect clipSpace) const override{
+			elem::draw_content(clipSpace);
 			auto drawable = get_region();
 			if(!drawable || !drawable->drawable)return;
 			auto sz = get_expected_size(*drawable->drawable, drawable->style, content_size());
@@ -103,7 +104,7 @@ namespace mo_yanxi::ui{
 
 	protected:
 		void draw_content(const rect clipSpace) const override{
-			// if(!static_cast<bool>(drawable_))return;
+			draw_background();
 
 			auto sz = ui::get_expected_size(drawable_, style, content_size());
 			auto off = align::get_offset_of(style.align, sz, property.content_bound_absolute());

@@ -2,8 +2,9 @@ module mo_yanxi.ui.elem.nested_scene;
 
 import mo_yanxi.ui.graphic;
 
-void mo_yanxi::ui::nested_scene::draw_pre(const rect clipSpace) const{
-	elem::draw_pre(clipSpace);
+
+void mo_yanxi::ui::nested_scene::draw_content(const rect clipSpace) const{
+	draw_background();
 
 	const auto proj = camera_.get_world_to_uniformed_flip_y();
 
@@ -14,9 +15,7 @@ void mo_yanxi::ui::nested_scene::draw_pre(const rect clipSpace) const{
 
 	float edge = 4 / camera_.get_scale();
 	batch.push_scissor({camera_.get_viewport()/*.shrink(edge), 4*/});
-}
 
-void mo_yanxi::ui::nested_scene::draw_content(const rect clipSpace) const{
 	scene_.draw(camera_.get_viewport());
 	//
 	draw_acquirer acquirer = ui::get_draw_acquirer(get_renderer());
@@ -32,15 +31,8 @@ void mo_yanxi::ui::nested_scene::draw_content(const rect clipSpace) const{
 			drawer->draw(*drag_state_->element, drag_state_->element->get_bound().set_src(cpos + drag_state_->offset), 0.25f);
 		}
 	}
-	// graphic::draw::fill::rect_ortho(acquirer.get(), rect{scene_.cursorPos, 12}, graphic::colors::YELLOW);
-}
-
-void mo_yanxi::ui::nested_scene::draw_post(const rect clipSpace) const{
-	auto& batch = graphic::renderer_from_erased(this->get_renderer()).batch;
 
 	batch.pop_scissor();
 	batch.pop_viewport();
 	batch.pop_projection();
-
-	elem::draw_post(clipSpace);
 }

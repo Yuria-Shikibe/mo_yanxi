@@ -34,7 +34,9 @@ namespace mo_yanxi::ui{
 		}
 
 		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{
-			return layout_text(extent.potential_extent());
+			auto ext = layout_text(extent.potential_extent());
+			extent.apply(ext);
+			return extent.potential_extent();
 		}
 
 		void set_text(std::string_view text){
@@ -173,6 +175,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] std::optional<font::typesetting::layout_pos_t> get_layout_pos(math::vec2 globalPos) const;
 
+		void draw_text() const;
 
 		void draw_content(const rect clipSpace) const override;
 	};

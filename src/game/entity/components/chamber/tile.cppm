@@ -347,14 +347,14 @@ namespace mo_yanxi::game::ecs::chamber{
 
 
 	export
-	struct building_ref : entity_ref{
+	struct building_entity_ref : entity_ref{
 		using entity_ref::entity_ref;
 
-		[[nodiscard]] explicit(false) building_ref(entity_ref&& entity_id)
+		[[nodiscard]] explicit(false) building_entity_ref(entity_ref&& entity_id)
 			: entity_ref(std::move(entity_id)){
 		}
 
-		[[nodiscard]] explicit(false) building_ref(const entity_ref& entity_id)
+		[[nodiscard]] explicit(false) building_entity_ref(const entity_ref& entity_id)
 			: entity_ref(entity_id){
 		}
 
@@ -370,7 +370,7 @@ namespace mo_yanxi::game::ecs::chamber{
 
 	struct tile{
 		tile_coord tile_pos{};
-		building_ref building{};
+		building_entity_ref building{};
 		// bool placeable{};
 
 		constexpr explicit operator bool() const noexcept{

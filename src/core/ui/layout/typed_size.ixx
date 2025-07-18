@@ -254,6 +254,18 @@ namespace mo_yanxi::ui{
 			if(!dx) width_ = size.x;
 			if(!dy) height_ = size.y;
 		}
+
+		constexpr void apply(const math::vec2 size) noexcept{
+			auto [dx, dy] = get_dependent();
+			if(dx) width_ = size.x;
+			if(dy) height_ = size.y;
+		}
+
+		constexpr void collapse_min(const math::vec2 size) noexcept{
+			auto [dx, dy] = get_dependent();
+			if(!dx) width_ = math::min(size.x, width_);
+			if(!dy) height_ = math::min(size.y, height_);
+		}
 	};
 
 	export {

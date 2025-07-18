@@ -11,6 +11,7 @@ import mo_yanxi.ui.elem.label;
 import mo_yanxi.ui.elem.image_frame;
 import mo_yanxi.ui.elem.progress_bar;
 import mo_yanxi.game.ui.bars;
+import mo_yanxi.game.ui.building_pane;
 
 import mo_yanxi.game.meta.instancing;
 import mo_yanxi.math.rand;
@@ -20,11 +21,10 @@ import std;
 
 namespace mo_yanxi::game::ecs::chamber{
 	struct turret_ui : entity_info_table{
-		ui::progress_bar* reload_progress_bar{};
-		ui::energy_bar* energy_bar{};
+		ui::building_pane* pane;
 
-		[[nodiscard]] turret_ui(ui::scene* scene, group* group, const entity_ref& ref)
-			: entity_info_table(scene, group, ref){
+		[[nodiscard]] turret_ui(ui::scene* scene, group* group, const entity_ref& e_ref)
+			: entity_info_table(scene, group, e_ref){
 
 			template_cell.set_external({false, true});
 			function_init([](ui::label& elem){
@@ -35,19 +35,18 @@ namespace mo_yanxi::game::ecs::chamber{
 			}).cell().set_pad({.top = 8});
 
 			{
-				auto bar = end_line().emplace<ui::progress_bar>();
+				auto bar = end_line().emplace<ui::building_pane>(ref);
 				bar.cell().set_pad(4);
-				bar.cell().set_height(50);
-				bar->approach_speed = 0.125f;
+				bar.cell().set_external({false, true});
+				bar->set_style();
 
-				reload_progress_bar = std::to_address(bar);
-			}
-			{
-				auto bar = end_line().emplace<ui::energy_bar>();
-				bar.cell().set_pad(4);
-				bar.cell().set_height(50);
+				if(ref){
+					auto& build = ref->at<turret_build>();
+					bar->get_bar_pane().info.set_reload(build.reload / build.body.reload_duration);
+				}
 
-				energy_bar = &bar.elem();
+
+				pane = std::to_address(bar);
 			}
 		}
 
@@ -58,15 +57,7 @@ namespace mo_yanxi::game::ecs::chamber{
 			auto& build = ref->at<turret_build>();
 			auto& build_data = build.data();
 
-			reload_progress_bar->update_progress(build.reload / build.body.reload_duration, delta_in_ticks);
-			energy_bar->drawer.set_bar_state({
-				.power_current = build_data.get_energy_dynamic_status().power,
-				.power_total = build_data.energy_status.power,
-				.power_assigned = build_data.assigned_energy,
-				.charge = build_data.get_energy_dynamic_status().charge,
-				.charge_duration = build_data.energy_status.charge_duration
-			});
-			energy_bar->drawer.update(delta_in_ticks);
+			pane->get_bar_pane().info.set_reload(build.reload / build.body.reload_duration);
 
 		}
 	};

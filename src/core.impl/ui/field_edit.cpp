@@ -5,6 +5,8 @@ import mo_yanxi.ui.assets;
 import mo_yanxi.graphic.draw.multi_region;
 
 void mo_yanxi::ui::field_editor::draw_content(const rect clipSpace) const{
+	draw_background();
+
 	auto draw_shadow = [&]{
 		auto acq = ui::get_draw_acquirer(get_renderer());
 		using namespace graphic;

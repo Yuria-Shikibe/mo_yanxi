@@ -3,23 +3,18 @@ module mo_yanxi.ui.elem.scroll_pane;
 import mo_yanxi.ui.graphic;
 import mo_yanxi.ui.assets;
 
-void mo_yanxi::ui::scroll_pane::draw_pre(const rect clipSpace) const{
-	elem::draw_pre(clipSpace);
-
-	const bool enableHori = enable_hori_scroll();
-	const bool enableVert = enable_vert_scroll();
-
-	if(enableHori || enableVert)graphic::renderer_from_erased(get_renderer()).batch.push_scissor({get_viewport().shrink(8, 8), 16});
-}
-
-void mo_yanxi::ui::scroll_pane::draw_post(const rect clipSpace) const{
-
-
-	const bool enableHori = enable_hori_scroll();
-	const bool enableVert = enable_vert_scroll();
+void mo_yanxi::ui::scroll_pane::draw_content(const rect clipSpace) const{
+	draw_background();
 
 	using namespace graphic;
 	auto& r = renderer_from_erased(get_renderer());
+
+	const bool enableHori = enable_hori_scroll();
+	const bool enableVert = enable_vert_scroll();
+
+	if(enableHori || enableVert)r.batch.push_scissor({get_viewport().shrink(8, 8), 16});
+
+	if(item)item->draw(clipSpace);
 
 	if(enableHori || enableVert)r.batch.pop_scissor();
 
@@ -40,13 +35,12 @@ void mo_yanxi::ui::scroll_pane::draw_post(const rect clipSpace) const{
 		rect.add_width(-shrink);
 		draw::nine_patch(param, theme::shapes::base, rect, colors::gray);
 	}
-
-	elem::draw_post(clipSpace);
 }
 
 void mo_yanxi::ui::scroll_pane::update_item_layout(){
 	if(!item)return;
 
+	//TODO merge these two method
 	modifyChildren(*item);
 	setChildrenFillParentSize_Quiet_legacy(*item, content_size());
 

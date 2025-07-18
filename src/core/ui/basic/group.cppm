@@ -44,6 +44,7 @@ namespace mo_yanxi::ui{
 	public:
 
 		void draw_content(const rect clipSpace) const override{
+			elem::draw_content(clipSpace);
 			const auto space = property.content_bound_absolute().intersection_with(clipSpace);
 			draw_children(space);
 		}
@@ -243,6 +244,19 @@ namespace mo_yanxi::ui{
 
 			if(is_sleep())return;
 			update_children(delta_in_ticks);
+		}
+
+		[[nodiscard]] elem& operator[](std::size_t index) const noexcept{
+			return *children[index];
+		}
+
+		template <std::derived_from<elem> Ty = elem>
+		[[nodiscard]] Ty& at(std::size_t index) const noexcept{
+#if DEBUG_CHECK
+			return dynamic_cast<Ty&>(*children.at(index));
+#else
+			return static_cast<Ty&>(*children.at(index));
+#endif
 		}
 
 	protected:

@@ -5,7 +5,7 @@ import mo_yanxi.ui.graphic;
 import mo_yanxi.ui.assets;
 
 void mo_yanxi::ui::slider::draw_content(const rect clipSpace) const{
-	elem::draw_content(clipSpace);
+	draw_background();
 
 	using namespace graphic;
 
