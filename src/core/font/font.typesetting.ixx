@@ -127,7 +127,7 @@ namespace mo_yanxi::font::typesetting{
 		}
 
 		[[nodiscard]] constexpr float blank() const noexcept{
-			return region.size().area() == 0;
+			return region.extent().area() == 0;
 		}
 
 		[[nodiscard]] constexpr auto index() const noexcept{

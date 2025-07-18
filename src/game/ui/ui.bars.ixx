@@ -121,7 +121,7 @@ namespace mo_yanxi::game::ui{
 		float current_target_value{};
 
 	public:
-		math::range valid_range{};
+		math::range normalized_valid_range{};
 		float approach_speed{0.105f};
 
 		[[nodiscard]] stalled_bar(mo_yanxi::ui::scene* scene, mo_yanxi::ui::group* group)
@@ -183,6 +183,7 @@ namespace mo_yanxi::game::ui{
 			math::lerp_inplace(current_efficiency, current_target_efficiency, delta_in_ticks * approach_speed);
 		}
 
+		void draw(math::frect region, float opacity, graphic::renderer_ui_ref renderer_ref) const;
 
 	};
 

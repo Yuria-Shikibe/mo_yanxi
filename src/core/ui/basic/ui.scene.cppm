@@ -162,7 +162,7 @@ namespace mo_yanxi::ui{
 		}
 
 		[[nodiscard]] math::vec2 get_extent() const noexcept{
-			return region.size();
+			return region.extent();
 		}
 
 		[[nodiscard]] math::vec2 get_cursor_pos() const noexcept{

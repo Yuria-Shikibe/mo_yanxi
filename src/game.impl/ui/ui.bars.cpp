@@ -10,7 +10,7 @@ void mo_yanxi::game::ui::stalled_hp_bar_drawer::draw(math::frect region, float o
 	using namespace graphic;
 
 	const auto src = region.src;
-	const auto [w, h] = region.size();
+	const auto [w, h] = region.extent();
 
 	if(stall){
 		float scale = (stall->value - current_value);
@@ -51,7 +51,7 @@ void mo_yanxi::game::ui::stalled_bar::draw_content(const mo_yanxi::ui::rect clip
 	}
 
 
-	get_chunked_progress_region({valid_range.from, valid_range.to}, current_value, [&](auto idx, float f, float t){
+	get_chunked_progress_region({normalized_valid_range.from, normalized_valid_range.to}, current_value, [&](auto idx, float f, float t){
 		float dst = t - f;
 		float width = dst * w;
 		if(width > std::numeric_limits<float>::epsilon()){
@@ -69,6 +69,41 @@ void mo_yanxi::game::ui::stalled_bar::draw_content(const mo_yanxi::ui::rect clip
 		}
 	}, [](auto, float f, float t){
 	});
+}
+
+void mo_yanxi::game::ui::reload_bar_drawer::draw(math::frect region, float opacity,
+	graphic::renderer_ui_ref renderer_ref) const{
+
+	auto acq = mo_yanxi::ui::get_draw_acquirer(renderer_ref);
+	using namespace graphic;
+
+	const auto src = region.src;
+	const auto [w, h] = region.extent();
+
+	{
+		auto gradient = reload_color;
+		gradient.from.set_a(opacity);
+		gradient.to.set_a(opacity);
+		const math::frect reload_progress{tags::from_extent, src, {w * current_value, h * (1 - efficiency_bar_scale)}};
+
+		draw::fill::fill(acq.get(),
+			reload_progress.vert_00(), reload_progress.vert_01(),  reload_progress.vert_11(),  reload_progress.vert_10(),
+			gradient.from, gradient.from,
+			gradient[current_value], gradient[current_value]
+		);
+	}
+
+	auto gradient = efficiency_color;
+	gradient.from.set_a(opacity);
+	gradient.to.set_a(opacity);
+	const math::vec2 sz{w * current_efficiency, h * efficiency_bar_scale};
+	const auto off = align::get_offset_of(align::pos::bottom_left, sz, region);
+	const math::frect efficiency_region{tags::from_extent, off, sz};
+	draw::fill::fill(acq.get(),
+		efficiency_region.vert_00(), efficiency_region.vert_01(),  efficiency_region.vert_11(),  efficiency_region.vert_10(),
+		gradient.from, gradient.from,
+			gradient[current_efficiency], gradient[current_efficiency]
+	);
 }
 
 void mo_yanxi::game::ui::reload_bar::draw_content(mo_yanxi::ui::rect clipSpace) const{
@@ -111,7 +146,7 @@ void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opaci
 	if(abs_power_total == 0)return;
 	int abs_current_power = math::abs(state_.power_current);
 
-	const math::vec2 bar_unit_extent = region.size() / math::vector2{abs_power_total, 1}.as<float>();
+	const math::vec2 bar_unit_extent = region.extent() / math::vector2{abs_power_total, 1}.as<float>();
 
 	auto acq = mo_yanxi::ui::get_draw_acquirer(renderer_ref);
 	using namespace graphic;

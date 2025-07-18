@@ -34,7 +34,7 @@ void mo_yanxi::ui::scene::drop_dialog(const elem* elem){
 
 void mo_yanxi::ui::scene::root_draw() const{
 	auto& renderer = *graphic::renderer_from_erased(this->renderer);
-	renderer.batch.push_projection(rect{tags::from_extent, math::vec2{}, region.size()});
+	renderer.batch.push_projection(rect{tags::from_extent, math::vec2{}, region.extent()});
 	renderer.batch.push_viewport(region);
 
 	draw(region);
@@ -261,7 +261,7 @@ void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos, bool for
 void mo_yanxi::ui::scene::resize(const math::frect region){
 	if(util::try_modify(this->region, region)){
 		// root->update_abs_src({});
-		root->resize(region.size());
+		root->resize(region.extent());
 	}
 }
 

@@ -177,8 +177,8 @@ namespace mo_yanxi::graphic{
 			}
 
 			if(need_scale){
-				auto target_bot_lft = external.size().scl(ratio_l - err, ratio_b - err).to_abs();
-				auto target_top_rit = external.size().scl(1 - ratio_l - err, 1 - ratio_b - err).to_abs();
+				auto target_bot_lft = external.extent().scl(ratio_l - err, ratio_b - err).to_abs();
+				auto target_top_rit = external.extent().scl(1 - ratio_l - err, 1 - ratio_b - err).to_abs();
 
 				auto true_botlft = align::embed_to(align::scale::fit, edge.bot_lft(), target_bot_lft);
 				auto true_toprit = align::embed_to(align::scale::fit, edge.top_rit(), target_top_rit);
@@ -223,7 +223,7 @@ namespace mo_yanxi::graphic{
 
 		constexpr void set_center_scale(const math::vector2<T> centerSize, const align::scale centerScale) noexcept{
 			if(centerScale != DefaultScale){
-				const auto sz = align::embed_to(centerScale, centerSize, center().size());
+				const auto sz = align::embed_to(centerScale, centerSize, center().extent());
 				const auto offset = align::get_offset_of<to_signed_t<T>>(align::pos::center, sz.as_signed(), center().as_signed());
 				center() = {tags::from_extent, static_cast<math::vector2<T>>(offset), sz};
 			}
@@ -333,9 +333,9 @@ namespace mo_yanxi::graphic{
 			const align::scale centerScale = DefaultScale,
 			const float edgeShrinkScale = 0.25f
 		) : image_nine_region{imageRegion, math::urect{
-			tags::from_extent, margin.bot_lft(), imageRegion.uv.get_region().size().sub(margin.extent())
+			tags::from_extent, margin.bot_lft(), imageRegion.uv.get_region().extent().sub(margin.extent())
 		}, external_margin, centerSize, centerScale, edgeShrinkScale}{
-			assert(margin.extent().within(imageRegion.uv.get_region().size()));
+			assert(margin.extent().within(imageRegion.uv.get_region().extent()));
 		}
 
 		// ImageViewNineRegion(

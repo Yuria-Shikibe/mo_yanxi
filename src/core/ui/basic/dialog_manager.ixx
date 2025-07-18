@@ -30,7 +30,7 @@ namespace mo_yanxi::ui{
 			elem->property.size.set_maximum_size(scene_viewport_size);
 
 			math::vec2 src{extent.region.src};
-			math::vec2 size{extent.region.size()};
+			math::vec2 size{extent.region.extent()};
 			if(extent.dependent.x == dialog_extent_type::scaling){
 				size.x *= scene_viewport_size.x;
 				src.x *= scene_viewport_size.x;

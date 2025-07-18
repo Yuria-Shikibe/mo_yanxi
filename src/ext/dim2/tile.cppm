@@ -646,7 +646,7 @@ export namespace mo_yanxi::dim2{
 		[[nodiscard]] constexpr tile(const size_type width, const size_type height, const value_type* data)
 			/*requires std::is_copy_assignable_v<value_type>*/ :
 			tile{width, height}{
-			this->copy(data, this->size());
+			this->copy(data, this->extent());
 		}
 
 		constexpr ~tile() noexcept{
@@ -656,7 +656,7 @@ export namespace mo_yanxi::dim2{
 		/*constexpr*/
 		tile(const tile& other)
 			: tile{other.width(), other.height()}{
-			this->copy(other.data(), this->size());
+			this->copy(other.data(), this->extent());
 		}
 
 		/*constexpr*/
@@ -670,7 +670,7 @@ export namespace mo_yanxi::dim2{
 				this->operator=(tile{other.width(), other.height()});
 			}
 
-			this->copy(other.data(), this->size());
+			this->copy(other.data(), this->extent());
 
 			return *this;
 		}

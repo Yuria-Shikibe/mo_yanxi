@@ -61,7 +61,7 @@ namespace mo_yanxi::graphic{
 		template <std::derived_from<uniformed_rect_uv> Ty, typename T>
 		[[nodiscard]] constexpr math::rect_ortho<T>
 		proj_region(this const Ty& self, const math::rect_ortho<T>& rect) noexcept{
-			auto sz = rect.size();
+			auto sz = rect.extent();
 
 			auto v00 = self.get_sized_v00(sz);
 			auto v11 = self.get_sized_v11(sz);
@@ -170,7 +170,7 @@ namespace mo_yanxi::graphic{
 
 		template <typename T = std::uint32_t>
 		[[nodiscard]] constexpr math::vector2<T> get_region_size() const noexcept{
-			auto sz = get_region().size();
+			auto sz = get_region().extent();
 			if constexpr (std::floating_point<T>){
 				return sz.template as<T>();
 			}else{

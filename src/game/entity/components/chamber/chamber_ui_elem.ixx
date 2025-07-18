@@ -66,7 +66,7 @@ namespace mo_yanxi::game::ui{
 		}
 
 		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent size) override{
-			return build_tile_status_drawer::get_required_extent(size, entity.data().region().size());
+			return build_tile_status_drawer::get_required_extent(size, entity.data().region().extent());
 		}
 
 		void draw_content(const rect clipSpace) const override{

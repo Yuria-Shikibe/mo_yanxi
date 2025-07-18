@@ -673,7 +673,7 @@ namespace mo_yanxi {
             }
 
             [[nodiscard]] bool full() const noexcept{
-                return capacityRegion.size() == capturedExtent;
+                return capacityRegion.extent() == capturedExtent;
             }
 
             [[nodiscard]] bool empty() const noexcept{
@@ -728,7 +728,7 @@ namespace mo_yanxi {
                     if(rect.area() == 0) continue;
 
                     subNodes[i] = std::make_unique<node>(packer, this, rect);
-                    subNodes[i]->addMark(rect.size());
+                    subNodes[i]->addMark(rect.extent());
                 }
             }
 
@@ -748,10 +748,10 @@ namespace mo_yanxi {
                     const auto isSelfMerged = parent->tryUnsplit();
                     if(!isSelfMerged){
                         //maximum merge at self, mark allocatable
-                        resetMark(capacityRegion.size());
+                        resetMark(capacityRegion.extent());
                     }
                 } else{
-                    resetMark(capacityRegion.size());
+                    resetMark(capacityRegion.extent());
                 }
             }
 
@@ -810,7 +810,7 @@ namespace mo_yanxi {
          * @endcode
          */
         [[nodiscard]] static constexpr sub_region_type splitQuad(const rect_type bound, const extent_type box) noexcept{
-            const auto [rx, ry] = bound.size() - box;
+            const auto [rx, ry] = bound.extent() - box;
 
             return sub_region_type{
                 rect_type{tags::from_extent, bound.vert_00().add(0, box.y), box.x, ry},

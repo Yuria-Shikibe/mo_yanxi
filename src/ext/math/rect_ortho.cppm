@@ -169,7 +169,7 @@ namespace mo_yanxi::math{
 			return size_.x;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr vec_t size() const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr vec_t extent() const noexcept{
 			return size_;
 		}
 

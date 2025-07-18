@@ -275,7 +275,7 @@ void mo_yanxi::game::meta::chamber::radar::radar_instance_data::draw(const basic
 
 	using namespace graphic;
 
-	math::trans2 pos = {region.src + m.transform.vec * region.size(), rotation};
+	math::trans2 pos = {region.src + m.transform.vec * region.extent(), rotation};
 
 	static constexpr color from_color = colors::dark_gray.copy().set_a(.5f);
 	static constexpr color to_color = colors::pale_green;

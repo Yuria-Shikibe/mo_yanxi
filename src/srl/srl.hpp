@@ -184,7 +184,7 @@ namespace mo_yanxi::io{
 	struct loader_impl<math::rect_ortho<float>> : loader_base<pb::math::rect_orthof, math::rect_ortho<float>>{
 		static void store(buffer_type& buf, const value_type& data){
 			io::store(buf.mutable_src(), data.src);
-			io::store(buf.mutable_size(), data.size());
+			io::store(buf.mutable_size(), data.extent());
 		}
 
 		static void load(const buffer_type& buf, value_type& data){
@@ -197,7 +197,7 @@ namespace mo_yanxi::io{
 	struct loader_impl<math::rect_ortho<std::int32_t>> : loader_base<pb::math::rect_orthoi, math::rect_ortho<std::int32_t>>{
 		static void store(buffer_type& buf, const value_type& data){
 			io::store(buf.mutable_src(), data.src);
-			io::store(buf.mutable_size(), data.size());
+			io::store(buf.mutable_size(), data.extent());
 		}
 
 		static void load(const buffer_type& buf, value_type& data){
@@ -210,7 +210,7 @@ namespace mo_yanxi::io{
 	struct loader_impl<math::rect_ortho<std::uint32_t>> : loader_base<pb::math::rect_orthou, math::rect_ortho<std::uint32_t>>{
 		static void store(buffer_type& buf, const value_type& data){
 			io::store(buf.mutable_src(), data.src);
-			io::store(buf.mutable_size(), data.size());
+			io::store(buf.mutable_size(), data.extent());
 		}
 
 		static void load(const buffer_type& buf, value_type& data){

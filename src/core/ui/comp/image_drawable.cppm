@@ -77,7 +77,7 @@ namespace mo_yanxi::ui{
 		void draw(const elem& elem, math::frect region, graphic::color color_scl) const override;
 
 		[[nodiscard]] std::optional<math::vec2> get_default_size() const override {
-			return image->get_region().size().as<float>();
+			return image->get_region().extent().as<float>();
 		}
 	};
 	export

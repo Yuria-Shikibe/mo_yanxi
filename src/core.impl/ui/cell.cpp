@@ -8,7 +8,7 @@ void mo_yanxi::ui::basic_cell::apply_to(group& group, elem& elem, optional_maste
 	elem.update_abs_src(group.content_src_pos());
 
 	//TODO scaling and offset depending on the align
-	elem.resize((allocated_region.size() * scaling - margin.extent()).max({}));
+	elem.resize((allocated_region.extent() * scaling - margin.extent()).max({}));
 
 	if(!real_cell_extent.width_dependent()){
 		real_cell_extent.set_width(std::fdim(allocated_region.width(), margin.width()));

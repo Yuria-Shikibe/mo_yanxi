@@ -338,7 +338,7 @@ namespace mo_yanxi::graphic{
 			}).as<std::uint32_t>();
 
 			blit_data.current.offset = clamped.src;
-			blit_dispatcher.set(clamped.size());
+			blit_dispatcher.set(clamped.extent());
 
 
 			auto& cur = blit_command_chunk[current_blit_chunk_index];
@@ -379,7 +379,7 @@ namespace mo_yanxi::graphic{
 		void push_projection(const math::frect viewport){
 			batch.consume_all();
 
-			projections.push_back(math::mat3{}.set_orthogonal(viewport.src, viewport.size()));
+			projections.push_back(math::mat3{}.set_orthogonal(viewport.src, viewport.extent()));
 		}
 
 		[[nodiscard]] math::mat3 get_cur_proj() const{
@@ -410,9 +410,9 @@ namespace mo_yanxi::graphic{
 			math::frect last_viewport = get_last_viewport();
 
 			math::mat3 transform;
-			auto scale = viewport.size() / last_viewport.size();
+			auto scale = viewport.extent() / last_viewport.extent();
 			transform.from_scaling(scale);
-			transform.set_translation(scale - math::vec2{1, 1} + viewport.src / last_viewport.size() * 2);
+			transform.set_translation(scale - math::vec2{1, 1} + viewport.src / last_viewport.extent() * 2);
 
 			if(viewports.empty()){
 				current_viewport_transform = transform;
@@ -433,9 +433,9 @@ namespace mo_yanxi::graphic{
 			math::frect last_viewport = get_last_viewport();
 
 			math::mat3 transform;
-			const auto scale = viewport.size() / last_viewport.size();
+			const auto scale = viewport.extent() / last_viewport.extent();
 			transform.from_scaling(scale);
-			transform.set_translation(scale - math::vec2{1, 1} + viewport.src / last_viewport.size() * 2);
+			transform.set_translation(scale - math::vec2{1, 1} + viewport.src / last_viewport.extent() * 2);
 
 			if(viewports.empty()){
 				current_viewport_transform = transform;
@@ -554,7 +554,7 @@ namespace mo_yanxi::graphic{
 			auto csr = scissors.back();
 
 			frag_data.current.scissor = csr;
-			frag_data.current.viewport_extent = viewports.back().size();
+			frag_data.current.viewport_extent = viewports.back().extent();
 
 			math::vec2 def_scale = math::vector2{region.extent.width, region.extent.height}.as<float>();
 			math::vec2 cur_scale = ~currentProj.get_scale() * 2;

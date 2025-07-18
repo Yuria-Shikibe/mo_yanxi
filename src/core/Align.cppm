@@ -384,7 +384,7 @@ namespace mo_yanxi{
 		 */
 		template <signed_number T>
 		constexpr math::vector2<T> get_offset_of(const pos align, const math::rect_ortho<T>& bound) noexcept{
-			return align::get_offset_of<T>(align, bound.size());
+			return align::get_offset_of<T>(align, bound.extent());
 		}
 
 
@@ -416,7 +416,7 @@ namespace mo_yanxi{
 		 */
 		template <signed_number T>
 		[[nodiscard]] constexpr math::vector2<T> get_vert(const pos align, const math::rect_ortho<T>& bound) noexcept{
-			return align::get_vert<T>(align, bound.size()) + bound.get_src();
+			return align::get_vert<T>(align, bound.extent()) + bound.get_src();
 		}
 
 		/**
@@ -515,7 +515,7 @@ namespace mo_yanxi{
 		template <signed_number T>
 		[[nodiscard]] constexpr math::vector2<T> get_offset_of(const pos align, const math::rect_ortho<T>& internal_toAlign,
 		                                        const math::rect_ortho<T>& external) noexcept{
-			return align::get_offset_of(align, internal_toAlign.size(), external);
+			return align::get_offset_of(align, internal_toAlign.extent(), external);
 		}
 	}
 }

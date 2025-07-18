@@ -150,7 +150,7 @@ namespace mo_yanxi::graphic::draw{
 			col color_scl = colors::white
 			) noexcept {
 
-			const auto size = rect_offset_in_local.size() * .5f;
+			const auto size = rect_offset_in_local.extent() * .5f;
 
 			auto [cos, sin] = center.rot_cos_sin();
 			const auto off = center.vec + rect_offset_in_local.src.copy().rotate(cos, sin);

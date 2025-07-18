@@ -13,7 +13,7 @@ import mo_yanxi.open_addr_hash_map;
 mo_yanxi::game::meta::chamber::grid::grid(const hitbox& hitbox){
 	auto bound = hitbox.get_bound();
 	bound.trunc_vert(tile_size).scl(1 / tile_size, 1 / tile_size);
-	extent_ = bound.size().round<unsigned>();
+	extent_ = bound.extent().round<unsigned>();
 	origin_coord_ = -bound.src.round<int>();
 
 

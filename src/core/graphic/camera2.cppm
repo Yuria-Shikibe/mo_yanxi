@@ -144,9 +144,9 @@ namespace mo_yanxi::graphic{
 				changed = true;
 
 				if(flip_y){
-					worldToScreen.set_orthogonal(viewport.get_src(), viewport.size());
+					worldToScreen.set_orthogonal(viewport.get_src(), viewport.extent());
 				}else{
-					worldToScreen.set_orthogonal_flip_y(viewport.get_src(), viewport.size());
+					worldToScreen.set_orthogonal_flip_y(viewport.get_src(), viewport.extent());
 				}
 
 				screenToWorld.set(worldToScreen).inv();
@@ -166,9 +166,9 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] math::mat3 get_world_to_uniformed_flip_y() const noexcept {
 			math::mat3 mat3;
 			if(!flip_y){
-				mat3.set_orthogonal(viewport.get_src(), viewport.size());
+				mat3.set_orthogonal(viewport.get_src(), viewport.extent());
 			}else{
-				mat3.set_orthogonal_flip_y(viewport.get_src(), viewport.size());
+				mat3.set_orthogonal_flip_y(viewport.get_src(), viewport.extent());
 			}
 			return mat3;
 		}
@@ -270,7 +270,7 @@ namespace mo_yanxi::graphic{
 			if(viewport != lastViewport){
 				changed = true;
 
-				worldToScreen.set_orthogonal_flip_y(viewport.get_src(), viewport.size());
+				worldToScreen.set_orthogonal_flip_y(viewport.get_src(), viewport.extent());
 				screenToWorld.set(worldToScreen).inv();
 			}
 

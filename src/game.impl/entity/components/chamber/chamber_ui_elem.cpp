@@ -9,11 +9,11 @@ void mo_yanxi::game::ui::build_tile_status_drawer::draw(
 	auto acq = mo_yanxi::ui::get_draw_acquirer(renderer);
 	// acq.proj.set_layer(ui::draw_layers::base);
 	using namespace graphic;
-	auto sz = data.region().size();
+	auto sz = data.region().extent();
 	bool swap = sz.x < sz.y;
 	if(swap)sz.swap_xy();
 
-	const auto unit_size = get_unit_size(region.size(), sz);
+	const auto unit_size = get_unit_size(region.extent(), sz);
 	const auto unit_rect = math::frect{0.f, 0.f, unit_size, unit_size}.shrink(2);
 
 	auto building_max_individual = data.get_tile_individual_max_hitpoint();
@@ -80,6 +80,6 @@ void mo_yanxi::game::ui::chamber_ui_elem::update(float delta_in_ticks){
 
 	if(hitpoint_bar){
 		hitpoint_bar->set_value(data.hit_point.factor());
-		hitpoint_bar->valid_range = data.hit_point.capability_range / data.hit_point.max;
+		hitpoint_bar->normalized_valid_range = data.hit_point.capability_range / data.hit_point.max;
 	}
 }

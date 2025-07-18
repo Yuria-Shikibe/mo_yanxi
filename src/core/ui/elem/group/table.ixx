@@ -343,7 +343,7 @@ namespace mo_yanxi::ui{
 					dst_off.*minor_target = head_minor.max_pad_dst;
 
 					if(elem.cell.saturate && std::ranges::size(line) == 1){
-						size.*major_target = region.size().*major_target - (src_off.*major_target + dst_off.*major_target);
+						size.*major_target = region.extent().*major_target - (src_off.*major_target + dst_off.*major_target);
 					}
 
 					stated_extent ext;
@@ -365,7 +365,7 @@ namespace mo_yanxi::ui{
 					elem.cell.allocated_region.set_size(size);
 					elem.apply(parent, ext);
 
-					const auto total_off = src_off + dst_off + elem.cell.allocated_region.size();
+					const auto total_off = src_off + dst_off + elem.cell.allocated_region.extent();
 
 					line_stride = math::max(line_stride, total_off.*minor_target);
 					current_position.*major_target += total_off.*major_target;

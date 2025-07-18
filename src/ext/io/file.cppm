@@ -334,7 +334,7 @@ namespace mo_yanxi::io{
 
 			std::vector<T> str((length - 1) / sizeof(T) + 1);
 
-		    file_stream.read(reinterpret_cast<char *>(str.data()), static_cast<std::streamsize>(str.size() * sizeof(T)));
+		    file_stream.read(reinterpret_cast<char *>(str.data()), static_cast<std::streamsize>(str.extent() * sizeof(T)));
 
 			return str;
 		}

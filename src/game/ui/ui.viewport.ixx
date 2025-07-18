@@ -44,7 +44,7 @@ namespace mo_yanxi::game::ui{
 	protected:
 		void update(const float delta_in_ticks) override{
 			E::update(delta_in_ticks);
-			const auto [w, h]{viewport_region - camera.get_viewport().size()};
+			const auto [w, h]{viewport_region - camera.get_viewport().extent()};
 			camera.clamp_position({math::vec2{}, w, h});
 			camera.update(delta_in_ticks);
 
