@@ -23,12 +23,12 @@ void mo_yanxi::ui::tooltip_instance::update_layout(const tooltip_manager& manage
 	if(policy.follow == tooltip_follow::dialog){
 		auto [fx, fy] = element->property.fill_parent;
 		if(fx){
-			fsz.x = manager.scene->region.width();
+			fsz.x = manager.scene->get_extent().x;
 			element->context_size_restriction.set_width(fsz.x);
 		}
 
 		if(fy){
-			fsz.y = manager.scene->region.height();
+			fsz.y = manager.scene->get_extent().y;
 			element->context_size_restriction.set_height(fsz.y);
 		}
 	}
@@ -63,7 +63,7 @@ void mo_yanxi::ui::tooltip_instance::update_layout(const tooltip_manager& manage
 	}
 
 	case tooltip_follow::dialog :{
-		followOffset += align::get_vert(policy.align, manager.scene->region);
+		followOffset += align::get_vert(policy.align, manager.scene->get_region());
 		break;
 	}
 
@@ -89,7 +89,7 @@ void mo_yanxi::ui::tooltip_instance::update_layout(const tooltip_manager& manage
 }
 
 mo_yanxi::math::vec2 mo_yanxi::ui::tooltip_manager::get_cursor_pos() const noexcept{
-	return scene->cursor_pos;
+	return scene->get_cursor_pos();
 }
 
 mo_yanxi::ui::tooltip_instance& mo_yanxi::ui::tooltip_manager::append_tooltip(
@@ -148,13 +148,13 @@ void mo_yanxi::ui::tooltip_manager::update(float delta_in_time){
 
 void mo_yanxi::ui::tooltip_manager::draw_above() const{
 	for (auto&& elem : drawSequence){
-		if(!elem.belowScene)elem.element->try_draw(scene->region);
+		if(!elem.belowScene)elem.element->try_draw(scene->get_region());
 	}
 }
 
 void mo_yanxi::ui::tooltip_manager::draw_below() const{
 	for (auto&& elem : drawSequence){
-		if(elem.belowScene)elem.element->try_draw(scene->region);
+		if(elem.belowScene)elem.element->try_draw(scene->get_region());
 	}
 }
 

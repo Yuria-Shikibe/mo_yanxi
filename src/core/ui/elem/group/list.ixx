@@ -21,8 +21,8 @@ namespace mo_yanxi::ui{
 		layout_policy policy_{layout_policy::hori_major};
 
 	public:
-		[[nodiscard]] list(scene* scene, group* group_)
-			: universal_group(scene, group_, "list"){
+		[[nodiscard]] list(scene* scene, group* parent)
+			: universal_group(scene, parent){
 		}
 
 	protected:
@@ -116,21 +116,21 @@ namespace mo_yanxi::ui{
 			std::vector<float> sizes{};
 			sizes.reserve(cells.size());
 
-			auto sz = content_size();
-			auto [masterings, passives] = get_list_layout_minor_mastering_length(sz.*majorTarget, &sizes);
+			const auto content_sz = content_size();
+			auto [masterings, passives] = get_list_layout_minor_mastering_length(content_sz.*majorTarget, &sizes);
 
 			{
 				auto bsize = get_pad_extent(policy_, prop().boarder);
 				math::vec2 size;
-				size.*majorTarget = sz.*majorTarget + bsize.major;
-				size.*minorTarget = math::max(masterings, sz.*minorTarget) + bsize.minor;
+				size.*majorTarget = content_sz.*majorTarget + bsize.major;
+				size.*minorTarget = math::max(masterings, content_sz.*minorTarget) + bsize.minor;
 
 				size.min(context_size_restriction.potential_extent());
 				elem::resize_masked(size);
 			}
 
-			auto remains = std::fdim(sz.*minorTarget, masterings);
-			auto passive_unit = remains / passives;
+			const auto remains = std::fdim(content_sz.*minorTarget, masterings);
+			const auto passive_unit = remains / passives;
 
 			math::vec2 currentOff{};
 			currentOff.*minorTarget = -cells.front().cell.pad.pre;
@@ -139,7 +139,7 @@ namespace mo_yanxi::ui{
 				auto minor = sizes[idx];
 				if(cell.cell.stated_size.type == size_category::passive)minor *= passive_unit;
 				math::vec2 cell_sz;
-				cell_sz.*majorTarget = sz.*majorTarget;
+				cell_sz.*majorTarget = content_sz.*majorTarget;
 				cell_sz.*minorTarget = minor;
 
 				cell.cell.allocated_region = {tags::from_extent, currentOff, cell_sz};

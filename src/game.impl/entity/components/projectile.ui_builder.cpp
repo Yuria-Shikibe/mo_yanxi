@@ -75,7 +75,7 @@ namespace mo_yanxi::game::ecs{
 
 			if(!ref)return;
 
-			auto& chunk = ref->unchecked_get<decl::projectile_entity_desc>();
+			auto& chunk = ref->unchecked_get<desc::projectile>();
 
 
 			position_info->set_text(std::format("At {:.1f}", chunk.mech_motion::pos()));

@@ -506,22 +506,7 @@ namespace mo_yanxi::ui{
 	export
 	struct text_input_area : label{
 		[[nodiscard]] text_input_area(scene* scene, group* group)
-			: label(scene, group, "input_area"){
-			/*events().on<events::click>([](const events::click& event, elem& e){
-				auto& self = static_cast<text_input_area&>(e);
-
-				if(event.code.action() == core::ctrl::act::release)return;
-				auto layoutPos = self.get_layout_pos(event.pos);
-
-				self.caret_ = layoutPos.transform([&self](const font::typesetting::layout_pos_t pos){
-					return caret{self.glyph_layout, pos};
-				});
-
-				if(self.caret_){
-					self.set_focused_key(true);
-				}
-			});*/
-
+			: label(scene, group){
 			property.maintain_focus_until_mouse_drop = true;
 			parser = &font::typesetting::global_empty_parser;
 		}

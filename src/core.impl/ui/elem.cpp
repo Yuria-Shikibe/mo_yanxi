@@ -24,42 +24,8 @@ namespace mo_yanxi{
 		}
 	}
 
-	void ui::cursor_states::register_default_cursor_events(elem_event_manager& event_manager){
-		event_manager.on<input_event::focus_begin>([](auto, elem& self){
-			self.cursor_state.focused = true;
-		});
-
-		event_manager.on<input_event::focus_end>([](auto, elem& self){
-			self.cursor_state.focused = false;
-			// stagnateTime = focusedTime = 0.f;
-		});
-
-		event_manager.on<input_event::cursor_moved>([](input_event::cursor_moved e, elem& self){
-			self.cursor_state.time_stagnate = 0;
-			if(self.get_tooltip_prop().use_stagnate_time && !e.pos.equals({})){
-				self.cursor_state.time_tooltip = 0.;
-				self.tooltip_notify_drop();
-			}
-		});
-	}
-
-	void ui::cursor_states::registerDefEvent(elem_event_manager& event_manager){
-		event_manager.on<input_event::focus_end>([](auto, elem& self){
-			self.cursor_state.pressed = false;
-		});
-
-		event_manager.on<input_event::inbound>([](auto, elem& self){
-			self.cursor_state.inbound = true;
-		});
-
-		event_manager.on<input_event::exbound>([](auto, elem& self){
-			self.cursor_state.inbound = false;
-		});
-	}
-
-
 	graphic::renderer_ui& ui::elem::get_renderer() const noexcept{
-		return *get_scene()->renderer; //fuck fake positive...
+		return *get_scene()->renderer;
 	}
 
 	void ui::elem::set_style(const style_drawer<elem>& drawer){
@@ -83,7 +49,7 @@ namespace mo_yanxi{
 		return cur;
 	}
 
-	void ui::elem::update_opacity(const float val){
+	void ui::elem::update_opacity(const float val) noexcept{
 		if(util::try_modify(property.graphic_data.context_opacity, val)){
 			for(const auto& element : get_children()){
 				element->update_opacity(gprop().get_opacity());
@@ -93,7 +59,7 @@ namespace mo_yanxi{
 
 	void ui::elem::notify_isolated_layout_changed(){
 		layout_state.notify_self_changed();
-		get_scene()->independentLayout.insert(this);
+		get_scene()->notify_isolated_layout_update(this);
 	}
 
 	math::vec2 ui::elem::get_local_from_global(math::vec2 global_input) const noexcept{
@@ -158,7 +124,7 @@ namespace mo_yanxi{
 	}
 
 	bool ui::elem::is_inbounded() const noexcept{
-		return scene_ && std::ranges::contains(scene_->lastInbounds, this);
+		return scene_ && std::ranges::contains(scene_->get_last_inbounds(), this);
 	}
 
 	void ui::elem::set_focused_scroll(const bool focus) noexcept{
@@ -183,11 +149,11 @@ namespace mo_yanxi{
 	// 	()->tooltipManager.appendToolTip(*this, belowScene);
 	// }
 
-	bool ui::elem::contains_parent(const math::vec2 cursorPos) const{
+	bool ui::elem::contains_parent(const math::vec2 cursorPos) const noexcept{
 		return (!parent || parent->contains_parent(cursorPos));
 	}
 
-	void ui::elem::notify_layout_changed(spread_direction toDirection){
+	void ui::elem::notify_layout_changed(spread_direction toDirection) noexcept{
 		if(toDirection & spread_direction::local) layout_state.notify_self_changed();
 
 		if(parent){

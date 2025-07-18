@@ -30,7 +30,7 @@ namespace mo_yanxi::game::ui{
 		}
 
 		[[nodiscard]] build_tile_status_elem(scene* scene, group* group)
-			: elem(scene, group, "tile_status"){
+			: elem(scene, group){
 		}
 
 		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{

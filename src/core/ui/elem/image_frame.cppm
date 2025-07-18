@@ -27,7 +27,7 @@ namespace mo_yanxi::ui{
 
 	public:
 		[[nodiscard]] image_frame(scene* scene, group* group)
-			: elem(scene, group, "image_frame"){
+			: elem(scene, group){
 		}
 
 		void add_collapser_image_swapper(){
@@ -94,7 +94,7 @@ namespace mo_yanxi::ui{
 
 	public:
 		[[nodiscard]] single_image_frame(scene* scene, group* group, T drawable = {}, const image_display_style& style = {})
-			: elem(scene, group, "image_frame"), style(style), drawable_(std::move(drawable)){
+			: elem(scene, group), style(style), drawable_(std::move(drawable)){
 		}
 
 		void set_drawable(T icon) noexcept {

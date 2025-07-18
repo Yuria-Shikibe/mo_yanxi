@@ -35,7 +35,6 @@ namespace mo_yanxi::ui{
 		callback_type callback{};
 
 		void add_button_prop(){
-			elem::cursor_state.registerDefEvent(elem::events());
 			elem::interactivity = interactivity::enabled;
 			elem::property.maintain_focus_until_mouse_drop = true;
 
@@ -53,15 +52,8 @@ namespace mo_yanxi::ui{
 
 		template <typename ...Args>
 		[[nodiscard]] button(scene* s, group* g, Args&& ...args)
-			requires (std::constructible_from<T, scene*, group*, Args...> && !std::constructible_from<T, scene*, group*, std::string_view, Args...>)
+			requires (std::constructible_from<T, scene*, group*, Args&&...>)
 		: T{s, g, std::forward<Args>(args) ...}{
-			add_button_prop();
-		}
-
-		template <typename ...Args>
-		[[nodiscard]] button(scene* s, group* g, Args&& ...args)
-			requires (std::constructible_from<T, scene*, group*, std::string_view, Args...>)
-		: T{s, g, "button<T>", std::forward<Args>(args) ...}{
 			add_button_prop();
 		}
 

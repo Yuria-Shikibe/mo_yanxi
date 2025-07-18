@@ -45,7 +45,7 @@ namespace mo_yanxi::ui{
 			return item ? std::span{&item, 1} : std::span{static_cast<const elem_ptr*>(nullptr), 0};
 		}
 
-		[[nodiscard]] bool contains_parent(math::vec2 cursorPos) const override{
+		[[nodiscard]] bool contains_parent(math::vec2 cursorPos) const noexcept override{
 			return elem::contains_parent(cursorPos) && get_viewport().contains_loose(cursorPos);
 		}
 
@@ -54,21 +54,18 @@ namespace mo_yanxi::ui{
 		// 	return property.content_bound_absolute().expand(margin, margin).contains_loose(absPos) && !region.expand(margin, margin).contains_loose(absPos);
 		// }
 
-		[[nodiscard]] scroll_pane(scene* scene, group* group_)
-			: group(scene, group_, "scroll_pane"){
-
-			events().on<input_event::inbound>([](const auto& e, elem& el){
-				el.set_focused_scroll(true);
-			});
-
-			events().on<input_event::exbound>([](const auto& e, elem& el){
-				el.set_focused_scroll(false);
-			});
+		[[nodiscard]] scroll_pane(scene* scene, group* parent)
+			: group(scene, parent){
 
 			property.maintain_focus_until_mouse_drop = true;
 		}
 
 	protected:
+		void on_inbound_changed(bool is_inbounded, bool changed) override{
+			elem::on_inbound_changed(is_inbounded, changed);
+			set_focused_scroll(is_inbounded);
+		}
+
 		void update(const float delta_in_ticks) override{
 			elem::update(delta_in_ticks);
 

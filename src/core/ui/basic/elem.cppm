@@ -82,10 +82,6 @@ namespace mo_yanxi::ui{
 	export using elem_event_manager =
 	mo_yanxi::events::event_manager<
 		std::move_only_function<void(elem&) const>,
-		input_event::exbound,
-		input_event::inbound,
-		input_event::focus_begin,
-		input_event::focus_end,
 		input_event::cursor_moved>;
 
 	const style_drawer<elem>* getDefaultStyleDrawer(){
@@ -203,28 +199,11 @@ namespace mo_yanxi::ui{
 				time_tooltip = time_stagnate = 0.f;
 			}
 		}
-
-		void register_default_cursor_events(elem_event_manager& event_manager);
-
-		void registerDefEvent(elem_event_manager& event_manager);
 	};
 
 
 
 	export struct elem_prop{
-	protected:
-		//TODO uses string view?
-		std::string elementTypeName{};
-
-	public:
-		[[nodiscard]] elem_prop() = default;
-
-		[[nodiscard]] elem_prop(const std::string_view element_type_name)
-			: elementTypeName(element_type_name){
-		}
-
-
-
 		//position fields
 		math::vec2 relative_src{};
 		math::vec2 absolute_src{};
@@ -333,7 +312,6 @@ namespace mo_yanxi::ui{
 		std::queue<std::unique_ptr<action::action<elem>>> actions{};
 
 	public:
-		elem_event_manager event_slots{};
 		ElemDynamicChecker<elem> checkers{};
 		//state
 		//TODO using a bit flags?
@@ -350,10 +328,6 @@ namespace mo_yanxi::ui{
 		interactivity interactivity{interactivity::enabled};
 
 	protected:
-		[[nodiscard]] explicit elem_fields(const std::string_view tyName)
-			: property(tyName){
-		}
-
 		[[nodiscard]] elem_fields() = default;
 	};
 
@@ -369,29 +343,13 @@ namespace mo_yanxi::ui{
 		// StatedToolTipOwner<elem>,
 		math::quad_tree_adaptor<elem>
 	{
-
-		[[nodiscard]] elem(){
-			cursor_state.register_default_cursor_events(events());
-			event_slots.set_context(*this);
-		}
+		friend scene;
 
 		[[nodiscard]] elem(
 			scene* scene,
-			group* group,
-			const std::string_view tyName)
-			: elem_fields{tyName}{
-			elem::set_scene(scene);
-			elem::set_parent(group);
-
-			cursor_state.register_default_cursor_events(events());
-			event_slots.set_context(*this);
-		}
-
-		[[nodiscard]] elem(
-			scene* scene,
-			group* group
-		)
-			: elem{scene, group, ""}{
+			group* group){
+			set_scene(scene);
+			set_parent(group);
 		}
 
 		virtual ~elem(){
@@ -403,13 +361,11 @@ namespace mo_yanxi::ui{
 		elem& operator=(const elem& other) = delete;
 
 		elem(elem&& other) noexcept: elem_fields{std::move(other)}{
-			event_slots.set_context(*this);
 		}
 
 		elem& operator=(elem&& other) noexcept{
 			if(this == &other) return *this;
 			elem_fields::operator =(std::move(other));
-			event_slots.set_context(*this);
 			return *this;
 		}
 
@@ -479,7 +435,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] group* get_root_parent() const noexcept;
 
-		virtual void update_opacity(float val);
+		void update_opacity(float val) noexcept;
 
 		void notify_isolated_layout_changed();
 
@@ -508,9 +464,6 @@ namespace mo_yanxi::ui{
 			return property.graphic_data;
 		}
 
-		elem_event_manager& events() noexcept{
-			return event_slots;
-		}
 
 		template <typename T>
 		bool fire_event(const T& event, spread_direction spread_direction = spread_direction::lower, bool force_spread = false){
@@ -528,7 +481,6 @@ namespace mo_yanxi::ui{
 				}
 			}
 
-
 			if(spread_direction & spread_direction::child){
 				for (auto && child : get_children()){
 					auto rst = child->fire_event(event, (spread_direction | spread_direction::local) - spread_direction::super, force_spread);
@@ -541,29 +493,8 @@ namespace mo_yanxi::ui{
 			return false;
 		}
 
-		template <typename T, typename Fn>
-		void register_event(this T& self, Fn&& fn){
-			using trait = function_traits<Fn>;
-			using event_t = std::remove_cvref_t<typename function_arg_at<trait::args_count - 2, Fn>::type>;
-			using elem_t = typename function_arg_at_last<Fn>::type;
 
-			static_assert(std::derived_from<std::remove_cvref_t<T>, std::remove_cvref_t<elem_t>>, "self type incompatible");
-
-			static_cast<elem&>(self).events().on<event_t>([f = std::forward<Fn>(fn)](const event_t& event, elem& e){
-				auto& ty = static_cast<elem_t>(e);
-				std::invoke(f, event, ty);
-			});
-		}
-
-		/**
-		 * @brief just used to notify tooltip drop
-		 * @param delta cursor transform
-		 */
-		void notify_cursor_moved(const math::vec2 delta) const{
-			event_slots.fire(input_event::cursor_moved{delta});
-			// dropToolTipIfMoved();
-		}
-
+	public:
 		[[nodiscard]] constexpr math::vec2 abs_pos() const noexcept{
 			return property.absolute_src;
 		}
@@ -599,12 +530,11 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] bool is_focused() const noexcept;
 		[[nodiscard]] bool is_inbounded() const noexcept;
 
+	protected:
 		void set_focused_scroll(bool focus) noexcept;
 		void set_focused_key(bool focus) noexcept;
-		//
-		// [[nodiscard]] constexpr bool isQuietInteractable() const noexcept{
-		// 	return (interactivity != Interactivity::enabled && hasTooltip()) && isVisible();
-		// }
+
+	public:
 
 		[[nodiscard]] constexpr bool ignore_inbound() const noexcept{
 			return skip_inbound_capture;
@@ -624,9 +554,9 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] virtual bool contains_self(math::vec2 absPos, float margin) const noexcept;
 
-		[[nodiscard]] virtual bool contains_parent(math::vec2 cursorPos) const;
+		[[nodiscard]] virtual bool contains_parent(math::vec2 cursorPos) const noexcept;
 
-		virtual void notify_layout_changed(spread_direction toDirection);
+		virtual void notify_layout_changed(spread_direction toDirection) noexcept;
 
 		virtual bool resize(const math::vec2 size/*, spread_direction Mask*/){
 			if(property.size.set_size(size)){
@@ -636,11 +566,15 @@ namespace mo_yanxi::ui{
 			return false;
 		}
 
-
-		virtual void set_scene(scene* s){
+	protected:
+		void set_scene(scene* s) noexcept{
 			this->scene_ = s;
+			for(const auto& element : get_children()){
+				element->set_scene(s);
+			}
 		}
 
+	public:
 
 		[[nodiscard]] virtual std::span<const elem_ptr> get_children() const noexcept{
 			return {};
@@ -650,8 +584,9 @@ namespace mo_yanxi::ui{
 			return !get_children().empty();
 		}
 
-
 		virtual void update(float delta_in_ticks);
+
+	public:
 
 		virtual bool try_layout(){
 			if(layout_state.is_changed()){
@@ -708,6 +643,15 @@ namespace mo_yanxi::ui{
 			return pre_acquire_size_impl(extent).transform([this](const math::vec2 v){return property.size.clamp(v);});
 		}
 
+	protected:
+		virtual void on_cursor_moved(const math::vec2 delta){
+			cursor_state.time_stagnate = 0;
+			if(get_tooltip_prop().use_stagnate_time && !delta.equals({})){
+				cursor_state.time_tooltip = 0.;
+				tooltip_notify_drop();
+			}
+		}
+
 		virtual void on_key_input(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode){
 
 		}
@@ -734,13 +678,20 @@ namespace mo_yanxi::ui{
 
 		}
 
-		virtual void on_focus_changed(bool is_focused){
+		virtual void on_inbound_changed(bool is_inbounded, bool changed){
+			cursor_state.inbound = is_inbounded;
+		}
 
+		virtual void on_focus_changed(bool is_focused){
+			cursor_state.focused = is_focused;
+			if(!is_focused)cursor_state.pressed = false;
 		}
 
 		virtual void on_scroll(const input_event::scroll event){
 
 		}
+
+	public:
 		// [[nodiscard]] virtual math::vec2 requestSpace(const StatedSize sz, math::vec2 minimumSize,
 		// 											  math::vec2 currentAllocatedSize){
 		// 	auto cur = get_size();

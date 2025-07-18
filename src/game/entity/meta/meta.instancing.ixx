@@ -115,7 +115,7 @@ namespace mo_yanxi::game::meta{
 	};
 
 
-	struct projectile_create_handle : entity_create_handle<projectile_create_handle, meta::projectile, ecs::decl::projectile_entity_desc>{
+	struct projectile_create_handle : entity_create_handle<projectile_create_handle, meta::projectile, ecs::desc::projectile>{
 		// using entity_create_handle::entity_create_handle;
 
 		// [[nodiscard]] explicit projectile_create_handle(handle&& hdl)
@@ -163,6 +163,6 @@ namespace mo_yanxi::game::meta{
 		comp.duration.set(metainfo.lifetime);
 
 
-		co_yield manager.create_entity_deferred<ecs::decl::projectile_entity_desc>(std::move(comp));
+		co_yield manager.create_entity_deferred<ecs::desc::projectile>(std::move(comp));
 	}
 }

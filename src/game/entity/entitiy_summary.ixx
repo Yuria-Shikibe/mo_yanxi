@@ -17,8 +17,8 @@ export import mo_yanxi.game.ecs.component.drawer;
 import std;
 
 namespace mo_yanxi::game::ecs{
-	namespace decl{
-		export using chamber_entity_desc = std::tuple<
+	namespace desc{
+		export using grid_entity = std::tuple<
 			mech_motion,
 			manifold,
 			physical_rigid,
@@ -28,7 +28,7 @@ namespace mo_yanxi::game::ecs{
 			chamber::chamber_ui_builder
 		>;
 
-		export using projectile_entity_desc = std::tuple<
+		export using projectile = std::tuple<
 			mech_motion,
 			manifold,
 			physical_rigid,
@@ -39,12 +39,12 @@ namespace mo_yanxi::game::ecs{
 
 		>;
 
-		using View = tuple_to_comp_t<projectile_entity_desc>;
+		using View = tuple_to_comp_t<projectile>;
 	}
 
 	export
 	template <>
-	struct ecs::archetype_custom_behavior<decl::chamber_entity_desc> : archetype_custom_behavior_base<decl::chamber_entity_desc>{
+	struct ecs::archetype_custom_behavior<desc::grid_entity> : archetype_custom_behavior_base<desc::grid_entity>{
 		static void on_init(value_type& comps){
 			auto [motion, mf] = get_unwrap_of<mech_motion, manifold>(comps);
 			mf.hitbox.set_trans_unchecked(motion.trans);
@@ -67,7 +67,7 @@ namespace mo_yanxi::game::ecs{
 
 	export
 	template <>
-	struct ecs::archetype_custom_behavior<decl::projectile_entity_desc> : archetype_custom_behavior_base<decl::projectile_entity_desc>{
+	struct ecs::archetype_custom_behavior<desc::projectile> : archetype_custom_behavior_base<desc::projectile>{
 		static void on_init(value_type& comps){
 
 

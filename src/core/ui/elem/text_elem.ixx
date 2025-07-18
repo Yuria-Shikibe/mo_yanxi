@@ -29,8 +29,8 @@ namespace mo_yanxi::ui{
 	public:
 		align::pos text_entire_align{align::pos::top_left};
 
-		[[nodiscard]] label(scene* scene, group* group, const std::string_view tyName = "basic_text_elem")
-			: elem(scene, group, tyName){
+		[[nodiscard]] label(scene* scene, group* group)
+			: elem(scene, group){
 		}
 
 		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{

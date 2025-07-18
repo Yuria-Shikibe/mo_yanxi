@@ -8,7 +8,7 @@ void mo_yanxi::ui::nested_scene::draw_pre(const rect clipSpace) const{
 	const auto proj = camera_.get_world_to_uniformed_flip_y();
 
 	get_renderer().batch.push_projection(proj);
-	get_renderer().batch.push_viewport(scene_.region);
+	get_renderer().batch.push_viewport(scene_.get_region());
 
 	float edge = 4 / camera_.get_scale();
 	get_renderer().batch.push_scissor({camera_.get_viewport()/*.shrink(edge), 4*/});
@@ -19,7 +19,7 @@ void mo_yanxi::ui::nested_scene::draw_content(const rect clipSpace) const{
 	scene_.draw(camera_.get_viewport());
 	//
 	draw_acquirer acquirer{get_renderer().batch, graphic::draw::white_region};
-	auto cpos = getTransferredPos(get_scene()->cursor_pos);
+	auto cpos = getTransferredPos(get_scene()->get_cursor_pos());
 	graphic::draw::fill::rect_ortho(acquirer.get(), rect{cpos, 12});
 
 	if(auto elem = get_selection(cpos)){

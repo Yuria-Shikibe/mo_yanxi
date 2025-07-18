@@ -125,7 +125,7 @@ namespace mo_yanxi::game::ui{
 		float approach_speed{0.105f};
 
 		[[nodiscard]] stalled_bar(mo_yanxi::ui::scene* scene, mo_yanxi::ui::group* group)
-			: elem(scene, group, "hitpoint_bar"){
+			: elem(scene, group){
 			interactivity = interactivity::disabled;
 		}
 
@@ -202,7 +202,7 @@ namespace mo_yanxi::game::ui{
 		math::section<graphic::color> efficiency_color{};
 
 		[[nodiscard]] reload_bar(mo_yanxi::ui::scene* scene, mo_yanxi::ui::group* group)
-			: elem(scene, group, "hitpoint_bar"){
+			: elem(scene, group){
 			interactivity = interactivity::disabled;
 		}
 	protected:

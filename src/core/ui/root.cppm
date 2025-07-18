@@ -29,7 +29,7 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] root() = default;
 
 		[[nodiscard]] explicit root(scene&& scene){
-			auto name = std::string(scene.name);
+			auto name = std::string(scene.get_name());
 			focus = &scenes.insert_or_assign(std::move(name), std::move(scene)).first->second;
 		}
 
@@ -51,7 +51,7 @@ namespace mo_yanxi::ui{
 		}
 
 		scene& add_scene(scene&& scene, bool focusIt = false){
-			auto name = std::string(scene.name);
+			auto name = std::string(scene.get_name());
 
 			auto itr = scenes.insert_or_assign(std::move(name), std::move(scene));
 			if(focusIt){

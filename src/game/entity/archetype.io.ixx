@@ -34,7 +34,7 @@ namespace mo_yanxi::game::ecs{
 
 	export
 	template <>
-	struct archetype_serialize_info<decl::chamber_entity_desc> : archetype_serialize_info_base<decl::chamber_entity_desc, archetype_serialize_identity{
+	struct archetype_serialize_info<desc::grid_entity> : archetype_serialize_info_base<desc::grid_entity, archetype_serialize_identity{
 		1
 	}>{
 		// static chunk_serialize_handle write(std::ostream& stream, const dump_chunk& chunk);
@@ -53,7 +53,7 @@ namespace mo_yanxi::game::ecs{
 	std::unique_ptr<archetype_serializer> get_archetype_serializer(const archetype_serialize_identity& identity){
 		switch(identity.index){
 			// case 0: return nullptr;
-			case_of_type(decl::chamber_entity_desc);
+			case_of_type(desc::grid_entity);
 		default: throw srl::srl_logical_error{std::format("unknown archetype serialization index: {}", identity.index)};
 		}
 	}

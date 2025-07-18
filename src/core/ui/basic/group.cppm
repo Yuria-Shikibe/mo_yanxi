@@ -72,12 +72,6 @@ namespace mo_yanxi::ui{
 		}
 	public:
 
-		void set_scene(scene* manager) override{
-			elem::set_scene(manager);
-			for(const auto& element : get_children()){
-				element->set_scene(manager);
-			}
-		}
 
 		bool resize(const math::vec2 size) override{
 			if(elem::resize(size)){
@@ -184,8 +178,8 @@ namespace mo_yanxi::ui{
 		std::vector<elem_ptr> children{};
 
 	public:
-		[[nodiscard]] basic_group(scene* scene, group* group_, const std::string_view tyName)
-			: group(scene, group_, tyName){
+		[[nodiscard]] basic_group(scene* scene, group* parent)
+			: group(scene, parent){
 			interactivity = interactivity::children_only;
 		}
 
@@ -258,10 +252,5 @@ namespace mo_yanxi::ui{
 	};
 
 	export
-	struct loose_group : basic_group{
-		[[nodiscard]] loose_group(scene* scene, group* group)
-			: basic_group(scene, group, "loose_group"){
-		}
-
-	};
+	using loose_group = basic_group;
 }

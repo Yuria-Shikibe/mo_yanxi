@@ -44,7 +44,7 @@ namespace mo_yanxi::ui{
 	struct nested_scene_group : basic_group{
 
 		[[nodiscard]] nested_scene_group(scene* scene, group* group)
-			: basic_group(scene, group, "nested_scene_group"){
+			: basic_group(scene, group){
 		}
 
 		// elem* manager{};
@@ -288,21 +288,6 @@ namespace mo_yanxi::ui{
 			group_.property.set_empty_drawer();
 
 			camera_.flip_y = true;
-
-			register_event([](input_event::cursor_moved e, nested_scene& self){
-				auto p = self.getTransferredPos(self.get_scene()->cursor_pos);
-				self.scene_.on_cursor_pos_update(p, false);
-			});
-
-			register_event([](input_event::focus_begin e, nested_scene& self){
-				self.get_scene()->set_camera_focus(&self.camera_);
-				self.set_focused_scroll(true);
-			});
-
-			register_event([](input_event::focus_end e, nested_scene& self){
-				self.get_scene()->set_camera_focus(nullptr);
-				self.set_focused_scroll(false);
-			});
 		}
 
 		[[nodiscard]] group_type& get_group(){
@@ -315,6 +300,18 @@ namespace mo_yanxi::ui{
 		scene scene_;
 
 		std::optional<drag_state> drag_state_{};
+
+		void on_cursor_moved(const math::vec2 delta) override{
+			auto p = getTransferredPos(get_scene()->get_cursor_pos());
+			scene_.on_cursor_pos_update(p, false);
+		}
+
+		void on_inbound_changed(bool is_inbounded, bool changed) override{
+			elem::on_inbound_changed(is_inbounded, changed);
+			get_scene()->set_camera_focus(is_inbounded ? &camera_ : nullptr);
+			set_focused_scroll(is_inbounded);
+
+		}
 
 		void draw_pre(rect clipSpace) const override;
 
@@ -350,7 +347,7 @@ namespace mo_yanxi::ui{
 		bool resize(const math::vec2 size) override{
 			if(elem::resize(size)){
 				scene_.resize(property.content_bound_absolute());
-				auto [x, y] = scene_.region.size();
+				auto [x, y] = scene_.get_extent();
 				camera_.resize_screen(x, y);
 				return true;
 			}

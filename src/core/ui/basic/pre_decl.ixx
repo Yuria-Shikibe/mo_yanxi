@@ -9,7 +9,6 @@ namespace mo_yanxi::ui{
 
 	export struct elem;
 	export struct group;
-	export struct loose_group;
 	export struct basic_group;
 	export struct scene;
 }

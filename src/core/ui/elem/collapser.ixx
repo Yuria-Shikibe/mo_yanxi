@@ -13,6 +13,7 @@ export import mo_yanxi.math.interpolation;
 import std;
 
 namespace mo_yanxi::ui{
+	//TODO use list instead of table?
 	//TODO support vert_major layout
 
 	export
@@ -64,7 +65,7 @@ namespace mo_yanxi::ui{
 		collapser& operator=(collapser&& other) noexcept = delete;
 
 		[[nodiscard]] collapser(scene* scene, group* group)
-			: basic_group(scene, group, "collapser"),
+			: basic_group(scene, group),
 			  head_(&static_cast<head_type&>(basic_group::add_children(elem_ptr{get_scene(), this, std::in_place_type<head_type>}))),
 			  content_(&static_cast<content_type&>(basic_group::add_children(elem_ptr{
 				                                                                 get_scene(), this, std::in_place_type<content_type>

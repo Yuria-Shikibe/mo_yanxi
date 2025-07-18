@@ -28,8 +28,9 @@ void mo_yanxi::ui::dialog_manager::update(float delta_in_tick){
 	});
 
 	for (auto& value : dialogs){
-		value.update_bound(scene_->region.size());
+		value.update_bound(scene_->get_extent());
 		value.get()->update(delta_in_tick);
+		value.get()->try_layout();
 	}
 }
 

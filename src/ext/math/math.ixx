@@ -661,10 +661,8 @@ namespace mo_yanxi::math {
 	export
 	template <mo_yanxi::arithmetic T>
 	MATH_ATTR constexpr T clamp(const T v, const T min = static_cast<T>(0), const T max = static_cast<T>(1)) noexcept{
-		if(v > max) return max;
-		if(v < min) return min;
-
-		return v;
+		MATH_ASSERT(min <= max);
+		return v < min ? min : v > max ? max : v;
 	}
 
 	export

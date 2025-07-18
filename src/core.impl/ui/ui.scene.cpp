@@ -81,7 +81,7 @@ void mo_yanxi::ui::scene::registerAsyncTaskElement(elem* element){
 	asyncTaskOwners.insert(element);
 }
 
-void mo_yanxi::ui::scene::notify_layout_update(elem* element){
+void mo_yanxi::ui::scene::notify_isolated_layout_update(elem* element){
 	independentLayout.insert(element);
 }
 
@@ -118,7 +118,6 @@ void mo_yanxi::ui::scene::swap_focus(elem* newFocus){
 		for(auto& state : mouseKeyStates){
 			state.clear(cursor_pos);
 		}
-		currentCursorFocus->events().fire(input_event::focus_end{cursor_pos});
 		currentCursorFocus->on_focus_changed(false);
 		currentCursorFocus->cursor_state.quit_focus();
 	}
@@ -127,7 +126,6 @@ void mo_yanxi::ui::scene::swap_focus(elem* newFocus){
 
 	if(currentCursorFocus){
 		if(currentCursorFocus->interactable()){
-			currentCursorFocus->events().fire(input_event::focus_begin{cursor_pos});
 			currentCursorFocus->on_focus_changed(true);
 		}
 	}
@@ -256,7 +254,7 @@ void mo_yanxi::ui::scene::on_cursor_pos_update(const math::vec2 newPos, bool for
 		currentCursorFocus->on_drag(dragEvent);
 	}
 
-	currentCursorFocus->notify_cursor_moved(delta);
+	currentCursorFocus->on_cursor_moved(delta);
 }
 
 void mo_yanxi::ui::scene::resize(const math::frect region){
@@ -297,9 +295,6 @@ void mo_yanxi::ui::scene::layout(){
 		independentLayout.clear();
 
 		root->try_layout();
-		for (const auto & dialog : dialog_manager.dialogs){
-			dialog.elem->try_layout();
-		}
 
 		count++;
 		if(count > 8){
@@ -375,13 +370,17 @@ mo_yanxi::ui::scene& mo_yanxi::ui::scene::operator=(scene&& other) noexcept{
 void mo_yanxi::ui::scene::updateInbounds(std::vector<elem*>&& next, bool force_drop){
 	auto [i1, i2] = std::ranges::mismatch(lastInbounds, next);
 
-	for(const auto& element : std::ranges::subrange{i1, lastInbounds.end()}){
-		element->events().fire(input_event::exbound{cursor_pos});
+	for(const auto& element : std::ranges::subrange{i1, lastInbounds.end()} | std::views::reverse){
+		element->on_inbound_changed(false, true);
 	}
 
-	// for(const auto& element : std::ranges::subrange{i2, next.end()}){
-	for(const auto& element : next){
-		element->events().fire(input_event::inbound{cursor_pos});
+	auto itr = next.begin();
+	for(; itr != i2; ++itr){
+		(*itr)->on_inbound_changed(true, false);
+	}
+
+	for(; itr != next.end(); ++itr){
+		(*itr)->on_inbound_changed(true, true);
 	}
 
 	lastInbounds = std::move(next);

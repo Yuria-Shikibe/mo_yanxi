@@ -285,7 +285,7 @@ void mo_yanxi::game::world::hud::hud_viewport::draw_content(const ui::rect clipS
 	}
 
 	get_renderer().batch.pop_projection();
-	get_renderer().batch.blit_viewport(get_scene()->region);
+	get_renderer().batch.blit_viewport(prop().content_bound_absolute());
 
 
 	manual_table::draw_content(clipSpace);

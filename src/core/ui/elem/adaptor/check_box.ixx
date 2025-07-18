@@ -17,7 +17,6 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] check_box(scene* s, group* g)
 			: image_frame(s, g){
 
-			cursor_state.registerDefEvent(events());
 			interactivity = interactivity::enabled;
 			property.maintain_focus_until_mouse_drop = true;
 

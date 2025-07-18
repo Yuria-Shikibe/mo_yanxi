@@ -85,7 +85,7 @@ namespace mo_yanxi::ui{
 		float approach_speed = 1.;
 
 		[[nodiscard]] progress_bar(scene* scene, group* group)
-			: elem(scene, group, "progress_bar"){
+			: elem(scene, group){
 			interactivity = interactivity::disabled;
 		}
 

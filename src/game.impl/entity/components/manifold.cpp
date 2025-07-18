@@ -72,7 +72,7 @@ namespace mo_yanxi::game::ecs{
 	}
 
 	entity_id projectile_collider::get_group_identity(entity_id self, const manifold& manifold){
-		return ecs::chunk_neighbour_of<projectile_manifold, decl::projectile_entity_desc>(manifold).owner;
+		return ecs::chunk_neighbour_of<projectile_manifold, desc::projectile>(manifold).owner;
 	}
 
 
@@ -80,7 +80,7 @@ namespace mo_yanxi::game::ecs{
 		const collision_object& sbj,
 		const collision_object& obj) noexcept{
 
-		auto& projectile_chunk = ecs::chunk_of<decl::projectile_entity_desc>(*sbj.manifold);
+		auto& projectile_chunk = ecs::chunk_of<desc::projectile>(*sbj.manifold);
 
 		if(projectile_chunk.projectile_manifold::owner == obj.manifold->get_hit_group_id(obj.id))return false;
 

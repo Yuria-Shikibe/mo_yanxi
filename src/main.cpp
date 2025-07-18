@@ -118,21 +118,6 @@ import test;
 
 import std;
 
-void compile_shaders(){
-	using namespace mo_yanxi;
-
-	graphic::shader_runtime_compiler compiler{};
-	graphic::shader_wrapper wrapper{compiler, assets::dir::shader_spv.path()};
-
-	assets::dir::shader_src.for_all_subs([&](io::file&& file){
-		wrapper.compile(file);
-	});
-}
-
-void init_assets(){
-	mo_yanxi::assets::load_dir(R"(D:\projects\mo_yanxi\prop)");
-	mo_yanxi::assets::ctrl::load();
-}
 
 void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& atlas){
 	using namespace std::literals;
@@ -370,28 +355,6 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	}*/
 }
 
-mo_yanxi::game::meta::projectile projectile_meta = [](){
-	using namespace mo_yanxi;
-
-	return game::meta::projectile{
-			.hitbox = {{game::meta::hitbox::comp{.box = {math::vec2{80, 10} * -0.5f, {80, 10}}}}},
-			.rigid = {
-				.drag = 0.001f
-			},
-			.damage = {.material_damage = 1000},
-			.lifetime = 75,
-			.initial_speed = 250,
-
-			.trail_style = {
-				game::meta::trail_style{
-					.radius = 7,
-					.color = {graphic::colors::aqua.to_light(), graphic::colors::aqua.to_light()},
-					.trans = {-40}
-				},
-				50
-			}
-		};
-}();
 
 void main_loop(){
 	using namespace mo_yanxi;
@@ -420,7 +383,7 @@ void main_loop(){
 	}
 
 	game::world::hud hud{};
-	// hud.focus_hud();
+	hud.focus_hud();
 
 	game::ecs::system::motion_system motion_system{};
 	game::ecs::system::renderer ecs_renderer{};
@@ -484,9 +447,9 @@ void main_loop(){
 	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
 
 
-	using grided_entity_desc = game::ecs::decl::chamber_entity_desc;
+	using grided_entity_desc = game::ecs::desc::grid_entity;
 
-	using projectile_entity_desc = game::ecs::decl::projectile_entity_desc;
+	using projectile_entity_desc = game::ecs::desc::projectile;
 
 
 	game::meta::chamber::grid grid{};
@@ -494,6 +457,7 @@ void main_loop(){
 		std::ifstream stream{R"(D:\projects\mo_yanxi\build\windows\x64\debug\test_grid.metagrid)", std::ios::binary};
 		game::meta::srl::read_grid(stream, grid);
 	}
+
 	{
 
 
@@ -549,7 +513,7 @@ void main_loop(){
 
 
 
-			auto hdl = game::meta::create(component_manager, projectile_meta);
+			auto hdl = game::meta::create(component_manager, test::projectile_meta);
 
 			math::rand rand{};
 			auto dir =
@@ -850,9 +814,8 @@ int main(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
 
-	init_assets();
+	test::init_assets();
 	// compile_shaders();
-	game::content::load();
 
 	core::glfw::init();
 	core::global::graphic::init_vk();
@@ -861,7 +824,7 @@ int main(){
 	core::global::ui::init();
 
 
-	// std::terminate();
+	game::content::load();
 
 	main_loop();
 

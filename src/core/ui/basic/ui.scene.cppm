@@ -108,15 +108,13 @@ namespace mo_yanxi::ui{
 			}
 		};
 
+	protected:
 		std::string_view name{};
-
 		math::frect region{};
-
 		math::vec2 cursor_pos{};
 		std::array<MouseState, core::ctrl::mouse::Count> mouseKeyStates{};
 
-
-
+	public:
 		bool root_ownership{true};
 		dependency<basic_group*> root{};
 
@@ -124,10 +122,12 @@ namespace mo_yanxi::ui{
 		elem* currentCursorFocus{nullptr};
 		elem* currentKeyFocus{nullptr};
 
+	protected:
 		std::vector<elem*> lastInbounds{};
 		std::unordered_set<elem*> independentLayout{};
 		std::unordered_set<elem*> asyncTaskOwners{};
 
+	public:
 		graphic::renderer_ui* renderer{};
 		graphic::camera2* focused_camera{};
 
@@ -152,6 +152,34 @@ namespace mo_yanxi::ui{
 		scene_base& operator=(const scene_base& other) = delete;
 
 		scene_base& operator=(scene_base&& other) noexcept = default;
+
+		[[nodiscard]] std::string_view get_name() const{
+			return name;
+		}
+
+		[[nodiscard]] math::frect get_region() const noexcept{
+			return region;
+		}
+
+		[[nodiscard]] math::vec2 get_extent() const noexcept{
+			return region.size();
+		}
+
+		[[nodiscard]] math::vec2 get_cursor_pos() const noexcept{
+			return cursor_pos;
+		}
+
+		[[nodiscard]] const basic_group& get_root() const noexcept{
+			return *root;
+		}
+
+		[[nodiscard]] basic_group& get_root() noexcept{
+			return *root;
+		}
+
+		[[nodiscard]] std::span<elem* const> get_last_inbounds() const noexcept{
+			return lastInbounds;
+		}
 	};
 
 	export struct scene : scene_base{
@@ -183,7 +211,7 @@ namespace mo_yanxi::ui{
 
 		[[deprecated]] void registerAsyncTaskElement(elem* element);
 
-		void notify_layout_update(elem* element);
+		void notify_isolated_layout_update(elem* element);
 
 		[[nodiscard]] bool is_mouse_pressed() const noexcept{
 			return std::ranges::any_of(mouseKeyStates, std::identity{}, &MouseState::pressed);
@@ -191,12 +219,6 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] bool is_mouse_pressed(core::ctrl::key_code_t mouse_button_code) const noexcept{
 			return mouseKeyStates[mouse_button_code].pressed;
-		}
-
-		// void joinTasks();
-
-		[[nodiscard]] math::vec2 get_cursor_pos() const noexcept{
-			return cursor_pos;
 		}
 
 		[[nodiscard]] core::ctrl::key_code_t get_input_mode() const noexcept;

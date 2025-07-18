@@ -69,15 +69,8 @@ namespace mo_yanxi::ui{
 		math::upoint2 segments{};
 
 		[[nodiscard]] slider(scene* scene, group* group)
-			: elem(scene, group, "Slider"){
+			: elem(scene, group){
 
-			register_event([](const input_event::exbound& event, slider& self){
-				self.set_focused_scroll(false);
-			});
-
-			register_event([](const input_event::inbound& event, slider& self){
-				self.set_focused_scroll(true);
-			});
 
 			property.maintain_focus_until_mouse_drop = true;
 		}
@@ -138,6 +131,11 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] bool is_clamped_to_vert() const noexcept{ return sensitivity.x == 0.0f; }
 
 	protected:
+		void on_inbound_changed(bool is_inbounded, bool changed) override{
+			elem::on_inbound_changed(is_inbounded, changed);
+			set_focused_scroll(is_inbounded);
+		}
+
 		virtual void on_data_changed(){
 
 		}

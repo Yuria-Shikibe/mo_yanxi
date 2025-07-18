@@ -381,7 +381,7 @@ namespace mo_yanxi::ui{
 	export struct table : universal_group<table_cell_adaptor::cell_type, table_cell_adaptor>{
 
 		[[nodiscard]] table(scene* scene, group* group)
-			: universal_group(scene, group, "table"){
+			: universal_group(scene, group){
 		}
 
 		void set_entire_align(const align::pos align){

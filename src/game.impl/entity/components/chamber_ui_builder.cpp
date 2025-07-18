@@ -84,7 +84,7 @@ namespace mo_yanxi::game::ecs::chamber{
 
 			if(!ref)return;
 
-			auto& chunk = ref->unchecked_get<decl::chamber_entity_desc>();
+			auto& chunk = ref->unchecked_get<desc::grid_entity>();
 
 			hitpoint_bar->set_value(chunk.hit_point.factor());
 			hitpoint_bar->valid_range = chunk.hit_point.capability_range / chunk.hit_point.max;

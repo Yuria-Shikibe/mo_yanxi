@@ -11,7 +11,7 @@ namespace mo_yanxi::ui{
 
 	export struct manual_table : celled_group<passive_cell_adaptor>{
 		[[nodiscard]] manual_table(scene* scene, group* group)
-			: universal_group(scene, group, "manual_group"){
+			: universal_group(scene, group){
 		}
 
 		void layout() override{
