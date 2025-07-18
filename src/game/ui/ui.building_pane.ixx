@@ -12,9 +12,16 @@ import mo_yanxi.ui.elem.list;
 namespace mo_yanxi::game::ui{
 	export using namespace mo_yanxi::ui;
 
-	struct building_pane : list{
-		[[nodiscard]] building_pane(scene* scene, group* group_)
-			: list(scene, group_){
+	struct building_info_pane : ui::elem{
+		using elem::elem;
+
+		void draw_content(const rect clipSpace) const override{
+
 		}
+	};
+
+	struct building_pane : ui::list{
+		using list::list;
+
 	};
 }

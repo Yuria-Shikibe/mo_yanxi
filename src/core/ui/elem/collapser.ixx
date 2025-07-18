@@ -104,17 +104,16 @@ namespace mo_yanxi::ui{
 		}
 
 		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{
-			auto ext = clip_boarder_from(extent);
-			auto table_size = head_->pre_acquire_size(ext);
+			auto table_size = head_->pre_acquire_size(extent);
 
 			if(policy == layout_policy::hori_major){
 				extent.set_height_dependent();
 
 				math::vec2 content_size{};
 				if(get_interped_progress() >= std::numeric_limits<float>::epsilon()){
-					content_size.lerp_inplace(content_->pre_acquire_size(ext).value_or(content_->get_size()).add_y(pad), get_interped_progress());
+					content_size.lerp_inplace(content_->pre_acquire_size(extent).value_or(content_->get_size()).add_y(pad), get_interped_progress());
 				}
-				return table_size.value().add_y(content_size.y) + property.boarder.extent();
+				return table_size.value().add_y(content_size.y);
 			}else{
 				return std::nullopt;
 			}

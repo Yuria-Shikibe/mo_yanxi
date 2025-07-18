@@ -33,13 +33,14 @@ void mo_yanxi::ui::scene::drop_dialog(const elem* elem){
 }
 
 void mo_yanxi::ui::scene::root_draw() const{
-	renderer->batch.push_projection(rect{tags::from_extent, math::vec2{}, region.size()});
-	renderer->batch.push_viewport(region);
+	auto& renderer = *graphic::renderer_from_erased(this->renderer);
+	renderer.batch.push_projection(rect{tags::from_extent, math::vec2{}, region.size()});
+	renderer.batch.push_viewport(region);
 
 	draw(region);
 
-	renderer->batch.pop_viewport();
-	renderer->batch.pop_projection();
+	renderer.batch.pop_viewport();
+	renderer.batch.pop_projection();
 }
 
 double mo_yanxi::ui::scene::get_global_time() const noexcept{
@@ -53,7 +54,7 @@ double mo_yanxi::ui::scene::get_global_time() const noexcept{
 mo_yanxi::ui::scene::scene(
 	const std::string_view name,
 	const owner<basic_group*> root,
-	graphic::renderer_ui* renderer) :
+	graphic::renderer_ui_ptr renderer) :
 	scene_base{name, root, renderer}{
 
 	// keyMapping = &core::input.register_sub_input(name);
@@ -310,6 +311,7 @@ void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 	//TODO draw and blit?
 
 	//TODO fix blit bound(apply viewport transform) when draw nested scene
+	auto& renderer = *graphic::renderer_from_erased(this->renderer);
 
 	constexpr auto to_uint_bound = [](rect region) static  {
 		return region.expand(8).round<std::int32_t>().max_src({}).as<std::uint32_t>();
@@ -319,15 +321,15 @@ void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 		for (auto&& elem : tooltip_manager.get_draw_sequence()){
 			if(elem.belowScene){
 				elem.element->try_draw(clipSpace);
-				renderer->batch->consume_all();
-				renderer->batch.blit_viewport(elem.element->get_bound());
+				renderer.batch->consume_all();
+				renderer.batch.blit_viewport(elem.element->get_bound());
 			}
 		}
 
 		for (auto& elem : root->get_children()){
 			elem->try_draw(clipSpace);
-			renderer->batch->consume_all();
-			renderer->batch.blit_viewport(elem->get_bound());
+			renderer.batch->consume_all();
+			renderer.batch.blit_viewport(elem->get_bound());
 		}
 	}else{
 		dialog_manager.draw_all(clipSpace);
@@ -337,12 +339,12 @@ void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 	for (auto&& elem : tooltip_manager.get_draw_sequence()){
 		if(!elem.belowScene){
 			elem.element->try_draw(clipSpace);
-			renderer->batch->consume_all();
-			renderer->batch.blit_viewport(elem.element->get_bound());
+			renderer.batch->consume_all();
+			renderer.batch.blit_viewport(elem.element->get_bound());
 		}
 	}
 
-	renderer->batch->consume_all();
+	renderer.batch->consume_all();
 }
 
 mo_yanxi::ui::scene::scene(scene&& other) noexcept:

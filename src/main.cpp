@@ -377,7 +377,7 @@ void main_loop(){
 	}
 
 	{
-		core::global::ui::root->add_scene(ui::scene{"main", new ui::loose_group{nullptr, nullptr}, &renderer_ui}, true);
+		core::global::ui::root->add_scene(ui::scene{"main", new ui::loose_group{nullptr, nullptr}, renderer_ui}, true);
 		core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()});
 		init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
 	}
@@ -803,7 +803,7 @@ void main_loop(){
 
 		context.flush();
 	}
-	async_collide.get();
+	if(async_collide.valid())async_collide.get();
 
 	context.wait_on_device();
 

@@ -4,12 +4,14 @@ module;
 
 export module mo_yanxi.ui.root;
 
-import mo_yanxi.ui.primitives;
+export import mo_yanxi.ui.primitives;
 
 import mo_yanxi.math.vector2;
 import mo_yanxi.math.rect_ortho;
 
 import mo_yanxi.heterogeneous;
+import mo_yanxi.graphic.renderer.predecl;
+
 import std;
 
 namespace mo_yanxi::ui{
@@ -71,7 +73,7 @@ namespace mo_yanxi::ui{
 			auto& scene = this->add_scene(
 				ui::scene{
 					name, new T{nullptr, nullptr, std::forward<Args>(args)...},
-					graphic::renderer_from_erased(renderer_ui)
+					renderer_ui
 				});
 
 			this->resize(region, name);

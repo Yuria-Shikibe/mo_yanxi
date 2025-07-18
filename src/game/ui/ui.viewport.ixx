@@ -6,6 +6,7 @@ export module mo_yanxi.game.ui.viewport;
 
 export import mo_yanxi.ui.primitives;
 export import mo_yanxi.graphic.camera;
+export import mo_yanxi.graphic.renderer.ui;
 
 import std;
 
@@ -88,16 +89,19 @@ namespace mo_yanxi::game::ui{
 
 		void viewport_begin() const {
 			const auto proj = camera.get_world_to_uniformed();
+			graphic::renderer_ui& r = graphic::renderer_from_erased(this->get_renderer());
 
-			this->get_renderer().batch.push_projection(proj);
-			this->get_renderer().batch.push_viewport(this->prop().content_bound_absolute());
-			this->get_renderer().batch.push_scissor({camera.get_viewport()});
+			r.batch.push_projection(proj);
+			r.batch.push_viewport(this->prop().content_bound_absolute());
+			r.batch.push_scissor({camera.get_viewport()});
 		}
 
 		void viewport_end() const {
-			this->get_renderer().batch.pop_scissor();
-			this->get_renderer().batch.pop_viewport();
-			this->get_renderer().batch.pop_projection();
+			graphic::renderer_ui& r = graphic::renderer_from_erased(this->get_renderer());
+
+			r.batch.pop_scissor();
+			r.batch.pop_viewport();
+			r.batch.pop_projection();
 		}
 
 		[[nodiscard]] math::vec2 get_transferred_pos(const math::vec2 pos) const noexcept{

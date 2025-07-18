@@ -52,7 +52,7 @@ namespace mo_yanxi::game::world{
 
 			void on_click(ui::input_event::click click);
 
-			void draw(const ui::elem& elem, graphic::renderer_ui& renderer) const;
+			void draw(const ui::elem& elem, graphic::renderer_ui_ref renderer) const;
 
 			void update(float delta_in_tick){
 				if(confirm_animation_progress_ >= 0){

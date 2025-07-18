@@ -11,7 +11,7 @@ import mo_yanxi.game.ecs.component.hit_point;
 import mo_yanxi.game.ecs.component.drawer;
 import mo_yanxi.ui.elem.table;
 
-// import mo_yanxi.graphic.renderer.predecl;
+import mo_yanxi.graphic.renderer.predecl;
 
 
 import mo_yanxi.type_map;
@@ -161,7 +161,7 @@ namespace mo_yanxi::game::meta::chamber{
 		virtual void draw(
 			const basic_chamber& meta,
 			math::frect region,
-			graphic::renderer_ui& renderer_ui,
+			graphic::renderer_ui_ref renderer_ui,
 			const graphic::camera2& camera
 		) const{
 
@@ -208,7 +208,7 @@ namespace mo_yanxi::game::meta::chamber{
 			return std::nullopt;
 		}
 
-		virtual void draw(math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const{
+		virtual void draw(math::frect region, graphic::renderer_ui_ref renderer_ui, const graphic::camera2& camera) const{
 
 		}
 
@@ -323,7 +323,7 @@ namespace mo_yanxi::game::meta::chamber{
 			return deduced_get_energy_consumption();
 		}
 
-		void draw(math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const override;
+		void draw(math::frect region, graphic::renderer_ui_ref renderer_ui, const graphic::camera2& camera) const override;
 
 		ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::manifold_ref grid, math::point2 where) const override;
 
@@ -334,7 +334,7 @@ namespace mo_yanxi::game::meta::chamber{
 
 			void install(ecs::chamber::build_ref build_ref) override;
 
-			void draw(const basic_chamber& meta, math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const override;
+			void draw(const basic_chamber& meta, math::frect region, graphic::renderer_ui_ref renderer_ui, const graphic::camera2& camera) const override;
 
 			ui_build_handle build_ui(ui::table& table, ui_edit_context& context) override;
 

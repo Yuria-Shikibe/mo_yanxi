@@ -144,13 +144,13 @@ void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opaci
 
 	draw::fill::rect_ortho(
 			acq.get(),
-			charging_region.copy().shrink(2),
+			charging_region.copy().shrink(1, 2).move_x(0.5),
 			charging_color
 		);
 
 	draw::fill::rect_ortho(
 			acq.get(),
-			math::frect{charging_region.vert_10(), region.src + bar_unit_extent.copy().scl(i, 0) + bar_unit_extent}.shrink(2),
+			math::frect{charging_region.vert_10(), region.src + bar_unit_extent.copy().scl(i, 0) + bar_unit_extent}.shrink(1, 2).move_x(-0.5),
 			get_unused_color()
 		);
 

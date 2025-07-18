@@ -16,7 +16,7 @@ import :group;
 namespace mo_yanxi{
 	void ui::debug_elem_drawer::draw(const elem& element, rect region, float opacityScl) const{
 		using namespace graphic;
-		draw_acquirer acquirer{element.get_renderer().batch, graphic::draw::white_region};
+		draw_acquirer acquirer{renderer_from_erased(element.get_renderer()).batch, graphic::draw::white_region};
 		draw::line::rect_ortho(acquirer, region);
 
 		if(element.cursor_state.focused){
@@ -24,7 +24,7 @@ namespace mo_yanxi{
 		}
 	}
 
-	graphic::renderer_ui& ui::elem::get_renderer() const noexcept{
+	graphic::renderer_ui_ref ui::elem::get_renderer() const noexcept{
 		return *get_scene()->renderer;
 	}
 

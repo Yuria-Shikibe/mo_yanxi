@@ -21,7 +21,7 @@ import mo_yanxi.open_addr_hash_map;
 import mo_yanxi.graphic.camera;
 
 //TODO isolate this in future
-import mo_yanxi.graphic.renderer.ui;
+import mo_yanxi.graphic.renderer.predecl;
 
 import std;
 
@@ -128,7 +128,7 @@ namespace mo_yanxi::ui{
 		std::unordered_set<elem*> asyncTaskOwners{};
 
 	public:
-		graphic::renderer_ui* renderer{};
+		graphic::renderer_ui_ptr renderer{};
 		graphic::camera2* focused_camera{};
 
 		tooltip_manager tooltip_manager{};
@@ -139,7 +139,7 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] scene_base(
 			const std::string_view name,
 			const owner<basic_group*> root,
-			graphic::renderer_ui* renderer = nullptr)
+			graphic::renderer_ui_ptr renderer = nullptr)
 			: name{name},
 			  root{root},
 			renderer(renderer)
@@ -186,7 +186,7 @@ namespace mo_yanxi::ui{
 		[[nodiscard]] explicit scene(
 			std::string_view name,
 			owner<basic_group*> root,
-			graphic::renderer_ui* renderer = nullptr
+			graphic::renderer_ui_ptr renderer = nullptr
 		);
 
 		~scene();

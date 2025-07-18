@@ -6,6 +6,8 @@ export module mo_yanxi.ui.elem.list;
 
 export import mo_yanxi.ui.primitives;
 export import mo_yanxi.ui.celled_group;
+export import mo_yanxi.game.ui.bars;
+export import mo_yanxi.game.ui.chamber_ui_elem;
 import std;
 
 namespace mo_yanxi::ui{

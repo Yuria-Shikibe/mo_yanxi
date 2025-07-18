@@ -9,7 +9,7 @@ void mo_yanxi::ui::slider::draw_content(const rect clipSpace) const{
 
 	using namespace graphic;
 
-	draw_acquirer param{get_renderer().get_batch(), draw::white_region};
+	draw_acquirer param = get_draw_acquirer(get_renderer());
 
 	param.proj.mode_flag = draw::mode_flags::sdf;
 	rect rect{get_bar_size()};

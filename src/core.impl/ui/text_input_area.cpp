@@ -7,7 +7,7 @@ void mo_yanxi::ui::text_input_area::draw_content(const rect clipSpace) const{
 	if(caret_){
 		auto off2 = get_glyph_abs_src();
 
-		draw_acquirer param{get_renderer().get_batch(), draw::white_region};
+		draw_acquirer param = get_draw_acquirer(get_renderer());
 		if(caret_->shouldBlink()){
 			const color caret_Color =
 				(on_failed() ? colors::red_dusted : colors::white).copy().mul_a(gprop().get_opacity());

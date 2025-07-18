@@ -34,13 +34,7 @@ namespace mo_yanxi::ui{
 		}
 
 		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{
-			math::vec2 bound{extent.potential_extent()};
-
-			bound -= property.boarder.extent();
-			bound.max({});
-
-			auto rst = layout_text(bound);
-			return (rst + property.boarder.extent());
+			return layout_text(extent.potential_extent());
 		}
 
 		void set_text(std::string_view text){

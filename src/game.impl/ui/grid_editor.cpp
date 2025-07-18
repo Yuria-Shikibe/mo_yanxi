@@ -61,8 +61,8 @@ void mo_yanxi::game::ui::grid_editor_viewport::grid_info_bar::draw_content(const
 
 void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace) const{
 	viewport_begin();
-	auto& r = get_renderer();
 	using namespace graphic;
+	auto& r = renderer_from_erased(get_renderer());
 	auto acquirer{mo_yanxi::ui::get_draw_acquirer(r)};
 
 
@@ -78,7 +78,7 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 		draw::line::quad_expanded(acquirer, comp.crop().view_as_quad(), -4, colors::light_gray.copy().set_a(.35));
 	}
 
-	grid.draw(get_renderer(), camera);
+	grid.draw(r, camera);
 
 	acquirer.proj.mode_flag = {};
 	acquirer.proj.set_layer(ui::draw_layers::def);

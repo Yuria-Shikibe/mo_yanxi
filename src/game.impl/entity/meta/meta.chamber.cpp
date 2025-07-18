@@ -241,7 +241,7 @@ mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::turret_ba
 	return add_build<ecs::chamber::turret_build>(*this, grid, where, extent);
 }
 
-void mo_yanxi::game::meta::chamber::radar::draw(math::frect region, graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const{
+void mo_yanxi::game::meta::chamber::radar::draw(math::frect region, graphic::renderer_ui_ref renderer_ui, const graphic::camera2& camera) const{
 	basic_chamber::draw(region, renderer_ui, camera);
 
 }
@@ -266,7 +266,7 @@ void mo_yanxi::game::meta::chamber::radar::radar_instance_data::install(ecs::cha
 }
 
 void mo_yanxi::game::meta::chamber::radar::radar_instance_data::draw(const basic_chamber& meta, math::frect region,
-                                                                     graphic::renderer_ui& renderer_ui, const graphic::camera2& camera) const{
+                                                                     graphic::renderer_ui_ref renderer_ui, const graphic::camera2& camera) const{
 	chamber_instance_data::draw(meta, region, renderer_ui, camera);
 
 	auto& m = static_cast<const radar&>(meta);

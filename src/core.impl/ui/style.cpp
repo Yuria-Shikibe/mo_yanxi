@@ -28,7 +28,7 @@ namespace mo_yanxi{
 	void ui::style::round_style::draw(const elem& element, math::frect region, float opacityScl) const{
 		using namespace graphic;
 
-		draw_acquirer acquirer{element.get_renderer().get_batch(), {}};
+		draw_acquirer acquirer{renderer_from_erased(element.get_renderer()).get_batch(), {}};
 		acquirer.proj.mode_flag = vk::vertices::mode_flag_bits::sdf;
 
 

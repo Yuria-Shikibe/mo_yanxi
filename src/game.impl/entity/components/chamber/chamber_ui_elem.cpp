@@ -2,20 +2,21 @@ module mo_yanxi.game.ui.chamber_ui_elem;
 
 import mo_yanxi.ui.graphic;
 
-void mo_yanxi::game::ui::build_tile_status_elem::draw_content(const rect clipSpace) const{
-	auto acq = mo_yanxi::ui::get_draw_acquirer(get_renderer());
+void mo_yanxi::game::ui::build_tile_status_drawer::draw(
+	ui::rect region, float opacity,
+	graphic::renderer_ui_ref renderer, const ecs::chamber::building_data& data) {
+
+	auto acq = mo_yanxi::ui::get_draw_acquirer(renderer);
 	// acq.proj.set_layer(ui::draw_layers::base);
 	using namespace graphic;
-	auto& data = building_data.data();
 	auto sz = data.region().size();
 	bool swap = sz.x < sz.y;
 	if(swap)sz.swap_xy();
 
-	const auto unit_size = get_unit_size(content_size(), sz);
+	const auto unit_size = get_unit_size(region.size(), sz);
 	const auto unit_rect = math::frect{0.f, 0.f, unit_size, unit_size}.shrink(2);
 
 	auto building_max_individual = data.get_tile_individual_max_hitpoint();
-	const auto opacity = gprop().get_opacity();
 
 	acq.proj.mode_flag = draw::mode_flags::slide_line;
 	for(int y = 0; y < sz.y; ++y){
@@ -23,12 +24,12 @@ void mo_yanxi::game::ui::build_tile_status_elem::draw_content(const rect clipSpa
 			auto& status = data.tile_states[swap ? (x * sz.y + y) : (y * sz.x + x)];
 
 			auto rect = unit_rect.copy().scl_size(status.valid_structure_hit_point / building_max_individual, 1);
-			draw::fill::rect_ortho(acq.get(), rect.move(content_src_pos() + math::vector2{x, y}.as<float>() * unit_size),
-			                       (status.valid_hit_point < building_max_individual *
-			                        ecs::chamber::tile_status::threshold_factor
-				                        ? colors::danger
-				                        : colors::light_gray)
-				                        .to_neutralize_light().set_a(opacity));
+			draw::fill::rect_ortho(acq.get(), rect.move(region.src + math::vector2{x, y}.as<float>() * unit_size),
+								   (status.valid_hit_point < building_max_individual *
+									ecs::chamber::tile_status::threshold_factor
+										? colors::danger
+										: colors::light_gray)
+										.to_neutralize_light().set_a(opacity));
 		}
 	}
 
@@ -39,7 +40,7 @@ void mo_yanxi::game::ui::build_tile_status_elem::draw_content(const rect clipSpa
 			auto& status = data.tile_states[swap ? (x * sz.y + y) : (y * sz.x + x)];
 
 			auto rect = unit_rect.copy().scl_size(status.valid_hit_point / building_max_individual, 1);
-			draw::fill::rect_ortho(acq.get(), rect.move(content_src_pos() + math::vector2{x, y}.as<float>() * unit_size),
+			draw::fill::rect_ortho(acq.get(), rect.move(region.src + math::vector2{x, y}.as<float>() * unit_size),
 				(colors::red_dusted.create_lerp(colors::pale_green, build_total_health_factor)).to_neutralize_light().set_a(opacity));
 		}
 	}
@@ -65,7 +66,7 @@ void mo_yanxi::game::ui::chamber_ui_elem::build(){
 	{
 		auto elem = end_line().emplace<build_tile_status_elem>();
 		elem->set_style();
-		elem->building_data = chamber_entity;
+		elem->entity = chamber_entity;
 
 		status_ = std::to_address(elem);
 	}

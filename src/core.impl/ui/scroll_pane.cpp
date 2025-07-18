@@ -9,7 +9,7 @@ void mo_yanxi::ui::scroll_pane::draw_pre(const rect clipSpace) const{
 	const bool enableHori = enable_hori_scroll();
 	const bool enableVert = enable_vert_scroll();
 
-	if(enableHori || enableVert)get_renderer().batch.push_scissor({get_viewport().shrink(8, 8), 16});
+	if(enableHori || enableVert)graphic::renderer_from_erased(get_renderer()).batch.push_scissor({get_viewport().shrink(8, 8), 16});
 }
 
 void mo_yanxi::ui::scroll_pane::draw_post(const rect clipSpace) const{
@@ -19,10 +19,11 @@ void mo_yanxi::ui::scroll_pane::draw_post(const rect clipSpace) const{
 	const bool enableVert = enable_vert_scroll();
 
 	using namespace graphic;
+	auto& r = renderer_from_erased(get_renderer());
 
-	if(enableHori || enableVert)get_renderer().batch.pop_scissor();
+	if(enableHori || enableVert)r.batch.pop_scissor();
 
-	draw_acquirer param{get_renderer().get_batch(), draw::white_region};
+	draw_acquirer param{r.batch, draw::white_region};
 	param.proj.mode_flag = vk::vertices::mode_flag_bits::sdf;
 
 	if(enableHori){

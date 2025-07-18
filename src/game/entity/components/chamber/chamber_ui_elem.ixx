@@ -13,9 +13,9 @@ import std;
 namespace mo_yanxi::game::ui{
 	export using namespace mo_yanxi::ui;
 
-	struct build_tile_status_elem : ui::elem{
+	export
+	struct build_tile_status_drawer{
 		static constexpr float chunk_max_draw_size = 64;
-		ecs::chamber::building_ref building_data{};
 
 	private:
 		template <typename T = int>
@@ -24,19 +24,13 @@ namespace mo_yanxi::game::ui{
 			auto min = math::min(self_extent.x, self_extent.y);
 			return std::min(chunk_max_draw_size, min);
 		}
+
 	public:
-		bool is_transposed() const noexcept{
-			return building_data.data().region().width() < building_data.data().region().height();
+		[[nodiscard]] constexpr static bool is_transposed(const math::isize2 size) noexcept{
+			return size.x < size.y;
 		}
 
-		[[nodiscard]] build_tile_status_elem(scene* scene, group* group)
-			: elem(scene, group){
-		}
-
-		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{
-			auto size = clip_boarder_from(extent);
-
-			auto region = building_data.data().region().size();
+		static math::vec2 get_required_extent(optional_mastering_extent size, math::isize2 region){
 			if(region.x < region.y){
 				region.swap_xy();
 			}
@@ -54,15 +48,32 @@ namespace mo_yanxi::game::ui{
 				auto usz = region.as<float>() * get_unit_size(sz, region);
 
 				if(size.width_mastering()){
-					return math::vec2{size.potential_width(), usz.y} + prop().boarder.extent();
+					return math::vec2{size.potential_width(), usz.y};
 				}else{
-					return math::vec2{usz.x, size.potential_height()} + prop().boarder.extent();
+					return math::vec2{usz.x, size.potential_height()};
 				}
 			}
 		}
 
-		void draw_content(const rect clipSpace) const override;
+		static void draw(ui::rect region, float opacity, graphic::renderer_ui_ref renderer, const ecs::chamber::building_data& data);
 	};
+
+	struct build_tile_status_elem : ui::elem{
+		ecs::chamber::building_ref entity{};
+
+		[[nodiscard]] build_tile_status_elem(scene* scene, group* group)
+			: elem(scene, group){
+		}
+
+		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent size) override{
+			return build_tile_status_drawer::get_required_extent(size, entity.data().region().size());
+		}
+
+		void draw_content(const rect clipSpace) const override{
+			build_tile_status_drawer::draw(get_content_bound(), gprop().get_opacity(), get_renderer(), entity.data());
+		}
+	};
+
 	export
 	struct chamber_ui_elem : ui::table{
 	private:

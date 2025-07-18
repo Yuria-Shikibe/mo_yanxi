@@ -3,13 +3,16 @@ module mo_yanxi.ui.primitives;
 import :scene;
 
 import mo_yanxi.basic_util;
+import mo_yanxi.graphic.renderer.ui;
 
 void mo_yanxi::ui::dialog_manager::draw_all(rect clipspace) const{
 
+	auto& batch = graphic::renderer_from_erased(scene_->renderer)->batch;
+
 	for (auto dialog : draw_sequence){
 		dialog->try_draw(clipspace);
-		scene_->renderer->batch->consume_all();
-		scene_->renderer->batch.blit_viewport(dialog->get_bound());
+		batch->consume_all();
+		batch.blit_viewport(dialog->get_bound());
 	}
 
 }

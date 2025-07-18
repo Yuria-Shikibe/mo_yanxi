@@ -1059,8 +1059,8 @@ namespace mo_yanxi::game{
 				void draw_content(const rect clipSpace) const override{
 					viewport_begin();
 
-					auto& r = get_renderer();
 					using namespace graphic;
+					auto& r = renderer_from_erased(get_renderer());
 					draw_acquirer acquirer{ui::get_draw_acquirer(r)};
 
 

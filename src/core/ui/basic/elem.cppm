@@ -27,7 +27,7 @@ export import mo_yanxi.ui.action;
 export import mo_yanxi.core.ctrl.constants;
 
 //TODO isolate this in future
-export import mo_yanxi.graphic.renderer.ui;
+export import mo_yanxi.graphic.renderer.predecl;
 
 
 import mo_yanxi.spreadable_event_handler;
@@ -100,12 +100,6 @@ namespace mo_yanxi::ui{
 			return inherent_opacity * context_opacity;
 		}
 
-		// [[nodiscard]] constexpr Graphic::Color getScaledColor() const noexcept{
-		// 	return style_color.copy().mulA(getOpacity());
-		// }
-
-		// mutable Graphic::Color tmpColor{};
-		//TODO drawer
 	};
 
 	export
@@ -208,7 +202,7 @@ namespace mo_yanxi::ui{
 		math::vec2 relative_src{};
 		math::vec2 absolute_src{};
 
-		math::vector2<bool> fill_parent{};
+		math::bool2 fill_parent{};
 		bool maintain_focus_until_mouse_drop{};
 
 		clamped_fsize size{};
@@ -312,7 +306,6 @@ namespace mo_yanxi::ui{
 		std::queue<std::unique_ptr<action::action<elem>>> actions{};
 
 	public:
-		ElemDynamicChecker<elem> checkers{};
 		//state
 		//TODO using a bit flags?
 		bool activated{}; //TODO as graphic property? / rename it
@@ -326,6 +319,8 @@ namespace mo_yanxi::ui{
 		//Layout Spec
 		layout_state layout_state{};
 		interactivity interactivity{interactivity::enabled};
+
+		ElemDynamicChecker<elem> checkers{};
 
 	protected:
 		[[nodiscard]] elem_fields() = default;
@@ -371,7 +366,7 @@ namespace mo_yanxi::ui{
 
 		// [[nodiscard]] Graphic::Batch_Direct& getBatch() const noexcept;
 		//
-		[[nodiscard]] graphic::renderer_ui& get_renderer() const noexcept;
+		[[nodiscard]] graphic::renderer_ui_ref get_renderer() const noexcept;
 
 		[[nodiscard]] const cursor_states& get_cursor_state() const noexcept{
 			return cursor_state;
@@ -612,16 +607,16 @@ namespace mo_yanxi::ui{
 		}
 
 		[[nodiscard]] constexpr stated_extent clip_boarder_from(stated_extent extent) const noexcept{
-			if(extent.width.mastering()){extent.width.value = math::clamp_positive(extent.width.value - property.boarder.width());}
-			if(extent.height.mastering()){extent.height.value = math::clamp_positive(extent.height.value - property.boarder.height());}
+			if(extent.width.mastering()){extent.width.value = std::fdim(extent.width.value, property.boarder.width());}
+			if(extent.height.mastering()){extent.height.value = std::fdim(extent.height.value, property.boarder.height());}
 
 			return extent;
 		}
 
 		[[nodiscard]] optional_mastering_extent clip_boarder_from(optional_mastering_extent extent) const noexcept{
 			auto [dx, dy] = extent.get_dependent();
-			if(dx)extent.set_width(math::clamp_positive(extent.potential_width() - property.boarder.width()));
-			if(dy)extent.set_height(math::clamp_positive(extent.potential_height() - property.boarder.height()));
+			if(dx)extent.set_width(std::fdim(extent.potential_width(), property.boarder.width()));
+			if(dy)extent.set_height(std::fdim(extent.potential_height(), property.boarder.height()));
 
 			return extent;
 		}
@@ -640,7 +635,9 @@ namespace mo_yanxi::ui{
 	public:
 
 		std::optional<math::vec2> pre_acquire_size(optional_mastering_extent extent){
-			return pre_acquire_size_impl(extent).transform([this](const math::vec2 v){return property.size.clamp(v);});
+			return pre_acquire_size_impl(clip_boarder_from(extent)).transform([&, this](const math::vec2 v){
+				return property.size.clamp(v + prop().boarder.extent()).min(extent.potential_extent());
+			});
 		}
 
 	protected:
@@ -767,6 +764,10 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] rect get_bound() const noexcept{
 			return prop().bound_absolute();
+		}
+
+		[[nodiscard]] rect get_content_bound() const noexcept{
+			return prop().content_bound_absolute();
 		}
 
 

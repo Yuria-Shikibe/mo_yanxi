@@ -9,7 +9,7 @@ import mo_yanxi.ui.graphic;
 
 void mo_yanxi::ui::progress_bar_drawer::draw(const progress_bar& elem) const{
 	using namespace graphic;
-	draw_acquirer param{elem.get_renderer().get_batch(), draw::white_region};
+	draw_acquirer param{renderer_from_erased(elem.get_renderer()).get_batch(), draw::white_region};
 
 	float progress = elem.get_progress().current;
 	auto region = get_region(elem);

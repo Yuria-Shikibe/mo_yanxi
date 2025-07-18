@@ -21,7 +21,7 @@ import mo_yanxi.basic_util;
 
 namespace mo_yanxi::game{
 	void draw_path(
-		graphic::renderer_ui& renderer,
+		graphic::renderer_ui_ref renderer,
 		math::trans2 cur_pos,
 		std::optional<math::trans2> next_pos,
 		const path_seq& current_path,
@@ -153,7 +153,7 @@ void mo_yanxi::game::world::hud::path_editor::on_click(ui::input_event::click cl
     }
 }
 
-void mo_yanxi::game::world::hud::path_editor::draw(const ui::elem& elem, graphic::renderer_ui& renderer) const{
+void mo_yanxi::game::world::hud::path_editor::draw(const ui::elem& elem, graphic::renderer_ui_ref renderer) const{
 
 
 	auto draw_acquirer = ui::get_draw_acquirer(renderer);
@@ -267,12 +267,14 @@ void mo_yanxi::game::world::hud::hud_viewport::draw_content(const ui::rect clipS
 
 	draw::line::square(draw_acquirer, {get_scene()->get_cursor_pos(), 45.f * math::deg_to_rad}, 32, 2, ui::theme::colors::theme);
 
-	get_renderer().batch.push_projection(context.graphic_context->renderer().camera.get_world_to_uniformed());
+	auto& renderer = renderer_from_erased(get_renderer());
+
+	renderer.batch.push_projection(context.graphic_context->renderer().camera.get_world_to_uniformed());
 
 	if(main_selected){
 
 		if(auto building = main_selected->try_get<ecs::chamber::chamber_manifold>()){
-			building->draw_hud(get_renderer());
+			building->draw_hud(renderer);
 		}
 
 		if(auto manifold = main_selected->try_get<ecs::manifold>()){
@@ -284,8 +286,8 @@ void mo_yanxi::game::world::hud::hud_viewport::draw_content(const ui::rect clipS
 		}
 	}
 
-	get_renderer().batch.pop_projection();
-	get_renderer().batch.blit_viewport(prop().content_bound_absolute());
+	renderer.batch.pop_projection();
+	renderer.batch.blit_viewport(prop().content_bound_absolute());
 
 
 	manual_table::draw_content(clipSpace);
