@@ -240,7 +240,7 @@ namespace mo_yanxi::graphic::draw{
 
 		batch_draw_param<Vtx, UV, Proj> get_reserved(std::size_t reserve = 8) noexcept{
 			if(current == sentinel){
-				acquire(1);
+				acquire(reserve);
 			}
 
 			auto rst = this->operator*();

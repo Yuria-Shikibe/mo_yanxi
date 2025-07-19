@@ -98,43 +98,35 @@ namespace mo_yanxi::ui{
 		}
 
 		void draw() const{
-			assert(focus != nullptr);
-			focus->root_draw();
+			if(focus)focus->root_draw();
 		}
 
 		void update(const float delta_in_ticks) const{
-			assert(focus != nullptr);
-			focus->update(delta_in_ticks);
+			if(focus)focus->update(delta_in_ticks);
 		}
 
 		void layout() const{
-			assert(focus != nullptr);
-			focus->layout();
+			if(focus)focus->layout();
 		}
 
 		void input_key(const int key, const int action, const int mode) const{
-			assert(focus != nullptr);
-			focus->on_key_action(key, action, mode);
+			if(focus)focus->on_key_action(key, action, mode);
 		}
 
 		void input_scroll(const float x, const float y) const{
-			assert(focus != nullptr);
-			focus->on_scroll({x, y});
+			if(focus)focus->on_scroll({x, y});
 		}
 
 		void input_mouse(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) const{
-			assert(focus != nullptr);
-			focus->on_mouse_action(key, action, mode);
+			if(focus)focus->on_mouse_action(key, action, mode);
 		}
 
 		void input_unicode(const char32_t val) const{
-			assert(focus != nullptr);
-			focus->on_unicode_input(val);
+			if(focus)focus->on_unicode_input(val);
 		}
 
 		void cursor_pos_update(const float x, const float y) const{
-			assert(focus != nullptr);
-			focus->on_cursor_pos_update({x, y}, false);
+			if(focus)focus->on_cursor_pos_update({x, y}, false);
 		}
 
 		scene* get_scene(const std::string_view sceneName){

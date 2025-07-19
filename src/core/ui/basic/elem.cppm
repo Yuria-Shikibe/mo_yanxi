@@ -103,6 +103,17 @@ namespace mo_yanxi::ui{
 	};
 
 	export
+	struct independent_draw_state{
+		float depth;
+
+		constexpr auto operator<=>(const independent_draw_state& rhs) const noexcept{
+			return depth <=> rhs.depth;
+		}
+
+		constexpr bool operator==(const independent_draw_state&) const = default;
+	};
+
+	export
 	template <typename T>
 	struct ElemDynamicChecker{
 	private:
@@ -731,6 +742,13 @@ namespace mo_yanxi::ui{
 		virtual void draw_content(const rect clipSpace) const{
 			draw_background();
 		}
+
+		virtual void draw_independent() const {
+
+		}
+
+		bool insert_independent_draw(independent_draw_state state) const;
+		bool erase_independent_draw() const noexcept;
 
 		void tooltip_on_drop() override{
 			stated_tooltip_owner::tooltip_on_drop();

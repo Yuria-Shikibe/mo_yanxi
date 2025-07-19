@@ -25,9 +25,7 @@ namespace mo_yanxi::io{
 	template <>
 	struct loader_impl<game::meta::hitbox> : loader_base<pb::game::hitbox_meta, game::meta::hitbox>{
 		static void store(buffer_type& buf, const value_type& data){
-			auto transformer = data | std::views::transform([](const value_type::comp& meta){
-				return io::pack(meta);
-			});
+			auto transformer = data | std::views::transform(io::pack<value_type::comp>);
 
 			buf.mutable_comps()->Assign(transformer.begin(), transformer.end());
 		}

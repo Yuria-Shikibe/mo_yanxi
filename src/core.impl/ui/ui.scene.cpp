@@ -73,6 +73,20 @@ mo_yanxi::ui::scene::~scene(){
 	else root->set_scene(nullptr);
 }
 
+bool mo_yanxi::ui::scene::insert_independent_draw(const elem& elem, independent_draw_state state){
+	if(std::ranges::contains(independent_draw_, std::addressof(elem), &independent_draw_entry::elem)){
+		return false;
+	}
+
+	auto lowerbound = std::ranges::lower_bound(independent_draw_, state, std::ranges::greater{}, &independent_draw_entry::state);
+	independent_draw_.insert(lowerbound, {std::addressof(elem), state});
+	return true;
+}
+
+bool mo_yanxi::ui::scene::erase_independent_draw(const elem* elem) noexcept{
+	return algo::erase_unique_unstable(independent_draw_, elem, &independent_draw_entry::elem);
+}
+
 // void mo_yanxi::ui::scene::setIMEPos(Geom::Point2 pos) const{
 // 	pos += this->pos.as<int>();
 // 	Core::Spec::setInputMethodEditor(Core::Global::window->getNative(), pos.x, size.y - pos.y);
@@ -95,6 +109,7 @@ void mo_yanxi::ui::scene::drop_all_focus(const elem* target){
 	std::erase(lastInbounds, target);
 	asyncTaskOwners.erase(const_cast<elem*>(target));
 	independentLayout.erase(const_cast<elem*>(target));
+	erase_independent_draw(target);
 	// tooltipManager.requestDrop(*target);
 }
 
@@ -331,10 +346,17 @@ void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 			renderer.batch->consume_all();
 			renderer.batch.blit_viewport(elem->get_bound());
 		}
+
+		for (const auto & independent_draw : independent_draw_){
+			independent_draw.elem->draw_independent();
+
+		}
+
+		renderer.batch.blit_viewport(get_region());
+
 	}else{
 		dialog_manager.draw_all(clipSpace);
 	}
-
 
 	for (auto&& elem : tooltip_manager.get_draw_sequence()){
 		if(!elem.belowScene){

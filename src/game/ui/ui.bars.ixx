@@ -222,6 +222,7 @@ namespace mo_yanxi::game::ui{
 		int power_current;
 		int power_total;
 		unsigned power_assigned;
+		unsigned power_valid;
 
 		float charge;
 		float charge_duration;

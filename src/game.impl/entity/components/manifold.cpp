@@ -21,7 +21,7 @@ namespace mo_yanxi::game::ecs{
 		chamber::chamber_manifold& obj_grid
 		) noexcept{
 
-		math::frect_box hitter_box = hitter.manifold->hitbox[intersection.index.obj_idx];
+		math::frect_box hitter_box = hitter.manifold->hitbox[intersection.index.sbj_idx];
 
 		const auto correction = -receiver.manifold->hitbox.get_back_trace_move();//receiver.manifold->is_under_correction ? -receiver.manifold->hitbox.get_back_trace_move() : receiver.motion->pos() - hitter.manifold->hitbox.get_trans().vec;
 		const auto move = hitter.manifold->hitbox.get_back_trace_move_full();

@@ -507,6 +507,7 @@ namespace mo_yanxi::ui{
 	struct text_input_area : label{
 		[[nodiscard]] text_input_area(scene* scene, group* group)
 			: label(scene, group){
+			interactivity = interactivity::enabled;
 			property.maintain_focus_until_mouse_drop = true;
 			parser = &font::typesetting::global_empty_parser;
 		}

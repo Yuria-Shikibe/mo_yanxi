@@ -5,7 +5,6 @@
 export module mo_yanxi.game.meta.grid.srl;
 
 export import mo_yanxi.game.meta.chamber;
-export import mo_yanxi.game.meta.grid;
 export import mo_yanxi.game.srl;
 
 import std;

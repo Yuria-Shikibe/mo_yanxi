@@ -1,29 +1,41 @@
-//
-// Created by Matrix on 2025/7/18.
-//
+
 
 export module mo_yanxi.game.ui.building_pane;
 
 export import mo_yanxi.ui.primitives;
 
-import mo_yanxi.ui.primitives;
-import mo_yanxi.ui.elem.list;
+import mo_yanxi.game.ecs.component.chamber;
 
+import mo_yanxi.ui.elem.list;
+import mo_yanxi.ui.elem.label;
+import mo_yanxi.game.ui.chamber_ui_elem;
 import mo_yanxi.game.ui.bars;
 
 import std;
+
 namespace mo_yanxi::game::ui{
 	export using namespace mo_yanxi::ui;
 
 	struct building_info_pane{
-		static constexpr float size_hp_bar = 30;
-		static constexpr float size_energy_bar = 30;
-		static constexpr float size_reload_bar = 30;
 
-		energy_bar_drawer energy_bar;
-		stalled_hp_bar_drawer hp_bar;
+		static constexpr float size_hp_bar = 20;
+		static constexpr float size_energy_bar = 20;
+		static constexpr float size_reload_bar = 20;
 
-		std::optional<reload_bar_drawer> reload_bar;
+
+
+		ecs::chamber::building_entity_ref entity{};
+
+		energy_bar_drawer energy_bar{};
+		stalled_hp_bar_drawer hp_bar{};
+
+		std::optional<reload_bar_drawer> reload_bar{};
+
+		[[nodiscard]] building_info_pane() = default;
+
+		[[nodiscard]] explicit building_info_pane(const ecs::chamber::building_entity_ref& entity)
+					: entity(entity){
+		}
 
 		void set_reload(float progress){
 			if(!reload_bar){
@@ -33,11 +45,14 @@ namespace mo_yanxi::game::ui{
 			reload_bar->current_reload_value = progress;
 		}
 
-		void set_state(const ecs::chamber::building_data& data){
+		void set_state(){
+			if(!entity)return;
+			auto& data = entity.data();
 			energy_bar.set_bar_state({
 				.power_current = data.get_energy_dynamic_status().power,
 				.power_total = data.energy_status.power,
 				.power_assigned = data.assigned_energy,
+				.power_valid = static_cast<unsigned>(std::abs(data.get_max_usable_energy())),
 				.charge = data.get_energy_dynamic_status().charge,
 				.charge_duration = data.energy_status.charge_duration
 			});
@@ -56,10 +71,13 @@ namespace mo_yanxi::game::ui{
 			if(reload_bar)reload_bar->update(delta_in_tick);
 		}
 
-		float acquire_size(float major_size){
+		[[nodiscard]] float acquire_size(float major_size) const noexcept{
 			auto sum = size_hp_bar;
 			if(energy_bar)sum += size_energy_bar;
 			if(reload_bar)sum += size_reload_bar;
+			if(entity){
+				sum += build_tile_status_drawer::get_required_extent({major_size, std::numeric_limits<float>::infinity()}, entity.data().region().extent()).y;
+			}
 			return sum;
 		}
 
@@ -78,14 +96,19 @@ namespace mo_yanxi::game::ui{
 				reload_bar->draw(math::frect{tags::from_extent, offset, {region.width(), size_reload_bar}}, opacity, renderer);
 				offset.add_y(size_reload_bar);
 			}
+
+			if(entity){
+				build_tile_status_drawer::draw(math::frect{offset, region.get_end()}, opacity, renderer, entity.data());
+			}
 		}
 	};
 
 	struct bars_pane : ui::elem{
 		building_info_pane info{};
 
-		[[nodiscard]] bars_pane(scene* scene, group* group)
-			: elem(scene, group){
+		[[nodiscard]] bars_pane(scene* scene, group* group, ecs::chamber::building_entity_ref entity)
+			: elem(scene, group), info(std::move(entity)){
+			interactivity = interactivity::disabled;
 		}
 
 	protected:
@@ -94,6 +117,7 @@ namespace mo_yanxi::game::ui{
 		}
 
 		void update(float delta_in_ticks) override{
+			info.set_state();
 			info.update(delta_in_ticks);
 		}
 
@@ -108,31 +132,60 @@ namespace mo_yanxi::game::ui{
 		[[nodiscard]] building_pane(
 			scene* scene,
 			group* parent,
-			ecs::chamber::building_entity_ref entity = {})
+			ecs::chamber::building_entity_ref e = {})
 			: list(scene, parent),
-			  entity(std::move(entity)){
+			  entity(std::move(e)){
+			interactivity = interactivity::enabled;
 
-			auto p = emplace<bars_pane>();
-			p->info.set_state(this->entity.data());
-			p->set_style();
-			p.cell().set_external();
+
+			auto name = emplace<ui::label>();
+			name->set_fit();
+			name->set_style();
+			name->prop().boarder.set(4);
+			name.cell().pad.set(8);
+			name.cell().set_size(40);
+
+			{
+				auto p = emplace<bars_pane>(entity);
+				p->set_style();
+				p.cell().set_external();
+
+				if(entity){
+					auto& data = this->entity.data();
+					if(auto meta = data.get_meta()){
+						name->set_text(meta->get_meta_info().name);
+					}
+					p->info.set_state();
+				}
+			}
+
+
 		}
 
 		ecs::chamber::building_entity_ref entity{};
 
 
 		[[nodiscard]] bars_pane& get_bar_pane() const noexcept{
-			return this->at<bars_pane>(0);
+			return this->at<bars_pane>(1);
 		}
 
 	private:
-		void update(float delta_in_ticks) override{
-			if(entity){
-				auto& bars = get_bar_pane();
-				bars.info.set_state(entity.data());
-			}
+		void on_focus_changed(bool is_focused) override{
+			elem::on_focus_changed(is_focused);
 
+			if(is_focused){
+				(void)insert_independent_draw({0});
+			}else{
+				(void)erase_independent_draw();
+			}
+		}
+
+		void update(float delta_in_ticks) override{
 			list::update(delta_in_ticks);
 		}
+
+		void draw_content(const rect clipSpace) const override;
+
+		void draw_independent() const override;
 	};
 }

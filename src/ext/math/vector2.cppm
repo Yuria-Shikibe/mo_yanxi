@@ -397,9 +397,6 @@ namespace mo_yanxi::math{
 		}*/
 
 		[[nodiscard]] PURE_FN FORCE_INLINE constexpr T dst2(const_pass_t other) const noexcept {
-			const T dx = math::dst_safe(x, other.x);
-			const T dy = math::dst_safe(y, other.y);
-
 			return math::dst2(x, y, other.x, other.y);
 		}
 
@@ -635,7 +632,7 @@ namespace mo_yanxi::math{
 		// }
 
 
-		FORCE_INLINE vector2& to_abs() noexcept {
+		FORCE_INLINE constexpr vector2& to_abs() noexcept {
 			if constexpr(!std::is_unsigned_v<T>) {
 				x = math::abs(x);
 				y = math::abs(y);
@@ -644,23 +641,23 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		FORCE_INLINE vector2& limit_y(const T yAbs) {
+		FORCE_INLINE constexpr vector2& limit_y(const T yAbs) {
 			y = math::clamp_range(y, yAbs);
 			return *this;
 		}
 
-		FORCE_INLINE vector2& limit_x(const T xAbs) {
+		FORCE_INLINE constexpr vector2& limit_x(const T xAbs) {
 			x = math::clamp_range(x, xAbs);
 			return *this;
 		}
 
-		FORCE_INLINE vector2& limit(const T xAbs, const T yAbs) noexcept {
+		FORCE_INLINE constexpr vector2& limit(const T xAbs, const T yAbs) noexcept {
 			this->limit_x(xAbs);
 			this->limit_y(yAbs);
 			return *this;
 		}
 
-		FORCE_INLINE vector2& limit_max_length(const T limit) noexcept {
+		FORCE_INLINE constexpr vector2& limit_max_length(const T limit) noexcept {
 			return this->limit_max_length2(limit * limit);
 		}
 
@@ -675,7 +672,7 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		FORCE_INLINE vector2& limit_min_length(const T limit) noexcept {
+		FORCE_INLINE constexpr vector2& limit_min_length(const T limit) noexcept {
 			return this->limit_min_length2(limit * limit);
 		}
 
@@ -765,7 +762,7 @@ namespace mo_yanxi::math{
 		/**
 		 * \brief clockwise rotation
 		 */
-		FORCE_INLINE constexpr vector2& rotate_rt_clockwise() noexcept requires std::is_signed_v<T> {
+		FORCE_INLINE constexpr vector2& rotate_rt_clockwise() noexcept requires (std::is_signed_v<T>) {
 			return this->set(-y, x);
 		}
 
@@ -775,7 +772,7 @@ namespace mo_yanxi::math{
 		 * @return
 		 */
 		template <mo_yanxi::arithmetic S>
-		FORCE_INLINE constexpr vector2& rotate_rt_with(const S signProv) noexcept requires std::is_signed_v<T> {
+		FORCE_INLINE constexpr vector2& rotate_rt_with(const S signProv) noexcept requires (std::is_signed_v<T>) {
 			const int sign = math::sign(signProv);
 			if(sign){
 				return this->set(y * sign, -x * sign);

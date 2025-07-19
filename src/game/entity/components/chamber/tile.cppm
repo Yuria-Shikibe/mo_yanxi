@@ -4,7 +4,9 @@ module;
 #include <gch/small_vector.hpp>
 #include <cassert>
 
-export module mo_yanxi.game.ecs.component.chamber:tile;
+export module mo_yanxi.game.ecs.component.chamber:chamber;
+
+import :grid_meta;
 
 export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.math.vector2;
@@ -13,12 +15,10 @@ export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.component.damage;
 export import mo_yanxi.game.ecs.component.hit_point;
 
-import mo_yanxi.referenced_ptr;
 export import mo_yanxi.game.ecs.component.ui.builder;
 export import mo_yanxi.graphic.renderer.ui;
 
 export import mo_yanxi.game.ecs.world.top;
-
 export import mo_yanxi.game.ecs.component.chamber.general;
 
 import std;
@@ -41,14 +41,6 @@ namespace mo_yanxi::game::ecs{
 			success,
 			damage_exhaust,
 			hitpoint_exhaust,
-
-		};
-
-		struct building_meta{
-			math::vector2<unsigned short> size;
-
-
-			//hitpoint
 		};
 
 		export
@@ -120,11 +112,13 @@ namespace mo_yanxi::game::ecs{
 		protected:
 			[[nodiscard]] float get_update_delta() const noexcept;
 
+		public:
 			[[nodiscard]] math::vec2 get_local_to_global(math::vec2 p) const noexcept;
+
 			[[nodiscard]] math::trans2 get_local_to_global_trans(math::vec2 p) const noexcept;
+
 			[[nodiscard]] math::trans2 get_local_to_global_trans(math::trans2 p) const noexcept;
 
-		public:
 			[[nodiscard]] building_data& data() const noexcept{
 				assert(data_ != nullptr);
 				return *data_;
@@ -181,6 +175,7 @@ namespace mo_yanxi::game::ecs{
 			using base_types = std::tuple<building, ui_builder, Bases ...>;
 		};
 
+		export
 		struct building_data{
 			friend chamber_grid;
 			friend chamber_manifold;
@@ -322,6 +317,8 @@ namespace mo_yanxi::game::ecs{
 			}
 
 			[[nodiscard]] math::trans2 get_trans() const noexcept;
+
+			[[nodiscard]] const meta::chamber::grid_building* get_meta() const noexcept;
 		};
 
 	}

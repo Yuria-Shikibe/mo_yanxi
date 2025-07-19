@@ -220,6 +220,10 @@ namespace mo_yanxi::math {
 		return min + sine;
 	}
 
+	export MATH_ATTR constexpr float tan(const float radians) noexcept {
+		return sin(radians) / cos(radians);
+	}
+
 	export MATH_ATTR constexpr float tan(const float radians, const float scl, const float mag) noexcept {
 		return sin(radians / scl) / cos(radians / scl) * mag;
 	}

@@ -70,11 +70,11 @@ namespace mo_yanxi::game::ecs::system{
 							float healed{};
 							for(auto& tile_state : data.tile_states){
 								math::approach_inplace_get_delta(tile_state.valid_structure_hit_point, hp,
-								                                 .15 * manager.get_update_delta());
+								                                 .5 * manager.get_update_delta());
 
 								if(tile_state.valid_structure_hit_point > hp / 2){
 									healed += math::approach_inplace_get_delta(tile_state.valid_hit_point, hp,
-									                                           .15 * manager.get_update_delta());
+									                                           .5 * manager.get_update_delta());
 								}
 							}
 							data.hit_point.heal(healed);

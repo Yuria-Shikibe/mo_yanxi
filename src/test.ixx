@@ -60,7 +60,7 @@ namespace test{
 				.drag = 0.001f
 			},
 			.damage = {.material_damage = 1000},
-			.lifetime = 75,
+			.lifetime = 150,
 			.initial_speed = 250,
 
 			.trail_style = {

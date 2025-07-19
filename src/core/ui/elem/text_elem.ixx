@@ -31,6 +31,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] label(scene* scene, group* group)
 			: elem(scene, group){
+			interactivity = interactivity::disabled;
 		}
 
 		std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent) override{

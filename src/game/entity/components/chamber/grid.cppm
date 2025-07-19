@@ -16,8 +16,8 @@ export import mo_yanxi.game.aiming;
 
 import mo_yanxi.concepts;
 
-
-import :tile;
+import :chamber;
+import :decl;
 
 import std;
 
@@ -230,7 +230,6 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 	};
 
-	export
 	class chamber_grid{
 	public:
 		using grid = tile_grid;
@@ -263,7 +262,6 @@ namespace mo_yanxi::game::ecs::chamber{
 			}
 		};
 
-		[[nodiscard]] chamber_grid() = default;
 		component_manager manager{};
 		grid local_grid{};
 
@@ -285,10 +283,16 @@ namespace mo_yanxi::game::ecs::chamber{
 		bool targeting_requested{};
 
 	public:
+		//TODO use reference counter?
+		const meta::chamber::grid* meta_grid{};
+
 		hit_point hit_point{};
 		targeting_queue targets_primary{};
 		targeting_queue targets_secondary{};
 
+		[[nodiscard]] chamber_grid() = default;
+
+		[[nodiscard]] explicit chamber_grid(const meta::chamber::grid& grid) : meta_grid(std::addressof(grid)){}
 
 		template <math::quad_like T>
 		[[nodiscard]] constexpr T box_to_local (const T& brief) const noexcept{
@@ -374,10 +378,10 @@ namespace mo_yanxi::game::ecs::chamber{
 
 	export
 	struct chamber_manifold : public chamber_grid{
-
-
 		[[nodiscard]] chamber_manifold() = default;
-		// std::vector<chamber::tile> under_hit{};
+
+		[[nodiscard]] explicit chamber_manifold(const meta::chamber::grid& grid);
+
 
 		template <tuple_spec Tuple>
 		void add_building_type(){
@@ -426,11 +430,6 @@ namespace mo_yanxi::game::ecs::chamber{
 			});
 		}
 
-		explicit(false) operator manifold_ref() noexcept{
-			return reinterpret_cast<manifold_ref&>(*this);
-		}
-
-
 		chamber_manifold(const chamber_manifold& other) = delete;
 
 		chamber_manifold(chamber_manifold&& other) noexcept
@@ -455,10 +454,7 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 	};
 
-	export
-	[[nodiscard]] chamber_manifold& to_manifold(manifold_ref ref) noexcept{
-		return reinterpret_cast<chamber_manifold&>(ref);
-	}
+
 
 	export
 	struct chamber_manifold_dump{
@@ -561,5 +557,6 @@ namespace mo_yanxi::game::ecs{
 			auto trs = grid_->get_transform();
 			return {region().get_src().mul(tile_size_integral).as<float>() | trs, trs.rot};
 		}
+
 	}
 }

@@ -10,14 +10,11 @@ namespace mo_yanxi::game::ecs::chamber{
 	export constexpr inline float tile_size = tile_size_integral;
 
 	struct building_;
-	struct manifold_;
 
 	export using build_ref = building_&;
 	export using build_ptr = building_*;
 
 	export using const_build_ref = const building_&;
-
-	export using manifold_ref = manifold_&;
 
 	export
 	struct energy_status{

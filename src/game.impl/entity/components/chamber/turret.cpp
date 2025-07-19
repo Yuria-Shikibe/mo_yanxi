@@ -25,20 +25,15 @@ namespace mo_yanxi::game::ecs::chamber{
 
 		[[nodiscard]] turret_ui(ui::scene* scene, group* group, const entity_ref& e_ref)
 			: entity_info_table(scene, group, e_ref){
+			set_style();
 
 			template_cell.set_external({false, true});
-			function_init([](ui::label& elem){
-				elem.set_style();
-				elem.set_scale(.5);
-				elem.set_policy(font::typesetting::layout_policy::auto_feed_line);
-				elem.set_text("Turret");
-			}).cell().set_pad({.top = 8});
 
 			{
 				auto bar = end_line().emplace<ui::building_pane>(ref);
 				bar.cell().set_pad(4);
 				bar.cell().set_external({false, true});
-				bar->set_style();
+				bar->set_style(ui::theme::styles::side_bar_whisper);
 
 				if(ref){
 					auto& build = ref->at<turret_build>();

@@ -252,6 +252,14 @@ namespace mo_yanxi{
 		if(property.graphic_data.drawer)property.graphic_data.drawer->draw(*this, get_bound(), property.graphic_data.get_opacity());
 	}
 
+	bool ui::elem::insert_independent_draw(independent_draw_state state) const{
+		return scene_->insert_independent_draw(*this, state);
+	}
+
+	bool ui::elem::erase_independent_draw() const noexcept{
+		return scene_->erase_independent_draw(this);
+	}
+
 	bool ui::elem::update_abs_src(const math::vec2 parent_content_abs_src){
 		if(util::try_modify(property.absolute_src, parent_content_abs_src + property.relative_src)){
 			for(const auto& element : get_children()){

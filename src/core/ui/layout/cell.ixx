@@ -16,7 +16,7 @@ namespace mo_yanxi::ui{
 	template <typename Elem, typename Cell>
 	struct cell_create_result{
 		Elem& elem;
-		Cell& cell;
+		Cell& cell; //Dangling Caution
 	};
 
 	export

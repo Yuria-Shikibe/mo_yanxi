@@ -5,6 +5,8 @@ import mo_yanxi.ui.graphic;
 void mo_yanxi::game::ui::build_tile_status_drawer::draw(
 	ui::rect region, float opacity,
 	graphic::renderer_ui_ref renderer, const ecs::chamber::building_data& data) {
+	static constexpr float shrinkion = 2;
+	region.expand(shrinkion);
 
 	auto acq = mo_yanxi::ui::get_draw_acquirer(renderer);
 	// acq.proj.set_layer(ui::draw_layers::base);
@@ -14,7 +16,7 @@ void mo_yanxi::game::ui::build_tile_status_drawer::draw(
 	if(swap)sz.swap_xy();
 
 	const auto unit_size = get_unit_size(region.extent(), sz);
-	const auto unit_rect = math::frect{0.f, 0.f, unit_size, unit_size}.shrink(2);
+	const auto unit_rect = math::frect{0.f, 0.f, unit_size, unit_size}.shrink(shrinkion);
 
 	auto building_max_individual = data.get_tile_individual_max_hitpoint();
 

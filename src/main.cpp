@@ -457,9 +457,16 @@ void main_loop(){
 
 
 	game::meta::chamber::grid grid{};
+	game::meta::hitbox_transed hitbox_transed{};
 	{
 		std::ifstream stream{R"(D:\projects\mo_yanxi\build\windows\x64\debug\test_grid.metagrid)", std::ios::binary};
 		game::meta::srl::read_grid(stream, grid);
+	}
+
+	{
+		std::ifstream stream{R"(D:\projects\mo_yanxi\build\windows\x64\debug\tes.hbox)", std::ios::binary};
+		io::loader<game::meta::hitbox_transed>::parse_from(stream, hitbox_transed);
+		hitbox_transed.apply();
 	}
 
 	{
@@ -473,34 +480,17 @@ void main_loop(){
 
 				manifold mf{};
 				math::trans2 trs = {{rand(40.f), rand(20.f)}, rand(180.f)};
-				mf.hitbox = game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 4, chamber::tile_size * 4}}}};
+				mf.hitbox = game::hitbox{hitbox_transed};
+				//game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 4, chamber::tile_size * 4}}}};
 
 				faction_data faction_data{};
-				if(i & 1){
+				if(!(i & 1)){
 					faction_data.faction = game::faction_0;
 				}else{
 					faction_data.faction = game::faction_1;
 				}
 
-				chamber::chamber_manifold cmf{};
-				grid.dump(cmf);
-
-				// {
-				// 	using namespace math;
-				// 	auto& chunk = grid.add_building<chamber::turret_build>({tags::from_extent, chamber::tile_coord{-8, -9}, 4, 18});
-				// 	auto& body = chunk.get<chamber::turret_build>().body;
-				// 	body.shoot_type.projectile = &projectile_meta;
-				// 	body.shoot_type.burst = {.count = 6, .spacing = 5, .angular_spacing = float(15._deg_to_rad)};
-				// 	body.shoot_type.salvo = {.count = 3};
-				// 	chunk.get<chamber::turret_build>().rotate_torque = 30;
-				// }
-				//
-				// grid.add_building<std::tuple<chamber::radar_build>>(
-				// 	{tags::from_extent, chamber::tile_coord{5, -8}, 4, 18}, chamber::radar_build{chamber::radar_meta{
-				// 		.targeting_range_radius = {400, 2000},
-				// 		.targeting_range_angular = math::full_circle_rad<float>,
-				// 		.reload_duration = 120
-				// 	}});
+				chamber::chamber_manifold cmf{grid};
 
 				world.component_manager.create_entity_deferred<grided_entity_desc>(mech_motion{.trans = trs},
 					std::move(mf),
@@ -602,10 +592,7 @@ void main_loop(){
 			dst.angle_rad()});
 
 		{
-
-
-			math::rect_box_posed rect1{math::vec2{200, 300}, {0, 30}};
-			{
+			/*{
 				//
 				for(int i = 0; i < 10; ++i){
 					acquirer << base_region;
@@ -635,8 +622,7 @@ void main_loop(){
 						(white.copy() * 2).set_a((i + 3) / 10.f)
 					);
 				}
-			}
-
+			}*/
 
 			acquirer.proj.depth = 0.35f;
 
@@ -647,29 +633,12 @@ void main_loop(){
 					graphic::colors::black
 				);
 
-			bool is_intersected = rect1.overlap_exact(rect2);
-
 			graphic::draw::line::quad(
 					acquirer,
 					rect2.view_as_quad(),
 					2.f,
-					is_intersected ? graphic::colors::pale_green : graphic::colors::white
+					graphic::colors::white
 				);
-
-			for(int i = 0; i < 4; ++i){
-				auto v0 = rect2[i];
-				auto v1 = rect2[i + 1];
-				auto n = rect2.edge_normal_at(i);
-
-				graphic::draw::line::line(
-					acquirer.get(),
-					(v0 + v1) / 2,
-					(v0 + v1) / 2 + n * 16,
-					3,
-					graphic::colors::PURPLE,
-					graphic::colors::PURPLE
-				);
-			}
 
 			acquirer.proj.slightly_decr_depth();
 
@@ -718,14 +687,14 @@ void main_loop(){
 
 					draw::line::quad(acquirer, grid.local_grid.get_wrap_bound(), 3, colors::AQUA_SKY.to_light());
 
-				// grid.local_grid.each_tile([&](const chamber::tile& tile){
-				// 		if(!tile.building) return;
-				//
-				// 		draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
-				// 		draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-				// 		                       (colors::red_dusted.create_lerp(colors::pale_green, tile.building.data().hit_point.get_capability_factor())).to_light(1.5f).set_a(
-				// 			                       tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
-				// 	});
+				grid.local_grid.each_tile([&](const chamber::tile& tile){
+						if(!tile.building) return;
+
+						draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
+						draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
+						                       (colors::red_dusted.create_lerp(colors::pale_green, tile.building.data().hit_point.get_capability_factor())).to_light(1.5f).set_a(
+							                       tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
+					});
 
 					grid.manager.sliced_each([&](const chamber::building_data& building_data){
 						draw::line::rect_ortho(acquirer, building_data.get_bound(), 3, colors::CRIMSON.to_light());
@@ -735,12 +704,10 @@ void main_loop(){
 
 					bool any{};
 					grid.local_grid.quad_tree()->intersect_then(
-						local_rect, [](const math::rect_box<float>& rect, math::frect region){
-							return rect.overlap_rough(region) && rect.overlap_exact(region);
+						local_rect, [&](const math::rect_box<float>& rect, math::frect region){
+							return !any && rect.overlap_rough(region) && rect.overlap_exact(region);
 						}, [&](const auto& rect, const chamber::tile& tile){
 							any = true;
-							// draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-							//                        colors::ACID.to_light().set_a(.3f));
 						});
 
 					if(any){

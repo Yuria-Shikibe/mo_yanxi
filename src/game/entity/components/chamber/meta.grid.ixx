@@ -3,14 +3,13 @@ module;
 #include <cassert>
 #include <plf_hive.h>
 
-export module mo_yanxi.game.meta.grid;
+export module mo_yanxi.game.ecs.component.chamber:grid_meta;
 
-export import mo_yanxi.game.meta.chamber;
+import :chamber_meta;
 import mo_yanxi.game.meta.hitbox;
 import mo_yanxi.algo;
 
 
-//TODO?
 import mo_yanxi.graphic.renderer.ui;
 import mo_yanxi.graphic.renderer.world;
 
@@ -18,7 +17,6 @@ import mo_yanxi.graphic.renderer.world;
 namespace mo_yanxi::game::meta::chamber{
 	constexpr inline int tile_size_integral = ecs::chamber::tile_size_integral;
 	constexpr inline float tile_size = tile_size_integral;
-
 
 	using chamber_meta = const basic_chamber*;
 
@@ -296,6 +294,6 @@ namespace mo_yanxi::game::meta::chamber{
 
 		void draw(graphic::renderer_ui& renderer, const graphic::camera2& camera) const;
 
-		void dump(ecs::chamber::manifold_ref clear_grid_manifold) const;
+		void dump(ecs::chamber::chamber_manifold& clear_grid_manifold) const;
 	};
 }

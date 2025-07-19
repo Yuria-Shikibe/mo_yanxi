@@ -956,7 +956,8 @@ namespace mo_yanxi::font::typesetting{
 			const parse_context& context,
 			const code_point code,
 			const unsigned layout_global_index,
-			const std::optional<char_code> real_code = std::nullopt
+			const std::optional<char_code> real_code = std::nullopt,
+			bool termination = false
 		);
 
 		void clear(){

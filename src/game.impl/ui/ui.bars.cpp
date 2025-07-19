@@ -146,11 +146,11 @@ void mo_yanxi::game::ui::reload_bar::draw_content(mo_yanxi::ui::rect clipSpace) 
 void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opacity, graphic::renderer_ui_ref renderer_ref) const{
 	region.expand(2, 2);
 
-	int abs_power_total = math::abs(state_.power_total);
+	unsigned abs_power_total = math::abs(state_.power_total);
 	if(abs_power_total == 0)return;
-	int abs_current_power = math::abs(state_.power_current);
+	unsigned abs_current_power = math::abs(state_.power_current);
 
-	const math::vec2 bar_unit_extent = region.extent() / math::vector2{abs_power_total, 1}.as<float>();
+	const math::vec2 bar_unit_extent = region.extent() / math::vector2{abs_power_total, 1u}.as<float>();
 
 	auto acq = mo_yanxi::ui::get_draw_acquirer(renderer_ref);
 	using namespace graphic;
@@ -159,10 +159,15 @@ void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opaci
 	const auto charging_color = colors::power.copy().set_a(opacity);
 	const auto invalid_color = colors::power.copy().mul(0.5f).mul_a(opacity);
 
-	int i = 0;
+	unsigned i = 0;
 
 	auto get_unused_color = [&, this]{
-		return state_.power_total > 0 || i < state_.power_assigned ? invalid_color : colors::dark_gray;
+		if(i >= state_.power_valid){
+			return colors::red_dusted;
+		}else{
+			return state_.power_total > 0 || i < state_.power_assigned ? invalid_color : colors::dark_gray;
+		}
+
 	};
 
 	for(;i < abs_current_power; ++i){
@@ -178,7 +183,7 @@ void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opaci
 		return;
 	}
 
-	auto charging_region = math::frect{tags::from_extent, region.src + bar_unit_extent.copy().scl(i, 0),
+	auto charging_region = math::frect{tags::from_extent, region.src + bar_unit_extent.copy().mul(i, 0),
 				bar_unit_extent.copy().mul(charge_smooth_, 1)};
 
 	draw::fill::rect_ortho(
@@ -189,7 +194,7 @@ void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opaci
 
 	draw::fill::rect_ortho(
 			acq.get(),
-			math::frect{charging_region.vert_10(), region.src + bar_unit_extent.copy().scl(i, 0) + bar_unit_extent}.shrink(1, 2).move_x(-0.5),
+			math::frect{charging_region.vert_10(), region.src + bar_unit_extent.copy().mul(i, 0) + bar_unit_extent}.shrink(1, 2).move_x(-0.5),
 			get_unused_color()
 		);
 

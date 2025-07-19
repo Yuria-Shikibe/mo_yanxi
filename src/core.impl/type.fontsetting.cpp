@@ -15,8 +15,13 @@ namespace mo_yanxi::font::typesetting{
 		}
 	}
 
-	void layout_unit::push_glyph(const parse_context& context, const code_point code,
-		const unsigned layout_global_index, const std::optional<char_code> real_code){
+	void layout_unit::push_glyph(
+		const parse_context& context,
+		const code_point code,
+		const unsigned layout_global_index,
+		const std::optional<char_code> real_code,
+		bool termination
+		){
 		const layout_index_t column_index = buffer.size();
 		auto& current = buffer.emplace_back(
 			code_point{real_code.value_or(code.code), code.unit_index},
@@ -26,7 +31,7 @@ namespace mo_yanxi::font::typesetting{
 
 		bool emptyChar = code.code == real_code && (code.code == U'\0' || code.code == U'\n');
 
-		const auto font_region_scale = emptyChar ? math::vec2{} : context.get_current_correction_scale();;
+		const auto font_region_scale = (!termination && emptyChar) ? math::vec2{} : context.get_current_correction_scale();
 		float advance = current.glyph.metrics().advance.x * font_region_scale.x;
 
 
@@ -159,7 +164,7 @@ namespace mo_yanxi::font::typesetting{
 
 		append_hint.push_glyph(
 			context,
-			{0, code.unit_index}, idx, U'\0');
+			{0, code.unit_index}, idx, U'\0', true);
 
 		parser::flush(context, layout, append_hint, code.code != U'\n', true);
 	}

@@ -15,7 +15,7 @@ namespace mo_yanxi::game::ui{
 
 	export
 	struct build_tile_status_drawer{
-		static constexpr float chunk_max_draw_size = 64;
+		static constexpr float chunk_max_draw_size = 20;
 
 	private:
 		template <typename T = int>

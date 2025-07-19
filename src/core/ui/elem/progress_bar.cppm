@@ -4,11 +4,7 @@
 
 export module mo_yanxi.ui.elem.progress_bar;
 
-
 export import mo_yanxi.ui.primitives;
-import mo_yanxi.core.ctrl.key_pack;
-
-import mo_yanxi.snap_shot;
 import mo_yanxi.graphic.color;
 import mo_yanxi.math;
 

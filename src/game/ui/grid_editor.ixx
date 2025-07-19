@@ -6,7 +6,7 @@ module;
 export module mo_yanxi.game.ui.grid_editor;
 
 
-export import mo_yanxi.game.meta.grid;
+export import mo_yanxi.game.ecs.component.chamber;
 
 import mo_yanxi.ui.primitives;
 import mo_yanxi.ui.elem.table;
@@ -134,9 +134,9 @@ namespace mo_yanxi::game{
 				if(building){
 					if(selected_building != building){
 						t.clear_children();
-						building->get_meta_info().build_ui(t);
+						building->get_meta_info().build_editor_ui(t);
 						if(auto ist = building->get_instance_data()){
-							auto hdl = ist->build_ui(t, edit_context);
+							auto hdl = ist->build_editor_ui(t, edit_context);
 							if(hdl.has_ui()){
 								t.end_line();
 								auto spl = t.create(creation::general_seperator_line{.stroke = 20, .palette =  ui::theme::style_pal::front_white.copy().mul_alpha(.25f)});

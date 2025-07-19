@@ -91,6 +91,17 @@ namespace mo_yanxi::ui{
 		}
 	};
 
+
+
+	struct independent_draw_entry{
+		const elem* elem;
+		independent_draw_state state;
+
+		constexpr auto operator<=>(const independent_draw_entry& rhs) const noexcept{
+			return state.depth <=> rhs.state.depth;
+		}
+	};
+
 	export struct scene_base{
 		struct MouseState{
 			math::vec2 src{};
@@ -126,6 +137,8 @@ namespace mo_yanxi::ui{
 		std::vector<elem*> lastInbounds{};
 		std::unordered_set<elem*> independentLayout{};
 		std::unordered_set<elem*> asyncTaskOwners{};
+
+		std::vector<independent_draw_entry> independent_draw_{};
 
 	public:
 		graphic::renderer_ui_ptr renderer{};
@@ -190,6 +203,10 @@ namespace mo_yanxi::ui{
 		);
 
 		~scene();
+
+		bool insert_independent_draw(const elem& elem, independent_draw_state state);
+
+		bool erase_independent_draw(const elem* elem) noexcept;
 
 		void set_camera_focus(graphic::camera2* camera2) noexcept{
 			focused_camera = camera2;

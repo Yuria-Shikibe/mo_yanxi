@@ -4,6 +4,7 @@
 
 export module mo_yanxi.ui.menu;
 
+import mo_yanxi.ui.elem.list;
 import mo_yanxi.ui.elem.table;
 import mo_yanxi.ui.elem.scroll_pane;
 import mo_yanxi.ui.elem.button;
@@ -14,15 +15,15 @@ namespace mo_yanxi::ui{
 	export
 	template <typename B, typename E>
 	struct menu_elem_create_handle{
-		create_handle<B, table::cell_type> button;
+		create_handle<B, list::cell_type> button;
 		E& elem;
 	};
 
 	export
-	struct menu : table{
+	struct menu : list{
 	private:
 		static constexpr std::size_t content_index = 1;
-		static constexpr align::spacing button_group_pad = {.right = 8};
+		static constexpr align::padding1d<float> button_group_pad = {4, 4};
 
 		static constexpr unsigned no_switched = std::numeric_limits<unsigned>::max();
 		unsigned last_index_{no_switched};
@@ -35,7 +36,7 @@ namespace mo_yanxi::ui{
 			using base = T;
 
 			menu& get_menu() const noexcept{
-				// self -> parent(table) -> parent(scroll_pane) -> parent(menu)
+				// self -> parent(list) -> parent(scroll_pane) -> parent(menu)
 				return static_cast<menu&>(*this->get_parent()->get_parent()->get_parent());
 			}
 
@@ -66,6 +67,8 @@ namespace mo_yanxi::ui{
 			template <typename ...Args>
 			[[nodiscard]] button_of(scene* scene, group* group, Args&& ...args)
 				: base(scene, group, std::forward<Args>(args) ...){
+				this->interactivity = interactivity::enabled;
+
 			}
 
 
@@ -102,7 +105,7 @@ namespace mo_yanxi::ui{
 		}
 
 	public:
-		table& get_default_elem() const noexcept{
+		[[nodiscard]] table& get_default_elem() const noexcept{
 			if(last_index_ != no_switched){
 				return static_cast<table&>(*sub_elements[last_index_]);
 			}else{
@@ -110,36 +113,36 @@ namespace mo_yanxi::ui{
 			}
 		}
 
-		table& get_button_group() const noexcept{
-			return button_menu_pane->get_item<table>();
+		[[nodiscard]] list& get_button_group() const noexcept{
+			return button_menu_pane->get_item<list>();
 		}
 
-		scroll_pane& get_button_group_pane() const noexcept{
+		[[nodiscard]] scroll_pane& get_button_group_pane() const noexcept{
 			return *button_menu_pane;
 		}
 
 		[[nodiscard]] menu(scene* scene, group* group)
-			: table(scene, group){
+			: list(scene, group){
 
 			//TODO implement vertical layout
 
-			auto pane = table::emplace<scroll_pane>();
-			pane.cell().set_height(0);
-			pane.cell().pad.bottom = 8;
+			auto pane = list::emplace<scroll_pane>();
+			pane.cell().pad.set(8);
 
 
 			button_menu_pane = std::to_address(pane);
 			button_menu_pane->set_layout_policy(layout_policy::vert_major);
 			button_menu_pane->set_style();
-			button_menu_pane->set_elem([](table& table){
-				table.set_entire_align(align::pos::left);
-				table.template_cell.set_external({true, false});
-				table.set_style();
+			button_menu_pane->set_elem([](list& lst){
+				lst.set_layout_policy(layout_policy::vert_major);
+				lst.template_cell.set_external();
+				lst.set_style();
 			});
 
-			pane.cell().set_height(80);
+			pane.cell().set_size(80);
 
-			end_line().emplace<table>();
+			//Default element
+			list::emplace<ui::table>();
 		}
 
 		auto emplace() = delete;
@@ -147,7 +150,7 @@ namespace mo_yanxi::ui{
 		auto create() = delete;
 
 		void set_button_group_height(const float height){
-			cells[0].cell.set_height(height);
+			cells[0].cell.set_size(height);
 			notify_isolated_layout_changed();
 			// notify_layout_changed(spread_direction::all_visible);
 		}
@@ -175,7 +178,7 @@ namespace mo_yanxi::ui{
 
 	private:
 		elem_ptr exchange_element(const std::size_t where, elem_ptr&& elem) override{
-			return table::exchange_element(where, std::move(elem));
+			return universal_group::exchange_element(where, std::move(elem));
 		}
 	};
 
