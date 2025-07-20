@@ -7,9 +7,33 @@ export module mo_yanxi.game.ecs.system.chamber;
 export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.ecs.component.chamber;
 
+import std;
+
 namespace mo_yanxi::game::ecs::system{
+
 	export
 	struct chamber{
+		static void update_energy_state(ecs::chamber::chamber_manifold& grid, float dt){
+			unsigned valid_sum{};
+			grid.manager.sliced_each(
+				[&, dt](
+				ecs::chamber::building_data& data, ecs::chamber::power_generator_building_tag){
+					const auto valid = data.update_energy_state(dt);
+					assert(valid.power >= 0);
+					valid_sum += valid.power;
+					grid.energy_status_maybe_changed |= valid.changed;
+				});
+
+			if(std::exchange(grid.energy_status_maybe_changed, false)){
+				grid.energy_allocator.update_allocation(valid_sum);
+			}
+			grid.manager.sliced_each(
+				[dt](
+				ecs::chamber::building_data& data, ecs::chamber::power_consumer_building_tag){
+					data.update_energy_state(dt);
+				});
+		}
+
 		void run(world::entity_top_world& top_world) const{
 			top_world.component_manager.sliced_each([&](
 				const component_manager& manager,
@@ -29,21 +53,6 @@ namespace mo_yanxi::game::ecs::system{
 
 
 					float dt = manager.get_update_delta();
-					unsigned valid_sum{};
-					grid.manager.sliced_each(
-						[&, dt](
-						ecs::chamber::building_data& data, ecs::chamber::power_generator_building_tag){
-							auto valid = data.update_energy_state(dt);
-							assert(valid >= 0);
-							valid_sum += valid;
-						});
-
-					grid.energy_allocator.update_allocation(valid_sum);
-					grid.manager.sliced_each(
-						[dt](
-						ecs::chamber::building_data& data, ecs::chamber::power_consumer_building_tag){
-							data.update_energy_state(dt);
-						});
 
 					bool inbound = grid.get_wrap_bound().overlap(top_world.graphic_context.viewport());
 					grid.manager.sliced_each(
@@ -80,6 +89,10 @@ namespace mo_yanxi::game::ecs::system{
 								}
 
 							data.hit_point.accept(data.building_damage_take);
+							if(data.energy_status && data.building_damage_take > 0){
+								grid.energy_status_maybe_changed |= true;
+							}
+
 							grid.hit_point.accept(data.structural_damage_take);
 
 							data.clear_hit_events();
@@ -97,6 +110,8 @@ namespace mo_yanxi::game::ecs::system{
 							}
 							data.hit_point.heal(healed);
 						});
+
+					update_energy_state(grid, dt);
 				});
 		}
 	};

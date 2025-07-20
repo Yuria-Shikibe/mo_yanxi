@@ -1699,7 +1699,7 @@ namespace mo_yanxi::game::ecs{
 			vec exclusives;
 
 			if constexpr (ExclusiveSize > 0){
-				[&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>){
+				[&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>) FORCE_INLINE {
 					([&, this](type_identity_index idx){
 						if(auto itr = type_to_archetype.find(idx); itr != type_to_archetype.end()){
 
@@ -1721,7 +1721,7 @@ namespace mo_yanxi::game::ecs{
 				//TODO consider that 'none' is really casual, remove it?
 
 				bool none = false;
-				auto try_find = [&, this](type_identity_index idx) -> std::span<const archetype_slice>{
+				auto try_find = [&, this](type_identity_index idx) FORCE_INLINE -> std::span<const archetype_slice>{
 					// std::println(std::cerr, "{}", idx.name());
 					if(none)return {};
 
@@ -1789,7 +1789,7 @@ namespace mo_yanxi::game::ecs{
 					};
 
 
-					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
 						if constexpr (std::invocable<Fn, std::array<archetype_slice, std::tuple_size_v<Tuple>>>){
 							std::invoke(fn, std::array<archetype_slice, std::tuple_size_v<Tuple>>{static_cast<subrange&>(ranges[Idx]).front() ...});
 						}else if constexpr (std::invocable<Fn, chunk_spans>){

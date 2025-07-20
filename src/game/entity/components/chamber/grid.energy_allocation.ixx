@@ -36,13 +36,16 @@ namespace mo_yanxi::game::ecs::chamber{
 		update_check update_acquisition() noexcept{
 			update_check result{};
 			for (auto& acquisition : acquisitions_){
-				result.any_changed = result.any_changed || acquisition.owner->energy_acquisition != acquisition.last_acquisition;
-				result.priority_changed = result.priority_changed || acquisition.owner->energy_acquisition.priority != acquisition.last_acquisition.priority;
+				auto acq = acquisition.owner->get_real_energy_acquisition();
 
-				acquisition.last_acquisition = acquisition.owner->energy_acquisition;
+				result.any_changed = result.any_changed || acq != acquisition.last_acquisition;
+				if(result.any_changed){
+					result.priority_changed = result.priority_changed || acq.priority != acquisition.last_acquisition.priority;
+					acquisition.last_acquisition = acq;
+				}
 
-				result.total_minimum_requirements += acquisition.last_acquisition.minimum_count;
-				result.total_requirements += acquisition.last_acquisition.count;
+				result.total_minimum_requirements += acq.minimum_count;
+				result.total_requirements += acq.count;
 			}
 			return result;
 		}
@@ -52,17 +55,17 @@ namespace mo_yanxi::game::ecs::chamber{
 			requires std::convertible_to<std::ranges::range_value_t<Rng>, building_data*>
 		void insert_acquisition(Rng&& rng){
 			acquisitions_.append_range(std::forward<Rng>(rng) | std::views::transform([](building_data* data){
-				return energy_acquisition_entry{data, {.priority = data->energy_acquisition.priority}};
+				return energy_acquisition_entry{data, {.priority = data->ideal_energy_acquisition.priority}};
 			}));
 
 			gfx::timsort(acquisitions_, std::ranges::greater{}, &energy_acquisition_entry::priority);
 		}
 
 		void insert_acquisition(building_data& data){
-			auto priority = data.energy_acquisition.priority;
+			auto priority = data.ideal_energy_acquisition.priority;
 
 			auto where = std::ranges::lower_bound(acquisitions_, priority, std::ranges::greater{}, &energy_acquisition_entry::priority);
-			acquisitions_.insert(where, energy_acquisition_entry{std::addressof(data), {.priority = data.energy_acquisition.priority}});
+			acquisitions_.insert(where, energy_acquisition_entry{std::addressof(data), {.priority = data.ideal_energy_acquisition.priority}});
 		}
 
 		[[nodiscard]] unsigned last_valid() const noexcept{
@@ -94,7 +97,7 @@ namespace mo_yanxi::game::ecs::chamber{
 				valid_energy -= check.total_minimum_requirements;
 
 				for (const auto & acquisition : acquisitions_){
-					acquisition.owner->valid_energy = acquisition.last_acquisition.count;
+					acquisition.owner->valid_energy = acquisition.last_acquisition.minimum_count;
 					if(valid_energy > 0){
 						unsigned valid;
 						if(acquisition.last_acquisition.get_append_count() >= valid_energy){
@@ -112,8 +115,6 @@ namespace mo_yanxi::game::ecs::chamber{
 				return;
 			}else{
 				for (const auto & acquisition : acquisitions_){
-					if(valid_energy == 0)break;
-
 					unsigned valid;
 					if(acquisition.last_acquisition.minimum_count >= valid_energy){
 						valid = valid_energy;

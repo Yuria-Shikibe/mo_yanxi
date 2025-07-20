@@ -30,6 +30,12 @@ namespace mo_yanxi::game::ecs::chamber{
 	};
 
 	export
+	struct energy_status_update_result{
+		int power;
+		bool changed;
+	};
+
+	export
 	struct energy_status{
 		int power;
 		float charge_duration;
@@ -56,14 +62,14 @@ namespace mo_yanxi::game::ecs::chamber{
 			return power != 0;
 		}
 
-		FORCE_INLINE void update(
+		FORCE_INLINE bool update(
 		 	const energy_status& status,
 		 	unsigned assigned_energy,
 		 	float capabilityFactor,
 		 	float update_delta_tick
 		 	) noexcept{
 
-
+			const int last = power;
 
 			assert(capabilityFactor <= (1.f + std::numeric_limits<float>::epsilon()));
 			assert(capabilityFactor >= 0);
@@ -73,17 +79,16 @@ namespace mo_yanxi::game::ecs::chamber{
 			if(max_usable == 0){
 				if(!status.reserve_charge_reload_if_power_off)charge = 0;
 				if(!status.reserve_energy_if_power_off)power = 0;
-				return;
 			}
 
-			const unsigned abs_cur = std::abs(power);
-			const unsigned abs_max = max_usable > 0 ? max_usable : std::min<unsigned>(-max_usable, assigned_energy);
+			const int abs_cur = std::abs(power);
+			const int abs_max = max_usable > 0 ? max_usable : std::min<unsigned>(-max_usable, assigned_energy);
 
 			assert(power * max_usable >= 0);
 			assert(abs_cur <= std::abs(status.power));
 
 			if(abs_cur >= abs_max){
-				if(!status.reserve_energy_if_power_off)power = (max_usable > 0 ? abs_max : -abs_max);
+				if(!status.reserve_energy_if_power_off)power = max_usable > 0 ? abs_max : -abs_max;
 				if(!status.reserve_charge_reload_if_power_off)charge = 0;
 			}else{
 				if(charge < status.charge_duration){
@@ -94,6 +99,7 @@ namespace mo_yanxi::game::ecs::chamber{
 				}
 			}
 
+			return power != last;
 		}
 	};
 

@@ -165,7 +165,7 @@ namespace mo_yanxi::game::meta::chamber{
 		[[nodiscard]] grid(const math::usize2 extent, const math::point2 origin_coord, std::vector<grid_tile>&& tiles) noexcept :
 			origin_coord_(origin_coord), extent_(extent), tiles_(std::move(tiles)){}
 
-		const energy_status& get_energy_status() const noexcept{
+		[[nodiscard]] const energy_status& get_energy_status() const noexcept{
 			return energy_status_;
 		}
 

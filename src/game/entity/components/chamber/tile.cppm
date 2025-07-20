@@ -201,7 +201,7 @@ namespace mo_yanxi::game::ecs{
 			float structural_damage_take{};
 
 			energy_status energy_status{};
-			energy_acquisition energy_acquisition{};
+			energy_acquisition ideal_energy_acquisition{};
 
 			unsigned valid_energy{};
 
@@ -213,7 +213,22 @@ namespace mo_yanxi::game::ecs{
 				energy_status = status;
 				energy_dynamic_status_ = {};
 
-				energy_acquisition.count = energy_status.power < 0 ? -energy_status.power / 2 : 0;
+				if(energy_status.power < 0){
+					ideal_energy_acquisition.count = -energy_status.power;
+					ideal_energy_acquisition.minimum_count = 1;
+				}else{
+					ideal_energy_acquisition = {};
+				}
+
+			}
+
+			[[nodiscard]] energy_acquisition get_real_energy_acquisition() const noexcept{
+				unsigned max = math::abs(get_max_usable_energy());
+				return energy_acquisition{
+					.count = math::min(max, ideal_energy_acquisition.count),
+					.minimum_count = math::min(max, ideal_energy_acquisition.minimum_count),
+					.priority = ideal_energy_acquisition.priority,
+				};
 			}
 
 			[[nodiscard]] const energy_dynamic_status& get_energy_dynamic_status() const noexcept{
@@ -280,6 +295,10 @@ namespace mo_yanxi::game::ecs{
 				return math::vector2{index % region_.width(), index / region_.width()};
 			}
 
+			[[nodiscard]] bool has_any_hit_events() const noexcept{
+				return !damage_events.empty();
+			}
+
 			void clear_hit_events() noexcept{
 				damage_events.clear();
 				structural_damage_take = building_damage_take = 0;
@@ -308,12 +327,14 @@ namespace mo_yanxi::game::ecs{
 				}
 			}
 
-			int update_energy_state(float update_delta_tick) noexcept{
+			energy_status_update_result update_energy_state(float update_delta_tick) noexcept{
+				energy_status_update_result rst{};
 				if(energy_status){
-					energy_dynamic_status_.update(energy_status, valid_energy, get_capability_factor(), update_delta_tick);
+					rst.changed = energy_dynamic_status_.update(energy_status, valid_energy, get_capability_factor(), update_delta_tick);
 				}
 
-				return energy_dynamic_status_.power;
+				rst.power = energy_dynamic_status_.power;
+				return rst;
 			}
 
 		public:

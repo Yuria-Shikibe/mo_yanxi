@@ -288,6 +288,7 @@ namespace mo_yanxi::game::ecs::chamber{
 
 		const meta::chamber::grid* meta_grid{};
 
+		bool energy_status_maybe_changed{};
 		energy_allocator energy_allocator{};
 
 		hit_point hit_point{};
