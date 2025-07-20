@@ -63,7 +63,7 @@ namespace mo_yanxi::assets::ctrl{
 			});
 		});
 
-		core::global::input.main_binds.register_bind(cc::key::ScrollLock, cc::mode::ignore, [](auto){
+		core::global::input.main_binds.register_bind(cc::key::Left_Shift, cc::mode::ignore, [](auto){
 			cameraMoveSpeed = fastCameraMoveSpeed;
 		}, [](auto){
 			cameraMoveSpeed = baseCameraMoveSpeed;

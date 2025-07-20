@@ -601,114 +601,109 @@ namespace mo_yanxi::game{
 		}
 
 		template <
-			std::invocable<value_type&, value_type&> Func,
-			std::predicate<value_type&, value_type&> Filter = decltype(trait::intersects)>
-		void intersect_all(value_type& to_test, Func func, Filter filter = trait::intersects){
-			if(isBranchEmpty() || !this->overlaps(to_test)) return;
+			typename S,
+			typename Ty = const value_type&,
+			std::invocable<copy_const_t<S, value_type>&, copy_const_t<S, value_type>&> Func,
+			std::predicate<copy_const_t<S, value_type>&, copy_const_t<S, value_type>&> Filter = decltype(trait::intersects)>
+			requires (std::same_as<std::remove_cvref_t<Ty>, value_type>)
+		bool intersect_all(this S& self, Ty& to_test, Func func, Filter filter = trait::intersects){
+			using Vty = copy_const_t<S, value_type>&;
 
-			for(auto&& element : this->items){
+			if(self.isBranchEmpty() || !self.overlaps(to_test)) return false;
+
+			for(auto&& element : self.items){
 				if(std::invoke(filter, to_test, element)){
-					std::invoke(func, to_test, element);
+					if constexpr (std::is_invocable_r_v<bool, Func, Vty, Vty>){
+						if(std::invoke(func, to_test, element)){
+							return true;
+						}
+					}else{
+						std::invoke(func, to_test, element);
+					}
 				}
 			}
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
-			if(this->has_valid_children()){
-				for (auto& node : children){
-					node.intersect_all(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter));
+			if(self.has_valid_children()){
+				for (auto& node : self.children){
+					if(node.intersect_all(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter))){
+						return true;
+					}
 				}
 			}
+
+			return false;
 		}
 
 		template <
-			std::invocable<const value_type&, const value_type&> Func,
-			std::predicate<const value_type&, const value_type&> Filter = decltype(trait::intersects)>
-		void intersect_all(const value_type& to_test, Func func, Filter filter = trait::intersects) const {
-			if(isBranchEmpty() || !this->overlaps(to_test)) return;
+			typename S,
+			std::invocable<copy_const_t<S, value_type>&> Func,
+			std::predicate<copy_const_t<S, value_type>&> Filter>
+		bool intersect_all(const S& self, copy_const_t<S, value_type>& to_test, Func func, Filter filter) {
+			if(self.isBranchEmpty() || !self.overlaps(to_test)) return false;
 
-			for(auto&& element : this->items){
-				if(std::invoke(filter, to_test, element)){
-					std::invoke(func, to_test, element);
-				}
-			}
-
-			// If this node has children, check if the rectangle overlaps with any rectangle in the children
-			if(this->has_valid_children()){
-				for (auto& node : children){
-					node.template intersect_all<Func, Filter>(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter));
-				}
-			}
-		}
-
-		template <
-			std::invocable<const value_type&> Func,
-			std::predicate<const value_type&> Filter>
-		void intersect_all(const value_type& to_test, Func func, Filter filter) const {
-			if(isBranchEmpty() || !this->overlaps(to_test)) return;
-
-			for(auto&& element : this->items){
+			for(auto&& element : self.items){
 				if(std::invoke(filter, element)){
-					std::invoke(func, element);
+					if constexpr (std::is_invocable_r_v<bool, Func, copy_const_t<S, value_type>&>){
+						if(std::invoke(func, element)){
+							return true;
+						}
+					}else{
+						std::invoke(func, element);
+					}
 				}
 			}
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
-			if(this->has_valid_children()){
-				for (auto& node : children){
-					node.template intersect_all<Func, Filter>(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter));
+			if(self.has_valid_children()){
+				for (auto& node : self.children){
+					if(node.intersect_all(to_test, mo_yanxi::pass_fn(func), mo_yanxi::pass_fn(filter))){
+						return true;
+					}
 				}
 			}
+
+			return false;
 		}
 
 		template <
+			typename S,
 			typename Region,
-			std::predicate<const Region&, const rect_type&> Pred,
-			std::invocable<const Region&, value_type&> Func
+			std::predicate<Region&, const rect_type&> Pred,
+			std::invocable<Region&, copy_const_t<S, value_type>&> Func
 		>
 			// requires !std::same_as<Region, rect_type>
-		void intersect_then(
-			const Region& region,
+		bool intersect_then(
+			this S& self,
+			Region& region,
 			Pred boundCheck,
 			Func func){
-			if(isBranchEmpty() || !std::invoke(boundCheck, region, this->boundary)) return;
+			if(self.isBranchEmpty() || !std::invoke(boundCheck, region, self.boundary)) return false;
+
+			for(auto& cont : self.items){
+				if(std::invoke(boundCheck, region, trait::bound_of(cont))){
+					if constexpr (std::is_invocable_r_v<bool, Func, Region&, copy_const_t<S, value_type>&>){
+						if(std::invoke(func, region, cont)){
+							return true;
+						}
+					}else{
+						std::invoke(func, region, cont);
+					}
+				}
+			}
 
 			// If this node has children, check if the rectangle overlaps with any rectangle in the children
-			if(this->has_valid_children()){
-				for (quad_tree_node & node : children){
-					node.template intersect_then<Region>(region, mo_yanxi::pass_fn(boundCheck), mo_yanxi::pass_fn(func));
+			if(self.has_valid_children()){
+				for (auto& node : self.children){
+					if(node.intersect_then(region, mo_yanxi::pass_fn(boundCheck), mo_yanxi::pass_fn(func))){
+						return true;
+					}
 				}
 			}
 
-			for(auto& cont : this->items){
-				if(std::invoke(boundCheck, region, trait::bound_of(cont))){
-					std::invoke(func, region, cont);
-				}
-			}
+			return false;
 		}
-		template <
-			typename Region,
-			std::predicate<const Region&, const rect_type&> Pred,
-			std::invocable<const Region&, const value_type&> Func
-		>
-		void intersect_then(
-			const Region& region,
-			Pred boundCheck,
-			Func func) const{
-			if(isBranchEmpty() || !std::invoke(boundCheck, region, this->boundary)) return;
 
-			// If this node has children, check if the rectangle overlaps with any rectangle in the children
-			if(this->has_valid_children()){
-				for (const quad_tree_node & node : children){
-					node.template intersect_then<Region>(region, mo_yanxi::pass_fn(boundCheck), mo_yanxi::pass_fn(func));
-				}
-			}
-
-			for(auto& cont : this->items){
-				if(std::invoke(boundCheck, region, trait::bound_of(cont))){
-					std::invoke(func, region, cont);
-				}
-			}
-		}
 
 	/*
 	private:

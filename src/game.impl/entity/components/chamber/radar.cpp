@@ -82,7 +82,7 @@ namespace mo_yanxi::game::ecs::chamber{
 		if(meta.targeting_range_radius.from > 0)draw::line::circle(acquirer, center, meta.targeting_range_radius.from, 3);
 		draw::line::circle(acquirer, center, meta.targeting_range_radius.to, 5, ui::theme::colors::theme, ui::theme::colors::theme);
 
-		for (const auto & candidate : data().grid().targets_primary.get_candidates()){
+		for (const auto & candidate : data().grid().grid_targets.get_candidates()){
 			if(!candidate.ref)continue;
 			auto pos = candidate.ref->at<mech_motion>().pos();
 			auto radius = candidate.ref->at<manifold>().hitbox.get_wrap_radius();
@@ -90,7 +90,7 @@ namespace mo_yanxi::game::ecs::chamber{
 			draw::fancy::select_rect(acquirer, {pos, radius * 2}, 4, ui::theme::colors::theme, radius / 4);
 		}
 
-		if(auto tgt = data().grid().targets_primary.get_optimal()){
+		if(auto tgt = data().grid().grid_targets.get_optimal()){
 			auto pos = tgt->at<mech_motion>().pos();
 			auto radius = tgt->at<manifold>().hitbox.get_wrap_radius();
 
@@ -112,12 +112,12 @@ namespace mo_yanxi::game::ecs::chamber{
 
 					auto faction = chunk_meta.id()->at<faction_data>().faction;
 
-					data().grid().targets_primary.index_candidates_by_distance(
+					data().grid().grid_targets.index_candidates_by_distance(
 						top_world.collision_system.quad_tree(),
 						chunk_meta.id(),
 						get_local_to_global(meta.transform.vec),
 						meta.targeting_range_radius, [&](const collision_object& obj){
-							return faction->is_hostile_to(obj.id->at<faction_data>().faction.get_id());
+							return obj.id->has<chamber_manifold>() && faction->is_hostile_to(obj.id->at<faction_data>().faction.get_id());
 						});
 				}
 			}else{

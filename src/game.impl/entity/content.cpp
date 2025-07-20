@@ -16,9 +16,10 @@ void mo_yanxi::game::content::load(){
 	{
 		auto& b = manager.emplace<basic_chamber, radar>("radar");
 		b.extent = {4, 4};
-		b.targeting_range_radius = {1200, 6000};
-		b.targeting_range_angular = {-math::pi_half / 3.f, math::pi_half / 3.f};
+		b.targeting_range_radius = {500, 6000};
+		// b.targeting_range_angular = {-math::pi_half / 3.f, math::pi_half / 3.f};
 		b.transform.vec = {.5f, .5f};
+		b.reload_duration = 60;
 	}
 
 	{
@@ -29,6 +30,7 @@ void mo_yanxi::game::content::load(){
 		// b. = {1200, 6000};
 		// b.targeting_range_angular = {-math::pi_half / 3.f, math::pi_half / 3.f};
 		b.transform.vec = {.5f, .5f};
+
 	}
 	{
 		auto& b = manager.emplace<basic_chamber, energy_generator>("generator");

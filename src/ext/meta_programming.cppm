@@ -4,7 +4,6 @@ import std;
 
 namespace mo_yanxi{
 
-
 	export
 	struct pred_always{
 		template <typename ...Args>

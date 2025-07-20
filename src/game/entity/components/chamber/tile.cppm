@@ -30,7 +30,7 @@ namespace mo_yanxi::game::ecs{
 
 		export struct tile;
 		export class tile_grid;
-		export class chamber_grid;
+		export class chamber_grid_fields;
 		export struct chamber_manifold;
 		export struct chamber_manifold_dump;
 
@@ -177,7 +177,7 @@ namespace mo_yanxi::game::ecs{
 
 		export
 		struct building_data{
-			friend chamber_grid;
+			friend chamber_grid_fields;
 			friend chamber_manifold;
 			friend ecs::component_custom_behavior<building_data>;
 			friend chamber_manifold_dump;
@@ -201,7 +201,9 @@ namespace mo_yanxi::game::ecs{
 			float structural_damage_take{};
 
 			energy_status energy_status{};
-			unsigned assigned_energy{};
+			energy_acquisition energy_acquisition{};
+
+			unsigned valid_energy{};
 
 		private:
 			energy_dynamic_status energy_dynamic_status_{};
@@ -211,7 +213,7 @@ namespace mo_yanxi::game::ecs{
 				energy_status = status;
 				energy_dynamic_status_ = {};
 
-				assigned_energy = energy_status.power < 0 ? -energy_status.power / 2 : 0;
+				energy_acquisition.count = energy_status.power < 0 ? -energy_status.power / 2 : 0;
 			}
 
 			[[nodiscard]] const energy_dynamic_status& get_energy_dynamic_status() const noexcept{
@@ -232,6 +234,14 @@ namespace mo_yanxi::game::ecs{
 
 			[[nodiscard]] tile_region region() const noexcept{
 				return region_;
+			}
+
+			[[nodiscard]] tile_coord get_src_coord() const noexcept{
+				return region_.src;
+			}
+
+			[[nodiscard]] math::vec2 real_extent() const noexcept{
+				return region_.extent().scl(tile_size_integral).as<float>();
 			}
 
 			[[nodiscard]] chamber_manifold& grid() const noexcept{
@@ -266,6 +276,10 @@ namespace mo_yanxi::game::ecs{
 				return coord.x + coord.y * region_.width();
 			}
 
+			[[nodiscard]] math::usize2 index_to_local(unsigned index) const noexcept{
+				return math::vector2{index % region_.width(), index / region_.width()};
+			}
+
 			void clear_hit_events() noexcept{
 				damage_events.clear();
 				structural_damage_take = building_damage_take = 0;
@@ -294,10 +308,12 @@ namespace mo_yanxi::game::ecs{
 				}
 			}
 
-			void update(float update_delta_tick) noexcept{
+			int update_energy_state(float update_delta_tick) noexcept{
 				if(energy_status){
-					energy_dynamic_status_.update(energy_status, assigned_energy, get_capability_factor(), update_delta_tick);
+					energy_dynamic_status_.update(energy_status, valid_energy, get_capability_factor(), update_delta_tick);
 				}
+
+				return energy_dynamic_status_.power;
 			}
 
 		public:
@@ -320,6 +336,12 @@ namespace mo_yanxi::game::ecs{
 
 			[[nodiscard]] const meta::chamber::grid_building* get_meta() const noexcept;
 		};
+
+		export
+		struct power_generator_building_tag{};
+
+		export
+		struct power_consumer_building_tag{};
 
 	}
 
@@ -359,11 +381,21 @@ namespace mo_yanxi::game::ecs::chamber{
 			return id()->at<building_data>();
 		}
 
-		template <std::derived_from<building> Building>
+		template <std::derived_from<building> Building = building>
 		[[nodiscard]] Building& build() const noexcept{
 			return id()->at<Building>();
 		}
+
+		template <std::derived_from<building> Building = building>
+		[[nodiscard]] Building* build_if() const noexcept{
+			return id()->try_get<Building>();
+		}
 	};
+
+	export
+	[[nodiscard]] constexpr math::vec2 grid_coord_to_real(tile_coord coord) noexcept{
+		return (coord.as<float>() * tile_size).add(tile_size / 2, tile_size / 2);
+	}
 
 	struct tile{
 		tile_coord tile_pos{};
@@ -384,7 +416,7 @@ namespace mo_yanxi::game::ecs::chamber{
 
 
 		[[nodiscard]] constexpr math::vec2 get_real_pos() const noexcept{
-			return (tile_pos.as<float>() * tile_size).add(tile_size / 2, tile_size / 2);
+			return grid_coord_to_real(tile_pos);
 		}
 
 

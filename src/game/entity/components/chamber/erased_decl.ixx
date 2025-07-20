@@ -17,6 +17,19 @@ namespace mo_yanxi::game::ecs::chamber{
 	export using const_build_ref = const building_&;
 
 	export
+	struct energy_acquisition{
+		unsigned count;
+		unsigned minimum_count;
+		float priority;
+
+		constexpr unsigned get_append_count() const noexcept{
+			return count - minimum_count;
+		}
+
+		constexpr bool operator==(const energy_acquisition&) const noexcept = default;
+	};
+
+	export
 	struct energy_status{
 		int power;
 		float charge_duration;

@@ -479,7 +479,7 @@ void main_loop(){
 				using namespace game::ecs;
 
 				manifold mf{};
-				math::trans2 trs = {{rand(40.f), rand(20.f)}, rand(180.f)};
+				math::trans2 trs = {{rand(4000.f), rand(2000.f)}, rand(180.f)};
 				mf.hitbox = game::hitbox{hitbox_transed};
 				//game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 4, chamber::tile_size * 4}}}};
 
@@ -491,6 +491,18 @@ void main_loop(){
 				}
 
 				chamber::chamber_manifold cmf{grid};
+
+				cmf.manager.sliced_each([](chamber::turret_build& b){
+					using namespace math;
+
+					auto& body = b.body;
+					body.shoot_type.projectile = &test::projectile_meta;
+					body.shoot_type.burst = {.count = 1, .spacing = 5};
+					body.shoot_type.salvo = {.count = 3};
+					b.rotate_torque = 30;
+
+					body.range.to = 6000;
+				});
 
 				world.component_manager.create_entity_deferred<grided_entity_desc>(mech_motion{.trans = trs},
 					std::move(mf),
@@ -710,7 +722,7 @@ void main_loop(){
 							any = true;
 						});
 
-					if(any){
+					if(true){
 						auto rst = grid.get_dst_sorted_tiles(rect2, (rect2[0] + rect2[3]) / 2, dst.normalize());
 						for (const auto& [idx, tile] : rst | std::views::enumerate){
 							draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),

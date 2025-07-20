@@ -79,7 +79,7 @@ namespace mo_yanxi::game::meta::chamber{
 	struct radar : basic_chamber, ecs::chamber::energy_status{
 		friend basic_chamber;
 
-		math::trans2z transform{};
+		math::pos_trans2z transform{};
 
 		math::range targeting_range_radius{};
 		math::range targeting_range_angular{-math::pi, math::pi};

@@ -57,6 +57,23 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 	};
 
+	math::optional_vec2<float> get_best_tile_of(const building_data& data) noexcept{
+		if(data.get_capability_factor() <= 0.f)return math::nullopt_vec2<float>;
+
+		unsigned idx{};
+		float lastHp{};
+		for (const auto & [i, tile_state] : data.tile_states | std::views::enumerate){
+			if(tile_state.valid_hit_point > lastHp){
+				lastHp = tile_state.valid_hit_point;
+				idx = i;
+				if(lastHp > data.get_tile_individual_max_hitpoint() * .5f)break;
+			}
+		}
+
+		auto lpos = data.index_to_local(idx);
+		return {grid_coord_to_real(lpos.as<int>() + data.get_src_coord())};
+	}
+
 	void turret_build::build_hud(ui::table& where, const entity_ref& eref) const{
 		auto hdl = where.emplace<turret_ui>(eref);
 	}
@@ -78,12 +95,13 @@ namespace mo_yanxi::game::ecs::chamber{
 
 		if(target){
 			auto& motion = target.entity->at<mech_motion>();
-			draw::line::line(acquirer.get(), pos, motion.pos(), 4, ui::theme::colors::theme, ui::theme::colors::accent);
+			auto target_pos = get_local_to_global(target.local_pos());
+			draw::line::line(acquirer.get(), pos, target_pos, 4, ui::theme::colors::theme, ui::theme::colors::accent);
 
-			if(auto rst = estimate_shoot_hit_delay(target.local_pos(), motion.vel.vec, cache_.projectile_speed, body.shoot_type.offset.trunk.x)){
+			if(auto rst = estimate_shoot_hit_delay(target_pos, motion.vel.vec, cache_.projectile_speed, body.shoot_type.offset.trunk.x)){
 				auto mov = rst * motion.vel.vec;
-				draw::line::line(acquirer.get(), pos, motion.pos() + mov, 4, ui::theme::colors::clear, ui::theme::colors::accent);
-				draw::line::square(acquirer, {motion.pos() + mov, 45 * math::deg_to_rad}, 32, 3, ui::theme::colors::accent);
+				draw::line::line(acquirer.get(), pos, target_pos + mov, 4, ui::theme::colors::clear, ui::theme::colors::accent);
+				draw::line::square(acquirer, {target_pos + mov, 45 * math::deg_to_rad}, 32, 3, ui::theme::colors::accent);
 
 			}
 		}
@@ -102,5 +120,65 @@ namespace mo_yanxi::game::ecs::chamber{
 			hdl.set_faction(chunk_meta.id()->at<faction_data>().faction);
 		}
 
+	}
+
+	bool turret_build::update_target() noexcept{
+		if(target){
+			if(
+				!target.update(transform.get_trans() | data().get_trans()) ||
+				!validate_target(target.local_pos())){
+				target = nullptr;
+			}else{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	game::target turret_build::get_new_target() noexcept{
+		return {data().grid().grid_targets.get_optimal()};
+	}
+
+	void turret_build::target_subtarget() noexcept{
+		if(update_subtarget()){
+			return;
+		}
+
+		const auto& grid = target.entity->at<chamber_manifold>();
+
+		const auto trs = get_local_to_global_trans(transform.get_trans());
+		const auto target_local = grid.get_transform().apply_inv_to(trs);
+
+		//TODO quad_tree to building
+		if(!grid.local_grid.quad_tree()->intersect_then(target_local.vec, [this](math::vec2 pos, const math::frect& region){
+			return region.overlap_ring(pos, body.range.from, body.range.to);
+		}, [this](auto&, const tile& tile){
+			if(!tile.building)return false;
+			if(auto* build = tile.building.build_if()){
+				auto& data = build->data();
+				if(auto best = get_best_tile_of(data)){
+					target.target_local_offset = best;
+					sub_target = tile.building;
+					return true;
+				}
+
+				return false;
+			}
+
+			return false;
+		})){
+			target = nullptr;
+		}
+
+	}
+
+	bool turret_build::update_subtarget() noexcept{
+		if(!sub_target)return false;
+		if(auto best = get_best_tile_of(sub_target.data())){
+			target.target_local_offset = best;
+			return true;
+		}
+
+		return false;
 	}
 }

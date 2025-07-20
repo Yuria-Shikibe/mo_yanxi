@@ -128,7 +128,7 @@ namespace mo_yanxi{
 	export
 	template <typename T>
 	constexpr auto pass_fn(T& fn) noexcept{
-		if constexpr (sizeof(T) > sizeof(void*) * 2){
+		if constexpr (sizeof(T) > sizeof(void*) * 2 || !std::constructible_from<T, const T&>){
 			return std::ref(fn);
 		}else{
 			return fn;

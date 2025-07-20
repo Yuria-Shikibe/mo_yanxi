@@ -20,6 +20,7 @@ namespace mo_yanxi::game::ecs{
 	namespace chamber{
 
 		constexpr float stand_by_reload = 120;
+		constexpr float re_target_reload = 20;
 
 		export
 		enum struct turret_state{
@@ -29,9 +30,10 @@ namespace mo_yanxi::game::ecs{
 		};
 
 		struct turret_cache{
-
 			float projectile_speed{};
 		};
+
+		math::optional_vec2<float> get_best_tile_of(const building_data& data) noexcept;
 
 		export
 		struct turret_build : building{
@@ -50,6 +52,9 @@ namespace mo_yanxi::game::ecs{
 			unsigned shoot_index{};
 			float burst_reload{};
 			target target{};
+			building_entity_ref sub_target{};
+
+			float subtarget_reload{};
 
 		private:
 			turret_state state_{};
@@ -124,7 +129,11 @@ namespace mo_yanxi::game::ecs{
 				bool has_target = static_cast<bool>(target);
 				switch(state_){
 				case turret_state::reloading: if(has_target || body.actively_reload){
-					if(const auto rst = math::forward_approach_then(reload, body.reload_duration, delta)){
+						if(const auto rst =
+							math::forward_approach_then(
+								reload, body.reload_duration,
+						        data().get_efficiency() * delta)){
+
 						state_ = turret_state::shoot_staging;
 						reload = 0;
 					}else{
@@ -172,37 +181,39 @@ namespace mo_yanxi::game::ecs{
 				const auto angular_accel = math::constrain_resolve::smooth_approach(target - rotation, rotate_speed, angular_accel_max);
 				rotate_speed += angular_accel.radians() * update_delta_tick;
 				rotate_speed = math::clamp_range(rotate_speed, body.max_rotate_speed);
-				rotation += rotate_speed;
+				rotation.rotate_toward_nearest_clamped(target, math::abs(rotate_speed * update_delta_tick));
 			}
 
-			bool update_target() noexcept{
-				if(target){
-					if(
-						!target.update(transform.get_trans() | data().get_trans()) ||
-						!validate_target(target.local_pos())){
-						target = nullptr;
-					}else{
-						return true;
-					}
-				}
-				return false;
-			}
+			bool update_target() noexcept;
 
+			game::target get_new_target() noexcept;
 
+			void target_subtarget() noexcept;
+
+			bool update_subtarget() noexcept;
 
 		public:
 			void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world) override{
 				if(!update_target()){
 					//TODO fetch target and update;
 					//update instantly
-					target = data().grid().targets_primary.get_optimal();
+					target = get_new_target();
+					subtarget_reload = re_target_reload;
 					update_target();
 				}
 
 				const auto dlt = top_world.component_manager.get_update_delta();
 				reload_turret(dlt, chunk_meta, top_world);
 
+				if(target && subtarget_reload >= re_target_reload){
+					subtarget_reload = 0;
+					target_subtarget();
+				}else{
+					subtarget_reload += dlt;
+				}
+
 				if(target){
+
 					standby_reload = 0;
 					rotate_to(get_estimate_target_rotation().value_or(target.local_pos().angle_rad()), dlt);
 				}else {

@@ -16,6 +16,7 @@ export import mo_yanxi.game.aiming;
 
 import mo_yanxi.concepts;
 
+import :energy_allocation;
 import :chamber;
 import :decl;
 
@@ -50,7 +51,7 @@ namespace mo_yanxi::game{
 namespace mo_yanxi::game::ecs::chamber{
 
 	class tile_grid{
-		friend chamber_grid;
+		friend chamber_grid_fields;
 	public:
 		using tile_type = tile;
 
@@ -230,7 +231,7 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 	};
 
-	class chamber_grid{
+	class chamber_grid_fields{
 	public:
 		using grid = tile_grid;
 
@@ -243,7 +244,7 @@ namespace mo_yanxi::game::ecs::chamber{
 				return tiles.empty() && builds.empty();
 			}
 
-			void update(chamber_grid& grid, const math::rect_box<float>& viewport_in_global) noexcept{
+			void update(chamber_grid_fields& grid, const math::rect_box<float>& viewport_in_global) noexcept{
 				viewport_in_local = grid.box_to_local(viewport_in_global);
 				tiles.clear();
 				builds.clear();
@@ -279,20 +280,23 @@ namespace mo_yanxi::game::ecs::chamber{
 		in_viewports inViewports{};
 
 	protected:
-
 		bool targeting_requested{};
 
 	public:
 		//TODO use reference counter?
+		//TODO private?
+
 		const meta::chamber::grid* meta_grid{};
 
+		energy_allocator energy_allocator{};
+
 		hit_point hit_point{};
-		targeting_queue targets_primary{};
+		targeting_queue grid_targets{};
 		targeting_queue targets_secondary{};
 
-		[[nodiscard]] chamber_grid() = default;
+		[[nodiscard]] chamber_grid_fields() = default;
 
-		[[nodiscard]] explicit chamber_grid(const meta::chamber::grid& grid) : meta_grid(std::addressof(grid)){}
+		[[nodiscard]] explicit chamber_grid_fields(const meta::chamber::grid& grid) : meta_grid(std::addressof(grid)){}
 
 		template <math::quad_like T>
 		[[nodiscard]] constexpr T box_to_local (const T& brief) const noexcept{
@@ -343,45 +347,26 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 
 		[[nodiscard]] std::vector<tile> get_dst_sorted_tiles(
-			this const chamber_grid& grid,
+			this const chamber_grid_fields& grid,
 			const math::frect_box& hitter_box_in_global,
 			math::vec2 basepoint_in_global,
 			math::nor_vec2 normal_in_global
-		){
-			const auto localBox = grid.box_to_local(hitter_box_in_global);
-
-			const auto trans = grid.get_transform();
-			math::vec2 pos{trans.apply_inv_to(basepoint_in_global)};
-			const math::vec2 vel{normal_in_global.rotate_rad(-static_cast<float>(trans.rot))};
-
-			std::vector<tile> under_hit;
-			grid.local_grid.quad_tree()->intersect_then(
-				localBox,
-				box_tile_collider{},
-				[&](const math::frect_box& box, const tile& tile){
-					auto dot = (tile.get_real_pos() - pos).dot(vel);
-					if(dot < 0.0f){
-						pos += vel * dot;
-					}
-					under_hit.push_back(tile);
-				});
-
-			std::ranges::sort(under_hit, pierce_comp{pos, vel}, &tile::get_real_pos);
-			return under_hit;
-		}
+		);
 
 
-		chamber_grid(chamber_grid&& other) noexcept = default;
-		chamber_grid& operator=(chamber_grid&& other) noexcept = default;
+		chamber_grid_fields(chamber_grid_fields&& other) noexcept = default;
+		chamber_grid_fields& operator=(chamber_grid_fields&& other) noexcept = default;
 	};
 
 
 	export
-	struct chamber_manifold : public chamber_grid{
+	struct chamber_manifold : public chamber_grid_fields{
 		[[nodiscard]] chamber_manifold() = default;
 
 		[[nodiscard]] explicit chamber_manifold(const meta::chamber::grid& grid);
 
+
+		//TODO make these only meta grid accessible?
 
 		template <tuple_spec Tuple>
 		void add_building_type(){
@@ -433,7 +418,7 @@ namespace mo_yanxi::game::ecs::chamber{
 		chamber_manifold(const chamber_manifold& other) = delete;
 
 		chamber_manifold(chamber_manifold&& other) noexcept
-			: chamber_grid{(other.manager.do_deferred(), std::move(other))}{
+			: chamber_grid_fields{(other.manager.do_deferred(), std::move(other))}{
 
 			manager.sliced_each([this](building_data& data){
 				data.grid_ = this;
@@ -445,7 +430,7 @@ namespace mo_yanxi::game::ecs::chamber{
 		chamber_manifold& operator=(chamber_manifold&& other) noexcept{
 			if(this == &other) return *this;
 			other.manager.do_deferred();
-			chamber_grid::operator =(std::move(other));
+			chamber_grid_fields::operator =(std::move(other));
 
 			manager.sliced_each([this](building_data& data){
 				data.grid_ = this;

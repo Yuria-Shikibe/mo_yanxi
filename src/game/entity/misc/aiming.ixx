@@ -251,6 +251,7 @@ namespace mo_yanxi::game{
 	export
 	struct target{
 		ecs::entity_ref entity{};
+		math::vec2 target_local_offset{};
 
 	protected:
 		math::vec2 local_pos_{};
@@ -286,7 +287,7 @@ namespace mo_yanxi::game{
 				return false;
 			}
 
-			local_pos_ = self_transform.apply_inv_to((entity->*&ecs::mech_motion::pos)());
+			local_pos_ = self_transform.apply_inv_to(target_local_offset | entity->*&ecs::mech_motion::trans);
 			return true;
 		}
 	};

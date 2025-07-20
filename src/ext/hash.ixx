@@ -104,7 +104,7 @@ namespace mo_yanxi::algo{
 	constexpr std::ranges::iterator_t<Rng> access_hash(
 		Rng&& range,
 		const std::remove_cvref_t<std::indirect_result_t<Proj, std::ranges::iterator_t<Rng>>>& value,
-		Proj proj = {}, Hash hash = {}, EmptyCheck empty_check = {}){
+		Proj proj = {}, Hash hash = {}, EmptyCheck is_empty_pred = {}){
 
 		const auto size = std::ranges::distance(range);
 		static constexpr bool is_pow2 = is_constexpr_range_with_power_of_2_size<Rng&&>();
@@ -126,7 +126,7 @@ namespace mo_yanxi::algo{
 				return cur;
 			}
 
-			if(std::invoke(empty_check, *cur)){
+			if(std::invoke(is_empty_pred, *cur)){
 				return std::ranges::end(range);
 			}
 

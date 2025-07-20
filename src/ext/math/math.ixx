@@ -127,14 +127,13 @@ namespace mo_yanxi::math{
 }
 
 namespace mo_yanxi::math {
-	export constexpr inline std::array SIGNS{ -1, 1 };
-	export constexpr inline std::array ZERO_ONE{ 0, 1 };
-	export constexpr inline std::array BOOLEANS{ true, false };
+	constexpr inline std::array SIGNS{ -1, 1 };
+	constexpr inline std::array ZERO_ONE{ 0, 1 };
+	constexpr inline std::array BOOLEANS{ true, false };
 
-	export constexpr double inline FLOATING_ROUNDING_ERROR = std::numeric_limits<float>::epsilon();
+	constexpr double inline FLOATING_ROUNDING_ERROR = std::numeric_limits<float>::epsilon();
+
 	export constexpr float inline pi                   = std::numbers::pi_v<float>;
-
-
 
 	export
 	template <std::floating_point Fp>
@@ -192,20 +191,35 @@ namespace mo_yanxi::math {
 		return sinTable[static_cast<unsigned>(radians * RAD_TO_INDEX) & SIN_MASK];
 	}
 
+	export MATH_ATTR constexpr float cos(const float radians) noexcept {
+		return sinTable[(static_cast<unsigned>(radians * RAD_TO_INDEX) + SIN_COUNT / 4) & SIN_MASK];
+	}
+
+	export struct cos_sin_result{
+		float cos;
+		float sin;
+	};
+
+	export MATH_ATTR constexpr cos_sin_result cos_sin(const float radians) noexcept{
+		const auto idx = static_cast<unsigned>(radians * RAD_TO_INDEX);
+		return {sinTable[idx + SIN_COUNT / 4 & SIN_MASK], sinTable[idx & SIN_MASK]};
+	}
+
 	export MATH_ATTR constexpr float sin(const float radians, const float scl, const float mag) noexcept {
 		return sin(radians / scl) * mag;
 	}
 
-	export MATH_ATTR constexpr float cos(const float radians) noexcept {
-		return sinTable[static_cast<unsigned>((radians + pi / 2) * RAD_TO_INDEX) & SIN_MASK];
-	}
 
 	export MATH_ATTR constexpr float sin_deg(const float degrees) noexcept {
 		return sinTable[static_cast<unsigned>(degrees * DEG_TO_INDEX) & SIN_MASK];
 	}
 
 	export MATH_ATTR constexpr float cos_deg(const float degrees) noexcept {
-		return sinTable[static_cast<unsigned>((degrees + 90) * DEG_TO_INDEX) & SIN_MASK];
+		return sinTable[static_cast<unsigned>(degrees * DEG_TO_INDEX) + SIN_COUNT / 4 & SIN_MASK];
+	}
+
+	export MATH_ATTR constexpr cos_sin_result cos_sin_deg(const float degree)noexcept{
+		return {cos_deg(degree), sin_deg(degree)};
 	}
 
 	/**
@@ -231,20 +245,6 @@ namespace mo_yanxi::math {
 	export MATH_ATTR constexpr float cos(const float radians, const float scl, const float mag) noexcept {
 		return cos(radians / scl) * mag;
 	}
-
-	export struct cos_sin_result{
-		float cos;
-		float sin;
-	};
-
-	export MATH_ATTR constexpr cos_sin_result cos_sin(const float radians) noexcept{
-		return {cos(radians), sin(radians)};
-	}
-
-	export MATH_ATTR constexpr cos_sin_result cos_sin_deg(const float degree)noexcept{
-		return {cos_deg(degree), sin_deg(degree)};
-	}
-
 
 	export
 	template <typename T>

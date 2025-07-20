@@ -478,6 +478,28 @@ namespace mo_yanxi::math{
 		[[nodiscard]] FORCE_INLINE constexpr vec_t v01() const noexcept{
 			return v3;
 		}
+
+		template <typename S, std::invocable<point2> Fn>
+		void each_tile_within(this S&& self, value_type tile_extent, Fn fn){
+			const rect_t& bound = self.get_bound();
+
+			const point2 src = bound.get_src().div(tile_extent).floor().template as<int>();
+			const point2 end = bound.get_end().div(tile_extent).ceil().template as<int>();
+
+			for(int y = src.y; y != end.y; ++y){
+				for(int x = src.x; x != end.x; ++x){
+					const rect_t tile_bound{tags::unchecked, x * tile_extent, y * tile_extent, tile_extent, tile_extent};
+					if(!self.overlap_exact(tile_bound))continue;
+					if constexpr (std::is_invocable_r_v<bool, Fn, point2>){
+						if(std::invoke(fn, point2{x, y})){
+							return;
+						}
+					}else{
+						std::invoke(fn, point2{x, y});
+					}
+				}
+			}
+		}
 	};
 
 	export using fquad = quad<float>;
@@ -600,6 +622,7 @@ namespace mo_yanxi::math{
 		using base::depart_vector_to_on_vel;
 		using base::depart_vector_to_on_vel_rough_min;
 		using base::depart_vector_to_on_vel_exact;
+		using base::each_tile_within;
 		using base::v00;
 		using base::v10;
 		using base::v11;

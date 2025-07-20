@@ -145,6 +145,14 @@ namespace mo_yanxi::math{
 			return src + size_;
 		}
 
+		[[nodiscard]] FORCE_INLINE constexpr rect_ortho& snap_to_wrap_bound_of(T tile_size) const noexcept{
+			auto end = get_end();
+			src.floor(tile_size);
+			end.ceil(tile_size);
+			size_ = end - src;
+			return *this;
+		}
+
 
 		/**
 		 * @brief set this to the minimum wrapper rect for original this and other
@@ -652,7 +660,7 @@ namespace mo_yanxi::math{
 		[[nodiscard]] FORCE_INLINE rect_ortho<N> round() const noexcept{
 			return rect_ortho<N>{
 					math::round<N>(src.x), math::round<N>(src.y), math::round<N>(size_.x), math::round<N>(size_.y)
-				};
+			};
 		}
 
 		FORCE_INLINE constexpr rect_ortho& set_size(typename vec_t::const_pass_t v) noexcept{
@@ -850,6 +858,37 @@ namespace mo_yanxi::math{
 
 		FORCE_INLINE constexpr rect_ortho& shrink(const T margin) noexcept{
 			return this->shrink(margin, margin);
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr bool within_circle(vec_t pos, T radius) const noexcept{
+			auto r2 = radius * radius;
+			return
+				pos.dst2(vert_00()) <= r2 &&
+					pos.dst2(vert_11()) <= r2 &&
+						pos.dst2(vert_01()) <= r2 &&
+							pos.dst2(vert_10()) <= r2;
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr bool within_ring(vec_t pos, T radius_from, T radius_to) const noexcept{
+			const auto [near, far] = math::minmax(
+				pos.dst2(vert_00()),
+				pos.dst2(vert_11()),
+				pos.dst2(vert_01()),
+				pos.dst2(vert_10())
+			);
+
+			return near >= radius_from * radius_from && far <= radius_to * radius_to;
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr bool overlap_ring(vec_t pos, T radius_from, T radius_to) const noexcept{
+			const auto [near, far] = math::minmax(
+				pos.dst2(vert_00()),
+				pos.dst2(vert_11()),
+				pos.dst2(vert_01()),
+				pos.dst2(vert_10())
+			);
+
+			return far >= radius_from * radius_from && near <= radius_to * radius_to;
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr rect_ortho intersection_with(const rect_ortho& r) const noexcept{

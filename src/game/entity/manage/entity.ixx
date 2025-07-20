@@ -232,6 +232,12 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		template <typename T>
+		[[nodiscard]] bool has() const noexcept{
+			assert(archetype_);
+			return archetype_->has_type<T>();
+		}
+
+		template <typename T>
 		[[nodiscard]] T& at() const noexcept{
 #ifdef COMP_AT_CHECK
 
@@ -1287,8 +1293,8 @@ namespace mo_yanxi::game::ecs{
 	struct component_manager{
 		template <typename T>
 		using small_vector_of = gch::small_vector<T>;
-		using archetype_map_type = fixed_open_hash_map<type_identity_index, std::unique_ptr<archetype_base>>;
-		// using archetype_map_type = std::unordered_map<type_identity, std::unique_ptr<archetype_base>>;
+		// using archetype_map_type = fixed_open_hash_map<type_identity_index, std::unique_ptr<archetype_base>>;
+		using archetype_map_type = std::unordered_map<type_identity_index, std::unique_ptr<archetype_base>>;
 
 	private:
 		//manager should always moved thread safely
@@ -1331,8 +1337,8 @@ namespace mo_yanxi::game::ecs{
 		plf::hive<entity> entities{};
 		archetype_map_type archetypes{};
 
-		fixed_open_hash_map<type_identity_index, std::vector<archetype_slice>> type_to_archetype{};
-		// std::unordered_map<type_identity, std::vector<archetype_slice>> type_to_archetype{};
+		// fixed_open_hash_map<type_identity_index, std::vector<archetype_slice>> type_to_archetype{};
+		std::unordered_map<type_identity_index, std::vector<archetype_slice>> type_to_archetype{};
 
 		no_propagation_mutex<> staging_adds_mutex{};
 		std::vector<std::unique_ptr<staging_add_base>> staging_adds{};
@@ -1562,17 +1568,17 @@ namespace mo_yanxi::game::ecs{
 				using params = unary_apply_to_tuple_t<std::decay_t, tuple_drop_first_elem_t<raw_params>>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				this->slice_and_then<params, Exclusives>([this, f = std::move(fn)](const span_tuple& p){
+				this->slice_and_then<params, Exclusives>([this, f = std::move(fn)](const span_tuple& p) FORCE_INLINE {
 					auto count = std::ranges::size(std::get<0>(p));
 
 					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
 
-					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
 						((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
 					}(std::make_index_sequence<std::tuple_size_v<params>>{});
 
 					for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
-						[&, this] <std::size_t ...Idx> (std::index_sequence<Idx...>){
+						[&, this] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
 							std::invoke(f, *this, *(std::get<Idx>(iterators)++) ...);
 						}(std::make_index_sequence<std::tuple_size_v<params>>{});
 					}
@@ -1739,30 +1745,30 @@ namespace mo_yanxi::game::ecs{
 
 			static constexpr auto comp = std::less<void>{};
 
-			auto cur_itr_min{spans.front().front().identity()};
-			for(std::size_t i = 0; i < std::tuple_size_v<Tuple>; ++i){
+			auto current_target{spans.front().front().identity()};
+			auto current_frontier = current_target;
+			ranges[0] = spans[0];
+			for(std::size_t i = 1; i < std::tuple_size_v<Tuple>; ++i){
 				ranges[i] = spans[i];
-				cur_itr_min = std::max(cur_itr_min, ranges[i].front().identity(), comp);
+				const auto idt = ranges[i].front().identity();
+				current_target = std::max(current_target, idt, comp);
+				current_frontier = std::min(current_frontier, idt, comp);
 			}
 
 			if constexpr (!std::same_as<ReserveFn, std::identity>)(void)std::invoke(reserve_fn, maximum_size);
 			while(true){
-				auto last_itr_min = cur_itr_min;
 				for (auto&& rng : ranges){
 					//TODO will binary search(lower bound) faster?
-					if(comp(rng.front().identity(), last_itr_min)){
+					if(comp(rng.front().identity(), current_target)){
 						++rng.begin_itr;
-
 						if(rng.empty()){
 							return;
 						}
-
+						current_frontier = std::max(current_frontier, rng.front().identity(), comp);
 					}
-
-					cur_itr_min = std::max(cur_itr_min, rng.front().identity(), comp);
 				}
 
-				if(last_itr_min == cur_itr_min){
+				if(current_frontier == current_target){
 					if constexpr (ExclusiveSize > 0){
 						for (const auto& archetype_slice : ranges){
 							if(std::ranges::binary_search(exclusives, archetype_slice.front().identity())){
@@ -1771,11 +1777,25 @@ namespace mo_yanxi::game::ecs{
 						}
 					}
 
+
+					static constexpr auto checker = [] <typename RTup>(const RTup& rng) FORCE_INLINE{
+#if DEBUG_CHECK
+						auto stride = std::get<0>(rng).stride();
+
+						[&] <std::size_t ... Idx>(std::index_sequence<Idx...>) FORCE_INLINE{
+							(assert(std::get<Idx + 1>(rng).stride() == stride && "Incompatible stride"), ...);
+						}(std::make_index_sequence<std::tuple_size_v<RTup> - 1>{});
+#endif
+					};
+
+
 					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
 						if constexpr (std::invocable<Fn, std::array<archetype_slice, std::tuple_size_v<Tuple>>>){
 							std::invoke(fn, std::array<archetype_slice, std::tuple_size_v<Tuple>>{static_cast<subrange&>(ranges[Idx]).front() ...});
 						}else if constexpr (std::invocable<Fn, chunk_spans>){
-							std::invoke(fn, std::make_tuple(static_cast<subrange&>(ranges[Idx]).front().slice<std::tuple_element_t<Idx, Tuple>>() ...));
+							auto rngs = std::make_tuple(static_cast<subrange&>(ranges[Idx]).front().slice<std::tuple_element_t<Idx, Tuple>>() ...);
+							checker(rngs);
+							std::invoke(fn, std::move(rngs));
 						}else{
 							std::invoke(fn, static_cast<subrange&>(ranges[Idx]).front().slice<std::tuple_element_t<Idx, Tuple>>() ...);
 						}
@@ -1783,14 +1803,18 @@ namespace mo_yanxi::game::ecs{
 
 				skip:
 
-					for (auto&& archetype_slice : ranges){
-						++archetype_slice.begin_itr;
-						if(archetype_slice.empty()){
+					for (auto&& rng : ranges){
+						++rng.begin_itr;
+						if(rng.empty()){
 							return;
 						}
-					}
 
-					cur_itr_min = ranges.back().front().identity();
+						const auto idt = rng.front().identity();
+						current_target = std::max(current_target, idt, comp);
+						current_frontier = std::max(current_frontier, idt, comp);
+					}
+				}else if(comp(current_target, current_frontier)){
+					current_target = current_frontier;
 				}
 			}
 		}

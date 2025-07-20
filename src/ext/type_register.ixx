@@ -7,16 +7,27 @@ export module mo_yanxi.type_register;
 import std;
 
 namespace mo_yanxi{
+	// [0x00007ff662428d08 {mo_yanxi.exe!??$idt@ Upower_generator_building_tag@ chamber@ ecs@ game@ mo_yanxi@ @ @ mo_yanxi@
+	// 	@ 3Utype_identity_data@ 1@ B::<!mo_yanxi.type_register>} {fn=0x00007ff6616c970e {mo_yanxi.exe!` mo_yanxi::
+	// 	type_identity_data::type_identity_data<mo_yanxi::game::ecs::chamber::power_generator_building_tag>(std::
+	// 		in_place_type_t<mo_yanxi::game::ecs::chamber::power_generator_building_tag>) __ptr64'::`1'::<lambda_41_>::
+	// 	operator()(void)}, ...}
+
+	template <typename T>
+	consteval std::string_view name() noexcept{
+		return __func__;
+	}
 
 	export
 	struct type_identity_data{
 	private:
 		using Fn = std::type_index() noexcept;
+		std::string_view name;
 		Fn* fn{};
 
 	public:
 		template <typename T>
-		[[nodiscard]] consteval explicit(false) type_identity_data(std::in_place_type_t<T>) : fn{+[] static noexcept {
+		[[nodiscard]] constexpr explicit(false) type_identity_data(std::in_place_type_t<T>) : name(mo_yanxi::name<T>()), fn{+[] static noexcept {
 			return std::type_index(typeid(T));
 		}}{
 

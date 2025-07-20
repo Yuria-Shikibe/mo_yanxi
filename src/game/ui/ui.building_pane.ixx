@@ -51,7 +51,7 @@ namespace mo_yanxi::game::ui{
 			energy_bar.set_bar_state({
 				.power_current = data.get_energy_dynamic_status().power,
 				.power_total = data.energy_status.power,
-				.power_assigned = data.assigned_energy,
+				.power_assigned = data.valid_energy,
 				.power_valid = static_cast<unsigned>(std::abs(data.get_max_usable_energy())),
 				.charge = data.get_energy_dynamic_status().charge,
 				.charge_duration = data.energy_status.charge_duration

@@ -284,28 +284,28 @@ export namespace mo_yanxi::math{
 
 		[[nodiscard]] FORCE_INLINE constexpr bool colinear(const_pass_t other,
 		                                                   const T epsilon = static_cast<T>(
-			                                                   math::FLOATING_ROUNDING_ERROR)) const noexcept{
+			                                                   std::numeric_limits<T>::epsilon())) const noexcept{
 			return this->cross(other).length2() <= epsilon;
 		}
 
 
 		[[nodiscard]] FORCE_INLINE constexpr bool colinear_directional(const_pass_t other,
 		                                                               const T epsilon = static_cast<T>(
-			                                                               math::FLOATING_ROUNDING_ERROR)) const
+			                                                               std::numeric_limits<T>::epsilon())) const
 			noexcept{
 			return this->colinear(other, epsilon) && (this->dot(other) > 0);
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr bool colinear_inv_directional(const_pass_t other,
 		                                                                   const T epsilon = static_cast<T>(
-			                                                                   math::FLOATING_ROUNDING_ERROR)) const
+			                                                                   std::numeric_limits<T>::epsilon())) const
 			noexcept{
 			return this->colinear(other, epsilon) && this->dot(other) < 0;
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr bool perpendicular_with(const_pass_t vector,
 		                                                             const T epsilon = static_cast<T>(
-			                                                             math::FLOATING_ROUNDING_ERROR)) const noexcept{
+			                                                             std::numeric_limits<T>::epsilon())) const noexcept{
 			return math::zero(this->dot(vector), epsilon);
 		}
 

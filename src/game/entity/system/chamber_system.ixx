@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 
 export module mo_yanxi.game.ecs.system.chamber;
 
@@ -27,13 +28,29 @@ namespace mo_yanxi::game::ecs::system{
 						});
 
 
+					float dt = manager.get_update_delta();
+					unsigned valid_sum{};
+					grid.manager.sliced_each(
+						[&, dt](
+						ecs::chamber::building_data& data, ecs::chamber::power_generator_building_tag){
+							auto valid = data.update_energy_state(dt);
+							assert(valid >= 0);
+							valid_sum += valid;
+						});
+
+					grid.energy_allocator.update_allocation(valid_sum);
+					grid.manager.sliced_each(
+						[dt](
+						ecs::chamber::building_data& data, ecs::chamber::power_consumer_building_tag){
+							data.update_energy_state(dt);
+						});
+
 					bool inbound = grid.get_wrap_bound().overlap(top_world.graphic_context.viewport());
 					grid.manager.sliced_each(
-						[&](
-						const component_manager& m,
+						[&, dt](
 						ecs::chamber::building_data& data
 					){
-							data.update(m.get_update_delta());
+							// data.update_energy_state(dt);
 
 							if(inbound)
 								for(auto&& damage_event : data.damage_events){
@@ -46,7 +63,8 @@ namespace mo_yanxi::game::ecs::system{
 													{graphic::colors::aqua.to_light()},
 													{graphic::colors::clear},
 													{
-														graphic::colors::aqua.create_lerp(graphic::colors::white, .5f).
+														graphic::colors::aqua.create_lerp(
+															                      graphic::colors::white, .5f).
 														                      to_light().set_a(.5f),
 														graphic::colors::clear,
 													}
@@ -70,11 +88,11 @@ namespace mo_yanxi::game::ecs::system{
 							float healed{};
 							for(auto& tile_state : data.tile_states){
 								math::approach_inplace_get_delta(tile_state.valid_structure_hit_point, hp,
-								                                 .5 * manager.get_update_delta());
+								                                 .5 * dt);
 
 								if(tile_state.valid_structure_hit_point > hp / 2){
 									healed += math::approach_inplace_get_delta(tile_state.valid_hit_point, hp,
-									                                           .5 * manager.get_update_delta());
+									                                           .5 * dt);
 								}
 							}
 							data.hit_point.heal(healed);

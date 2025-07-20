@@ -10,11 +10,48 @@ import mo_yanxi.ui.graphic;
 import mo_yanxi.ui.creation.generic;
 import mo_yanxi.math.fancy;
 
+
 import mo_yanxi.game.ui.bars;
+import mo_yanxi.strided_span;
 
 namespace mo_yanxi::game::ecs::chamber{
-	chamber_manifold::chamber_manifold(const meta::chamber::grid& grid): chamber_grid(grid){
+	std::vector<tile> chamber_grid_fields::get_dst_sorted_tiles(this const chamber_grid_fields& grid,
+		const math::frect_box& hitter_box_in_global, math::vec2 basepoint_in_global, math::nor_vec2 normal_in_global){
+		const auto localBox = grid.box_to_local(hitter_box_in_global);
+
+		const auto trans = grid.get_transform();
+		math::vec2 pos{trans.apply_inv_to(basepoint_in_global)};
+		const math::vec2 vel{normal_in_global.rotate_rad(-static_cast<float>(trans.rot))};
+
+
+
+		std::vector<tile> under_hit;
+
+		localBox.each_tile_within(tile_size, [&](tile_coord coord){
+			if(auto tile = grid.local_grid.tiles.find(coord); tile && tile->building){
+				auto dot = (tile->get_real_pos() - pos).dot(vel);
+				if(dot < 0.0f){
+					pos += vel * dot;
+				}
+				under_hit.push_back(*tile);
+			}
+		});
+
+		std::ranges::sort(under_hit, pierce_comp{pos, vel}, &tile::get_real_pos);
+		return under_hit;
+	}
+
+	chamber_manifold::chamber_manifold(const meta::chamber::grid& grid): chamber_grid_fields(grid){
 		grid.dump(*this);
+
+		using params = std::tuple<building_data, power_consumer_building_tag>;
+		using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
+
+		manager.slice_and_then<params>([this](const span_tuple& p){
+			energy_allocator.insert_acquisition(std::get<0>(p) | std::views::transform([](building_data& data){
+				return std::addressof<building_data>(data);
+			}));
+		});
 	}
 }
 

@@ -220,25 +220,25 @@ namespace mo_yanxi::math{
 		}
 
 
-		FORCE_INLINE constexpr vector2& set(const T ox, const T oy) noexcept {
+		CONST_FN FORCE_INLINE constexpr vector2& set(const T ox, const T oy) noexcept {
 			this->x = ox;
 			this->y = oy;
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& snap_to(const_pass_t snap, const_pass_t offset = {}) noexcept {
+		CONST_FN FORCE_INLINE constexpr vector2& snap_to(const_pass_t snap, const_pass_t offset = {}) noexcept {
 			this->x = math::snap_to(x, snap.x, offset.x);
 			this->y = math::snap_to(y, snap.y, offset.y);
 
 			return *this;
 		}
 
-		FORCE_INLINE constexpr vector2& set(const T val) noexcept {
+		CONST_FN FORCE_INLINE constexpr vector2& set(const T val) noexcept {
 			return this->set(val, val);
 		}
 
-		FORCE_INLINE constexpr vector2& set(const_pass_t tgt) noexcept {
+		CONST_FN FORCE_INLINE constexpr vector2& set(const_pass_t tgt) noexcept {
 			return this->operator=(tgt);
 		}
 
@@ -472,15 +472,16 @@ namespace mo_yanxi::math{
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& rotate_rad(const Fp rad) noexcept{
+		CONST_FN FORCE_INLINE constexpr vector2& rotate_rad(const Fp rad) noexcept{
+			const auto [c, s] = math::cos_sin(rad);
 			//  Matrix Multi
 			//  cos rad		-sin rad	x    crx   -sry
 			//	sin rad		 cos rad	y	 srx	cry
-			return this->rotate(math::cos(rad), math::sin(rad));
+			return this->rotate(c, s);
 		}
 
 		template <std::floating_point Fp>
-		FORCE_INLINE constexpr vector2& rotate(const Fp cos, const Fp sin) noexcept{
+		CONST_FN FORCE_INLINE constexpr vector2& rotate(const Fp cos, const Fp sin) noexcept{
 			if constexpr(std::floating_point<T>) {
 				return this->set(cos * x - sin * y, sin * x + cos * y);
 			}else {
@@ -829,7 +830,7 @@ namespace mo_yanxi::math{
 
 
 		template <typename N>
-		[[nodiscard]] PURE_FN FORCE_INLINE vector2<N> round() const noexcept requires std::is_floating_point_v<T>{
+		[[nodiscard]] PURE_FN FORCE_INLINE vector2<N> round() const noexcept requires std::floating_point<T>{
 			vector2<N> tgt = as<N>();
 			tgt.x = math::round<N>(x);
 			tgt.y = math::round<N>(y);
@@ -837,7 +838,7 @@ namespace mo_yanxi::math{
 			return tgt;
 		}
 
-		FORCE_INLINE vector2& floor()  noexcept requires std::is_floating_point_v<T>{
+		FORCE_INLINE vector2& floor()  noexcept{
 			if constexpr (std::floating_point<T>){
 				x = std::floor(x);
 				y = std::floor(y);
@@ -846,7 +847,21 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		FORCE_INLINE vector2& ceil()  noexcept requires std::is_floating_point_v<T>{
+		FORCE_INLINE vector2& floor(T stride) noexcept{
+			x = std::floor(x / stride) * stride;
+			y = std::floor(y / stride) * stride;
+
+			return *this;
+		}
+
+		FORCE_INLINE vector2& ceil(T stride) noexcept{
+			x = std::ceil(x / stride) * stride;
+			y = std::ceil(y / stride) * stride;
+
+			return *this;
+		}
+
+		FORCE_INLINE vector2& ceil()  noexcept{
 			if constexpr (std::floating_point<T>){
 				x = std::ceil(x);
 				y = std::ceil(y);
@@ -1173,7 +1188,6 @@ namespace mo_yanxi::math{
 	};
 
 
-
 	export namespace vectors{
 		template <typename N = float>
 		vector2<N> hit_normal(const vector2<N> approach_direction, const vector2<N> tangent){
@@ -1232,6 +1246,10 @@ namespace mo_yanxi::math{
 		};
 	}
 
+
+	export
+	template <std::floating_point T = float>
+	constexpr inline optional_vec2<T> nullopt_vec2 = vectors::constant2<T>::SNaN;
 
 }
 
