@@ -242,12 +242,12 @@ namespace mo_yanxi::game::ecs{
 #ifdef COMP_AT_CHECK
 
 			if(!archetype_){
-				std::println(std::cerr, "[FATAL ERROR] Illegal Access To Chunk<{}> on entity<{}> on empty archetype", typeid(T).name(), type()->type_idx().name());
+				std::println(std::cerr, "[FATAL ERROR] Illegal Access To Chunk<{}> on entity<{}> on empty archetype", name_of<T>(), type()->name());
 				std::terminate();
 			}
 
 			if(!is_inserted()){
-				std::println(std::cerr, "[FATAL ERROR] Illegal Access To Chunk<{}> on entity<{}> before insertion", typeid(T).name(), type()->type_idx().name());
+				std::println(std::cerr, "[FATAL ERROR] Illegal Access To Chunk<{}> on entity<{}> before insertion", name_of<T>(), type()->name());
 				std::terminate();
 			}
 #endif
@@ -256,7 +256,7 @@ namespace mo_yanxi::game::ecs{
 
 #ifdef COMP_AT_CHECK
 			if(!ptr){
-				std::println(std::cerr, "[FATAL ERROR] Illegal Access To Chunk<{}> on entity<{}> at[{}]", typeid(T).name(), type()->type_idx().name(), chunk_index());
+				std::println(std::cerr, "[FATAL ERROR] Illegal Access To Chunk<{}> on entity<{}> at[{}]", name_of<T>(), type()->name(), chunk_index());
 				std::terminate();
 			}
 #endif

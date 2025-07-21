@@ -143,8 +143,10 @@ void mo_yanxi::game::ui::reload_bar::draw_content(mo_yanxi::ui::rect clipSpace) 
 	);
 }
 
-void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opacity, graphic::renderer_ui_ref renderer_ref) const{
-	region.expand(2, 2);
+void mo_yanxi::game::ui::energy_bar_drawer::draw(const math::frect region, float opacity, graphic::renderer_ui_ref renderer_ref) const{
+	// region.expand(2, 2);
+
+	static constexpr float shrinksion = 2;
 
 	unsigned abs_power_total = math::abs(state_.power_total);
 	if(abs_power_total == 0)return;
@@ -161,11 +163,13 @@ void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opaci
 
 	unsigned i = 0;
 
+	acq.acquire(8 + 1 + state_.power_total);
+
 	auto get_unused_color = [&, this]{
 		if(i >= state_.power_valid){
-			return colors::red_dusted;
+			return colors::red_dusted.copy().mul_a(opacity);
 		}else{
-			return state_.power_total > 0 || i < state_.power_assigned ? invalid_color : colors::dark_gray;
+			return state_.power_total > 0 && i < state_.power_assigned ? invalid_color : colors::dark_gray.copy().mul_a(opacity);
 		}
 
 	};
@@ -175,36 +179,57 @@ void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opaci
 		draw::fill::rect_ortho(
 			acq.get(),
 			math::frect{tags::from_extent, region.src + bar_unit_extent.copy().mul(i, 0),
-				bar_unit_extent}.shrink(2), valid_color
+				bar_unit_extent}.shrink(shrinksion), valid_color
 		);
 	}
 
-	if(i == abs_power_total){
-		return;
+	if(i != abs_power_total){
+		{
+			auto charging_region = math::frect{tags::from_extent, region.src + bar_unit_extent.copy().mul(i, 0),
+				   bar_unit_extent}.shrink(shrinksion);
+
+			math::frect c1{charging_region.vert_00(), charging_region.vert_01().add_x(charging_region.width() * get_target_charge_progress())};
+			math::frect c2{c1.vert_10(), charging_region.vert_11()};
+
+			draw::fill::rect_ortho(
+					acq.get(),
+					c1,
+					charging_color
+				);
+
+			draw::fill::rect_ortho(
+					acq.get(),
+					c2,
+					get_unused_color()
+				);
+		}
+
+		++i;
+		for(;i < abs_power_total; ++i){
+			draw::fill::rect_ortho(
+				acq.get(),
+				math::frect{tags::from_extent, region.src + bar_unit_extent.copy().mul(i, 0),
+					bar_unit_extent}.shrink(shrinksion),
+				get_unused_color()
+			);
+		}
 	}
 
-	auto charging_region = math::frect{tags::from_extent, region.src + bar_unit_extent.copy().mul(i, 0),
-				bar_unit_extent.copy().mul(charge_smooth_, 1)};
+	{
+		if(!math::equal(expected_minimum_count_smooth_, expected_count_smooth_)){
+			draw::fill::rect_ortho(
+				acq.get(), math::raw_frect{region.src + bar_unit_extent.copy().mul(expected_minimum_count_smooth_, 0), {0, bar_unit_extent.y}}.expand({
+						shrinksion, 0
+					}), colors::CRIMSON.copy().set_a(opacity));
 
-	draw::fill::rect_ortho(
-			acq.get(),
-			charging_region.copy().shrink(1, 2).move_x(0.5),
-			charging_color
-		);
+		}
 
-	draw::fill::rect_ortho(
-			acq.get(),
-			math::frect{charging_region.vert_10(), region.src + bar_unit_extent.copy().mul(i, 0) + bar_unit_extent}.shrink(1, 2).move_x(-0.5),
-			get_unused_color()
-		);
-
-	++i;
-	for(;i < abs_power_total; ++i){
-		draw::fill::rect_ortho(
-			acq.get(),
-			math::frect{tags::from_extent, region.src + bar_unit_extent.copy().mul(i, 0),
-				bar_unit_extent}.shrink(2),
-			get_unused_color()
-		);
+		if(expected_count_smooth_ > std::numeric_limits<float>::epsilon()){
+			draw::line::rect_ortho(
+				acq, math::raw_frect{region.src, bar_unit_extent.copy().mul(expected_count_smooth_, 1)}.shrink({
+						shrinksion / 2, shrinksion / 2
+					}), shrinksion, colors::pale_green.copy().set_a(opacity));
+		}
 	}
+
 }

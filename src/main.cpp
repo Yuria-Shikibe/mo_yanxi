@@ -475,11 +475,11 @@ void main_loop(){
 
 		{
 			math::rand rand{};
-			for(int i = 0; i < 2; ++i){
+			for(int i = 0; i < 1; ++i){
 				using namespace game::ecs;
 
 				manifold mf{};
-				math::trans2 trs = {{rand(4000.f), rand(2000.f)}, rand(180.f)};
+				math::trans2 trs = {{rand(400.f), rand(200.f)}, rand(180.f)};
 				mf.hitbox = game::hitbox{hitbox_transed};
 				//game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 4, chamber::tile_size * 4}}}};
 
@@ -641,7 +641,7 @@ void main_loop(){
 			acquirer << graphic::draw::white_region;
 			graphic::draw::fill::rect_ortho(
 					acquirer.get(),
-					{math::vec2{}, 40000},
+					math::frect{math::vec2{}, 40000},
 					graphic::colors::black
 				);
 

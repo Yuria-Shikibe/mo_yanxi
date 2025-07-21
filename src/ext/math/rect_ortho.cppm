@@ -36,6 +36,42 @@ namespace mo_yanxi::math{
 		constexpr static rect_ortho_trivial from_vert(vec_t begin, vec_t end) noexcept{
 			return rect_ortho_trivial{begin, end - begin};
 		}
+
+
+		[[nodiscard]] FORCE_INLINE constexpr vec_t vert_00() const noexcept{
+			return src;
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr vec_t vert_10() const noexcept{
+			return {src.x + extent.x, src.y};
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr vec_t vert_01() const noexcept{
+			return {src.x, src.y + extent.y};
+		}
+
+		[[nodiscard]] FORCE_INLINE constexpr vec_t vert_11() const noexcept{
+			return src + extent;
+		}
+
+		FORCE_INLINE rect_ortho_trivial& expand(vec_t expansion) noexcept{
+			extent += expansion * 2;
+			src -= expansion;
+			return *this;
+		}
+
+
+		FORCE_INLINE rect_ortho_trivial& shrink(vec_t shrinsion) noexcept{
+			extent -= shrinsion * 2;
+			src += shrinsion;
+			return *this;
+		}
+		FORCE_INLINE rect_ortho_trivial& move(vec_t mov) noexcept{
+			src += mov;
+			return *this;
+		}
+
+
 	};
 	/**
 	 * \brief width, height should be always non-negative.
@@ -844,16 +880,14 @@ namespace mo_yanxi::math{
 
 		FORCE_INLINE constexpr rect_ortho& shrink(const T marginX, const T marginY) noexcept{
 			(void)this->shrink_x(marginX);
-			(void)this->shrink_y(marginY);
 
-			return *this;
+			return this->shrink_y(marginY);
 		}
 
 		FORCE_INLINE constexpr rect_ortho& shrink(typename vec_t::const_pass_t margin) noexcept{
 			(void)this->shrink_x(margin.x);
-			(void)this->shrink_y(margin.y);
 
-			return *this;
+			return this->shrink_y(margin.y);
 		}
 
 		FORCE_INLINE constexpr rect_ortho& shrink(const T margin) noexcept{
@@ -961,7 +995,7 @@ namespace mo_yanxi::math{
 	//TODO provide trivial rect with no class invariant
 	export
 	template <typename T>
-	using raw_rect = rect_ortho<T>;
+	using raw_rect = rect_ortho_trivial<T>;
 
 	export using raw_frect = raw_rect<float>;
 	export using raw_irect = raw_rect<int>;

@@ -343,6 +343,18 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
+		FORCE_INLINE constexpr vector2& mul_x(const T ox) noexcept {
+			x *= ox;
+
+			return *this;
+		}
+
+		FORCE_INLINE constexpr vector2& mul_y(const T oy) noexcept {
+			y *= oy;
+
+			return *this;
+		}
+
 		FORCE_INLINE constexpr vector2& mul(const T val) noexcept {
 			return this->mul(val, val);
 		}

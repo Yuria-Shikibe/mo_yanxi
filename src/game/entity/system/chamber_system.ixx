@@ -41,6 +41,7 @@ namespace mo_yanxi::game::ecs::system{
 				ecs::chamber::chamber_manifold& grid,
 				const mech_motion& motion
 			){
+
 					grid.update_transform(motion.trans);
 
 					grid.manager.do_deferred();

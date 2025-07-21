@@ -141,6 +141,21 @@ namespace mo_yanxi::graphic::draw{
 				);
 		}
 
+
+		export
+		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+		FORCE_INLINE void rect_ortho(
+			const batch_draw_param<Vtx, UV, Proj>& param,
+			const math::raw_frect rect,
+			col color_scl = colors::white
+			) noexcept {
+			fill::fill(
+				param,
+				rect.vert_00(), rect.vert_10(), rect.vert_11(), rect.vert_01(),
+				color_scl, color_scl, color_scl, color_scl
+				);
+		}
+
 		export
 		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
 		FORCE_INLINE void rect(
@@ -390,6 +405,20 @@ namespace mo_yanxi::graphic::draw{
 		FORCE_INLINE void rect_ortho(
 			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
 			const math::frect rect,
+			const float stroke = 2.f,
+			const color color = colors::white){
+			acquirer_guard _{auto_param, 4};
+			line::line_ortho(auto_param[0], rect.vert_00(), rect.vert_01(), stroke, color, color);
+			line::line_ortho(auto_param[1], rect.vert_01().add_x(stroke), rect.vert_11().add_x(-stroke), stroke, color, color);
+			line::line_ortho(auto_param[2], rect.vert_11(), rect.vert_10(), stroke, color, color);
+			line::line_ortho(auto_param[3], rect.vert_10().add_x(-stroke), rect.vert_00().add_x(stroke), stroke, color, color);
+		}
+
+		export
+		template <typename Vtx, std::derived_from<uniformed_rect_uv> UV = uniformed_rect_uv, typename Proj = basic_batch_param_proj>
+		FORCE_INLINE void rect_ortho(
+			auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+			const math::rect_ortho_trivial<float> rect,
 			const float stroke = 2.f,
 			const color color = colors::white){
 			acquirer_guard _{auto_param, 4};

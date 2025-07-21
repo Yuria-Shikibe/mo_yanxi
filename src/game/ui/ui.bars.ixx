@@ -221,6 +221,8 @@ namespace mo_yanxi::game::ui{
 	struct energy_bar_state{
 		int power_current;
 		int power_total;
+		unsigned power_minimal_expected;
+		unsigned power_expected;
 		unsigned power_assigned;
 		unsigned power_valid;
 
@@ -233,9 +235,14 @@ namespace mo_yanxi::game::ui{
 	private:
 		energy_bar_state state_{};
 
-		float charge_smooth_{};
+		float expected_count_smooth_{};
+		float expected_minimum_count_smooth_{};
 
 	public:
+		[[nodiscard]] float get_target_charge_progress() const noexcept{
+			return state_.charge / state_.charge_duration;
+		}
+
 		explicit operator bool() const noexcept{
 			return state_.power_total != 0;
 		}
@@ -245,13 +252,9 @@ namespace mo_yanxi::game::ui{
 		}
 
 		void update(float delta_in_ticks) noexcept{
-			auto next = state_.charge / state_.charge_duration;
-			if(!std::isfinite(next))next = 0;
-			if(next < charge_smooth_){
-				charge_smooth_ = next;
-			}else{
-				math::lerp_inplace<float>(charge_smooth_, next, delta_in_ticks * 0.075f);
-			}
+			math::lerp_inplace<float>(expected_count_smooth_, state_.power_expected, delta_in_ticks * 0.075f);
+			math::lerp_inplace<float>(expected_minimum_count_smooth_, state_.power_minimal_expected, delta_in_ticks * 0.075f);
+
 		}
 
 		void draw(math::frect region, float opacity, graphic::renderer_ui_ref renderer_ref) const;

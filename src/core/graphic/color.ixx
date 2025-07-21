@@ -626,8 +626,8 @@ namespace mo_yanxi::graphic{
 	namespace colors{
 		export {
 			constexpr inline color white{1, 1, 1, 1};
-			constexpr inline color light_gray{color::from_rgba8888(0xbfbfbfff)};
-			constexpr inline color gray{color::from_rgba8888(0x7f7f7fff)};
+			constexpr inline color light_gray{color::from_rgba8888(0xC8C8C8FF)};
+			constexpr inline color gray{color::from_rgba8888(0x777777FF)};
 			constexpr inline color dark_gray{color::from_rgba8888(0x3f3f3fff)};
 			constexpr inline color black{0, 0, 0, 1};
 			constexpr inline color clear{0, 0, 0, 0};
