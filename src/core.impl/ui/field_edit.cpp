@@ -14,7 +14,7 @@ void mo_yanxi::ui::field_editor::draw_content(const rect clipSpace) const{
 		draw::nine_patch(acq, theme::shapes::base, slider_->get_bound(), colors::black.copy().set_a(.85f));
 	};
 
-	if(slider_->visible && slider_->is_sliding()){
+	if(slider_->visible && slider_->bar.is_sliding()){
 		input_area->draw(clipSpace);
 		// unit_label->draw(clipSpace);
 		draw_shadow();

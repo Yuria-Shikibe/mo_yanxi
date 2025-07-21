@@ -209,12 +209,15 @@ namespace mo_yanxi::game::ecs{
 			energy_dynamic_status energy_dynamic_status_{};
 
 		public:
+			bool set_ideal_energy_acquisition(energy_acquisition acq);
+			bool set_ideal_energy_acquisition(unsigned min, unsigned max);
+
 			void set_energy_status(const chamber::energy_status& status) noexcept{
 				energy_status = status;
 				energy_dynamic_status_ = {};
 
 				if(energy_status.power < 0){
-					ideal_energy_acquisition.count = -energy_status.power;
+					ideal_energy_acquisition.maximum_count = -energy_status.power;
 					ideal_energy_acquisition.minimum_count = 1;
 				}else{
 					ideal_energy_acquisition = {};
@@ -225,7 +228,7 @@ namespace mo_yanxi::game::ecs{
 			[[nodiscard]] energy_acquisition get_real_energy_acquisition() const noexcept{
 				unsigned max = math::abs(get_max_usable_energy());
 				return energy_acquisition{
-					.count = math::min(max, ideal_energy_acquisition.count),
+					.maximum_count = math::min(max, ideal_energy_acquisition.maximum_count),
 					.minimum_count = math::min(max, ideal_energy_acquisition.minimum_count),
 					.priority = ideal_energy_acquisition.priority,
 				};

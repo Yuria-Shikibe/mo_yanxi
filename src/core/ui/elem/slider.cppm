@@ -13,88 +13,79 @@ import mo_yanxi.math;
 import std;
 
 namespace mo_yanxi::ui{
-	export 
-	struct slider : elem{
-
-
-	protected:
-		/**
-		 * @brief Has 2 degree of freedom [x, y]
-		 */
+	export
+	struct slider2d_slot{
+	private:
 		snap_shot<math::vec2> bar_progress_{};
+	public:
+		math::upoint2 segments{};
 
-		std::move_only_function<void(slider&)> callback{};
-
-		[[nodiscard]] math::vec2 getBarMovableSize() const{
-			return content_size() - bar_base_size;
+		[[nodiscard]] math::vec2 get_segment_unit() const noexcept{
+			return math::vec2{segments.x ? 1.f / static_cast<float>(segments.x) : 1.f, segments.y ? 1.f / static_cast<float>(segments.y) : 1.f};
 		}
 
-		[[nodiscard]] math::vec2 getSegmentUnit() const{
-			return getBarMovableSize() / segments.copy().max({1, 1}).as<float>();
+		[[nodiscard]] bool is_segment_move_activated() const noexcept{
+			return static_cast<bool>(segments.x) || static_cast<bool>(segments.y);
 		}
 
-		void moveBar(const math::vec2 baseMovement) noexcept{
+		void move_progress(const math::vec2 movement_in_percent) noexcept{
 			if(is_segment_move_activated()){
 				bar_progress_.temp =
-					(bar_progress_.base + (baseMovement * sensitivity).round_by(getSegmentUnit()) / getBarMovableSize()).clamp_xy({}, {1, 1});
+					(bar_progress_.base + movement_in_percent).round_by(get_segment_unit()).clamp_xy_normalized();
 			} else{
-				bar_progress_.temp = (bar_progress_.base + (baseMovement * sensitivity) / getBarMovableSize()).clamp_xy({}, {1, 1});
+				bar_progress_.temp = (bar_progress_.base + movement_in_percent).clamp_xy({}, {1, 1});
 			}
 		}
 
-		void applyLast(){
+		void move_minimum_delta(const math::vec2 move){
+			if(is_segment_move_activated()){
+				move_progress(move.sign_or_zero().mul(get_segment_unit()));
+			}else{
+				move_progress(move);
+			}
+		}
+
+		void clamp(math::vec2 from, math::vec2 to) noexcept{
+			from.clamp_xy_normalized();
+			to.clamp_xy_normalized();
+			bar_progress_.temp.clamp_xy(from, to);
+			bar_progress_.base.clamp_xy(from, to);
+		}
+
+		void min(math::vec2 min) noexcept{
+			min.max({});
+			bar_progress_.temp.min(min);
+			bar_progress_.base.min(min);
+		}
+
+		void max(math::vec2 max) noexcept{
+			max.min({1, 1});
+			bar_progress_.temp.max(max);
+			bar_progress_.base.max(max);
+		}
+
+		bool apply() noexcept{
 			if(bar_progress_.try_apply()){
-				on_data_changed();
-				if(callback)callback(*this);
+				return true;
 			}
+			return false;
 		}
 
-		void resumeLast(){
+		void resume(){
 			bar_progress_.resume();
 		}
 
-	public:
-		/**
-		 * @brief set 0 to disable one freedom degree
-		 * Negative value is accepted to flip the operation
-		 */
-		math::vec2 sensitivity{1.0f, 1.0f};
-
-		/**
-		 * @brief Negative value is accepted to flip the operation
-		 */
-		math::vec2 scroll_sensitivity{6.0f, 3.0f};
-
-		math::vec2 bar_base_size{10.0f, 10.0f};
-		math::upoint2 segments{};
-
-		[[nodiscard]] slider(scene* scene, group* group)
-			: elem(scene, group){
-
-
-			property.maintain_focus_until_mouse_drop = true;
+		void set_progress_from_segments(math::usize2 current, math::usize2 total){
+			segments = total;
+			set_progress((current.as<float>() / total.as<float>()).nan_to0());
 		}
 
-		template <typename Func>
-		decltype(auto) setCallback(Func&& func){
-			if constexpr (std::invocable<Func, math::usize2>){
-				return std::exchange(callback, [func = std::forward<Func>(func)](const slider& slider){
-					std::invoke(func, slider.segments.copy().scl_round(slider.get_progress()));
-				});
-			}else if constexpr (std::invocable<Func, math::vec2>){
-				return std::exchange(callback, [func = std::forward<Func>(func)](const slider& slider){
-					std::invoke(func, slider.get_progress());
-				});
-			}else if constexpr (std::invocable<Func, slider&>){
-				return std::exchange(callback, std::forward<Func>(func));
-			}else if constexpr (std::invocable<Func>){
-				return std::exchange(callback, [func = std::forward<Func>(func)](slider&){
-					std::invoke(func);
-				});
-			}else{
-				static_assert(false, "callback function type not support");
-			}
+		void set_progress_from_segments_x(unsigned current, unsigned total){
+			set_progress_from_segments({current, 0}, {total, 0});
+		}
 
+		void set_progress_from_segments_y(unsigned current, unsigned total){
+			set_progress_from_segments({0, current}, {0, total});
 		}
 
 		void set_progress(math::vec2 progress) noexcept{
@@ -102,33 +93,81 @@ namespace mo_yanxi::ui{
 			this->bar_progress_ = progress;
 		}
 
-		[[nodiscard]] bool is_segment_move_activated() const noexcept{
-			return static_cast<bool>(segments.x) || static_cast<bool>(segments.y);
+		[[nodiscard]] math::vec2 get_progress() const noexcept{
+			return bar_progress_.base;
 		}
+
+
+		template <typename T>
+		[[nodiscard]] math::vector2<T> get_segments_progress() const noexcept{
+			return (bar_progress_.base.as<double>() * segments.as<double>()).round<T>();
+		}
+
+		[[nodiscard]] math::vec2 get_temp_progress() const noexcept{
+			return bar_progress_.temp;
+		}
+
+		[[nodiscard]] bool is_sliding() const noexcept{
+			return bar_progress_.base != bar_progress_.temp;
+		}
+	};
+
+	export
+	struct raw_slider : elem{
+	private:
+		[[nodiscard]] math::vec2 getBarMovableSize() const{
+			return content_size() - bar_base_size;
+		}
+
+	protected:
+		void check_apply(){
+			if(bar.apply()){
+				on_data_changed();
+			}
+		}
+
+	public:
+		slider2d_slot bar;
+
+		/**
+		 * @brief Negative value is accepted to flip the operation
+		 */
+		math::vec2 scroll_sensitivity{6.0f, 3.0f};
+
+		math::vec2 sensitivity{1.0f, 1.0f};
+
+		math::vec2 bar_base_size{10.0f, 10.0f};
+
+		[[nodiscard]] raw_slider(scene* scene, group* group)
+			: elem(scene, group){
+			property.maintain_focus_until_mouse_drop = true;
+		}
+
 
 		[[nodiscard]] bool is_clamped() const noexcept{
 			return is_clamped_to_hori() || is_clamped_to_vert();
 		}
 
-		[[nodiscard]] math::vec2 get_bar_last_pos() const noexcept{
-			return getBarMovableSize() * bar_progress_.temp;
-		}
-
-		[[nodiscard]] math::vec2 get_bar_cur_pos() const noexcept{
-			return getBarMovableSize() * bar_progress_.base;
-		}
-
 		[[nodiscard]] math::vec2 get_progress() const noexcept{
-			return bar_progress_.base;
+			return bar.get_progress();
 		}
 
-		void set_hori_only() noexcept{ sensitivity.y = 0.0f; }
 
-		[[nodiscard]] bool is_clamped_to_hori() const noexcept{ return sensitivity.y == 0.0f; }
+		void set_hori_only() noexcept{
+			sensitivity.y = 0.0f;
+		}
 
-		void set_vert_only() noexcept{ sensitivity.x = 0.0f; }
+		[[nodiscard]] bool is_clamped_to_hori() const noexcept{
+			return sensitivity.y == 0.0f;
+		}
 
-		[[nodiscard]] bool is_clamped_to_vert() const noexcept{ return sensitivity.x == 0.0f; }
+		void set_vert_only() noexcept{
+			sensitivity.x = 0.0f;
+		}
+
+		[[nodiscard]] bool is_clamped_to_vert() const noexcept{
+			return sensitivity.x == 0.0f;
+		}
 
 	protected:
 		void on_inbound_changed(bool is_inbounded, bool changed) override{
@@ -140,10 +179,25 @@ namespace mo_yanxi::ui{
 
 		}
 
+		void draw_bar(
+			const slider2d_slot& slot,
+			const graphic::color base = graphic::colors::gray,
+			const graphic::color temp = graphic::colors::light_gray
+			) const noexcept;
+
 		void draw_content(rect clipSpace) const override;
 
 		void on_scroll(const input_event::scroll event) override{
+			move_bar(bar, event);
 
+			check_apply();
+		}
+
+	public:
+
+
+	protected:
+		void move_bar(slider2d_slot& slot, const input_event::scroll& event) const{
 			math::vec2 move = event.delta;
 
 			if(event.mode & core::ctrl::mode::shift){
@@ -152,27 +206,14 @@ namespace mo_yanxi::ui{
 			}
 
 			if(is_clamped()){
-				moveBar(scroll_sensitivity * sensitivity.to_sign() * move.y * math::vec2{-1, 1});
+				slot.move_minimum_delta(scroll_sensitivity * sensitivity * move.y * math::vec2{-1, 1});
 			} else{
-				if(is_segment_move_activated()){
-					move.to_sign().mul(getSegmentUnit());
-				} else{
-					move *= scroll_sensitivity;
-				}
-				moveBar(move);
+				slot.move_progress(scroll_sensitivity * sensitivity * move);
 			}
-
-			applyLast();
 		}
 
-	public:
-		bool is_sliding() const noexcept{
-			return bar_progress_.base != bar_progress_.temp;
-		}
-
-	protected:
 		void on_drag(const input_event::drag event) override{
-			moveBar(event.trans());
+			bar.move_progress(event.trans() * sensitivity / content_size());
 		}
 
 		input_event::click_result on_click(const input_event::click click_event) override{
@@ -183,16 +224,15 @@ namespace mo_yanxi::ui{
 			switch(action){
 			case core::ctrl::act::press :{
 				if(mode == core::ctrl::mode::ctrl){
-					const auto move =
-						click_event.pos - (get_progress() * content_size() + content_src_pos());
-					moveBar(move);
-					applyLast();
+					const auto move = (click_event.pos - (get_progress() * content_size() + content_src_pos())) / content_size();
+					bar.move_progress(move * sensitivity.sign_or_zero());
+					check_apply();
 				}
 				break;
 			}
 
 			case core::ctrl::act::release :{
-				applyLast();
+				check_apply();
 			}
 
 			default : break;
@@ -210,5 +250,43 @@ namespace mo_yanxi::ui{
 			};
 		}
 
+	};
+
+	export
+	struct slider : raw_slider{
+	private:
+		std::move_only_function<void(slider&)> callback{};
+
+	public:
+		[[nodiscard]] slider(scene* scene, group* group)
+			: raw_slider(scene, group){
+		}
+
+		template <typename Func>
+		decltype(auto) set_callback(Func&& func){
+			if constexpr (std::invocable<Func, math::usize2>){
+				return std::exchange(callback, [func = std::forward<Func>(func)](const slider& slider){
+					std::invoke(func, slider.bar.get_segments_progress<unsigned>());
+				});
+			}else if constexpr (std::invocable<Func, math::vec2>){
+				return std::exchange(callback, [func = std::forward<Func>(func)](const slider& slider){
+					std::invoke(func, slider.get_progress());
+				});
+			}else if constexpr (std::invocable<Func, slider&>){
+				return std::exchange(callback, std::forward<Func>(func));
+			}else if constexpr (std::invocable<Func>){
+				return std::exchange(callback, [func = std::forward<Func>(func)](slider&){
+					std::invoke(func);
+				});
+			}else{
+				static_assert(false, "callback function type not support");
+			}
+
+		}
+
+	protected:
+		void on_data_changed() override{
+			if(callback)callback(*this);
+		}
 	};
 }

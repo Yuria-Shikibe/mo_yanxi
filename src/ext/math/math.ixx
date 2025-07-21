@@ -602,10 +602,6 @@ namespace mo_yanxi::math {
 		}
 	}
 
-	/** Returns 1 if true, -1 if false. */
-	export MATH_ATTR constexpr int sign(const bool b) noexcept {
-		return b ? 1 : -1;
-	}
 
 	export
 	template <unsigned Exponent, typename T>
@@ -942,6 +938,9 @@ namespace mo_yanxi::math {
 	export
 	template <mo_yanxi::arithmetic T>
 	MATH_ATTR T round(const T num, const T step) {
+		if(step == 0){
+			return num;
+		}
 		if constexpr (std::floating_point<T>){
 			return static_cast<T>(std::round(num / step) * step);
 		}else{

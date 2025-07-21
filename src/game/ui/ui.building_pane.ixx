@@ -52,7 +52,7 @@ namespace mo_yanxi::game::ui{
 				.power_current = data.get_energy_dynamic_status().power,
 				.power_total = data.energy_status.power,
 				.power_minimal_expected = data.ideal_energy_acquisition.minimum_count,
-				.power_expected = data.ideal_energy_acquisition.count,
+				.power_expected = data.ideal_energy_acquisition.maximum_count,
 				.power_assigned = data.valid_energy,
 				.power_valid = static_cast<unsigned>(std::abs(data.get_max_usable_energy())),
 				.charge = data.get_energy_dynamic_status().charge,
@@ -129,6 +129,14 @@ namespace mo_yanxi::game::ui{
 		}
 	};
 
+	struct building_energy_bar_setter /*:*/ {
+	private:
+		ecs::chamber::building_entity_ref entity{};
+
+	public:
+		void build();
+	};
+
 	export
 	struct building_pane final : ui::list{
 		[[nodiscard]] building_pane(
@@ -139,29 +147,7 @@ namespace mo_yanxi::game::ui{
 			  entity(std::move(e)){
 			interactivity = interactivity::enabled;
 
-
-			auto name = emplace<ui::label>();
-			name->set_fit();
-			name->set_style();
-			name->prop().boarder.set(4);
-			name.cell().pad.set(8);
-			name.cell().set_size(40);
-
-			{
-				auto p = emplace<bars_pane>(entity);
-				p->set_style();
-				p.cell().set_external();
-
-				if(entity){
-					auto& data = this->entity.data();
-					if(auto meta = data.get_meta()){
-						name->set_text(meta->get_meta_info().name);
-					}
-					p->info.set_state();
-				}
-			}
-
-
+			build();
 		}
 
 		ecs::chamber::building_entity_ref entity{};
@@ -172,6 +158,7 @@ namespace mo_yanxi::game::ui{
 		}
 
 	private:
+		void build();
 		void on_focus_changed(bool is_focused) override{
 			elem::on_focus_changed(is_focused);
 

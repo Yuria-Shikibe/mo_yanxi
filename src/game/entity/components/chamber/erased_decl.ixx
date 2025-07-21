@@ -18,12 +18,12 @@ namespace mo_yanxi::game::ecs::chamber{
 
 	export
 	struct energy_acquisition{
-		unsigned count;
+		unsigned maximum_count;
 		unsigned minimum_count;
 		float priority;
 
 		constexpr unsigned get_append_count() const noexcept{
-			return count - minimum_count;
+			return maximum_count - minimum_count;
 		}
 
 		constexpr bool operator==(const energy_acquisition&) const noexcept = default;
@@ -46,6 +46,13 @@ namespace mo_yanxi::game::ecs::chamber{
 
 		FORCE_INLINE explicit operator bool() const noexcept{
 			return power != 0;
+		}
+
+		[[nodiscard]] bool is_consumer() const noexcept{
+			return power < 0;
+		}
+		[[nodiscard]] unsigned abs_power() const noexcept{
+			return std::abs(power);
 		}
 	};
 

@@ -169,7 +169,7 @@ void mo_yanxi::game::ui::energy_bar_drawer::draw(const math::frect region, float
 		if(i >= state_.power_valid){
 			return colors::red_dusted.copy().mul_a(opacity);
 		}else{
-			return state_.power_total > 0 && i < state_.power_assigned ? invalid_color : colors::dark_gray.copy().mul_a(opacity);
+			return state_.power_total > 0 || i < state_.power_assigned ? invalid_color : colors::dark_gray.copy().mul_a(opacity);
 		}
 
 	};

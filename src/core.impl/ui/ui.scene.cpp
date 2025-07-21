@@ -349,9 +349,9 @@ void mo_yanxi::ui::scene::draw(math::frect clipSpace) const{
 
 		for (const auto & independent_draw : independent_draw_){
 			independent_draw.elem->draw_independent();
-
 		}
 
+		renderer.batch->consume_all();
 		renderer.batch.blit_viewport(get_region());
 
 	}else{

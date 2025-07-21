@@ -81,7 +81,7 @@ namespace mo_yanxi::core{
 			}
 #endif
 
-			globalDelta = deltaSetter(globalTime);
+			globalDelta = std::clamp<double>(deltaSetter(globalTime), 0, 5. / 60.);
 			globalTime = timerSetter();
 
 			updateDelta = paused ? RawSec{0} : globalDelta;

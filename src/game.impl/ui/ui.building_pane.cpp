@@ -1,6 +1,9 @@
 module mo_yanxi.game.ui.building_pane;
 
 import mo_yanxi.core.global.graphic;
+
+import mo_yanxi.ui.elem.slider;
+
 import mo_yanxi.ui.graphic;
 
 namespace mo_yanxi::graphic::draw{
@@ -66,6 +69,164 @@ namespace mo_yanxi::graphic::draw{
 	}
 }
 
+namespace mo_yanxi::game{
+	struct build_energy_slider : mo_yanxi::ui::raw_slider{
+		ui::slider2d_slot bar2{};
+
+		ecs::chamber::building_entity_ref ref{};
+
+		[[nodiscard]] build_energy_slider(ui::scene* scene, ui::group* group,
+			const ecs::chamber::building_entity_ref& ref)
+			: raw_slider(scene, group),
+			  ref(ref){
+
+			this->set_hori_only();
+
+			if(ref){
+				auto& data = ref.data();
+				bar.set_progress_from_segments_x(data.ideal_energy_acquisition.maximum_count, data.energy_status.abs_power());
+				bar2.set_progress_from_segments_x(data.ideal_energy_acquisition.minimum_count, data.energy_status.abs_power());
+			}
+		}
+
+	protected:
+		void check_apply_2(){
+			if(bar2.apply()){
+				if(ref){
+					auto& data = ref.data();
+					auto power = bar2.get_segments_progress<unsigned>().x;
+					data.set_ideal_energy_acquisition(math::min(data.ideal_energy_acquisition.maximum_count, power), data.ideal_energy_acquisition.maximum_count);
+				}
+			}
+		}
+
+		void on_data_changed() override{
+			if(ref){
+				auto& data = ref.data();
+				auto power = bar.get_segments_progress<unsigned>().x;
+				auto min_power = bar2.get_segments_progress<unsigned>().x;
+
+				data.set_ideal_energy_acquisition(math::min(power, min_power), power);
+			}
+		}
+
+
+		void on_scroll(const ui::input_event::scroll event) override{
+			if(event.mode == core::ctrl::mode::alt){
+				move_bar(bar2, event);
+
+				check_apply_2();
+			}
+
+			if(event.mode == core::ctrl::mode::none){
+				move_bar(bar, event);
+
+				check_apply();
+			}
+		}
+
+		void on_drag(const ui::input_event::drag event) override{
+			if(event.code.mode() == core::ctrl::mode::alt){
+				bar2.move_progress(event.trans() * sensitivity / content_size());
+			}
+
+			if(event.code.mode() == core::ctrl::mode::none){
+				bar.move_progress(event.trans() * sensitivity / content_size());
+			}
+		}
+
+		ui::input_event::click_result on_click(const ui::input_event::click click_event) override{
+			elem::on_click(click_event);
+
+			const auto [key, action, mode] = click_event.unpack();
+
+			switch(action){
+			case core::ctrl::act::press :{
+				if(mode == core::ctrl::mode::ctrl){
+					const auto move = (click_event.pos - (bar.get_progress() * content_size() + content_src_pos())) / content_size();
+					bar.move_progress(move * sensitivity.copy().sign_or_zero());
+					check_apply();
+				}
+				if(mode == (core::ctrl::mode::ctrl | core::ctrl::mode::alt)){
+					const auto move = (click_event.pos - (bar2.get_progress() * content_size() + content_src_pos())) / content_size();
+					bar2.move_progress(move * sensitivity.copy().sign_or_zero());
+					check_apply_2();
+				}
+				break;
+			}
+
+			case core::ctrl::act::release :{
+				check_apply();
+				check_apply_2();
+			}
+
+			default : break;
+			}
+
+			return ui::input_event::click_result::intercepted;
+		}
+
+		void draw_content(const ui::rect clipSpace) const override{
+			elem::draw_content(clipSpace);
+
+			using namespace graphic::colors;
+			static constexpr auto c2 = CRIMSON.create_lerp(light_gray, .5f);
+			static constexpr auto c1 = power.create_lerp(light_gray, .2f);
+
+			draw_bar(bar2, c2.copy().mul_rgba(.75f), c2);
+
+			draw_bar(bar, c1.copy().mul_rgba(.75f), c1);
+		}
+
+	};
+}
+
+void mo_yanxi::game::ui::building_energy_bar_setter::build(){
+
+}
+
+void mo_yanxi::game::ui::building_pane::build(){
+
+	auto name = emplace<ui::label>();
+	name->set_fit();
+	name->set_style();
+	name->prop().boarder.set(4);
+	name.cell().pad.set(8);
+	name.cell().set_size(40);
+
+	{
+		auto p = emplace<bars_pane>(entity);
+		p->set_style();
+		p.cell().set_external();
+
+		if(entity){
+			auto& data = this->entity.data();
+			if(auto meta = data.get_meta()){
+				name->set_text(meta->get_meta_info().name);
+			}
+			p->info.set_state();
+		}
+	}
+
+	set_tooltip_state({
+		.layout_info = tooltip_layout_info{
+			.follow = tooltip_follow::owner,
+			.align_owner = align::pos::top_right,
+			.align_tooltip = align::pos::top_left,
+		},
+		.use_stagnate_time = false,
+		.auto_release = true,
+	}, [this](ui::list& list){
+		list.prop().size.set_minimum_size({400, 0});
+		list.template_cell.set_size(50);
+		list.template_cell.pad.set(4);
+
+		if(entity && entity.data().energy_status.is_consumer())list.emplace<build_energy_slider>(entity);
+		list.emplace<ui::elem>();
+		list.emplace<ui::elem>();
+		list.emplace<ui::elem>();
+	});
+}
 
 void mo_yanxi::game::ui::building_pane::draw_content(const rect clipSpace) const{
 	list::draw_content(clipSpace);

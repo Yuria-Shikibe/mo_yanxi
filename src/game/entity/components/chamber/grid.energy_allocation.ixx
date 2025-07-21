@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 #include <gfx/timsort.hpp>
 
 export module mo_yanxi.game.ecs.component.chamber:energy_allocation;
@@ -43,9 +44,9 @@ namespace mo_yanxi::game::ecs::chamber{
 					result.priority_changed = result.priority_changed || acq.priority != acquisition.last_acquisition.priority;
 					acquisition.last_acquisition = acq;
 				}
-
+				assert(acq.minimum_count <= acq.maximum_count);
 				result.total_minimum_requirements += acq.minimum_count;
-				result.total_requirements += acq.count;
+				result.total_requirements += acq.maximum_count;
 			}
 			return result;
 		}
@@ -87,7 +88,7 @@ namespace mo_yanxi::game::ecs::chamber{
 			if(check.total_requirements <= valid_energy){
 				//fully valid
 				for (const auto & acquisition : acquisitions_){
-					acquisition.owner->valid_energy = acquisition.last_acquisition.count;
+					acquisition.owner->valid_energy = acquisition.last_acquisition.maximum_count;
 				}
 				return;
 			}

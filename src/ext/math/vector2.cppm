@@ -602,6 +602,13 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
+
+		FORCE_INLINE constexpr vector2& clamp_xy_normalized() noexcept {
+			x = math::clamp<T>(x, 0, 1);
+			y = math::clamp<T>(y, 0, 1);
+			return *this;
+		}
+
 		FORCE_INLINE constexpr vector2& clamp_y(const T min, const T max) noexcept {
 			y = math::clamp(y, min, max);
 			return *this;
@@ -797,25 +804,25 @@ namespace mo_yanxi::math{
 		/**
 		 * \brief clockwise rotation
 		 */
-		[[deprecated]] FORCE_INLINE constexpr vector2& rotate_rt() noexcept requires std::is_signed_v<T> {
+		[[deprecated]] FORCE_INLINE constexpr vector2& rotate_rt() noexcept requires (std::is_signed_v<T>) {
 			return rotate_rt_clockwise();
 		}
 
 		/**
 		 * \brief counterclockwise rotation
 		 */
-		FORCE_INLINE constexpr vector2& rotate_rt_counter_clockwise() noexcept requires std::is_signed_v<T> {
+		FORCE_INLINE constexpr vector2& rotate_rt_counter_clockwise() noexcept requires (std::is_signed_v<T>) {
 			return this->set(y, -x);
 		}
 
-		FORCE_INLINE vector2& round_by(const_pass_t other) noexcept requires std::is_floating_point_v<T>{
+		FORCE_INLINE vector2& round_by(const_pass_t other) noexcept requires (std::floating_point<T>){
 			x = math::round<T>(x, other.x);
 			y = math::round<T>(y, other.y);
 
 			return *this;
 		}
 
-		FORCE_INLINE vector2& round_by(const T val) noexcept requires std::is_floating_point_v<T>{
+		FORCE_INLINE vector2& round_by(const T val) noexcept requires (std::floating_point<T>){
 			x = math::round<T>(x, val);
 			y = math::round<T>(y, val);
 
@@ -842,7 +849,7 @@ namespace mo_yanxi::math{
 
 
 		template <typename N>
-		[[nodiscard]] PURE_FN FORCE_INLINE vector2<N> round() const noexcept requires std::floating_point<T>{
+		[[nodiscard]] PURE_FN FORCE_INLINE vector2<N> round() const noexcept requires (std::floating_point<T>){
 			vector2<N> tgt = as<N>();
 			tgt.x = math::round<N>(x);
 			tgt.y = math::round<N>(y);
@@ -923,7 +930,10 @@ namespace mo_yanxi::math{
 		}
 
 		[[nodiscard]] PURE_FN FORCE_INLINE constexpr vector2 sign() const noexcept{
-			return {x >= 0 ? 1 : -1, y >= 0 ? 1 : -1};
+			if constexpr (std::is_unsigned_v<T>){
+				return {T{1}, T{1}};
+			}
+			return {static_cast<T>(x >= 0 ? 1 : -1), static_cast<T>(y >= 0 ? 1 : -1)};
 		}
 
 		[[nodiscard]] PURE_FN FORCE_INLINE constexpr bool within(const_pass_t other_in_axis) const noexcept{

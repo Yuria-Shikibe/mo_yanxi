@@ -32,7 +32,7 @@ namespace mo_yanxi::ui{
 
 					return 0.f;
 				}, get_edit_target());
-				get_editor().slider_->set_progress({math::clamp(val), 0});
+				get_editor().slider_->bar.set_progress({math::clamp(val), 0});
 			}
 
 			[[nodiscard]] field_editor& get_editor() const noexcept{
@@ -66,7 +66,7 @@ namespace mo_yanxi::ui{
 
 			input_event::click_result on_click(const input_event::click click_event) override{
 				if(click_event.code.mode() & core::ctrl::mode::alt){
-					if(click_event.code.action() == core::ctrl::act::release)applyLast();
+					if(click_event.code.action() == core::ctrl::act::release)check_apply();
 					return input_event::click_result::spread;
 				}
 				return slider::on_click(click_event);
@@ -88,8 +88,8 @@ namespace mo_yanxi::ui{
 				disabled = !visible;
 
 				if(visible){
-					if(is_sliding()){
-						notify_update(bar_progress_.temp.x);
+					if(bar.is_sliding()){
+						notify_update(bar.get_temp_progress().x);
 					}
 				}
 			}

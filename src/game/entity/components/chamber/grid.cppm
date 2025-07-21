@@ -539,6 +539,24 @@ namespace mo_yanxi::game::ecs{
 			return trans2 | data().get_trans();
 		}
 
+		bool building_data::set_ideal_energy_acquisition(energy_acquisition acq){
+			if(acq != ideal_energy_acquisition){
+				grid().energy_status_maybe_changed |= true;
+				ideal_energy_acquisition = acq;
+				return true;
+			}
+			return false;
+		}
+
+		bool building_data::set_ideal_energy_acquisition(unsigned min, unsigned max){
+			if(ideal_energy_acquisition.minimum_count == min && ideal_energy_acquisition.maximum_count == max)return false;
+			ideal_energy_acquisition.minimum_count = min;
+			ideal_energy_acquisition.maximum_count = max;
+			grid().energy_status_maybe_changed |= true;
+
+			return true;
+		}
+
 		math::trans2 building_data::get_trans() const noexcept{
 			auto trs = grid_->get_transform();
 			return {region().get_src().mul(tile_size_integral).as<float>() | trs, trs.rot};
