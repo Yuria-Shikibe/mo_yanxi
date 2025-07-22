@@ -297,6 +297,8 @@ namespace mo_yanxi::ui{
 	};
 
 	export struct elem_fields{
+		friend scene;
+
 		std::string name{};
 
 		elem_prop property{};
@@ -327,6 +329,9 @@ namespace mo_yanxi::ui{
 		//TODO move this to property?
 		bool skip_inbound_capture{};
 
+	private:
+		bool has_scene_direct_access{false};
+	public:
 		//Layout Spec
 		layout_state layout_state{};
 		interactivity interactivity{interactivity::enabled};

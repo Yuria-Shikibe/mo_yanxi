@@ -815,14 +815,14 @@ namespace mo_yanxi::math{
 			return this->set(y, -x);
 		}
 
-		FORCE_INLINE vector2& round_by(const_pass_t other) noexcept requires (std::floating_point<T>){
+		FORCE_INLINE vector2& round_to(const_pass_t other) noexcept requires (std::floating_point<T>){
 			x = math::round<T>(x, other.x);
 			y = math::round<T>(y, other.y);
 
 			return *this;
 		}
 
-		FORCE_INLINE vector2& round_by(const T val) noexcept requires (std::floating_point<T>){
+		FORCE_INLINE vector2& round_to(const T val) noexcept requires (std::floating_point<T>){
 			x = math::round<T>(x, val);
 			y = math::round<T>(y, val);
 

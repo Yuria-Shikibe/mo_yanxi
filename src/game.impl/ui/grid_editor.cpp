@@ -48,11 +48,11 @@ void mo_yanxi::game::ui::grid_editor_viewport::grid_info_bar::draw_content(const
 
 
 	for(unsigned i = 0; i < max_generate; ++i){
-		draw::fill::rect_ortho(acquirer.get_reserved(max_generate), rect{tags::from_extent, src.copy().add_y(i * height), width, height}.shrink(2), colors::power);
+		draw::fill::rect_ortho(acquirer.get(max_generate), rect{tags::from_extent, src.copy().add_y(i * height), width, height}.shrink(2), colors::power);
 	}
 
 	for(unsigned i = 0; i < max_consume; ++i){
-		draw::fill::rect_ortho(acquirer.get_reserved(max_consume), rect{tags::from_extent, src.copy().add(width, i * height), width, height}.shrink(2), colors::red_dusted);
+		draw::fill::rect_ortho(acquirer.get(max_consume), rect{tags::from_extent, src.copy().add(width, i * height), width, height}.shrink(2), colors::red_dusted);
 	}
 
 
@@ -78,60 +78,106 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 		draw::line::quad_expanded(acquirer, comp.crop().view_as_quad(), -4, colors::light_gray.copy().set_a(.35));
 	}
 
-	grid.draw(r, camera);
+	auto placement_drawer = [this, &acquirer](math::usize2 chamber_extent, math::raw_frect region, auto pred){
+		math::irect place_region = get_selected_place_region(chamber_extent, region);
+		draw::line::rect_ortho(acquirer, place_region.as<float>().scl(ecs::chamber::tile_size, ecs::chamber::tile_size), 4, colors::pale_green);
 
-	acquirer.proj.mode_flag = {};
-	acquirer.proj.set_layer(ui::draw_layers::def);
+		auto chamber_sz = chamber_extent.as<int>();
 
-	if (current_chamber && get_scene()->get_input_mode() == 0){
-		auto extent = current_chamber->extent.as<int>();
-		auto currentCoord = get_current_tile_coord();
-		math::irect to_place_region{tags::from_extent, currentCoord, extent};
-		auto world_region = get_region_at(to_place_region);
+		acquirer.proj.mode_flag = draw::mode_flags::slide_line;
+		game::each_tile(place_region, chamber_sz, [&, this](math::point2 pos){
+			if(auto idxp = grid.coord_to_index(pos)){
+				if(pred(*idxp)){
+					draw::fill::rect_ortho(acquirer.get(), get_region_at({tags::from_extent, pos, chamber_sz}).shrink(4), colors::pale_green.copy().set_a(.5f));
+				}
+			}
+		});
+		acquirer.proj.mode_flag = {};
+	};
 
-		if(auto idxp = grid.coord_to_index(currentCoord); idxp && grid.is_building_placeable_at(*idxp, *current_chamber)){
-			draw::line::rect_ortho(acquirer, world_region, 4, colors::pale_green.copy().set_a(.5f));
+	auto remove_drawer = [this, &acquirer](math::raw_frect region, auto pred){
+		math::irect place_region = get_selected_place_region({1, 1}, region);
+		draw::line::rect_ortho(acquirer, place_region.as<float>().scl(ecs::chamber::tile_size, ecs::chamber::tile_size), 4, colors::red_dusted);
+
+		acquirer.proj.mode_flag = draw::mode_flags::slide_line;
+		game::each_tile(place_region, math::isize2{1, 1}, [&, this](math::point2 pos){
+			if(auto idxp = grid.coord_to_index(pos)){
+				if(pred(*idxp)){
+					draw::fill::rect_ortho(acquirer.get(), get_region_at({pos, 1, 1}).shrink(4), colors::red_dusted.copy().set_a(.5f));
+				}
+			}
+		});
+		acquirer.proj.mode_flag = {};
+	};
+
+	if(focus_on_grid){
+		if(grid_op_ == operation::move){
+			grid.draw(r, camera, {}, .5f);
+			grid.draw(r, camera, get_grid_edit_offset(get_scene()->get_cursor_pos()));
 		}else{
-			draw::line::rect_ortho(acquirer, world_region, 4, colors::red_dusted.copy().set_a(.5f));
+			grid.draw(r, camera);
+
+			if (get_scene()->get_input_mode() == 0){
+				auto currentCoord = get_transferred_cursor_pos().div(ecs::chamber::tile_size).floor().as<int>();
+				math::irect to_place_region{tags::from_extent, currentCoord, 1, 1};
+				auto world_region = get_region_at(to_place_region);
+
+				if(auto idxp = grid.coord_to_index(currentCoord)){
+					draw::line::rect_ortho(acquirer, world_region, 4, colors::pale_green.copy().set_a(.5f));
+				}
+			}
+
+			if(last_click_ && get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift){
+				math::rect_ortho_trivial rect{get_select_box(last_click_)};
+
+				if(get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
+					placement_drawer({1, 1}, rect, [this](math::upoint2 idx){
+						return !grid[idx].placeable;
+					});
+				}else if(get_scene()->is_mouse_pressed(core::ctrl::mouse::RMB)){
+					remove_drawer(rect, [this](math::upoint2 idx){
+						return grid[idx].placeable && grid[idx].building == nullptr;
+					});
+				}
+			}
+		}
+	}else{
+		grid.draw(r, camera);
+
+		acquirer.proj.mode_flag = {};
+		acquirer.proj.set_layer(ui::draw_layers::def);
+
+		if (current_chamber && get_scene()->get_input_mode() == 0){
+			auto extent = current_chamber->extent.as<int>();
+			auto currentCoord = get_current_tile_coord();
+			math::irect to_place_region{tags::from_extent, currentCoord, extent};
+			auto world_region = get_region_at(to_place_region);
+
+			if(auto idxp = grid.coord_to_index(currentCoord); idxp && grid.is_building_placeable_at(*idxp, *current_chamber)){
+				draw::line::rect_ortho(acquirer, world_region, 4, colors::pale_green.copy().set_a(.5f));
+			}else{
+				draw::line::rect_ortho(acquirer, world_region, 4, colors::red_dusted.copy().set_a(.5f));
+			}
+		}
+
+		if(last_click_ && get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift){
+			math::rect_ortho_trivial rect{get_select_box(last_click_)};
+
+			if(current_chamber && get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
+				placement_drawer(current_chamber->extent, rect, [this](math::upoint2 idx){
+					return grid.is_building_placeable_at(idx, *current_chamber);
+				});
+			}
+
+			if(get_scene()->is_mouse_pressed(core::ctrl::mouse::RMB)){
+				remove_drawer(rect, [this](math::upoint2 idx){
+					return grid[idx].building != nullptr;
+				});
+			}
 		}
 
 	}
 
-	if(last_click_ && get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift){
-		math::rect_ortho_trivial rect{get_select_box()};
-
-		if(current_chamber && get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
-			math::irect place_region = get_selected_place_region(current_chamber->extent, rect);
-			draw::line::rect_ortho(acquirer, place_region.as<float>().scl(ecs::chamber::tile_size, ecs::chamber::tile_size), 4, colors::pale_green);
-
-			auto chamber_sz = current_chamber->extent.as<int>();
-
-			acquirer.proj.mode_flag = draw::mode_flags::slide_line;
-			each_tile(place_region, chamber_sz, [&, this](math::point2 pos){
-				if(auto idxp = grid.coord_to_index(pos)){
-					if(grid.is_building_placeable_at(*idxp, *current_chamber)){
-						draw::fill::rect_ortho(acquirer.get(), get_region_at({tags::from_extent, pos, chamber_sz}).shrink(4), colors::pale_green.copy().set_a(.5f));
-					}
-				}
-			});
-			acquirer.proj.mode_flag = {};
-		}
-
-		if(get_scene()->is_mouse_pressed(core::ctrl::mouse::RMB)){
-			math::irect place_region = get_selected_place_region({1, 1}, rect);
-			draw::line::rect_ortho(acquirer, place_region.as<float>().scl(ecs::chamber::tile_size, ecs::chamber::tile_size), 4, colors::red_dusted);
-
-			acquirer.proj.mode_flag = draw::mode_flags::slide_line;
-			each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
-				if(auto idxp = grid.coord_to_index(pos)){
-					if(grid[idxp.value()].building != nullptr){
-						draw::fill::rect_ortho(acquirer.get(), get_region_at({pos, 1, 1}).shrink(4), colors::red_dusted.copy().set_a(.5f));
-					}
-				}
-			});
-			acquirer.proj.mode_flag = {};
-		}
-	}
 
 	drawEnd:
 
@@ -303,7 +349,25 @@ void mo_yanxi::game::ui::grid_editor::build_menu(){
 				*this, [](const creation::file_selector& s, const grid_editor&){
 					return s.get_current_main_select().has_value();
 				}, [](const creation::file_selector& s, grid_editor& self){
-					self.viewport->set_reference(load_hitbox_from(s.get_current_main_select().value()));
+					self.viewport->set_reference(load_hitbox_from(s.get_current_main_select().value()), true);
+					return true;
+				}});
+			selector.set_cared_suffix({".hbox"});
+		});
+	}
+
+	{
+		auto b = side_menu->end_line().emplace<button<label>>();
+
+		b->set_style(theme::styles::side_bar_whisper);
+		b->set_fit();
+		b->set_text("set mesh");
+		b->set_button_callback(button_tags::general, [this]{
+			auto& selector = creation::create_file_selector(creation::file_selector_create_info{
+				*this, [](const creation::file_selector& s, const grid_editor&){
+					return s.get_current_main_select().has_value();
+				}, [](const creation::file_selector& s, grid_editor& self){
+					self.viewport->set_reference(load_hitbox_from(s.get_current_main_select().value()), false);
 					return true;
 				}});
 			selector.set_cared_suffix({".hbox"});
@@ -350,6 +414,32 @@ void mo_yanxi::game::ui::grid_editor::build_menu(){
 					return true;
 				}});
 			selector.set_cared_suffix({".metagrid"});
+		});
+	}
+
+	{
+		{
+			auto sep = side_menu->end_line().create(ui::creation::general_seperator_line{
+					.stroke = 20,
+					.palette = ui::theme::style_pal::front_white.copy().mul_alpha(.25f)
+				});
+			sep.cell().pad.set_vert(4);
+			sep.cell().margin.set_hori(8);
+		}
+	}
+
+
+	{
+		auto b = side_menu->end_line().emplace<button<label>>();
+
+		b->set_style(theme::styles::side_bar_whisper);
+		b->set_fit();
+		b->set_text("edit grid");
+		b->set_button_callback(button_tags::general, [this]{
+			viewport->focus_on_grid = !viewport->focus_on_grid;
+		});
+		b->checkers.setActivatedProv([this]{
+			return viewport->focus_on_grid;
 		});
 	}
 

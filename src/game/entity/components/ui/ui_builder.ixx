@@ -6,6 +6,7 @@ export module mo_yanxi.game.ecs.component.ui.builder;
 
 export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.ui.elem.table;
+export import mo_yanxi.ui.elem.list;
 import mo_yanxi.ui.action.generic;
 
 import std;
@@ -43,7 +44,7 @@ namespace mo_yanxi::game::ecs{
 		/**
 		 * @return hdl if no table is build, or empty handle if hdl is used
 		 */
-		virtual void build_hud(ui::table& where, const entity_ref& eref) const {
+		virtual void build_hud(ui::list& where, const entity_ref& eref) const {
 		}
 	};
 

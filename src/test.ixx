@@ -1,7 +1,15 @@
+module;
+
+#include <vulkan/vulkan.h>
+
 export module test;
 
 import mo_yanxi.assets.directories;
 import mo_yanxi.assets.ctrl;
+
+import mo_yanxi.vk.context;
+import mo_yanxi.core.window;
+
 
 import mo_yanxi.ui.primitives;
 import mo_yanxi.ui.style;
@@ -48,6 +56,53 @@ namespace test{
 			wrapper.compile(file);
 		});
 	}
+
+	export
+	void set_swapchain_flusher(){
+		auto& context = core::global::graphic::context;
+		auto& renderer_world = core::global::graphic::world;
+		auto& renderer_ui = core::global::graphic::ui;
+		auto& merger = core::global::graphic::merger;
+
+		context.register_post_resize("test", [&](window_instance::resize_event event){
+			//TODO should it resize all?
+			//TODO resize registry?
+		   core::global::ui::root->resize_all(
+			   math::frect{math::vector2{event.size.width, event.size.height}.as<float>()});
+
+		   renderer_world.resize(event.size);
+		   renderer_ui.resize(event.size);
+		   merger.resize(event.size);
+
+		   context.set_staging_image(
+			   {
+				   .image = merger.get_result().image,
+				   .extent = context.get_extent(),
+				   .clear = false,
+				   .owner_queue_family = context.compute_family(),
+				   .src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				   .src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+				   .dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				   .dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+				   .src_layout = VK_IMAGE_LAYOUT_GENERAL,
+				   .dst_layout = VK_IMAGE_LAYOUT_GENERAL
+			   }, false);
+	   });
+
+		context.set_staging_image({
+			.image = merger.get_result().image,
+			.extent = context.get_extent(),
+			.clear = false,
+			.owner_queue_family = context.compute_family(),
+			.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+			.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+		});
+	}
+
 
 
 	export

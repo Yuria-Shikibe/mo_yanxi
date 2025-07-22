@@ -13,6 +13,7 @@ import mo_yanxi.ui.elem.progress_bar;
 import mo_yanxi.ui.elem.collapser;
 
 import mo_yanxi.game.ui.chamber_ui_elem;
+import mo_yanxi.game.ui.building_pane;
 
 import mo_yanxi.ui.graphic;
 
@@ -20,67 +21,29 @@ import std;
 
 
 namespace mo_yanxi::game::ecs::chamber{
-	struct radar_ui : entity_info_table{
-		ui::reload_bar* reload_progress_bar{};
-		[[nodiscard]] radar_ui(ui::scene* scene, group* group, const entity_ref& ref)
-			: entity_info_table(scene, group, ref){
-
-			template_cell.set_external({false, true});
-			set_style();
-
-			auto collapser = function_init([](ui::collapser& collapser){
-				collapser.head().set_style(ui::theme::styles::no_edge);
-				collapser.head().function_init([](ui::label& elem){
-					elem.set_style();
-					elem.set_scale(.5);
-					elem.set_policy(font::typesetting::layout_policy::auto_feed_line);
-					elem.set_text("Radar");
-				}).cell().set_external({false, true});
-			});
-
-			auto content = collapser->content().function_init([&](ui::table& t){
-				t.set_style();
-				t.template_cell.set_external({false, true});
-			});
-			content.cell().set_external({false, true});
-
-			{
-				auto bar = content->end_line().emplace<ui::chamber_ui_elem>(ref);
-			}
-
-			{
-				auto bar = content->end_line().emplace<ui::reload_bar>();
-				bar.cell().set_height(50);
-				bar.cell().pad.top = 8;
-				bar->approach_speed = 0.125f;
-
-				reload_progress_bar = std::to_address(bar);
-			}
+	struct radar_ui : ui::default_building_ui_elem{
+		[[nodiscard]] radar_ui(ui::scene* scene, group* parent, const building_entity_ref& e)
+			: default_building_ui_elem(scene, parent, e){
 		}
 
 		void update(float delta_in_ticks) override{
-			entity_info_table::update(delta_in_ticks);
+			default_building_ui_elem::update(delta_in_ticks);
 
-			if(!ref)return;
-			auto& build = ref->at<radar_build>();
-
-			reload_progress_bar->current_reload_value = build.reload / build.meta.reload_duration;
-			reload_progress_bar->current_target_efficiency = build.data().hit_point.get_capability_factor();
-
-			reload_progress_bar->efficiency_color = {graphic::colors::power.to_neutralize_light(), graphic::colors::power.to_neutralize_light()};
-			reload_progress_bar->reload_color = {graphic::colors::dark_gray.to_neutralize_light(), graphic::colors::gray.to_neutralize_light()};
+			if(!entity)return;
+			auto& build = entity->at<radar_build>();
+			get_bar_pane().info.set_reload(build.reload / build.meta.reload_duration);
 		}
 	};
 
-	void radar_build::draw_hud(graphic::renderer_ui& renderer) const{
+	void radar_build::draw_hud_on_building_selection(graphic::renderer_ui_ref renderer) const{
 		using namespace graphic;
 
-		mo_yanxi::ui::draw_acquirer acquirer{ui::get_draw_acquirer(renderer)};
+		auto acquirer{mo_yanxi::ui::get_draw_acquirer(renderer)};
 
-		auto center = get_local_to_global(meta.transform.vec);
+		auto trs = get_local_to_global_trans(meta.transform);
+		auto center = trs.vec;
 
-		if(meta.targeting_range_radius.from > 0)draw::line::circle(acquirer, center, meta.targeting_range_radius.from, 3);
-		draw::line::circle(acquirer, center, meta.targeting_range_radius.to, 5, ui::theme::colors::theme, ui::theme::colors::theme);
+		draw::fancy::draw_targeting_range_auto(acquirer, trs, meta.targeting_range_radius, meta.targeting_range_angular, 5, colors::gray, colors::aqua);
 
 		for (const auto & candidate : data().grid().grid_targets.get_candidates()){
 			if(!candidate.ref)continue;
@@ -98,7 +61,7 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 	}
 
-	void radar_build::build_hud(ui::table& where, const entity_ref& eref) const{
+	void radar_build::build_hud(ui::list& where, const entity_ref& eref) const{
 		auto hdl = where.emplace<radar_ui>(eref);
 	}
 

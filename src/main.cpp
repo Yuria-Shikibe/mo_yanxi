@@ -172,12 +172,12 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	// }
 	{
 		auto pane = bed.emplace<game::ui::grid_editor>();
-		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 0.75f}};
+		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, 1.f}};
 		pane.cell().align = align::pos::top_left;
 		pane.cell().margin.set(4);
 	}
 
-	{
+	if(false){
 		auto pane = bed.emplace<ui::scroll_pane>();
 		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{1.f, .25f}};
 		pane.cell().align = align::pos::bottom_left;
@@ -375,19 +375,21 @@ void main_loop(){
 	auto& renderer_ui = core::global::graphic::ui;
 	auto& merger = core::global::graphic::merger;
 
+	renderer_world.camera.set_scale_range({0.25f, 2.f});
+
 	{
 		auto& g = renderer_ui.batch.emplace_batch_layer<graphic::layers::grid_drawer>();
 		g.data.current = graphic::layers::default_grid_style;
 	}
 
 	{
-		core::global::ui::root->add_scene(ui::scene{"main", new ui::loose_group{nullptr, nullptr}, renderer_ui}, true);
-		core::global::ui::root->resize(math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()});
-		init_ui(core::global::ui::root->root_of<ui::loose_group>("main"), atlas);
+		auto main_scene = core::global::ui::root->add_scene<ui::loose_group>("main", math::frect{math::vector2{context.get_extent().width, context.get_extent().height}.as<float>()}, renderer_ui);
+		init_ui(main_scene.root_group, atlas);
+		core::global::ui::root->switch_scene_to("main");
 	}
 
 	game::world::hud hud{};
-	hud.focus_hud();
+	// hud.focus_hud();
 
 	game::ecs::system::motion_system motion_system{};
 	game::ecs::system::renderer ecs_renderer{};
@@ -408,43 +410,7 @@ void main_loop(){
 				>("gfx");
 	wgfx_input.set_context(math::vec2{}, std::ref(world.graphic_context), std::ref(world.component_manager));
 
-	{
-		context.register_post_resize("test", [&](window_instance::resize_event event){
-		   core::global::ui::root->resize_all(
-			   math::frect{math::vector2{event.size.width, event.size.height}.as<float>()});
-
-		   renderer_world.resize(event.size);
-		   renderer_ui.resize(event.size);
-		   merger.resize(event.size);
-
-		   context.set_staging_image(
-			   {
-				   .image = merger.get_result().image,
-				   .extent = context.get_extent(),
-				   .clear = false,
-				   .owner_queue_family = context.compute_family(),
-				   .src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				   .src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-				   .dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				   .dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-				   .src_layout = VK_IMAGE_LAYOUT_GENERAL,
-				   .dst_layout = VK_IMAGE_LAYOUT_GENERAL
-			   }, false);
-	   });
-
-		context.set_staging_image({
-			.image = merger.get_result().image,
-			.extent = context.get_extent(),
-			.clear = false,
-			.owner_queue_family = context.compute_family(),
-			.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-			.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-			.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-			.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-			.src_layout = VK_IMAGE_LAYOUT_GENERAL,
-			.dst_layout = VK_IMAGE_LAYOUT_GENERAL
-		});
-	}
+	test::set_swapchain_flusher();
 
 	graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.light.png)"}).first;
 	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
@@ -475,11 +441,11 @@ void main_loop(){
 
 		{
 			math::rand rand{};
-			for(int i = 0; i < 1; ++i){
+			for(int i = 0; i < 0; ++i){
 				using namespace game::ecs;
 
 				manifold mf{};
-				math::trans2 trs = {{rand(400.f), rand(200.f)}, rand(180.f)};
+				math::trans2 trs = {{rand(4000.f), rand(2000.f)}, rand(180.f)};
 				mf.hitbox = game::hitbox{hitbox_transed};
 				//game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 4, chamber::tile_size * 4}}}};
 
@@ -495,7 +461,7 @@ void main_loop(){
 				cmf.manager.sliced_each([](chamber::turret_build& b){
 					using namespace math;
 
-					auto& body = b.body;
+					auto& body = b.meta;
 					body.shoot_type.projectile = &test::projectile_meta;
 					body.shoot_type.burst = {.count = 1, .spacing = 5};
 					body.shoot_type.salvo = {.count = 3};

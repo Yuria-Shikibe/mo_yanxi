@@ -306,6 +306,11 @@ namespace mo_yanxi::graphic{
 			return *this;
 		}
 
+		FORCE_INLINE constexpr color copy_set_a(this color self, const float ta) noexcept{
+			self.a = ta;
+			return self;
+		}
+
 		FORCE_INLINE constexpr color& mul_a(const float ta) noexcept{
 			this->a *= ta;
 			return *this;

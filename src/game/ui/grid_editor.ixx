@@ -43,6 +43,10 @@ namespace mo_yanxi::game{
 		}
 	}
 
+	enum struct operation{
+		none,
+		move
+	};
 
 	using chamber_meta = const meta::chamber::basic_chamber*;
 
@@ -67,7 +71,7 @@ namespace mo_yanxi::game{
 			};
 
 			meta::hitbox_transed reference{};
-			math::optional_vec2<float> last_click_{math::vectors::constant2<float>::SNaN};
+			math::optional_vec2<float> last_click_{math::nullopt_vec2<float>};
 
 			bool overview{false};
 
@@ -81,9 +85,19 @@ namespace mo_yanxi::game{
 
 			chamber_meta current_chamber{};
 			meta::chamber::grid_building* selected_building{};
+
+			bool focus_on_grid{};
 		private:
 			meta::chamber::ui_edit_context edit_context{};
 
+			math::vec2 operation_initial{};
+			operation grid_op_;
+
+			[[nodiscard]] math::point2 get_grid_edit_offset(math::vec2 cur_in_screen) const{
+				auto cur = get_transferred_pos(cur_in_screen);
+				auto mov = cur - operation_initial;
+				return mov.div(ecs::chamber::tile_size).round<int>();
+			}
 
 		public:
 			[[nodiscard]] grid_editor_viewport(scene* scene, group* group)
@@ -114,10 +128,10 @@ namespace mo_yanxi::game{
 
 			void draw_content(const rect clipSpace) const override;
 
-			void set_reference(const meta::hitbox_transed& hitbox_transed){
+			void set_reference(const meta::hitbox_transed& hitbox_transed, bool autoSetMesh){
 				reference = hitbox_transed;
 				reference.apply();
-				grid = meta::chamber::grid{reference};
+				if(autoSetMesh)grid = meta::chamber::grid{reference};
 			}
 
 			[[nodiscard]] math::frect get_region_at(math::irect region_in_world) const noexcept;
@@ -175,45 +189,85 @@ namespace mo_yanxi::game{
 				last_click_.reset();
 			}
 
+			bool apply_grid_op(math::vec2 cursorpos){
+				switch(grid_op_){
+				case operation::move:
+					grid.move(get_grid_edit_offset(cursorpos));
+					grid_op_ = operation::none;
+
+					return true;
+				default: return false;
+				}
+			}
+
 			input_event::click_result on_click(const input_event::click click_event) override{
+				using namespace core::ctrl;
+				if(focus_on_grid){
+					if(click_event.code.matches(lmb_click_no_mode)){
+						if(apply_grid_op(click_event.pos))goto fbk;
+					}
 
+					if(click_event.code.action() == act::release){
+						const math::irect place_region = get_selected_place_region({1, 1}, get_select_box(last_click_));
 
-				if(last_click_ && click_event.code.on_release()){
-					switch(click_event.code.key()){
-					case core::ctrl::mouse::LMB:
-						if(current_chamber){
-							math::irect place_region = get_selected_place_region(current_chamber->extent, get_select_box());
-							each_tile(place_region, current_chamber->extent.as<int>(), [&, this](math::point2 pos){
+						switch(click_event.code.key()){
+						case mouse::LMB:
+							each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
 								if(const auto idx = grid.coord_to_index(pos)){
-									if(auto* b = grid.try_place_building_at(idx.value(), *current_chamber)){
-										update_selected_building(b);
-									}
+									grid[idx.value()].placeable = true;
 								}
 							});
-						}else{
-							auto p = get_current_tile_coord();
-							if(auto idx = grid.coord_to_index(p)){
-								update_selected_building(grid[*idx].building);
-							}
+							break;
+						case mouse::RMB:
+							each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
+								if(const auto idx = grid.coord_to_index(pos)){
+									if(!grid[idx.value()].building)grid[idx.value()].placeable = false;
+								}
+							});
+							break;
+						default: break;
 						}
-						break;
-					case core::ctrl::mouse::RMB: {
-						const math::irect place_region = get_selected_place_region({1, 1}, get_select_box());
-						if(selected_building){
-							auto reg = selected_building->get_indexed_region().as<int>().move(grid.get_origin_offset());
-							if(reg.overlap_exclusive(place_region)){
-								update_selected_building(nullptr);
+					}
+
+				}else{
+					if(last_click_ && click_event.code.on_release()){
+						switch(click_event.code.key()){
+						case mouse::LMB:
+							if(current_chamber){
+								math::irect place_region = get_selected_place_region(current_chamber->extent, get_select_box(last_click_));
+								each_tile(place_region, current_chamber->extent.as<int>(), [&, this](math::point2 pos){
+									if(const auto idx = grid.coord_to_index(pos)){
+										if(auto* b = grid.try_place_building_at(idx.value(), *current_chamber)){
+											update_selected_building(b);
+										}
+									}
+								});
+							}else{
+								auto p = get_current_tile_coord();
+								if(auto idx = grid.coord_to_index(p)){
+									update_selected_building(grid[*idx].building);
+								}
 							}
+							break;
+						case mouse::RMB: {
+							const math::irect place_region = get_selected_place_region({1, 1}, get_select_box(last_click_));
+							if(selected_building){
+								auto reg = selected_building->get_indexed_region().as<int>().move(grid.get_origin_offset());
+								if(reg.overlap_exclusive(place_region)){
+									update_selected_building(nullptr);
+								}
+							}
+							each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
+								if(const auto idx = grid.coord_to_index(pos)){
+									grid.erase_building_at(idx.value());
+								}
+							});
 						}
-						each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
-							if(const auto idx = grid.coord_to_index(pos)){
-								grid.erase_building_at(idx.value());
-							}
-						});
+							break;
+						default: break;
+						}
 					}
-						break;
-					default: break;
-					}
+
 				}
 
 				if(click_event.code.on_press()){
@@ -222,42 +276,71 @@ namespace mo_yanxi::game{
 					last_click_.reset();
 				}
 
+				fbk:
+
 				return viewport::on_click(click_event);
 			}
 
 			esc_flag on_esc() override{
-				if(last_click_){
-					last_click_.reset();
-					return esc_flag::intercept;
+				if(focus_on_grid){
+					if(grid_op_ != operation::none){
+						grid_op_ = operation::none;
+						return esc_flag::intercept;
+					}
+
+				}else{
+					if(last_click_){
+						last_click_.reset();
+						return esc_flag::intercept;
+					}
+
+					if(current_chamber){
+						current_chamber = nullptr;
+						return esc_flag::intercept;
+					}
 				}
 
-				if(current_chamber){
-					current_chamber = nullptr;
-					return esc_flag::intercept;
-				}
 
 				return viewport::on_esc();
 			}
 
 			void on_key_input(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
 				if(action == core::ctrl::act::release){
-					if(key == core::ctrl::key::M){
-						overview = !overview;
+					switch(key){
+					case core::ctrl::key::M:
+						overview = !overview; break;
+					case core::ctrl::key::G:{
+						if(focus_on_grid){
+							if(grid_op_ == operation::move){
+								grid_op_ = operation::none;
+							}else{
+								grid_op_ = operation::move;
+								operation_initial = get_transferred_cursor_pos();
+							}
+
+						}
+						break;
 					}
+					case core::ctrl::key::Enter:{
+						apply_grid_op(get_scene()->get_cursor_pos());
+						break;
+					}
+						default: break;
+					}
+
+
 				}
 			}
 
-			[[nodiscard]] math::rect_ortho_trivial<float> get_select_box() const noexcept{
+			[[nodiscard]] math::rect_ortho_trivial<float> get_select_box(math::vec2 initial) const noexcept{
 				auto cur = get_transferred_cursor_pos();
 
-				if(last_click_){
-					if((get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift) == core::ctrl::mode::ctrl_shift){
-						return  math::rect_ortho_trivial<float>::from_vert(last_click_, cur);
-					}
-					if(get_scene()->get_input_mode() & core::ctrl::mode::ctrl){
-						auto line = math::vectors::snap_segment_to_angle(last_click_, cur, math::pi_half);
-						return math::rect_ortho_trivial<float>::from_vert(last_click_, line);
-					}
+				if((get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift) == core::ctrl::mode::ctrl_shift){
+					return  math::rect_ortho_trivial<float>::from_vert(initial, cur);
+				}
+				if(get_scene()->get_input_mode() & core::ctrl::mode::ctrl){
+					auto line = math::vectors::snap_segment_to_angle(initial, cur, math::pi_half);
+					return math::rect_ortho_trivial<float>::from_vert(initial, line);
 				}
 
 				return {cur};

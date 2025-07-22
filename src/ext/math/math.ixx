@@ -205,6 +205,10 @@ namespace mo_yanxi::math {
 		return {sinTable[idx + SIN_COUNT / 4 & SIN_MASK], sinTable[idx & SIN_MASK]};
 	}
 
+	export MATH_ATTR cos_sin_result cos_sin_exact(const float radians) noexcept{
+		return {std::cos(radians), std::sin(radians)};
+	}
+
 	export MATH_ATTR constexpr float sin(const float radians, const float scl, const float mag) noexcept {
 		return sin(radians / scl) * mag;
 	}
@@ -944,7 +948,7 @@ namespace mo_yanxi::math {
 		if constexpr (std::floating_point<T>){
 			return static_cast<T>(std::round(num / step) * step);
 		}else{
-			return static_cast<T>(std::lround(std::round(static_cast<float>(num) / static_cast<float>(step)) * static_cast<float>(step)));
+			return static_cast<T>(std::lround(std::round(static_cast<double>(num) / static_cast<double>(step)) * static_cast<double>(step)));
 		}
 
 	}

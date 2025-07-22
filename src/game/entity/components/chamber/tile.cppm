@@ -16,7 +16,6 @@ export import mo_yanxi.game.ecs.component.damage;
 export import mo_yanxi.game.ecs.component.hit_point;
 
 export import mo_yanxi.game.ecs.component.ui.builder;
-export import mo_yanxi.graphic.renderer.ui;
 
 export import mo_yanxi.game.ecs.world.top;
 export import mo_yanxi.game.ecs.component.chamber.general;
@@ -138,7 +137,11 @@ namespace mo_yanxi::game::ecs{
 				return reinterpret_cast<const_build_ref>(*this);
 			}
 
-			virtual void draw_hud(graphic::renderer_ui& renderer) const{
+			virtual void draw_hud_on_building_selection(graphic::renderer_ui_ref renderer) const{
+
+			}
+
+			virtual void draw_hud_on_grid_selection(graphic::renderer_ui_ref renderer) const{
 
 			}
 

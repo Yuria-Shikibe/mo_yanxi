@@ -31,7 +31,7 @@ namespace mo_yanxi::ui{
 		void move_progress(const math::vec2 movement_in_percent) noexcept{
 			if(is_segment_move_activated()){
 				bar_progress_.temp =
-					(bar_progress_.base + movement_in_percent).round_by(get_segment_unit()).clamp_xy_normalized();
+					(bar_progress_.base + movement_in_percent).round_to(get_segment_unit()).clamp_xy_normalized();
 			} else{
 				bar_progress_.temp = (bar_progress_.base + movement_in_percent).clamp_xy({}, {1, 1});
 			}

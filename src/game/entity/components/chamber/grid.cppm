@@ -410,9 +410,9 @@ namespace mo_yanxi::game::ecs::chamber{
 			}, std::forward<Args>(args)...);
 		}
 
-		void draw_hud(graphic::renderer_ui& renderer){
+		void draw_hud(graphic::renderer_ui_ref renderer){
 			manager.sliced_each([&](const building& building){
-				building.draw_hud(renderer);
+				building.draw_hud_on_grid_selection(renderer);
 			});
 		}
 

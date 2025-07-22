@@ -18,6 +18,7 @@ export import mo_yanxi.ui.flags;
 import mo_yanxi.owner;
 import mo_yanxi.handle_wrapper;
 import mo_yanxi.open_addr_hash_map;
+import mo_yanxi.heterogeneous.open_addr_hash;
 import mo_yanxi.graphic.camera;
 
 //TODO isolate this in future
@@ -140,6 +141,8 @@ namespace mo_yanxi::ui{
 
 		std::vector<independent_draw_entry> independent_draw_{};
 
+		string_open_addr_hash_map<elem*> direct_access{};
+
 	public:
 		graphic::renderer_ui_ptr renderer{};
 		graphic::camera2* focused_camera{};
@@ -203,6 +206,28 @@ namespace mo_yanxi::ui{
 		);
 
 		~scene();
+
+		bool insert_direct_access(std::string_view alias_name, elem& elem);
+
+		bool erase_direct_access(std::string_view hint_name, const elem* elem);
+
+		template <std::derived_from<elem> T = elem>
+		[[nodiscard]] T* access(const std::string_view name) const noexcept{
+			if(auto itr = direct_access.find(name); itr != direct_access.end()){
+				return dynamic_cast<T*>(itr->second);
+			}
+			return nullptr;
+		}
+
+		template <std::derived_from<elem> T = elem>
+		[[nodiscard]] T& access_unchecked(const std::string_view name) const noexcept{
+#if DEBUG_CHECK
+			return dynamic_cast<T&>(*direct_access.at(name));
+#else
+			return static_cast<T&>(direct_access.at(name));
+#endif
+
+		}
 
 		bool insert_independent_draw(const elem& elem, independent_draw_state state);
 

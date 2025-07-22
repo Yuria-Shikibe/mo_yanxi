@@ -9,14 +9,9 @@ import :chamber_meta;
 import mo_yanxi.game.meta.hitbox;
 import mo_yanxi.algo;
 
-
-import mo_yanxi.graphic.renderer.ui;
-import mo_yanxi.graphic.renderer.world;
-
-
 namespace mo_yanxi::game::meta::chamber{
-	constexpr inline int tile_size_integral = ecs::chamber::tile_size_integral;
-	constexpr inline float tile_size = tile_size_integral;
+	export constexpr inline int tile_size_integral = ecs::chamber::tile_size_integral;
+	export constexpr inline float tile_size = tile_size_integral;
 
 	using chamber_meta = const basic_chamber*;
 
@@ -158,7 +153,6 @@ namespace mo_yanxi::game::meta::chamber{
 
 		[[nodiscard]] explicit grid(const hitbox& hitbox);
 
-
 		[[nodiscard]] grid(const math::usize2 extent, const math::point2 origin_coord, std::span<const grid_tile> tiles) :
 			origin_coord_(origin_coord), extent_(extent), tiles_(std::from_range, tiles){}
 
@@ -184,6 +178,8 @@ namespace mo_yanxi::game::meta::chamber{
 		[[nodiscard]] std::span<const grid_tile> get_tiles() const noexcept{
 			return tiles_;
 		}
+
+		void move(math::point2 offset) noexcept;
 
 		[[nodiscard]] math::usize2 get_extent() const noexcept{
 			return extent_;
@@ -292,7 +288,7 @@ namespace mo_yanxi::game::meta::chamber{
 
 		//TODO move draw to other place?
 
-		void draw(graphic::renderer_ui& renderer, const graphic::camera2& camera) const;
+		void draw(graphic::renderer_ui_ref renderer, const graphic::camera2& camera, math::point2 offset = {}, float opacity_scl = 1.f) const;
 
 		void dump(ecs::chamber::chamber_manifold& clear_grid_manifold) const;
 	};

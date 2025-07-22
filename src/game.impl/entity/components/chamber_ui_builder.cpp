@@ -22,6 +22,7 @@ namespace mo_yanxi::game::ecs::chamber{
 
 		[[nodiscard]] chamber_ui(ui::scene* scene, group* group, const entity_ref& ref)
 			: entity_info_table(scene, group, ref){
+			set_style();
 
 			template_cell.set_external({false, true});
 			function_init([](ui::label& elem){
@@ -63,18 +64,16 @@ namespace mo_yanxi::game::ecs::chamber{
 
 
 			if(auto mf = this->ref->try_get<chamber_manifold>()){
-				end_line().function_init([this, &manifold = *mf](ui::table& elem){
+				end_line().function_init([this, &manifold = *mf](ui::list& elem){
 					elem.set_style();
-					elem.template_cell.set_external({false, true});
-					elem.template_cell.pad.bottom = 8;
+					elem.template_cell.set_external();
+					elem.template_cell.pad.set(4);
 
 					manifold.manager.sliced_each([&](
 						const chunk_meta& meta,
 						const ui_builder& builder){
-						builder.build_hud(elem.end_line(), meta.id());
+						builder.build_hud(elem, meta.id());
 					});
-
-					elem.set_edge_pad(0);
 				}).cell().set_external({false, true});
 			}
 		}
@@ -91,7 +90,7 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 	};
 
-	void chamber_ui_builder::build_hud(ui::table& where, const entity_ref& eref) const{
+	void chamber_ui_builder::build_hud(ui::list& where, const entity_ref& eref) const{
 		auto hdl = where.emplace<chamber_ui>(eref);
 	}
 }

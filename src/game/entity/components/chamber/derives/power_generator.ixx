@@ -13,7 +13,7 @@ namespace mo_yanxi::game::ecs{
 	namespace chamber{
 		export
 		struct power_generator_build : building{
-			void build_hud(ui::table& where, const entity_ref& eref) const override;
+			void build_hud(ui::list& where, const entity_ref& eref) const override;
 		};
 
 

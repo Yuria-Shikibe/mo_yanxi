@@ -41,42 +41,51 @@ mo_yanxi::game::meta::chamber::grid::grid(const hitbox& hitbox){
 	}
 }
 
-void mo_yanxi::game::meta::chamber::grid::draw(graphic::renderer_ui& renderer, const graphic::camera2& camera) const{
+void mo_yanxi::game::meta::chamber::grid::move(math::point2 offset) noexcept{
+	origin_coord_ -= offset.as<int>();
+}
+
+void mo_yanxi::game::meta::chamber::grid::draw(
+	graphic::renderer_ui_ref renderer,
+	const graphic::camera2& camera, const math::point2 offset, float opacity_scl
+) const{
 	auto acquirer = ui::get_draw_acquirer(renderer);
 	using namespace graphic;
 	
 	acquirer.proj.set_layer(ui::draw_layers::base);
-	
-	auto region = get_grid_region().as<float>().scl(tile_size, tile_size);
 	const auto [w, h] = get_extent();
 
-	constexpr auto color = colors::gray.copy().set_a(.5f);
+	{
+		const auto region = get_grid_region().move(offset).as<float>().scl(tile_size, tile_size);
 
-	for(unsigned x = 0; x <= w; ++x){
-		static constexpr math::vec2 off{tile_size, 0};
-		draw::line::line_ortho(acquirer.get(), region.vert_00() + off * x, region.vert_01() + off * x, 4, color, color);
-	}
+		const auto color = colors::gray.copy().set_a(.5f * opacity_scl);
 
-	for(unsigned y = 0; y <= h; ++y){
-		static constexpr math::vec2 off{0, tile_size};
-		draw::line::line_ortho(acquirer.get(), region.vert_00() + off * y, region.vert_10() + off * y, 4, color, color);
+		for(unsigned x = 0; x <= w; ++x){
+			static constexpr math::vec2 off{tile_size, 0};
+			draw::line::line_ortho(acquirer.get(), region.vert_00() + off * x, region.vert_01() + off * x, 4, color, color);
+		}
+
+		for(unsigned y = 0; y <= h; ++y){
+			static constexpr math::vec2 off{0, tile_size};
+			draw::line::line_ortho(acquirer.get(), region.vert_00() + off * y, region.vert_10() + off * y, 4, color, color);
+		}
 	}
 
 	acquirer.proj.set_layer(ui::draw_layers::def);
 	acquirer.proj.mode_flag = draw::mode_flags::slide_line;
-	auto off = get_origin_offset();
+	const auto off = get_origin_offset() + offset;
 	for(unsigned y = 0; y < h; ++y){
 		for(unsigned x = 0; x < w; ++x){
 			auto& info = (*this)[x, y];
 
 			if(info.is_idle()){
 				auto sz = math::irect{tags::from_extent, off.copy().add(x, y), 1, 1}.as<float>().scl(tile_size, tile_size);
-				draw::fill::rect_ortho(acquirer.get(), sz, colors::aqua.copy().set_a(.1f));
+				draw::fill::rect_ortho(acquirer.get(), sz, colors::aqua.copy().set_a(.1f * opacity_scl));
 			}else if (info.is_building_identity({x, y})){
 				acquirer.proj.mode_flag = {};
 
-				auto rg = info.building->get_indexed_region().as<int>().move(get_origin_offset()).as<float>().scl(tile_size, tile_size);
-				draw::line::rect_ortho(acquirer, rg, 4, colors::aqua.copy());
+				auto rg = info.building->get_indexed_region().as<int>().move(off).as<float>().scl(tile_size, tile_size);
+				draw::line::rect_ortho(acquirer, rg, 4, colors::aqua.copy_set_a(opacity_scl));
 				info.building->get_meta_info().draw(rg, renderer, camera);
 				if(auto ist = info.building->get_instance_data()){
 					ist->draw(info.building->get_meta_info(), rg, renderer, camera);

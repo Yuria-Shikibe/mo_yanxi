@@ -37,7 +37,7 @@ namespace mo_yanxi::game::ecs{
 
 		export
 		struct turret_build : building{
-			meta::turret::turret_body body;
+			meta::turret::turret_body meta;
 
 			math::trans2z transform{};
 			float rotate_torque{};
@@ -65,20 +65,20 @@ namespace mo_yanxi::game::ecs{
 			[[nodiscard]] turret_build() = default;
 
 			[[nodiscard]] explicit turret_build(const meta::turret::turret_body& body)
-				: body(body){
+				: meta(body){
 			}
 
 			void reset_body(const meta::turret::turret_body& body) noexcept{
-				this->body = body;
+				this->meta = body;
 				cache_.projectile_speed = body.shoot_type.projectile->initial_speed;
 			}
 
-			void build_hud(ui::table& where, const entity_ref& eref) const override;
+			void build_hud(ui::list& where, const entity_ref& eref) const override;
 
-			void draw_hud(graphic::renderer_ui& renderer) const override;
+			void draw_hud_on_building_selection(graphic::renderer_ui_ref renderer) const override;
 
 			[[nodiscard]] bool validate_target(const math::vec2 target_local_trs) const noexcept{
-				return body.range.within_open(target_local_trs.length());
+				return meta.range.within_open(target_local_trs.length());
 			}
 
 		private:
@@ -103,7 +103,7 @@ namespace mo_yanxi::game::ecs{
 						target.local_pos(),
 						motion.vel.vec,
 						cache_.projectile_speed,
-						body.shoot_type.offset.trunk.x)){
+						meta.shoot_type.offset.trunk.x)){
 
 					const auto tgt_pos = pos.apply_inv_to(motion.pos().fma(motion.vel.vec, rst));
 					const auto ang = tgt_pos.angle_rad();
@@ -115,10 +115,10 @@ namespace mo_yanxi::game::ecs{
 
 			void shoot_until(unsigned current_count, const chunk_meta& chunk_meta, world::entity_top_world& top_world){
 				for(; shoot_index < current_count; ++shoot_index){
-					auto idx = body.shoot_type.get_shoot_index(shoot_index);
+					auto idx = meta.shoot_type.get_shoot_index(shoot_index);
 
-					for(unsigned i = 0; i < body.shoot_type.offset.count; ++i){
-						auto off = body.shoot_type[idx, i];
+					for(unsigned i = 0; i < meta.shoot_type.offset.count; ++i){
+						auto off = meta.shoot_type[idx, i];
 
 						shoot(off, chunk_meta, top_world);
 					}
@@ -128,10 +128,10 @@ namespace mo_yanxi::game::ecs{
 			void reload_turret(const float delta, const chunk_meta& chunk_meta, world::entity_top_world& top_world){
 				bool has_target = static_cast<bool>(target);
 				switch(state_){
-				case turret_state::reloading: if(has_target || body.actively_reload){
+				case turret_state::reloading: if(has_target || meta.actively_reload){
 						if(const auto rst =
 							math::forward_approach_then(
-								reload, body.reload_duration,
+								reload, meta.reload_duration,
 						        data().get_efficiency() * delta)){
 
 						state_ = turret_state::shoot_staging;
@@ -158,9 +158,9 @@ namespace mo_yanxi::game::ecs{
 					}
 
 					burst_reload += delta;
-					auto total = body.shoot_type.get_total_shoots();
-					auto next = body.shoot_type.get_current_shoot_index(burst_reload);
-					auto nextIdx = math::min(next.salvo_index * body.shoot_type.burst.count + next.burst_index, total);
+					auto total = meta.shoot_type.get_total_shoots();
+					auto next = meta.shoot_type.get_current_shoot_index(burst_reload);
+					auto nextIdx = math::min(next.salvo_index * meta.shoot_type.burst.count + next.burst_index, total);
 					shoot_until(nextIdx, chunk_meta, top_world);
 					if(nextIdx == total){
 						burst_reload = 0;
@@ -176,11 +176,11 @@ namespace mo_yanxi::game::ecs{
 
 			void rotate_to(const float target, const float update_delta_tick) noexcept{
 				const auto torque = rotate_torque * data().get_efficiency();
-				const auto angular_accel_max = torque / body.rotational_inertia;
+				const auto angular_accel_max = torque / meta.rotational_inertia;
 
 				const auto angular_accel = math::constrain_resolve::smooth_approach(target - rotation, rotate_speed, angular_accel_max);
 				rotate_speed += angular_accel.radians() * update_delta_tick;
-				rotate_speed = math::clamp_range(rotate_speed, body.max_rotate_speed);
+				rotate_speed = math::clamp_range(rotate_speed, meta.max_rotate_speed);
 				rotation.rotate_toward_nearest_clamped(target, math::abs(rotate_speed * update_delta_tick));
 			}
 

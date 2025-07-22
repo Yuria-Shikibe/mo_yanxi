@@ -8,6 +8,7 @@ import mo_yanxi.ui.primitives;
 import mo_yanxi.ui.root;
 import mo_yanxi.ui.elem.manual_table;
 import mo_yanxi.ui.elem.table;
+import mo_yanxi.ui.elem.list;
 
 import mo_yanxi.game.ecs.component.manage;
 import mo_yanxi.game.path_sequence;
@@ -70,12 +71,13 @@ namespace mo_yanxi::game::world{
 			hud* hud{};
 			hud_context context{};
 
+			ecs::entity_ref building_focus{};
 		private:
 			ecs::entity_ref main_selected{};
 			std::unordered_set<ecs::entity_ref> selected{};
 
-			ui::table* side_bar{};
-			ui::table* button_bar{};
+			mo_yanxi::ui::list* side_bar{};
+			mo_yanxi::ui::table* button_bar{};
 
 			path_editor path_editor_{};
 
@@ -87,6 +89,8 @@ namespace mo_yanxi::game::world{
 				: manual_table(scene, group){
 				// skip_inbound_capture = true;
 				interactivity = ui::interactivity::enabled;
+				get_scene()->insert_direct_access("hud", *this);
+
 				build_hud();
 			}
 
@@ -116,8 +120,12 @@ namespace mo_yanxi::game::world{
 		hud_viewport* viewport;
 
 	public:
-		void bind_context(const hud_context& ctx){
+		void bind_context(const hud_context& ctx) noexcept{
 			viewport->context = ctx;
+		}
+
+		[[nodiscard]] hud_viewport& get_viewport() noexcept{
+			return *viewport;
 		}
 
 		[[nodiscard]] hud();

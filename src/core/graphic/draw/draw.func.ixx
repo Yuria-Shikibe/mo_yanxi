@@ -11,13 +11,19 @@ export import mo_yanxi.math.quad;
 import std;
 
 namespace mo_yanxi::graphic::draw{
-	using vec = math::vec2;
+	export using vec = math::vec2;
 	using col = color;
 
 	constexpr float CircleVertPrecision{12};
 
-	FORCE_INLINE constexpr int getCircleVertices(const float radius) noexcept{
-		return math::clamp(static_cast<int>(radius * math::pi / CircleVertPrecision), 12, 512);
+	export
+	FORCE_INLINE constexpr int get_circle_vertices(const float radius) noexcept{
+		return math::clamp(static_cast<int>(radius * math::pi / CircleVertPrecision), 12, 256);
+	}
+
+	export
+	FORCE_INLINE constexpr int get_partial_circle_vertices(const float length) noexcept{
+		return math::clamp(static_cast<int>(length / (CircleVertPrecision * 2)), 12, 256);
 	}
 
 	/*
@@ -268,7 +274,7 @@ namespace mo_yanxi::graphic::draw{
 					auto [cos3, sin3] = math::cos_sin(abase + space * 2);
 
 					fill::fill(
-						auto_param.get_reserved(math::min<std::size_t>((sides - i) / 2 + (sides & 1), MaxReserve)),
+						auto_param.get(math::min<std::size_t>((sides - i) / 2 + (sides & 1), MaxReserve)),
 						trans.vec,
 						vec{trans.vec.x + radius * cos1, trans.vec.y + radius * sin1},
 						vec{trans.vec.x + radius * cos2, trans.vec.y + radius * sin2},
@@ -303,7 +309,7 @@ namespace mo_yanxi::graphic::draw{
 			const col color = colors::white
 			){
 
-			fill::poly(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, color);
+			fill::poly(auto_param, math::trans2{pos, 0}, get_circle_vertices(radius), radius, color);
 		}
 	}
 
@@ -559,7 +565,7 @@ namespace mo_yanxi::graphic::draw{
 					lerpColor2.lerp(currentRatio, colorGroup);
 
 					fill::fill(
-						auto_param.get_reserved(),
+						auto_param.get(),
 						vec{cos1 * r1 + trans.vec.x, sin1 * r1 + trans.vec.y},
 						vec{cos1 * r2 + trans.vec.x, sin1 * r2 + trans.vec.y},
 						vec{cos2 * r2 + trans.vec.x, sin2 * r2 + trans.vec.y},
@@ -637,7 +643,7 @@ namespace mo_yanxi::graphic::draw{
 					currentRatio = fp / fSides;
 
 					fill::fill(
-						auto_param.get_reserved(),
+						auto_param.get(),
 						vec{cos1 * r1 + trans.vec.x, sin1 * r1 + trans.vec.y},
 						vec{cos1 * r2 + trans.vec.x, sin1 * r2 + trans.vec.y},
 						vec{cos2 * r2 + trans.vec.x, sin2 * r2 + trans.vec.y},
@@ -707,7 +713,7 @@ namespace mo_yanxi::graphic::draw{
 					auto [cos1, sin1] = math::cos_sin(a);
 					auto [cos2, sin2] = math::cos_sin(a + space);
 					fill::fill(
-						auto_param.get_reserved(math::min<std::size_t>(sides - i, MaxReserve)),
+						auto_param.get(math::min<std::size_t>(sides - i, MaxReserve)),
 						vec{trans.vec.x + r1 * cos1, trans.vec.y + r1 * sin1},
 						vec{trans.vec.x + r1 * cos2, trans.vec.y + r1 * sin2},
 						vec{trans.vec.x + r2 * cos2, trans.vec.y + r2 * sin2},
@@ -728,7 +734,7 @@ namespace mo_yanxi::graphic::draw{
 			const col color_inner = colors::white,
 			const col color_outer = colors::white
 		){
-			line::poly(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius, stroke, color_inner, color_outer);
+			line::poly(auto_param, math::trans2{pos, 0}, get_circle_vertices(radius), radius, stroke, color_inner, color_outer);
 		}
 
 		export
@@ -741,7 +747,7 @@ namespace mo_yanxi::graphic::draw{
 			const float stroke = 2.f,
 			const col color = colors::white
 		){
-			line::poly_partial(auto_param, trans, getCircleVertices(radius), radius, ratio, stroke, color);
+			line::poly_partial(auto_param, trans, get_circle_vertices(radius), radius, ratio, stroke, color);
 		}
 	}
 
@@ -775,7 +781,7 @@ namespace mo_yanxi::graphic::draw{
 			const col inner_center_color = colors::white,
 			const col inner_edge_color = colors::white
 		){
-			fancy::poly_outlined(auto_param, math::trans2{pos, 0}, getCircleVertices(radius), radius,
+			fancy::poly_outlined(auto_param, math::trans2{pos, 0}, get_circle_vertices(radius), radius,
 						outline_stroke,
 						edge_inner_color,
 			           edge_outer_color,
@@ -885,5 +891,167 @@ namespace mo_yanxi::graphic::draw{
 					);
 				}
 			}
+
+
+	export
+	template <
+		typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj
+	>
+	void draw_targeting_range(
+		auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+		const math::vec2 pos,
+		const math::range radius,
+		const float stroke = 4,
+		const color& color_from = colors::white,
+		const color& color_to = colors::white
+	){
+		const int sides = get_circle_vertices(radius.to);
+		const auto space = math::pi_2 / static_cast<float>(sides);
+		const auto h_step = stroke / 2.0f / math::cos(space / 2.0f);
+		const auto r_from_1 = radius.from - h_step;
+		const auto r_from_2 = radius.from + h_step;
+
+		const auto r_to_1 = radius.to - h_step;
+		const auto r_to_2 = radius.to + h_step;
+
+		const auto tc1 = color_from.copy().set_a(.3f);
+		const auto tc2 = color_to.copy().set_a(.45f);
+
+		static constexpr std::size_t MaxReserve = 64;
+
+		math::cos_sin_result rst1{1, 0};
+
+		for(int i = 0; i < sides; i++){
+			const float a = space * static_cast<float>(i);
+
+			auto rst2 = math::cos_sin_exact(a + space);
+			fill::fill(
+				auto_param.get(math::min<std::size_t>((sides - i) * 3, MaxReserve)),
+				vec{pos.x + r_from_1 * rst1.cos, pos.y + r_from_1 * rst1.sin},
+				vec{pos.x + r_from_1 * rst2.cos, pos.y + r_from_1 * rst2.sin},
+				vec{pos.x + r_from_2 * rst2.cos, pos.y + r_from_2 * rst2.sin},
+				vec{pos.x + r_from_2 * rst1.cos, pos.y + r_from_2 * rst1.sin},
+				color_from, color_from, color_from, color_from
+			);
+
+			fill::fill(
+				auto_param.get(),
+				vec{pos.x + r_from_2 * rst1.cos, pos.y + r_from_2 * rst1.sin},
+				vec{pos.x + r_from_2 * rst2.cos, pos.y + r_from_2 * rst2.sin},
+				vec{pos.x + r_to_1 * rst2.cos, pos.y + r_to_1 * rst2.sin},
+				vec{pos.x + r_to_1 * rst1.cos, pos.y + r_to_1 * rst1.sin},
+				tc1, tc1, tc2, tc2
+			);
+
+			fill::fill(
+				auto_param.get(math::min<std::size_t>((sides - i) * 3, MaxReserve)),
+				vec{pos.x + r_to_1 * rst1.cos, pos.y + r_to_1 * rst1.sin},
+				vec{pos.x + r_to_1 * rst2.cos, pos.y + r_to_1 * rst2.sin},
+				vec{pos.x + r_to_2 * rst2.cos, pos.y + r_to_2 * rst2.sin},
+				vec{pos.x + r_to_2 * rst1.cos, pos.y + r_to_2 * rst1.sin},
+				color_to, color_to, color_to, color_to
+			);
+
+			rst1 = rst2;
+		}
+	}
+
+	export
+	template <
+		typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj
+	>
+	void draw_targeting_range(
+		auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+		const math::trans2 trans,
+		const math::range radius,
+		const math::range angular_range,
+		const float stroke = 4,
+		const color& color_from = colors::white,
+		const color& color_to = colors::white
+	){
+
+		const int sides = get_circle_vertices(angular_range.length() * radius.to);
+		const auto space = angular_range.length() / static_cast<float>(sides);
+		const auto h_step = stroke / 2.0f / math::cos(space / 2.0f);
+		const auto r_from_1 = radius.from - h_step;
+		const auto r_from_2 = radius.from + h_step;
+
+		const auto r_to_1 = radius.to - h_step;
+		const auto r_to_2 = radius.to + h_step;
+		const auto tc1 = color_from.copy().set_a(.3f);
+		const auto tc2 = color_to.copy().set_a(.45f);
+
+		static constexpr std::size_t MaxReserve = 64;
+
+		math::cos_sin_result rst1{math::cos_sin_exact(trans.rot + angular_range.from)};
+
+		for(int i = 0; i < sides; i++){
+			const float a = trans.rot + angular_range.from + space * static_cast<float>(i);
+
+			auto rst2 = math::cos_sin_exact(a + space);
+			fill::fill(
+				auto_param.get(math::min<std::size_t>((sides - i) * 3 + 2, MaxReserve)),
+				vec{trans.vec.x + r_from_1 * rst1.cos, trans.vec.y + r_from_1 * rst1.sin},
+				vec{trans.vec.x + r_from_1 * rst2.cos, trans.vec.y + r_from_1 * rst2.sin},
+				vec{trans.vec.x + r_from_2 * rst2.cos, trans.vec.y + r_from_2 * rst2.sin},
+				vec{trans.vec.x + r_from_2 * rst1.cos, trans.vec.y + r_from_2 * rst1.sin},
+				color_from, color_from, color_from, color_from
+			);
+
+			fill::fill(
+				auto_param.get(),
+				vec{trans.vec.x + r_from_2 * rst1.cos, trans.vec.y + r_from_2 * rst1.sin},
+				vec{trans.vec.x + r_from_2 * rst2.cos, trans.vec.y + r_from_2 * rst2.sin},
+				vec{trans.vec.x + r_to_1 * rst2.cos, trans.vec.y + r_to_1 * rst2.sin},
+				vec{trans.vec.x + r_to_1 * rst1.cos, trans.vec.y + r_to_1 * rst1.sin},
+				tc1, tc1, tc2, tc2
+			);
+
+			fill::fill(
+				auto_param.get(math::min<std::size_t>((sides - i) * 3, MaxReserve)),
+				vec{trans.vec.x + r_to_1 * rst1.cos, trans.vec.y + r_to_1 * rst1.sin},
+				vec{trans.vec.x + r_to_1 * rst2.cos, trans.vec.y + r_to_1 * rst2.sin},
+				vec{trans.vec.x + r_to_2 * rst2.cos, trans.vec.y + r_to_2 * rst2.sin},
+				vec{trans.vec.x + r_to_2 * rst1.cos, trans.vec.y + r_to_2 * rst1.sin},
+				color_to, color_to, color_to, color_to
+			);
+
+			rst1 = rst2;
+		}
+
+		math::cos_sin_result l1{math::cos_sin(trans.rot + angular_range.from)};
+		math::cos_sin_result l2{math::cos_sin(trans.rot + angular_range.to)};
+		line::line(
+			auto_param.get(2),
+			trans.vec + math::vec2{l1.cos * radius.from, l1.sin * radius.from},
+			trans.vec + math::vec2{l1.cos * radius.to, l1.sin * radius.to},
+			stroke, color_from, color_to);
+
+		line::line(
+			auto_param.get() ,
+			trans.vec + math::vec2{l2.cos * radius.from, l2.sin * radius.from},
+			trans.vec + math::vec2{l2.cos * radius.to, l2.sin * radius.to},
+			stroke, color_from, color_to);
+		}
+
+	export
+	template <
+		typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj
+	>
+	FORCE_INLINE void draw_targeting_range_auto(
+		auto_batch_acquirer<Vtx, UV, Proj>& auto_param,
+		const math::trans2 trans,
+		const math::range radius,
+		const math::range angular_range,
+		const float stroke = 4,
+		const color& color_from = colors::white,
+		const color& color_to = colors::white
+	){
+		if(angular_range.length() >= math::pi_2){
+			fancy::draw_targeting_range(auto_param, trans.vec, radius, stroke, color_from, color_to);
+		} else{
+			fancy::draw_targeting_range(auto_param, trans, radius, angular_range, stroke, color_from, color_to);
+		}
+	}
 	}
 }

@@ -10,7 +10,7 @@ export import mo_yanxi.game.ecs.component.manage;
 namespace mo_yanxi::game::ecs{
 	export
 	struct projectile_ui_builder : ui_builder{
-		void build_hud(ui::table& where, const entity_ref& eref) const override;
+		void build_hud(ui::list& where, const entity_ref& eref) const override;
 	};
 
 	template <>

@@ -20,40 +20,17 @@ import std;
 
 
 namespace mo_yanxi::game::ecs::chamber{
-	struct turret_ui : entity_info_table{
-		ui::building_pane* pane;
-
-		[[nodiscard]] turret_ui(ui::scene* scene, group* group, const entity_ref& e_ref)
-			: entity_info_table(scene, group, e_ref){
-			set_style();
-
-			template_cell.set_external({false, true});
-
-			{
-				auto bar = end_line().emplace<ui::building_pane>(ref);
-				bar.cell().set_pad(4);
-				bar.cell().set_external({false, true});
-				bar->set_style(ui::theme::styles::side_bar_whisper);
-
-				if(ref){
-					auto& build = ref->at<turret_build>();
-					bar->get_bar_pane().info.set_reload(build.reload / build.body.reload_duration);
-				}
-
-
-				pane = std::to_address(bar);
-			}
+	struct turret_ui : ui::default_building_ui_elem{
+		[[nodiscard]] turret_ui(ui::scene* scene, group* parent, const building_entity_ref& e)
+			: default_building_ui_elem(scene, parent, e){
 		}
 
 		void update(float delta_in_ticks) override{
-			entity_info_table::update(delta_in_ticks);
+			default_building_ui_elem::update(delta_in_ticks);
 
-			if(!ref)return;
-			auto& build = ref->at<turret_build>();
-			auto& build_data = build.data();
-
-			pane->get_bar_pane().info.set_reload(build.reload / build.body.reload_duration);
-
+			if(!entity)return;
+			auto& build = entity->at<turret_build>();
+			get_bar_pane().info.set_reload(build.reload / build.meta.reload_duration);
 		}
 	};
 
@@ -74,20 +51,20 @@ namespace mo_yanxi::game::ecs::chamber{
 		return {grid_coord_to_real(lpos.as<int>() + data.get_src_coord())};
 	}
 
-	void turret_build::build_hud(ui::table& where, const entity_ref& eref) const{
+	void turret_build::build_hud(ui::list& where, const entity_ref& eref) const{
 		auto hdl = where.emplace<turret_ui>(eref);
 	}
 
-	void turret_build::draw_hud(graphic::renderer_ui& renderer) const{
+	void turret_build::draw_hud_on_building_selection(graphic::renderer_ui_ref renderer) const{
 		auto acquirer = ui::get_draw_acquirer(renderer);
 		using namespace graphic;
 		auto trs = get_local_to_global_trans(transform.vec);
 		auto pos = trs.vec;
 
-		if(body.range.from > 0){
-			draw::line::circle(acquirer, pos, body.range.from, 3, ui::theme::colors::red_dusted);
-		}
-		draw::line::circle(acquirer, pos, body.range.to, 5, ui::theme::colors::pale_green, ui::theme::colors::pale_green);
+
+		// draw::fancy::draw_targeting_range(acquirer, trs, body.range, {-math::pi_half, math::pi_half});
+
+		draw::fancy::draw_targeting_range(acquirer, pos, meta.range, 4, colors::red_dusted, colors::pale_green);
 
 		auto offset_dir = math::vec2::from_polar_rad(rotation.radians() + trs.rot);
 		draw::line::line(acquirer.get(), pos + offset_dir * 32, pos + offset_dir * 96, 12, ui::theme::colors::accent, ui::theme::colors::accent);
@@ -98,7 +75,7 @@ namespace mo_yanxi::game::ecs::chamber{
 			auto target_pos = get_local_to_global(target.local_pos());
 			draw::line::line(acquirer.get(), pos, target_pos, 4, ui::theme::colors::theme, ui::theme::colors::accent);
 
-			if(auto rst = estimate_shoot_hit_delay(target_pos, motion.vel.vec, cache_.projectile_speed, body.shoot_type.offset.trunk.x)){
+			if(auto rst = estimate_shoot_hit_delay(target_pos, motion.vel.vec, cache_.projectile_speed, meta.shoot_type.offset.trunk.x)){
 				auto mov = rst * motion.vel.vec;
 				draw::line::line(acquirer.get(), pos, target_pos + mov, 4, ui::theme::colors::clear, ui::theme::colors::accent);
 				draw::line::square(acquirer, {target_pos + mov, 45 * math::deg_to_rad}, 32, 3, ui::theme::colors::accent);
@@ -109,14 +86,14 @@ namespace mo_yanxi::game::ecs::chamber{
 	}
 
 	void turret_build::shoot(math::trans2 shoot_offset, const chunk_meta& chunk_meta, world::entity_top_world& top_world) const{
-		if(body.shoot_type.projectile){
-			auto hdl = meta::create(top_world.component_manager, *body.shoot_type.projectile);
+		if(meta.shoot_type.projectile){
+			auto hdl = meta::create(top_world.component_manager, *meta.shoot_type.projectile);
 			auto& comp = hdl.get_components();
 			shoot_offset.rot += rotation;
 			const auto trs = get_local_to_global_trans(shoot_offset | transform);
 
 			hdl.set_initial_trans(trs);
-			hdl.set_initial_vel(trs.rot + math::rand{}(body.shoot_type.angular_inaccuracy));
+			hdl.set_initial_vel(trs.rot + math::rand{}(meta.shoot_type.angular_inaccuracy));
 			hdl.set_faction(chunk_meta.id()->at<faction_data>().faction);
 		}
 
@@ -151,7 +128,7 @@ namespace mo_yanxi::game::ecs::chamber{
 
 		//TODO quad_tree to building
 		if(!grid.local_grid.quad_tree()->intersect_then(target_local.vec, [this](math::vec2 pos, const math::frect& region){
-			return region.overlap_ring(pos, body.range.from, body.range.to);
+			return region.overlap_ring(pos, meta.range.from, meta.range.to);
 		}, [this](auto&, const tile& tile){
 			if(!tile.building)return false;
 			if(auto* build = tile.building.build_if()){

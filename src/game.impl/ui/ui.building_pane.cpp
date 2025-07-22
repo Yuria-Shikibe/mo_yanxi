@@ -1,16 +1,16 @@
 module mo_yanxi.game.ui.building_pane;
 
 import mo_yanxi.core.global.graphic;
-
 import mo_yanxi.ui.elem.slider;
-
 import mo_yanxi.ui.graphic;
+import mo_yanxi.ui.assets;
+
+import mo_yanxi.game.world.hud;
 
 namespace mo_yanxi::graphic::draw{
 	template <
 		typename Vtx, std::derived_from<uniformed_rect_uv> UV, typename Proj,
 		std::ranges::input_range Rng = std::initializer_list<math::vec2>
-
 	>
 	void draw_line_seq(
 		auto_batch_acquirer<Vtx, UV, Proj>& acq,
@@ -43,7 +43,7 @@ namespace mo_yanxi::graphic::draw{
 			const auto ang = current_line_normal.angle_between_rad(last_line_normal);
 			const auto ext = (current_line_normal + last_line_normal) * (stroke / (math::cos(ang) + 1));
 
-			draw::fill::quad(acq.get_reserved(acqire_per_draw),
+			draw::fill::quad(acq.get(acqire_per_draw),
 				last1 - last_extend_vector,
 				last1 + last_extend_vector,
 				last2 + ext,
@@ -186,18 +186,18 @@ void mo_yanxi::game::ui::building_energy_bar_setter::build(){
 }
 
 void mo_yanxi::game::ui::building_pane::build(){
+	template_cell.set_external();
+	template_cell.pad.set(6);
+	set_style(ui::theme::styles::side_bar_whisper);
 
 	auto name = emplace<ui::label>();
 	name->set_fit();
 	name->set_style();
-	name->prop().boarder.set(4);
-	name.cell().pad.set(8);
 	name.cell().set_size(40);
 
 	{
 		auto p = emplace<bars_pane>(entity);
 		p->set_style();
-		p.cell().set_external();
 
 		if(entity){
 			auto& data = this->entity.data();
@@ -226,6 +226,20 @@ void mo_yanxi::game::ui::building_pane::build(){
 		list.emplace<ui::elem>();
 		list.emplace<ui::elem>();
 	});
+}
+
+void mo_yanxi::game::ui::building_pane::on_focus_changed(bool is_focused){
+	elem::on_focus_changed(is_focused);
+
+	auto& hud = get_scene()->access_unchecked<world::hud::hud_viewport>("hud");
+
+	if(is_focused){
+		(void)insert_independent_draw({0});
+		hud.building_focus = entity;
+	}else{
+		(void)erase_independent_draw();
+		hud.building_focus = nullptr;
+	}
 }
 
 void mo_yanxi::game::ui::building_pane::draw_content(const rect clipSpace) const{

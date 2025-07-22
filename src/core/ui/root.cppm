@@ -155,11 +155,11 @@ namespace mo_yanxi::ui{
 			}
 		}
 
-		[[nodiscard]] bool scrollIdle() const noexcept{
+		[[nodiscard]] bool is_scroll_idle() const noexcept{
 			return !focus || focus->currentScrollFocus == nullptr;
 		}
 
-		[[nodiscard]] bool focusIdle() const noexcept{
+		[[nodiscard]] bool is_focus_idle() const noexcept{
 			return !focus || focus->currentCursorFocus == nullptr;
 		}
 	};

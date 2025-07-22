@@ -238,7 +238,7 @@ namespace mo_yanxi::graphic::draw{
 			return *this;
 		}
 
-		batch_draw_param<Vtx, UV, Proj> get_reserved(std::size_t reserve = 8) noexcept{
+		batch_draw_param<Vtx, UV, Proj> get(std::size_t reserve) noexcept{
 			if(current == sentinel){
 				acquire(reserve);
 			}

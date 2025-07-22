@@ -70,7 +70,7 @@ namespace mo_yanxi::assets::ctrl{
 		});
 
 		core::global::input.scroll_listeners.emplace_back([](const float x, const float y) -> void {
-			if(!core::global::ui::root->scrollIdle()){
+			if(!core::global::ui::root->is_scroll_idle()){
 				core::global::ui::root->input_scroll(x, y);
 			}else{
 				core::global::graphic::world.camera.set_target_scale(core::global::graphic::world.camera.get_target_scale() + y * 0.05f);

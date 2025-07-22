@@ -73,6 +73,38 @@ mo_yanxi::ui::scene::~scene(){
 	else root->set_scene(nullptr);
 }
 
+bool mo_yanxi::ui::scene::insert_direct_access(std::string_view alias_name, elem& elem){
+	auto [_, rst] = direct_access.try_emplace(alias_name, std::addressof(elem));
+	if(rst){
+		elem.has_scene_direct_access = true;
+	}
+
+	return rst;
+}
+
+bool mo_yanxi::ui::scene::erase_direct_access(const std::string_view hint_name, const elem* elem){
+	if(!elem->has_scene_direct_access)return false;
+
+	if(!hint_name.empty()){
+		if(auto itr = direct_access.find(hint_name); itr != direct_access.end() && itr->second == elem){
+			direct_access.erase(itr);
+			return true;
+		}
+	}
+
+
+	auto cur = direct_access.begin();
+	auto end = direct_access.end();
+	for(; cur != end; ++cur){
+		if(cur->second == elem){
+			direct_access.erase(cur);
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool mo_yanxi::ui::scene::insert_independent_draw(const elem& elem, independent_draw_state state){
 	if(std::ranges::contains(independent_draw_, std::addressof(elem), &independent_draw_entry::elem)){
 		return false;
@@ -110,6 +142,7 @@ void mo_yanxi::ui::scene::drop_all_focus(const elem* target){
 	asyncTaskOwners.erase(const_cast<elem*>(target));
 	independentLayout.erase(const_cast<elem*>(target));
 	erase_independent_draw(target);
+	erase_direct_access({}, target);
 	// tooltipManager.requestDrop(*target);
 }
 

@@ -86,7 +86,7 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	void projectile_ui_builder::build_hud(ui::table& where, const entity_ref& eref) const{
+	void projectile_ui_builder::build_hud(ui::list& where, const entity_ref& eref) const{
 		auto hdl = where.emplace<projectile_ui>(eref);
 
 	}

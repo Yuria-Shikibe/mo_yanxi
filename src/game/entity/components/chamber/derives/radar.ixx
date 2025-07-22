@@ -34,9 +34,9 @@ namespace mo_yanxi::game::ecs{
 			float reload{};
 			bool active{true};
 
-			void draw_hud(graphic::renderer_ui& renderer) const override;
+			void draw_hud_on_building_selection(graphic::renderer_ui_ref renderer) const override;
 
-			void build_hud(ui::table& where, const entity_ref& eref) const override;
+			void build_hud(ui::list& where, const entity_ref& eref) const override;
 
 			void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world) override;
 

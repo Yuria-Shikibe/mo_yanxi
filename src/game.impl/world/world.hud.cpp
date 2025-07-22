@@ -208,35 +208,38 @@ void mo_yanxi::game::world::hud::path_editor::draw(const ui::elem& elem, graphic
 void mo_yanxi::game::world::hud::hud_viewport::build_hud(){
 	auto& bed = *this;
 
-	{
-		auto pane = bed.emplace<ui::scroll_pane>();
-		side_bar = &pane->set_elem([](ui::table& t){
-			t.set_style();
-			t.interactivity = ui::interactivity::enabled;
+	using namespace mo_yanxi::ui;
 
-			t.template_cell.pad.bottom = 8;
-			t.template_cell.set_external({false, true});
+	{
+		auto pane = bed.emplace<scroll_pane>();
+		side_bar = &pane->set_elem([](list& t){
+			t.set_style();
+			t.interactivity = interactivity::enabled;
+
+			t.template_cell.pad.set(4);;
+			t.template_cell.set_external();
 		});
-		pane->set_style(ui::theme::styles::general_static);
+		pane->set_style(theme::styles::general_static);
 		pane.cell().region_scale = {tags::from_extent, {}, {0.2, 1.}};
 		pane.cell().margin.set(4);
 		pane.cell().align = align::pos::center_left;
 	}
+
 	{
-		auto pane = bed.emplace<ui::scroll_pane>();
-		pane->set_style(ui::theme::styles::general_static);
-		pane->set_layout_policy(ui::layout_policy::vert_major);
+		auto pane = bed.emplace<scroll_pane>();
+		pane->set_style(theme::styles::general_static);
+		pane->set_layout_policy(layout_policy::vert_major);
 		pane.cell().region_scale = {tags::from_extent, {}, {0.3, .2}};
 		pane.cell().margin.set(4);
 		pane.cell().align = align::pos::bottom_right;
 
-		button_bar = &pane->set_elem([](ui::table& t){
+		button_bar = &pane->set_elem([](table& t){
 			t.set_style();
-			t.interactivity = ui::interactivity::enabled;
+			t.interactivity = interactivity::enabled;
 
-			auto box = t.emplace<ui::check_box>();
-			box->set_drawable<ui::icon_drawable>(0, ui::theme::icons::close);
-			box->set_drawable<ui::icon_drawable>(1, ui::theme::icons::up);
+			auto box = t.emplace<check_box>();
+			box->set_drawable<icon_drawable>(0, theme::icons::close);
+			box->set_drawable<icon_drawable>(1, theme::icons::up);
 			// box->add_multi_select_tooltip({
 			//
 			// });
@@ -252,7 +255,7 @@ void mo_yanxi::game::world::hud::hud_viewport::build_entity_info(){
 
 	if(main_selected){
 		if(const auto b = main_selected->try_get<ecs::ui_builder>()){
-			b->build_hud(side_bar->end_line(), main_selected);
+			b->build_hud(*side_bar, main_selected);
 		}
 
 		if(const auto move_cmd = main_selected->try_get<ecs::move_command>()){
@@ -274,6 +277,10 @@ void mo_yanxi::game::world::hud::hud_viewport::draw_content(const ui::rect clipS
 	renderer.batch.push_projection(context.graphic_context->renderer().camera.get_world_to_uniformed());
 
 	if(main_selected){
+
+		if(building_focus){
+			building_focus->at<ecs::chamber::building>().draw_hud_on_building_selection(renderer);
+		}
 
 		if(auto building = main_selected->try_get<ecs::chamber::chamber_manifold>()){
 			building->draw_hud(renderer);

@@ -138,7 +138,7 @@ namespace mo_yanxi::game::ui{
 	};
 
 	export
-	struct building_pane final : ui::list{
+	struct building_pane  : ui::list{
 		[[nodiscard]] building_pane(
 			scene* scene,
 			group* parent,
@@ -152,29 +152,29 @@ namespace mo_yanxi::game::ui{
 
 		ecs::chamber::building_entity_ref entity{};
 
-
 		[[nodiscard]] bars_pane& get_bar_pane() const noexcept{
 			return this->at<bars_pane>(1);
 		}
 
 	private:
 		void build();
-		void on_focus_changed(bool is_focused) override{
-			elem::on_focus_changed(is_focused);
 
-			if(is_focused){
-				(void)insert_independent_draw({0});
-			}else{
-				(void)erase_independent_draw();
-			}
-		}
+	protected:
+		void on_focus_changed(bool is_focused) override;
 
 		void update(float delta_in_ticks) override{
 			list::update(delta_in_ticks);
 		}
 
-		void draw_content(const rect clipSpace) const override;
+		void draw_content(rect clipSpace) const override;
 
 		void draw_independent() const override;
+	};
+
+	export
+	struct default_building_ui_elem : building_pane{
+		[[nodiscard]] default_building_ui_elem(scene* scene, group* parent, const ecs::chamber::building_entity_ref& e)
+			: building_pane(scene, parent, e){
+		}
 	};
 }

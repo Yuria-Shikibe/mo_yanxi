@@ -143,8 +143,10 @@ void mo_yanxi::game::ui::reload_bar::draw_content(mo_yanxi::ui::rect clipSpace) 
 	);
 }
 
-void mo_yanxi::game::ui::energy_bar_drawer::draw(const math::frect region, float opacity, graphic::renderer_ui_ref renderer_ref) const{
-	// region.expand(2, 2);
+void mo_yanxi::game::ui::energy_bar_drawer::draw(math::frect region, float opacity, graphic::renderer_ui_ref renderer_ref) const{
+	if(state_.power_total > 0){
+		region.expand(2, 2);
+	}
 
 	static constexpr float shrinksion = 2;
 
@@ -215,20 +217,22 @@ void mo_yanxi::game::ui::energy_bar_drawer::draw(const math::frect region, float
 		}
 	}
 
-	{
+	if(state_.power_total < 0){
+		static constexpr float min = std::numeric_limits<float>::epsilon() * 1024;
+		auto stroke = math::curve<float>(expected_count_smooth_, 0, 0.1f) * shrinksion;
 		if(!math::equal(expected_minimum_count_smooth_, expected_count_smooth_)){
 			draw::fill::rect_ortho(
 				acq.get(), math::raw_frect{region.src + bar_unit_extent.copy().mul(expected_minimum_count_smooth_, 0), {0, bar_unit_extent.y}}.expand({
-						shrinksion, 0
+						stroke, 0
 					}), colors::CRIMSON.copy().set_a(opacity));
 
 		}
 
 		if(expected_count_smooth_ > std::numeric_limits<float>::epsilon()){
 			draw::line::rect_ortho(
-				acq, math::raw_frect{region.src, bar_unit_extent.copy().mul(expected_count_smooth_, 1)}.shrink({
+				acq, math::frect{tags::from_extent, region.src, bar_unit_extent.copy().mul(expected_count_smooth_, 1)}.shrink({
 						shrinksion / 2, shrinksion / 2
-					}), shrinksion, colors::pale_green.copy().set_a(opacity));
+					}), stroke, colors::pale_green.copy().set_a(opacity));
 		}
 	}
 
