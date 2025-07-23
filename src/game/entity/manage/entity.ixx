@@ -1236,7 +1236,7 @@ namespace mo_yanxi::game::ecs{
 
 	export
 	struct archetype_slice{
-		using acquirer_type = std::add_pointer_t<strided_span<std::byte>(void*) noexcept>;
+		using acquirer_type = std::add_pointer_t<strided_span<std::byte>(archetype_base*) noexcept>;
 	private:
 		archetype_base* idt{};
 		acquirer_type getter{};
@@ -1298,9 +1298,9 @@ namespace mo_yanxi::game::ecs{
 
 	private:
 		//manager should always moved thread safely
-		no_propagation_mutex<> to_expire_mutex{};
-		no_propagation_mutex<> entity_mutex{};
-		// no_propagation_mutex<std::shared_mutex> archetype_mutex{};
+		no_propagation_mutex<> entity_expire_mutex_{};
+		no_propagation_mutex<> entity_acquire_mutex_{};
+		no_propagation_mutex<> entity_staging_add_mutex_{};
 
 		struct staging_add_base{
 			virtual ~staging_add_base() = default;
@@ -1337,14 +1337,16 @@ namespace mo_yanxi::game::ecs{
 		plf::hive<entity> entities{};
 		archetype_map_type archetypes{};
 
-		// fixed_open_hash_map<type_identity_index, std::vector<archetype_slice>> type_to_archetype{};
-		std::unordered_map<type_identity_index, std::vector<archetype_slice>> type_to_archetype{};
 
-		no_propagation_mutex<> staging_adds_mutex{};
+		//TODO make all archetype slices on the same vector, while hash map provides type to span
+		std::vector<archetype_slice> archetype_slices_{};
+		fixed_open_hash_map<type_identity_index, std::span<const archetype_slice>> type_to_archetype{};
+		// std::unordered_map<type_identity_index, std::span<const archetype_slice>> type_to_archetype{};
+
 		std::vector<std::unique_ptr<staging_add_base>> staging_adds{};
 
 	public:
-		float update_delta;
+		float update_delta{};
 
 		auto get_archetypes() const noexcept{
 			return archetypes | std::views::values;
@@ -1402,7 +1404,7 @@ namespace mo_yanxi::game::ecs{
 				auto& comp = ptr->comp;
 
 				{
-					std::lock_guard _{staging_adds_mutex};
+					std::lock_guard _{entity_staging_add_mutex_};
 					staging_adds.push_back(std::move(ptr));
 				}
 
@@ -1441,7 +1443,7 @@ namespace mo_yanxi::game::ecs{
 		entity_id acquire_entity(){
 			static constexpr type_identity_index idx = unstable_type_identity_of<Tuple>();
 
-			std::lock_guard _{entity_mutex};
+			std::lock_guard _{entity_acquire_mutex_};
 			return std::to_address(entities.emplace(idx));
 		}
 
@@ -1470,7 +1472,7 @@ namespace mo_yanxi::game::ecs{
 	public:
 
 		bool mark_expired(entity_id entity){
-			std::lock_guard _{to_expire_mutex};
+			std::lock_guard _{entity_expire_mutex_};
 			return to_expire.try_emplace(entity).second;
 		}
 
@@ -1483,7 +1485,7 @@ namespace mo_yanxi::game::ecs{
 			if(!staging_adds.empty()){
 				gch::small_vector<type_identity_index> indices{};
 
-				assert_unlocked(staging_adds_mutex);
+				assert_unlocked(entity_staging_add_mutex_);
 
 				for (auto & staging_add_base : staging_adds){
 					if(auto itr = std::ranges::find(indices, staging_add_base->get_idx()); itr == indices.end()){
@@ -1503,7 +1505,7 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		void do_deferred_destroy(){
-			assert_unlocked(to_expire_mutex);
+			assert_unlocked(entity_expire_mutex_);
 
 			modifiable_erase_if(expired, [this](entity_id e){
 				if(e->get_ref_count() == 0){
@@ -1531,8 +1533,8 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		void deferred_destroy_no_reference_entities(){
-			assert_unlocked(to_expire_mutex);
-			assert_unlocked(entity_mutex);
+			assert_unlocked(entity_expire_mutex_);
+			assert_unlocked(entity_acquire_mutex_);
 
 			for (auto& entity : entities){
 				if(entity.get_ref_count() == 0){
@@ -1543,7 +1545,7 @@ namespace mo_yanxi::game::ecs{
 
 		template <typename Tuple>
 			requires (is_tuple_v<Tuple>)
-		auto get_slice_of(){
+		auto get_slice_of() const{
 			static_assert(std::tuple_size_v<Tuple> > 0);
 
 			using chunk_spans = unary_apply_to_tuple_t<strided_span, Tuple>;
@@ -1560,15 +1562,15 @@ namespace mo_yanxi::game::ecs{
 			return result;
 		}
 
-		template <typename Exclusives = std::tuple<>, typename Fn>
-		FORCE_INLINE void sliced_each(Fn fn){
+		template <typename Exclusives = std::tuple<>, typename Fn, typename S>
+		FORCE_INLINE void sliced_each(this S& self, Fn fn){
 			using raw_params = remove_mfptr_this_args<Fn>;
 
 			if constexpr (std::same_as<std::remove_cvref_t<std::tuple_element_t<0, raw_params>>, component_manager>){
 				using params = unary_apply_to_tuple_t<std::decay_t, tuple_drop_first_elem_t<raw_params>>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				this->slice_and_then<params, Exclusives>([this, f = std::move(fn)](const span_tuple& p) FORCE_INLINE {
+				self.template slice_and_then<params, Exclusives>([&self, f = std::move(fn)](const span_tuple& p) FORCE_INLINE {
 					auto count = std::ranges::size(std::get<0>(p));
 
 					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
@@ -1578,8 +1580,8 @@ namespace mo_yanxi::game::ecs{
 					}(std::make_index_sequence<std::tuple_size_v<params>>{});
 
 					for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
-						[&, this] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
-							std::invoke(f, *this, *(std::get<Idx>(iterators)++) ...);
+						[&] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
+							std::invoke(f, self, *(std::get<Idx>(iterators)++) ...);
 						}(std::make_index_sequence<std::tuple_size_v<params>>{});
 					}
 				});
@@ -1587,7 +1589,7 @@ namespace mo_yanxi::game::ecs{
 				using params = unary_apply_to_tuple_t<std::decay_t, raw_params>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				this->slice_and_then<params, Exclusives>([f = std::move(fn)](const span_tuple& p) FORCE_INLINE {
+				self.template slice_and_then<params, Exclusives>([f = std::move(fn)](const span_tuple& p) FORCE_INLINE {
 					auto count = std::ranges::size(std::get<0>(p));
 
 					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
@@ -1610,7 +1612,7 @@ namespace mo_yanxi::game::ecs{
 
 		template <typename ...T>
 			requires (!is_tuple_v<T> && ...)
-		auto get_slice_of(){
+		auto get_slice_of() const{
 			return get_slice_of<std::tuple<T...>>();
 		}
 
@@ -1646,6 +1648,13 @@ namespace mo_yanxi::game::ecs{
 		}
 
 	private:
+
+		struct savement{
+			std::ptrdiff_t off;
+			std::size_t size;
+		};
+
+
 		struct subrange{
 			using value_type = const archetype_slice;
 			using rng = std::span<value_type>;
@@ -1687,7 +1696,7 @@ namespace mo_yanxi::game::ecs{
 			typename Fn,
 			std::invocable<std::size_t>	ReserveFn = std::identity>
 			requires (!tuple_has_duplicate_types_v<tuple_cat_t<Tuple, Exclusives>>)
-		void slice_and_then(Fn fn, ReserveFn reserve_fn = {}){
+		void slice_and_then(Fn fn, ReserveFn reserve_fn = {}) const{
 			static_assert(std::tuple_size_v<Tuple> > 0);
 			using chunk_spans = unary_apply_to_tuple_t<strided_span, Tuple>;
 
@@ -1826,11 +1835,23 @@ namespace mo_yanxi::game::ecs{
 
 			auto insert = [&, this]<typename T>(){
 				static constexpr type_identity_index idx{unstable_type_identity_of<T>()};
-				auto& vector = type_to_archetype[idx];
+
+				auto itr = type_to_archetype.find(idx);
+				const bool requires_resize = (archetype_slices_.size() == archetype_slices_.capacity());
+
+				fixed_open_hash_map<type_identity_index, savement> type_to_index_map{0};
+
+				auto make_mark = [&]{
+					if(!requires_resize)return;
+					type_to_index_map = decltype(type_to_index_map){type_to_archetype.bucket_count()};
+					for (const auto & [key, value] : type_to_archetype){
+						type_to_index_map.try_emplace(key, value.data() - archetype_slices_.data(), value.size());
+					}
+				};
 
 				archetype_slice elem{
 					&type,
-					+[](void* arg) noexcept -> strided_span<std::byte>{
+					+[](archetype_base* arg) noexcept -> strided_span<std::byte>{
 						auto slice = static_cast<archetype_t*>(arg)->template slice<T>();
 						return strided_span<std::byte>{
 							const_cast<std::byte*>(reinterpret_cast<const std::byte*>(std::ranges::data(slice))),
@@ -1840,16 +1861,57 @@ namespace mo_yanxi::game::ecs{
 					}
 				};
 
-				if(const auto it = std::ranges::lower_bound(vector, elem); it == vector.end() || it->identity() != elem.identity()){
-					vector.insert(it, std::move(elem));
+				if(itr != type_to_archetype.end()){
+					const auto span = itr->second;
+					const savement savement{span.data() - archetype_slices_.data(), span.size()};
+					//already has a span:
+					if(const auto it = std::ranges::lower_bound(span, elem); it == span.end() || it->identity() != elem.identity()){
+						const auto foundIdx = std::to_address(it) - archetype_slices_.data();
+						make_mark();
+						archetype_slices_.insert(archetype_slices_.begin() + foundIdx, std::move(elem));
+
+						if(requires_resize){
+							for (auto& [key, value] : type_to_archetype){
+								auto original_idx = type_to_index_map.at(key);
+								if(savement.off >= original_idx.off + original_idx.size){
+									value = {archetype_slices_.data() + original_idx.off, original_idx.size};
+								}else if(savement.off + savement.size <= original_idx.off){
+									value = {archetype_slices_.data() + original_idx.off + 1, original_idx.size};
+								}else{
+									value = {archetype_slices_.data() + original_idx.off, original_idx.size + 1};
+								}
+							}
+						}else{
+							for (auto& [key, value] : type_to_archetype){
+								if(savement.off >= value.data() + value.size() - archetype_slices_.data()){
+								}else if(savement.off + savement.size <= value.data() - archetype_slices_.data()){
+									value = {value.data() + 1, value.size()};
+								}else{
+									value = {value.data(), value.size()  + 1};
+								}
+							}
+						}
+					}
+				}else{
+					make_mark();
+					auto& inserted = archetype_slices_.emplace_back(std::move(elem));
+					if(requires_resize){
+						for (auto& [key, value] : type_to_archetype){
+							auto original_idx = type_to_index_map.at(key);
+							value = {archetype_slices_.data() + original_idx.off, original_idx.size};
+						}
+					}
+
+					type_to_archetype.try_emplace(idx, std::span{std::addressof(inserted), 1});
 				}
 			};
 
-			insert.template operator()<chunk_meta>();
+			static constexpr auto base_map_idx = unstable_type_identity_of<typename archetype_t::base_to_derive_map>();
 
 			[&] <std::size_t ...Idx> (std::index_sequence<Idx...>){
 				(insert.template operator()<typename std::tuple_element_t<Idx, typename archetype_t::base_to_derive_map>::first_type>(), ...);
 			}(std::make_index_sequence<std::tuple_size_v<typename archetype_t::base_to_derive_map>>{});
+
 		}
 
 
