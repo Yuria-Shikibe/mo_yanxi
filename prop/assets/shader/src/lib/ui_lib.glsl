@@ -7,7 +7,7 @@
 
 
 const slide_line_style line_style = slide_line_style(
-    45.f, 1.f, 35, 19
+    45.f, 1.f, 25, 12.5
 );
 
 

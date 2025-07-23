@@ -764,7 +764,7 @@ int main(){
 	using namespace mo_yanxi::game;
 
 	test::init_assets();
-	// compile_shaders();
+	test::compile_shaders();
 
 	core::glfw::init();
 	core::global::graphic::init_vk();

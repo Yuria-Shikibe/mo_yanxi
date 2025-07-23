@@ -107,4 +107,9 @@ namespace mo_yanxi::core::ctrl{
 	export constexpr inline key_pack lmb_click_no_mode{mouse::LMB, act::release, mode::none};
 	export constexpr inline key_pack rmb_click{mouse::RMB, act::release, mode::ignore};
 	export constexpr inline key_pack rmb_click_no_mode{mouse::RMB, act::release, mode::none};
+
+	export constexpr inline key_pack lmb_press{mouse::LMB, act::press, mode::ignore};
+	export constexpr inline key_pack lmb_press_no_mode{mouse::LMB, act::press, mode::none};
+	export constexpr inline key_pack rmb_press{mouse::RMB, act::press, mode::ignore};
+	export constexpr inline key_pack rmb_press_no_mode{mouse::RMB, act::press, mode::none};
 }

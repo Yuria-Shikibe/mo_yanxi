@@ -50,6 +50,153 @@ namespace mo_yanxi::game{
 
 	using chamber_meta = const meta::chamber::basic_chamber*;
 
+	struct mirrow_axis{
+		bool at_mid{};
+		int coord{};
+	};
+
+	using mirrow_axis_vec2 = math::vector2<std::optional<mirrow_axis>>;
+
+	unsigned get_mirrowed_region_count(const mirrow_axis_vec2& vec){
+		if(vec.x && vec.y)return 4;
+		if(vec.x || vec.y)return 2;
+		return 1;
+	}
+
+	mirrow_axis_vec2 get_moved_axis(mirrow_axis_vec2 mirrow, math::ivec2 move) noexcept{
+		if(mirrow.x){
+			mirrow.x->coord += move.y;
+		}
+
+		if(mirrow.y){
+			mirrow.y->coord += move.x;
+		}
+
+		return mirrow;
+	}
+
+	auto get_mirrowed_region(const mirrow_axis_vec2& vec, const math::irect region){
+		auto v00 = region.vert_00();
+		auto v11 = region.vert_11();
+
+		std::array<math::irect, 4> array{region};
+
+		static constexpr auto flip = [](int& coord, mirrow_axis axis){
+			auto dst = coord - axis.coord;
+			coord = axis.coord - dst + axis.at_mid;
+		};
+
+		auto flip_x = [&](math::point2 src, math::point2 dst) -> math::irect{
+			auto mirrowed_v00 = src;
+			auto mirrowed_v11 = dst;
+			flip(mirrowed_v00.y, *vec.x);
+			flip(mirrowed_v11.y, *vec.x);
+			return math::irect{mirrowed_v00, mirrowed_v11};
+		};
+
+		auto flip_y = [&](math::point2 src, math::point2 dst) -> math::irect{
+			auto mirrowed_v00 = src;
+			auto mirrowed_v11 = dst;
+			flip(mirrowed_v00.x, *vec.y);
+			flip(mirrowed_v11.x, *vec.y);
+			return math::irect{mirrowed_v00, mirrowed_v11};
+		};
+
+		if(vec.x && vec.y){
+			array[1] = flip_x(v00, v11);
+			array[2] = flip_y(v00, v11);
+			array[3] = flip_y(array[1].vert_00(), array[1].vert_11());
+		}else if(vec.x){
+			array[1] = flip_x(v00, v11);
+		}else if(vec.y){
+			array[1] = flip_y(v00, v11);
+		}
+
+		return std::ranges::owning_view{std::move(array)} | std::views::take(get_mirrowed_region_count(vec)) | std::views::reverse;
+	}
+
+	struct mirrow_mode_channel{
+	private:
+		enum mode{
+			none,
+			x,
+			x_mid,
+
+			y,
+			y_mid,
+
+			COUNT
+		};
+
+
+		unsigned current_mode_{};
+		mirrow_axis_vec2 mirrow{};
+
+
+		void apply_to_axis(mirrow_axis_vec2& vec, math::point2 pos) const{
+			switch(current_mode_){
+			case x:
+				vec.x = mirrow_axis{false, pos.y};
+				break;
+			case x_mid:
+				vec.x = mirrow_axis{true, pos.y};
+				break;
+			case y:
+				vec.y = mirrow_axis{false, pos.x};
+				break;
+			case y_mid:
+				vec.y = mirrow_axis{true, pos.x};
+				break;
+			default: break;
+			}
+		}
+
+	public:
+		[[nodiscard]] bool is_editing() const noexcept{
+			return current_mode_ != 0;
+		}
+
+		void exit_edit() noexcept{
+			current_mode_ = 0;
+		}
+
+		void switch_mode() noexcept{
+			current_mode_ = (current_mode_ + 1) % COUNT;
+		}
+
+		void erase() noexcept{
+			switch(current_mode_){
+			case x :[[fallthrough]];
+			case x_mid : mirrow.x = std::nullopt;
+				break;
+			case y :[[fallthrough]];
+			case y_mid : mirrow.y = std::nullopt;
+				break;
+			default : break;
+			}
+		}
+
+		void apply(math::point2 pos) noexcept{
+			apply_to_axis(mirrow, pos);
+		}
+
+		void move(math::ivec2 move) noexcept{
+			mirrow = get_moved_axis(mirrow, move);
+		}
+
+		[[nodiscard]] mirrow_axis_vec2 get_current_axis() const noexcept{
+			return mirrow;
+		}
+
+		[[nodiscard]] mirrow_axis_vec2 get_temp_axis(math::point2 pos) const noexcept{
+			mirrow_axis_vec2 axis{};
+			apply_to_axis(axis, pos);
+			return axis;
+		}
+
+
+	};
+
 	namespace ui{
 
 		export using namespace mo_yanxi::ui;
@@ -87,6 +234,7 @@ namespace mo_yanxi::game{
 			meta::chamber::grid_building* selected_building{};
 
 			bool focus_on_grid{};
+			mirrow_mode_channel mirrow_channel{};
 		private:
 			meta::chamber::ui_edit_context edit_context{};
 
@@ -192,7 +340,9 @@ namespace mo_yanxi::game{
 			bool apply_grid_op(math::vec2 cursorpos){
 				switch(grid_op_){
 				case operation::move:
-					grid.move(get_grid_edit_offset(cursorpos));
+					auto mov = get_grid_edit_offset(cursorpos);
+					grid.move(mov);
+					mirrow_channel.move(mov);
 					grid_op_ = operation::none;
 
 					return true;
@@ -201,31 +351,43 @@ namespace mo_yanxi::game{
 			}
 
 			input_event::click_result on_click(const input_event::click click_event) override{
+
 				using namespace core::ctrl;
-				if(focus_on_grid){
+				if (mirrow_channel.is_editing()){
+					if(click_event.code.matches(lmb_click)){
+						mirrow_channel.apply(get_world_pos_to_tile_coord(get_transferred_pos(click_event.pos)));
+					}
+
+					if(click_event.code.matches(rmb_click)){
+						mirrow_channel.erase();
+					}
+				}else if(focus_on_grid){
 					if(click_event.code.matches(lmb_click_no_mode)){
 						if(apply_grid_op(click_event.pos))goto fbk;
 					}
 
 					if(click_event.code.action() == act::release){
-						const math::irect place_region = get_selected_place_region({1, 1}, get_select_box(last_click_));
+						const auto region =
+							get_mirrowed_region(
+								mirrow_channel.get_current_axis(),
+								get_selected_place_region({1, 1}, get_select_box(last_click_)));
 
-						switch(click_event.code.key()){
-						case mouse::LMB:
+						for(const auto& place_region : region){
 							each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
 								if(const auto idx = grid.coord_to_index(pos)){
-									grid[idx.value()].placeable = true;
+									switch(click_event.code.key()){
+									case mouse::LMB :{
+										grid[idx.value()].placeable = true;
+										break;
+									}
+									case mouse::RMB :{
+										if(!grid[idx.value()].building) grid[idx.value()].placeable = false;
+										break;
+									}
+									default : break;
+									}
 								}
 							});
-							break;
-						case mouse::RMB:
-							each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
-								if(const auto idx = grid.coord_to_index(pos)){
-									if(!grid[idx.value()].building)grid[idx.value()].placeable = false;
-								}
-							});
-							break;
-						default: break;
 						}
 					}
 
@@ -234,14 +396,20 @@ namespace mo_yanxi::game{
 						switch(click_event.code.key()){
 						case mouse::LMB:
 							if(current_chamber){
-								math::irect place_region = get_selected_place_region(current_chamber->extent, get_select_box(last_click_));
-								each_tile(place_region, current_chamber->extent.as<int>(), [&, this](math::point2 pos){
-									if(const auto idx = grid.coord_to_index(pos)){
-										if(auto* b = grid.try_place_building_at(idx.value(), *current_chamber)){
-											update_selected_building(b);
-										}
-									}
-								});
+								for(const auto& place_region : get_mirrowed_region(
+									    mirrow_channel.get_current_axis(),
+									    get_selected_place_region(current_chamber->extent,
+									                              get_select_box(last_click_)))){
+									each_tile(place_region, current_chamber->extent.as<int>(),
+									          [&, this](math::point2 pos){
+										          if(const auto idx = grid.coord_to_index(pos)){
+											          if(auto* b = grid.try_place_building_at(
+												          idx.value(), *current_chamber)){
+												          update_selected_building(b);
+											          }
+										          }
+									          });
+								}
 							}else{
 								auto p = get_current_tile_coord();
 								if(auto idx = grid.coord_to_index(p)){
@@ -250,18 +418,20 @@ namespace mo_yanxi::game{
 							}
 							break;
 						case mouse::RMB: {
-							const math::irect place_region = get_selected_place_region({1, 1}, get_select_box(last_click_));
-							if(selected_building){
-								auto reg = selected_building->get_indexed_region().as<int>().move(grid.get_origin_offset());
-								if(reg.overlap_exclusive(place_region)){
-									update_selected_building(nullptr);
+							for (const auto & place_region : get_mirrowed_region(mirrow_channel.get_current_axis(), get_selected_place_region({1, 1}, get_select_box(last_click_)))){
+								if(selected_building){
+									auto reg = selected_building->get_indexed_region().as<int>().move(grid.get_origin_offset());
+									if(reg.overlap_exclusive(place_region)){
+										update_selected_building(nullptr);
+									}
 								}
+
+								each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
+									if(const auto idx = grid.coord_to_index(pos)){
+										grid.erase_building_at(idx.value());
+									}
+								});
 							}
-							each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
-								if(const auto idx = grid.coord_to_index(pos)){
-									grid.erase_building_at(idx.value());
-								}
-							});
 						}
 							break;
 						default: break;
@@ -282,7 +452,10 @@ namespace mo_yanxi::game{
 			}
 
 			esc_flag on_esc() override{
-				if(focus_on_grid){
+				if(mirrow_channel.is_editing()){
+					mirrow_channel.exit_edit();
+					return esc_flag::intercept;
+				}else if(focus_on_grid){
 					if(grid_op_ != operation::none){
 						grid_op_ = operation::none;
 						return esc_flag::intercept;
@@ -307,7 +480,7 @@ namespace mo_yanxi::game{
 			void on_key_input(const core::ctrl::key_code_t key, const core::ctrl::key_code_t action, const core::ctrl::key_code_t mode) override{
 				if(action == core::ctrl::act::release){
 					switch(key){
-					case core::ctrl::key::M:
+					case core::ctrl::key::Space:
 						overview = !overview; break;
 					case core::ctrl::key::G:{
 						if(focus_on_grid){
@@ -319,6 +492,10 @@ namespace mo_yanxi::game{
 							}
 
 						}
+						break;
+					}
+					case core::ctrl::key::M:{
+						mirrow_channel.switch_mode();
 						break;
 					}
 					case core::ctrl::key::Enter:{
@@ -344,6 +521,10 @@ namespace mo_yanxi::game{
 				}
 
 				return {cur};
+			}
+
+			[[nodiscard]] math::point2 get_world_to_tile(math::vec2 pos_in_world) const noexcept{
+				return pos_in_world.div(ecs::chamber::tile_size).floor().round<int>();
 			}
 
 			[[nodiscard]] math::irect get_selected_place_region(mo_yanxi::math::usize2 extent, mo_yanxi::math::rect_ortho_trivial<float> rect) const noexcept;

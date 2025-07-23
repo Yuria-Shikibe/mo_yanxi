@@ -65,7 +65,6 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 	auto& r = renderer_from_erased(get_renderer());
 	auto acquirer{mo_yanxi::ui::get_draw_acquirer(r)};
 
-
 	{
 		batch_layer_guard guard(r.batch, std::in_place_type<layers::grid_drawer>);
 
@@ -78,106 +77,153 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 		draw::line::quad_expanded(acquirer, comp.crop().view_as_quad(), -4, colors::light_gray.copy().set_a(.35));
 	}
 
-	auto placement_drawer = [this, &acquirer](math::usize2 chamber_extent, math::raw_frect region, auto pred){
-		math::irect place_region = get_selected_place_region(chamber_extent, region);
-		draw::line::rect_ortho(acquirer, place_region.as<float>().scl(ecs::chamber::tile_size, ecs::chamber::tile_size), 4, colors::pale_green);
+	acquirer.proj.mode_flag = {};
+	acquirer.proj.set_layer(ui::draw_layers::def);
 
-		auto chamber_sz = chamber_extent.as<int>();
 
-		acquirer.proj.mode_flag = draw::mode_flags::slide_line;
-		game::each_tile(place_region, chamber_sz, [&, this](math::point2 pos){
-			if(auto idxp = grid.coord_to_index(pos)){
-				if(pred(*idxp)){
-					draw::fill::rect_ortho(acquirer.get(), get_region_at({tags::from_extent, pos, chamber_sz}).shrink(4), colors::pale_green.copy().set_a(.5f));
-				}
-			}
-		});
-		acquirer.proj.mode_flag = {};
+	auto mirrow_axis_drawer = [&, this](mirrow_axis_vec2 vec, float opacity = 1.f){
+		using namespace ecs::chamber;
+		math::vec2 center{};
+		if(vec.x){
+			center.y = vec.x->coord * tile_size + (tile_size / 2) * vec.x->at_mid;
+		}
+
+		if(vec.y){
+			center.x = vec.y->coord * tile_size + (tile_size / 2) * vec.y->at_mid;
+		}
+
+		if(vec.x){
+			draw::line::line_angle_center(acquirer.get(), {center, 0}, 1E5, 4, colors::RED.copy_set_a(opacity));
+		}
+
+		if(vec.y){
+			draw::line::line_angle_center(acquirer.get(), {center, math::pi_half}, 1E5, 4, colors::ACID.copy_set_a(opacity));
+		}
+
 	};
 
-	auto remove_drawer = [this, &acquirer](math::raw_frect region, auto pred){
-		math::irect place_region = get_selected_place_region({1, 1}, region);
-		draw::line::rect_ortho(acquirer, place_region.as<float>().scl(ecs::chamber::tile_size, ecs::chamber::tile_size), 4, colors::red_dusted);
+	{
+		auto placement_drawer = [this, &acquirer](math::usize2 chamber_extent, math::raw_frect region, auto pred){
+			const auto regions =
+							get_mirrowed_region(
+								mirrow_channel.get_current_axis(),
+								get_selected_place_region(chamber_extent, region));
 
-		acquirer.proj.mode_flag = draw::mode_flags::slide_line;
-		game::each_tile(place_region, math::isize2{1, 1}, [&, this](math::point2 pos){
-			if(auto idxp = grid.coord_to_index(pos)){
-				if(pred(*idxp)){
-					draw::fill::rect_ortho(acquirer.get(), get_region_at({pos, 1, 1}).shrink(4), colors::red_dusted.copy().set_a(.5f));
+			for (const auto & place_region : regions){
+				draw::line::rect_ortho(acquirer, get_region_at(place_region), 4, colors::pale_green);
+
+				auto chamber_sz = chamber_extent.as<int>();
+
+				acquirer.proj.mode_flag = draw::mode_flags::slide_line;
+				game::each_tile(place_region, chamber_sz, [&, this](math::point2 pos){
+					if(auto idxp = grid.coord_to_index(pos)){
+						if(pred(*idxp)){
+							draw::fill::rect_ortho(acquirer.get(), get_region_at({tags::from_extent, pos, chamber_sz}).shrink(4), colors::pale_green.copy().set_a(.5f));
+						}
+					}
+				});
+				acquirer.proj.mode_flag = {};
+			}
+		};
+
+		auto remove_drawer = [this, &acquirer](math::raw_frect region, auto pred){
+			const auto regions =
+							get_mirrowed_region(
+								mirrow_channel.get_current_axis(),
+								get_selected_place_region({1, 1}, region));
+
+			for (const auto & place_region : regions){
+				draw::line::rect_ortho(acquirer, get_region_at(place_region), 4, colors::red_dusted);
+
+				acquirer.proj.mode_flag = draw::mode_flags::slide_line;
+				game::each_tile(place_region, math::isize2{1, 1}, [&, this](math::point2 pos){
+					if(auto idxp = grid.coord_to_index(pos)){
+						if(pred(*idxp)){
+							draw::fill::rect_ortho(acquirer.get(), get_region_at({pos, 1, 1}).shrink(4), colors::red_dusted.copy().set_a(.5f));
+						}
+					}
+				});
+				acquirer.proj.mode_flag = {};
+			}
+		};
+
+
+		if(focus_on_grid){
+			if(grid_op_ == operation::move){
+				auto mov = get_grid_edit_offset(get_scene()->get_cursor_pos());
+				grid.draw(r, camera, {}, .5f);
+				grid.draw(r, camera, mov);
+				mirrow_axis_drawer(get_moved_axis(mirrow_channel.get_current_axis(), mov), .75f);
+			}else{
+				grid.draw(r, camera);
+
+				if(last_click_ && get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift){
+					math::rect_ortho_trivial rect{get_select_box(last_click_)};
+
+					if(get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
+						placement_drawer({1, 1}, rect, [this](math::upoint2 idx){
+							return !grid[idx].placeable;
+						});
+					}else if(get_scene()->is_mouse_pressed(core::ctrl::mouse::RMB)){
+						remove_drawer(rect, [this](math::upoint2 idx){
+							return grid[idx].placeable && grid[idx].building == nullptr;
+						});
+					}
+				}
+
+
+				if (!last_click_ || get_scene()->get_input_mode() == 0){
+					for (const auto & mirrowed_region : get_mirrowed_region(
+						mirrow_channel.get_current_axis(),
+						math::irect{
+							tags::from_extent,
+							get_world_pos_to_tile_coord(get_transferred_cursor_pos()),
+							1, 1})){
+						if((grid.coord_to_index(mirrowed_region.vert_00()))){
+							draw::line::rect_ortho(acquirer, get_region_at(mirrowed_region), 4, colors::pale_green.copy().set_a(.5f));
+						}
+					}
 				}
 			}
-		});
-		acquirer.proj.mode_flag = {};
-	};
-
-	if(focus_on_grid){
-		if(grid_op_ == operation::move){
-			grid.draw(r, camera, {}, .5f);
-			grid.draw(r, camera, get_grid_edit_offset(get_scene()->get_cursor_pos()));
 		}else{
 			grid.draw(r, camera);
 
-			if (get_scene()->get_input_mode() == 0){
-				auto currentCoord = get_transferred_cursor_pos().div(ecs::chamber::tile_size).floor().as<int>();
-				math::irect to_place_region{tags::from_extent, currentCoord, 1, 1};
-				auto world_region = get_region_at(to_place_region);
+			if (current_chamber && (!last_click_ || get_scene()->get_input_mode() == 0)){
+				auto extent = current_chamber->extent.as<int>();
+				auto currentCoord = get_current_tile_coord();
+				math::irect to_place_region{tags::from_extent, currentCoord, extent};
 
-				if(auto idxp = grid.coord_to_index(currentCoord)){
-					draw::line::rect_ortho(acquirer, world_region, 4, colors::pale_green.copy().set_a(.5f));
+				for (const auto & mirrowed_region : get_mirrowed_region(
+						mirrow_channel.get_current_axis(), to_place_region)){
+					auto world_region = get_region_at(mirrowed_region);
+
+					if(auto idxp = grid.coord_to_index(mirrowed_region.vert_00()); idxp && grid.is_building_placeable_at(*idxp, *current_chamber)){
+						draw::line::rect_ortho(acquirer, world_region, 4, colors::pale_green.copy().set_a(.5f));
+					}else{
+						draw::line::rect_ortho(acquirer, world_region, 4, colors::red_dusted.copy().set_a(.5f));
+					}
 				}
+
 			}
 
 			if(last_click_ && get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift){
 				math::rect_ortho_trivial rect{get_select_box(last_click_)};
 
-				if(get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
-					placement_drawer({1, 1}, rect, [this](math::upoint2 idx){
-						return !grid[idx].placeable;
+				if(current_chamber && get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
+					placement_drawer(current_chamber->extent, rect, [this](math::upoint2 idx){
+						return grid.is_building_placeable_at(idx, *current_chamber);
 					});
-				}else if(get_scene()->is_mouse_pressed(core::ctrl::mouse::RMB)){
+				}
+
+				if(get_scene()->is_mouse_pressed(core::ctrl::mouse::RMB)){
 					remove_drawer(rect, [this](math::upoint2 idx){
-						return grid[idx].placeable && grid[idx].building == nullptr;
+						return grid[idx].building != nullptr;
 					});
 				}
 			}
+
 		}
-	}else{
-		grid.draw(r, camera);
-
-		acquirer.proj.mode_flag = {};
-		acquirer.proj.set_layer(ui::draw_layers::def);
-
-		if (current_chamber && get_scene()->get_input_mode() == 0){
-			auto extent = current_chamber->extent.as<int>();
-			auto currentCoord = get_current_tile_coord();
-			math::irect to_place_region{tags::from_extent, currentCoord, extent};
-			auto world_region = get_region_at(to_place_region);
-
-			if(auto idxp = grid.coord_to_index(currentCoord); idxp && grid.is_building_placeable_at(*idxp, *current_chamber)){
-				draw::line::rect_ortho(acquirer, world_region, 4, colors::pale_green.copy().set_a(.5f));
-			}else{
-				draw::line::rect_ortho(acquirer, world_region, 4, colors::red_dusted.copy().set_a(.5f));
-			}
-		}
-
-		if(last_click_ && get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift){
-			math::rect_ortho_trivial rect{get_select_box(last_click_)};
-
-			if(current_chamber && get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
-				placement_drawer(current_chamber->extent, rect, [this](math::upoint2 idx){
-					return grid.is_building_placeable_at(idx, *current_chamber);
-				});
-			}
-
-			if(get_scene()->is_mouse_pressed(core::ctrl::mouse::RMB)){
-				remove_drawer(rect, [this](math::upoint2 idx){
-					return grid[idx].building != nullptr;
-				});
-			}
-		}
-
 	}
-
 
 	drawEnd:
 
@@ -186,6 +232,16 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 		draw::fancy::select_rect(acquirer, b, 8, theme::colors::accent, ecs::chamber::tile_size / 1.5f, true, 1.f);
 	}
 
+	{
+
+
+		if(mirrow_channel.is_editing()){
+			mirrow_axis_drawer(mirrow_channel.get_temp_axis(get_world_pos_to_tile_coord(get_transferred_cursor_pos())));
+			mirrow_axis_drawer(mirrow_channel.get_current_axis(), .3f);
+		}else{
+			mirrow_axis_drawer(mirrow_channel.get_current_axis());
+		}
+	}
 
 	viewport_end();
 

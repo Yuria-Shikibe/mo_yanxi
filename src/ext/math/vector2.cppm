@@ -1160,6 +1160,7 @@ namespace mo_yanxi::math{
 
 
 	export using vec2 = vector2<float>;
+	export using ivec2 = vector2<int>;
 	export using bool2 = vector2<bool>;
 	 /**
 	  * @brief indicate a normalized vector2<float>

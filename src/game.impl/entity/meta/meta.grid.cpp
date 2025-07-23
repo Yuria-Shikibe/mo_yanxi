@@ -80,7 +80,7 @@ void mo_yanxi::game::meta::chamber::grid::draw(
 
 			if(info.is_idle()){
 				auto sz = math::irect{tags::from_extent, off.copy().add(x, y), 1, 1}.as<float>().scl(tile_size, tile_size);
-				draw::fill::rect_ortho(acquirer.get(), sz, colors::aqua.copy().set_a(.1f * opacity_scl));
+				draw::fill::rect_ortho(acquirer.get(), sz, colors::aqua.copy().set_a(.25f * opacity_scl));
 			}else if (info.is_building_identity({x, y})){
 				acquirer.proj.mode_flag = {};
 
