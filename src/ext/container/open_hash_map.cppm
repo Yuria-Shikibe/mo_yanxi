@@ -550,16 +550,11 @@ namespace mo_yanxi{
 			size_ = 0;
 		}
 
-		constexpr void seemly_clear() noexcept{
+		constexpr void seemly_clear() noexcept requires (std::is_trivially_destructible_v<mapped_type> && std::is_copy_assignable_v<key_type>){
 			for(auto& b : buckets_){
-				if constexpr (std::is_trivially_copy_assignable_v<key_type>){
+				if(!fixed_open_addr_hash_map::is_empty_key(b.key)){
 					b.key = empty_key();
-				}else{
-					if(!fixed_open_addr_hash_map::is_empty_key(b.key)){
-						b.key = empty_key();
-					}
 				}
-
 			}
 			size_ = 0;
 		}
@@ -678,6 +673,12 @@ namespace mo_yanxi{
 		constexpr void reserve(const size_type count){
 			if(count * 2 > buckets_.size()){
 				rehash(count * 2);
+			}
+		}
+
+		constexpr void reserve_exact(const size_type count){
+			if(count > buckets_.size()){
+				rehash(count);
 			}
 		}
 

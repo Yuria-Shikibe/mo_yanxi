@@ -88,7 +88,7 @@ void mo_yanxi::game::meta::chamber::grid::draw(
 				draw::line::rect_ortho(acquirer, rg, 4, colors::aqua.copy_set_a(opacity_scl));
 				info.building->get_meta_info().draw(rg, renderer, camera);
 				if(auto ist = info.building->get_instance_data()){
-					ist->draw(info.building->get_meta_info(), rg, renderer, camera);
+					ist->draw(info.building->get_meta_info(), rg, renderer, camera.get_scale());
 				}
 				acquirer.proj.mode_flag = draw::mode_flags::slide_line;
 			}

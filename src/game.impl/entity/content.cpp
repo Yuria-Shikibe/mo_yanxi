@@ -20,6 +20,11 @@ void mo_yanxi::game::content::load(){
 		// b.targeting_range_angular = {-math::pi_half / 3.f, math::pi_half / 3.f};
 		b.transform.vec = {.5f, .5f};
 		b.reload_duration = 60;
+
+		static_cast<ecs::chamber::energy_status&>(b) = ecs::chamber::energy_status{
+			.power = -4,
+			.charge_duration = 45
+		};
 	}
 
 	{

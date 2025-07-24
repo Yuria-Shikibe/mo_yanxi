@@ -208,11 +208,23 @@ namespace mo_yanxi{
 	export
 	template <template <typename, typename> typename W, typename LHS, typename RHS>
 	using binary_apply_to_tuple_t = typename decltype([]{
-		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
-			return std::type_identity<std::tuple<W<std::tuple_element_t<Idx, LHS>, std::tuple_element_t<Idx, RHS>> ...>> {};
-		}(std::make_index_sequence<
-			min_const<std::size_t, std::tuple_size_v<LHS>, std::tuple_size_v<RHS>>
-		>{});
+		if constexpr (is_tuple_v<LHS> && is_tuple_v<RHS>){
+			return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+				return std::type_identity<std::tuple<W<std::tuple_element_t<Idx, LHS>, std::tuple_element_t<Idx, RHS>> ...>> {};
+			}(std::make_index_sequence<
+				min_const<std::size_t, std::tuple_size_v<LHS>, std::tuple_size_v<RHS>>
+			>{});
+		}else if constexpr (is_tuple_v<LHS>){
+			return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+				return std::type_identity<std::tuple<W<std::tuple_element_t<Idx, LHS>, RHS> ...>> {};
+			}(std::make_index_sequence<std::tuple_size_v<LHS>>{});
+		}else if constexpr (is_tuple_v<RHS>){
+			return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+				return std::type_identity<std::tuple<W<LHS, std::tuple_element_t<Idx, RHS>> ...>> {};
+			}(std::make_index_sequence<std::tuple_size_v<RHS>>{});
+		}else{
+			static_assert(false, "At least one side should be tuple");
+		}
 	}())::type;
 
 	// using A = binary_apply_to_tuple_t<copy_qualifier_t, std::tuple<int&, const double>, std::tuple<float, volatile short>>;

@@ -42,7 +42,7 @@ namespace mo_yanxi::game::ecs::system{
 									}
 								}
 							},
-							.trans = {grid.local_to_global(damage_event.local_coord.as<int>() + data.region().src)},
+							.trans = {grid.tile_coord_to_global(damage_event.local_coord.as<int>() + data.region().src)},
 							.depth = 0,
 							.duration = {60}
 						});

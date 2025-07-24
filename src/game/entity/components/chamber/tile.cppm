@@ -152,7 +152,7 @@ namespace mo_yanxi::game::ecs{
 
 		export
 		template <std::derived_from<building> T = building>
-		[[nodiscard]] T& to_building(build_ref ptr) noexcept{
+		[[nodiscard]] T& building_cast(build_ref ptr) noexcept{
 #if DEBUG_CHECK
 			return dynamic_cast<T&>(reinterpret_cast<building&>(ptr));
 #else
@@ -168,8 +168,8 @@ namespace mo_yanxi::game::ecs{
 
 		export
 		template <std::derived_from<building> T = building>
-		[[nodiscard]] const T& to_building(const_build_ref ptr) noexcept{
-			return to_building<T>(const_cast<build_ref>(ptr));
+		[[nodiscard]] const T& building_cast(const_build_ref ptr) noexcept{
+			return building_cast<T>(const_cast<build_ref>(ptr));
 		}
 
 		export
@@ -177,6 +177,9 @@ namespace mo_yanxi::game::ecs{
 		struct building_trait_base{
 			using base_types = std::tuple<building, ui_builder, Bases ...>;
 		};
+
+		export
+		struct power_generator_building_tag{};
 
 		export
 		struct building_data{
@@ -203,10 +206,10 @@ namespace mo_yanxi::game::ecs{
 			float building_damage_take{};
 			float structural_damage_take{};
 
-			energy_status energy_status{};
+			energy_status energy_status{}; //TODO private?
 			energy_acquisition ideal_energy_acquisition{};
 
-			unsigned valid_energy{};
+			unsigned valid_energy{}; //TODO private?
 
 		private:
 			energy_dynamic_status energy_dynamic_status_{};
@@ -214,6 +217,7 @@ namespace mo_yanxi::game::ecs{
 		public:
 			bool set_ideal_energy_acquisition(energy_acquisition acq);
 			bool set_ideal_energy_acquisition(unsigned min, unsigned max);
+			bool set_ideal_energy_acquisition(float priority);
 
 			void set_energy_status(const chamber::energy_status& status) noexcept{
 				energy_status = status;
@@ -231,10 +235,10 @@ namespace mo_yanxi::game::ecs{
 			[[nodiscard]] energy_acquisition get_real_energy_acquisition() const noexcept{
 				unsigned max = math::abs(get_max_usable_energy());
 				return energy_acquisition{
-					.maximum_count = math::min(max, ideal_energy_acquisition.maximum_count),
-					.minimum_count = math::min(max, ideal_energy_acquisition.minimum_count),
-					.priority = ideal_energy_acquisition.priority,
-				};
+						.maximum_count = math::min(max, ideal_energy_acquisition.maximum_count),
+						.minimum_count = math::min(max, ideal_energy_acquisition.minimum_count),
+						.priority = ideal_energy_acquisition.priority,
+					};
 			}
 
 			[[nodiscard]] const energy_dynamic_status& get_energy_dynamic_status() const noexcept{
@@ -344,6 +348,7 @@ namespace mo_yanxi::game::ecs{
 			}
 
 		public:
+			void notify_grid_power_state_maybe_changed() const noexcept;
 			[[nodiscard]] building_data() = default;
 
 			[[nodiscard]] building_data(
@@ -363,9 +368,6 @@ namespace mo_yanxi::game::ecs{
 
 			[[nodiscard]] const meta::chamber::grid_building* get_meta() const noexcept;
 		};
-
-		export
-		struct power_generator_building_tag{};
 
 		export
 		struct power_consumer_building_tag{};

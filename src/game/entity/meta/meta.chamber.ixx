@@ -14,7 +14,6 @@ import mo_yanxi.ui.elem.table;
 
 import mo_yanxi.graphic.renderer.predecl;
 
-
 import mo_yanxi.type_map;
 import mo_yanxi.owner;
 import mo_yanxi.game.srl;
@@ -104,7 +103,7 @@ namespace mo_yanxi::game::meta::chamber{
 
 			void install(ecs::chamber::build_ref build_ref) override;
 
-			void draw(const basic_chamber& meta, math::frect region, graphic::renderer_ui_ref renderer_ui, const graphic::camera2& camera) const override;
+			void draw(const basic_chamber& meta, math::frect region, graphic::renderer_ui_ref renderer_ui, float camera_scale) const override;
 
 			ui_build_handle build_editor_ui(ui::table& table, ui_edit_context& context) override;
 

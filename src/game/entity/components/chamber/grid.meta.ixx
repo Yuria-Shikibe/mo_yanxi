@@ -57,6 +57,17 @@ namespace mo_yanxi::game::meta::chamber{
 		[[nodiscard]] bool has_instance_data() const noexcept{
 			return instance_data != nullptr;
 		}
+
+		void try_draw(math::ivec2 origin_offset, graphic::renderer_ui_ref renderer, const float camera_scale) const{
+			if(auto* p = get_instance_data()){
+				p->draw(
+					get_meta_info(),
+					math::irect{tags::from_extent, identity_pos.as<int>() + origin_offset, meta_info->extent.as<int>()}.
+					scl(tile_size_integral, tile_size_integral).as<float>(),
+					renderer, camera_scale
+				);
+			}
+		}
 	};
 
 	export

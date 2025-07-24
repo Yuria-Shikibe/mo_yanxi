@@ -36,6 +36,8 @@ import mo_yanxi.type_register;
 
 import std;
 
+import :misc;
+
 namespace mo_yanxi::game::ecs{
 	export struct bad_chunk_access : std::exception{
 		[[nodiscard]] bad_chunk_access() = default;
@@ -45,8 +47,7 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	export struct entity;
-	export using entity_id = entity*;
+
 	export using entity_data_chunk_index = std::vector<int>::size_type;
 	export auto invalid_chunk_idx = std::numeric_limits<entity_data_chunk_index>::max();
 
@@ -57,111 +58,9 @@ namespace mo_yanxi::game::ecs{
 	struct archetype;
 
 	export
-	struct chunk_meta{
-
-		template <typename TupleT>
-		friend struct archetype;
-		friend component_manager;
-
-	private:
-		entity_id eid_{};
-
-	public:
-		[[nodiscard]] constexpr chunk_meta() = default;
-
-		[[nodiscard]] constexpr explicit(false) chunk_meta(ecs::entity_id entity_id)
-			noexcept : eid_(entity_id){
-		}
-
-		[[nodiscard]] constexpr entity_id id() const noexcept{
-			return eid_;
-		}
-	};
-
-	/*
-	export
-	template <typename T>
-	using component = T;//: T{};
-	*/
-
-	export
-	struct archetype_base{
-	protected:
-		template <typename T>
-		[[nodiscard]] static constexpr chunk_meta& meta_of(T& comp) noexcept{
-			return comp.template get<chunk_meta>();
-		}
-
-		template <typename T>
-		[[nodiscard]] static constexpr const chunk_meta& meta_of(const T& comp) noexcept{
-			return comp.template get<chunk_meta>();
-		}
-
-	public:
-		virtual ~archetype_base() = default;
-
-		virtual void reserve(std::size_t sz){
-
-		}
-
-		virtual std::size_t insert(const entity_id entity);
-
-		virtual void erase(const entity_id entity);
-
-	protected:
-
-		virtual void* get_chunk_partial_ptr(type_identity_index type, std::size_t idx) noexcept = 0;
-		virtual strided_span<std::byte> get_staging_chunk_partial_slice(type_identity_index type) noexcept = 0;
-
-	public:
-		[[nodiscard]] virtual bool has_type(type_identity_index type) const = 0;
-
-		[[nodiscard]] virtual std::unique_ptr<archetype_serializer> dump() const = 0;
-
-		// virtual void set_expired(entity_id entity_id);
-
-		template <typename T>
-		[[nodiscard]] bool has_type() const noexcept{
-			if constexpr (std::same_as<T, chunk_meta>){
-				return true;
-			}else{
-				return this->has_type(unstable_type_identity_of<T>());
-			}
-		}
-
-		template <typename T>
-		[[nodiscard]] T* try_get_comp(const std::size_t idx) noexcept{
-			return static_cast<T*>(this->get_chunk_partial_ptr(unstable_type_identity_of<T>(), idx));
-		}
-
-		template <typename T>
-		[[nodiscard]] strided_span<T> try_get_slice_of_staging() noexcept{
-			auto span = this->get_staging_chunk_partial_slice(unstable_type_identity_of<T>());
-			return strided_span<T>{reinterpret_cast<T*>(span.data()), span.size(), span.stride()};
-		}
-
-		template <typename T>
-		[[nodiscard]] T* try_get_comp(entity_id id) noexcept;
-
-		virtual void dump_staging() = 0;
-
-		[[nodiscard]] virtual std::size_t size() const noexcept = 0;
-	};
-
-	export
 	struct entity_ref;
 
-
-	export
-	template <typename Tuple>
-		requires (is_tuple_v<Tuple>)
-	using tuple_to_comp_t = std::conditional_t<
-		std::same_as<std::tuple_element_t<0, Tuple>, chunk_meta>,
-		tuple_to_seq_chunk_t<tuple_cat_t<Tuple>>,
-		tuple_to_seq_chunk_t<tuple_cat_t<std::tuple<chunk_meta>, Tuple>>
-	>;
-	
-	struct entity{
+	export struct entity{
 
 	private:
 		template <typename TupleT>
@@ -296,156 +195,6 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	struct entity_ref{
-	private:
-		entity_id id_{};
-
-		void try_incr_ref() const noexcept{
-			if(id_ && !id_->is_expired()){
-				id_->referenced_count.fetch_add(1, std::memory_order_relaxed);
-			}
-		}
-
-		void try_drop_ref() const noexcept{
-			if(id_){
-				auto rst = id_->referenced_count.fetch_sub(1, std::memory_order_relaxed);
-				assert(rst != 0);
-			}
-		}
-
-	public:
-		[[nodiscard]] constexpr entity_ref() noexcept = default;
-
-		[[nodiscard]] explicit(false) entity_ref(entity_id entity_id) noexcept :
-			id_(entity_id){
-			try_incr_ref();
-		}
-
-		[[nodiscard]] explicit(false) entity_ref(entity& entity) noexcept :
-			id_(entity.id()){
-			if(entity){
-				id_->referenced_count.fetch_add(1, std::memory_order_relaxed);
-			}
-		}
-
-		entity_ref(const entity_ref& other) noexcept
-			: id_{other.id_}{
-			try_incr_ref();
-		}
-
-		entity_ref(entity_ref&& other) noexcept
-			: id_{std::exchange(other.id_, {})}{
-		}
-
-		entity_ref& operator=(const entity_ref& other) noexcept{
-			if(this == &other) return *this;
-			try_drop_ref();
-			id_ = other.id_;
-			try_incr_ref();
-			return *this;
-		}
-
-		entity_ref& operator=(entity_id other) noexcept{
-			if(id_ == other) return *this;
-			try_drop_ref();
-			id_ = other;
-			try_incr_ref();
-			return *this;
-		}
-
-		entity_ref& operator=(std::nullptr_t other) noexcept{
-			try_drop_ref();
-			id_ = nullptr;
-			return *this;
-		}
-
-		entity_ref& operator=(entity_ref&& other) noexcept{
-			if(this == &other) return *this;
-			try_drop_ref();
-			id_ = std::exchange(other.id_, {});
-			return *this;
-		}
-
-		~entity_ref(){
-			try_drop_ref();
-		}
-
-		constexpr entity* operator->() const noexcept{
-			return id_;
-		}
-
-		constexpr entity& operator*() const noexcept{
-			assert(id_);
-			return *id_;
-		}
-
-		void reset(const entity_id entity_id = nullptr) noexcept{
-			this->operator=(entity_id);
-		}
-
-		void reset(entity& entity) noexcept{
-			this->operator=(entity);
-		}
-
-		explicit constexpr operator bool() const noexcept{
-			return id_ && *id_;
-		}
-
-		[[nodiscard]] entity_id id() const noexcept{
-			return id_;
-		}
-
-		template <typename C, typename T>
-		FORCE_INLINE constexpr T& operator->*(T C::* mptr) const noexcept{
-			assert(id_);
-			return id_->operator->*<C, T>(mptr);
-		}
-
-
-		template <typename T>
-			requires (std::is_member_function_pointer_v<T>)
-		FORCE_INLINE constexpr decltype(auto) operator->*(T mfptr) const noexcept{
-			assert(id_);
-			return id_->operator->*(mfptr);
-		}
-
-		constexpr explicit(false) operator entity&() const noexcept{
-			assert(id_);
-			return *id_;
-		}
-
-		constexpr explicit(false) operator entity_id() const noexcept{
-			return id_;
-		}
-
-		/**
-		 * @brief drop the referenced entity if it is already erased
-		 */
-		constexpr bool drop_if_expired() noexcept{
-			if(id_ && id_->is_expired()){
-				this->operator=(nullptr);
-				return true;
-			}
-			return false;
-		}
-
-		[[nodiscard]] constexpr bool is_expired() const noexcept{
-			return id_ && id_->is_expired();
-		}
-
-		[[nodiscard]] constexpr bool is_valid() const noexcept{
-			return id_ && !id_->is_expired();
-		}
-
-		constexpr friend bool operator==(const entity_ref& lhs, const entity_ref& rhs) noexcept = default;
-		constexpr friend bool operator==(const entity_ref& lhs, const entity_id eid) noexcept{
-			return lhs.id_ == eid;
-		}
-		constexpr friend bool operator==(const entity_id eid, const entity_ref& rhs) noexcept{
-			return eid == rhs.id_;
-		}
-	};
-
 	export
 	template <typename Tgt, typename EntityChunkDesc, typename ChunkPartial>
 		requires requires{
@@ -488,334 +237,6 @@ namespace mo_yanxi::game::ecs{
 #endif
 		return *rst;
 	}
-
-	template <typename T, typename D>
-	struct dump_base{
-		static void dump(D& srl_type, const T& value) requires (std::is_assignable_v<D&, T>){
-			srl_type = value;
-		}
-
-		static void load(const D& srl_type, T& value) requires (std::is_assignable_v<T&, D>){
-			value = srl_type;
-		}
-	};
-
-	template <typename T>
-	struct dump_base<T, void>{
-
-	};
-
-	template <typename T>
-	using get_dump_type = decltype([]{
-		if constexpr (requires{
-			typename T::dump_type;
-		}){
-			return std::type_identity<typename T::dump_type>{};
-		}else if constexpr (std::is_copy_assignable_v<T>){
-			return std::type_identity<T>{};
-		}else{
-			return std::type_identity<void>{};
-		}
-	}())::type;
-
-	export
-	template <typename T, typename DumpTy = get_dump_type<T>>
-	struct component_custom_behavior_base : dump_base<T, DumpTy>{
-		using value_type = T;
-		using dump_type = DumpTy;
-
-		static void on_init(const chunk_meta& meta, value_type& comp) = delete;
-		static void on_terminate(const chunk_meta& meta, value_type& comp) = delete;
-		static void on_relocate(const chunk_meta& meta, value_type& comp) = delete;
-
-		static void on_init(const chunk_meta& meta, const value_type& comp) = delete;
-		static void on_terminate(const chunk_meta& meta, const value_type& comp) = delete;
-		static void on_relocate(const chunk_meta& meta, const value_type& comp) = delete;
-	};
-
-	export
-	template <typename T>
-	struct component_custom_behavior : component_custom_behavior_base<T>{};
-
-	template <>
-	struct component_custom_behavior<chunk_meta> : component_custom_behavior_base<chunk_meta, void>{
-
-	};
-
-	template <typename T>
-	using dump_type_to_tuple_t = std::conditional_t<
-		std::same_as<typename component_custom_behavior<T>::dump_type, void>, std::tuple<>, std::tuple<
-			typename component_custom_behavior<T>::dump_type>>;
-
-	template <typename T>
-	using unwrap_type = T::type;
-
-	template <typename T>
-	struct get_base_types{
-		using direct_parent = decltype([]{
-			if constexpr (requires{
-				typename component_custom_behavior<T>::base_types;
-			}){
-				if constexpr (is_tuple_v<typename component_custom_behavior<T>::base_types>){
-					return std::type_identity<typename component_custom_behavior<T>::base_types>{};
-				}else{
-					return std::type_identity<std::tuple<typename component_custom_behavior<T>::base_types>>{};
-				}
-			}else{
-				return std::type_identity<std::tuple<>>{};
-			}
-		}())::type;
-
-		using type = tuple_cat_t<
-			std::tuple<T>,
-			all_apply_to<tuple_cat_t,
-				unary_apply_to_tuple_t<unwrap_type,
-					unary_apply_to_tuple_t<get_base_types, direct_parent>>>>;
-	};
-
-	template <typename T>
-	struct component_trait{
-		using value_type = component_custom_behavior<T>::value_type;
-		static_assert(std::same_as<T, value_type>);
-
-		using dump_type = component_custom_behavior<T>::dump_type;
-
-		static constexpr bool is_transient = std::is_void_v<dump_type>;
-
-		using base_types = get_base_types<value_type>::type;
-
-		static constexpr bool is_polymorphic = !requires{
-			typename component_custom_behavior<T>::base_types;
-		};
-
-		static void on_init(const chunk_meta& meta, T& comp) {
-
-			[&]<std::size_t ... I>(std::index_sequence<I...>){
-				([&]<std::size_t J>{
-					using Cur = std::tuple_element_t<J, base_types>;
-
-					if constexpr (requires{
-						component_custom_behavior<Cur>::on_init(meta, comp);
-					}){
-						component_custom_behavior<Cur>::on_init(meta, comp);
-					}
-				}.template operator()<I>(), ...);
-			}(std::make_index_sequence<std::tuple_size_v<base_types>>());
-		}
-
-		static void on_terminate(const chunk_meta& meta, T& comp) {
-			[&]<std::size_t ... I>(std::index_sequence<I...>){
-				([&]<std::size_t J>{
-					using Cur = std::tuple_element_t<J, base_types>;
-
-					if constexpr (requires{
-						component_custom_behavior<Cur>::on_terminate(meta, comp);
-					}){
-						component_custom_behavior<Cur>::on_terminate(meta, comp);
-					}
-				}.template operator()<I>(), ...);
-			}(std::make_index_sequence<std::tuple_size_v<base_types>>());
-		}
-
-		static void on_relocate(const chunk_meta& meta, T& comp) {
-			[&]<std::size_t ... I>(std::index_sequence<I...>){
-				([&]<std::size_t J>{
-					using Cur = std::tuple_element_t<J, base_types>;
-
-					if constexpr (requires{
-						component_custom_behavior<Cur>::on_relocate(meta, comp);
-					}){
-						component_custom_behavior<Cur>::on_relocate(meta, comp);
-					}
-				}.template operator()<I>(), ...);
-			}(std::make_index_sequence<std::tuple_size_v<base_types>>());
-
-		}
-	};
-
-	export
-	template <typename TypeDesc, typename SrlIdx = int, SrlIdx = SrlIdx{}>
-	struct archetype_custom_behavior_base{
-
-		using raw_desc = TypeDesc;
-		using value_type = tuple_to_comp_t<TypeDesc>;
-		using dump_types = all_apply_to<tuple_cat_t, unary_apply_to_tuple_t<dump_type_to_tuple_t, TypeDesc>>;
-		using dump_chunk = tuple_to_seq_chunk_t<dump_types>;
-
-		[[nodiscard]] static dump_chunk dump(const value_type& comp){
-			dump_chunk chunk{};
-			[&]<std::size_t... I>(std::index_sequence<I...>){
-				([&]<std::size_t Idx>(){
-					using SrcTy = std::tuple_element_t<I, raw_desc>;
-					using DstTy = component_trait<SrcTy>::dump_type;
-					if constexpr (!component_trait<SrcTy>::is_transient){
-						component_custom_behavior<SrcTy>::dump(get<DstTy>(chunk), get<SrcTy>(comp));
-					}
-				}.template operator()<I>(), ...);
-			}(std::make_index_sequence<std::tuple_size_v<raw_desc>>{});
-			return chunk;
-		}
-
-		[[nodiscard]] static value_type load(const dump_chunk& comp){
-			value_type chunk{};
-			[&]<std::size_t... I>(std::index_sequence<I...>){
-				([&]<std::size_t Idx>(){
-					using SrcTy = std::tuple_element_t<I, raw_desc>;
-					using DstTy = component_trait<SrcTy>::dump_type;
-					if constexpr (!component_trait<SrcTy>::is_transient){
-						component_custom_behavior<SrcTy>::load(get<DstTy>(comp), get<SrcTy>(chunk));
-					}
-				}.template operator()<I>(), ...);
-			}(std::make_index_sequence<std::tuple_size_v<raw_desc>>{});
-			return chunk;
-		}
-
-		template <typename ...Ts>
-		static auto get_unwrap_of(value_type& comp) noexcept{
-			return [&] <std::size_t... I>(std::index_sequence<I...>){
-				return std::tie(get<Ts>(comp) ...);
-			}(std::index_sequence_for<Ts ...>{});
-		}
-
-		template <typename ...Ts>
-		static auto get_unwrap_of(const value_type& comp) noexcept{
-			return [&] <std::size_t... I>(std::index_sequence<I...>){
-				return std::tie(get<Ts>(comp) ...);
-			}(std::index_sequence_for<Ts ...>{});
-		}
-
-		constexpr static entity_id id_of_chunk(const value_type& comp) noexcept{
-			return static_cast<const chunk_meta&>(get<chunk_meta>(comp)).id();
-		}
-
-		static void on_init(value_type& comp) = delete;
-		static void on_terminate(value_type& comp) = delete;
-		static void on_relocate(value_type& comp) = delete;
-
-	};
-
-	export
-	template <typename TypeDesc>
-	struct archetype_custom_behavior : archetype_custom_behavior_base<TypeDesc>{};
-
-	export
-	template <typename TypeDesc, archetype_serialize_identity id>
-	struct archetype_serialize_info_base{
-		using behavior = archetype_custom_behavior<TypeDesc>;
-		using value_type = behavior::value_type;
-		using dump_chunk = behavior::dump_chunk;
-
-		static constexpr archetype_serialize_identity identity = id;
-		static constexpr bool is_transient = (std::tuple_size_v<dump_chunk> > 0 && id.index != archetype_serialize_identity::unknown);
-
-		static srl::chunk_serialize_handle write(std::ostream& stream, const dump_chunk& chunk) noexcept {
-			co_yield 0;
-			co_return;
-		}
-
-		static void read(std::istream& stream, component_chunk_offset off, dump_chunk& chunk) noexcept {
-			return;
-		}
-	};
-
-	export
-	template <typename TypeDesc>
-	struct archetype_serialize_info : archetype_serialize_info_base<TypeDesc, archetype_serialize_identity{}>{
-	};
-
-	template <typename T>
-	struct archetype_trait{
-		using behavior = archetype_custom_behavior<T>;
-		using value_type = behavior::value_type;
-		static_assert(std::same_as<tuple_to_comp_t<T>, value_type>);
-
-		using dump_chunk = behavior::dump_chunk;
-		using serialize = archetype_serialize_info<T>;
-
-		static constexpr bool is_transient = serialize::is_transient;
-
-		static void on_init(value_type& chunk) {
-			if constexpr (requires{
-				behavior::on_init(chunk);
-			}){
-				behavior::on_init(chunk);
-			}
-		}
-
-		static void on_terminate(value_type& chunk) {
-			if constexpr (requires{
-				behavior::on_terminate(chunk);
-			}){
-				behavior::on_terminate(chunk);
-			}
-		}
-
-		static void on_relocate(value_type& chunk) {
-			if constexpr (requires{
-				behavior::on_relocate(chunk);
-			}){
-				behavior::on_relocate(chunk);
-			}
-		}
-	};
-
-	template <typename L, typename R>
-	struct type_pair{
-		using first_type = L;
-		using second_type = R;
-	};
-
-	struct type_comp_convert{
-		using converter = std::add_pointer_t<void*(void*) noexcept>;
-		converter comp_converter;
-
-		[[nodiscard]] constexpr type_comp_convert() = default;
-
-		template <typename Ty, typename MostDerivedTy, typename ChunkSeqTy>
-		[[nodiscard]] constexpr type_comp_convert(std::in_place_type_t<Ty>, std::in_place_type_t<MostDerivedTy>, std::in_place_type_t<ChunkSeqTy>)
-			noexcept :  comp_converter(+[](void* c) noexcept -> void*{
-				auto& chunk = *static_cast<ChunkSeqTy*>(c);
-				auto& most_derived_comp = chunk.template get<MostDerivedTy>();
-				return static_cast<void*>(static_cast<Ty*>(std::addressof(most_derived_comp)));
-			})  {}
-
-		constexpr explicit operator bool() const noexcept{
-			return comp_converter != nullptr;
-		}
-
-
-		template <typename T>
-		[[nodiscard]] void* get(T& chunk) const noexcept{
-			return comp_converter(std::addressof(chunk));
-		}
-
-		template <typename T>
-		[[nodiscard]] void* get(T* chunk) const noexcept{
-			return comp_converter(chunk);
-		}
-	};
-
-	struct type_index_to_convertor{
-		type_identity_index type{};
-		type_comp_convert convertor{};
-	};
-
-	template <typename T>
-	using derive_map_of_trait = decltype([]{
-		// if constexpr (!component_trait<T>::is_polymorphic){
-			using bases = component_trait<T>::base_types;
-			return []<std::size_t ...Idx>(std::index_sequence<Idx...>){
-				return std::type_identity<std::tuple<
-					type_pair<std::tuple_element_t<Idx, bases>, T> ...
-				>>{};
-			}(std::make_index_sequence<std::tuple_size_v<bases>>{});
-		// }else{
-		// 	return std::type_identity<std::tuple<>>{};
-		// }
-	}())::type;
-
-	template <typename Pair, typename Ty>
-	struct find_if_first_equal : std::bool_constant<std::same_as<typename Pair::first_type, Ty>>{};
 
 	template <typename TupleT>
 	struct archetype : archetype_base{
@@ -1189,16 +610,6 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	std::size_t archetype_base::insert(const entity_id entity){
-		entity->id()->archetype_ = this;
-		return 0;
-	}
-
-	void archetype_base::erase(const entity_id entity){
-		entity->chunk_index_ = invalid_chunk_idx;
-		entity->archetype_ = nullptr;
-	}
-
 	template <typename T>
 	T* archetype_base::try_get_comp(const entity_id id) noexcept{
 		return try_get_comp<T>(id->chunk_index());
@@ -1242,7 +653,7 @@ namespace mo_yanxi::game::ecs{
 		acquirer_type getter{};
 
 	public:
-		[[nodiscard]] archetype_slice(archetype_base* identity, acquirer_type getter)
+		[[nodiscard]] constexpr archetype_slice(archetype_base* identity, acquirer_type getter)
 			: idt(identity),
 			  getter(getter){
 		}
@@ -1271,25 +682,6 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	template <typename T = std::mutex>
-	struct no_propagation_mutex : T{
-		[[nodiscard]] no_propagation_mutex() = default;
-
-		no_propagation_mutex(const no_propagation_mutex& other) noexcept{
-		}
-
-		no_propagation_mutex(no_propagation_mutex&& other) noexcept{
-		}
-
-		no_propagation_mutex& operator=(const no_propagation_mutex& other) noexcept{
-			return *this;
-		}
-
-		no_propagation_mutex& operator=(no_propagation_mutex&& other) noexcept{
-			return *this;
-		}
-	};
-
 	struct component_manager{
 		template <typename T>
 		using small_vector_of = gch::small_vector<T>;
@@ -1301,13 +693,6 @@ namespace mo_yanxi::game::ecs{
 		no_propagation_mutex<> entity_expire_mutex_{};
 		no_propagation_mutex<> entity_acquire_mutex_{};
 		no_propagation_mutex<> entity_staging_add_mutex_{};
-
-		struct staging_add_base{
-			virtual ~staging_add_base() = default;
-			[[nodiscard]] virtual type_identity_index get_idx() const noexcept = 0;
-			virtual void add_archetype(component_manager& manager) const noexcept = 0;
-			virtual void push_entity(component_manager& manager) noexcept = 0;
-		};
 
 		template <typename Tup>
 		struct staging_add final : staging_add_base{
@@ -1833,21 +1218,25 @@ namespace mo_yanxi::game::ecs{
 		void add_new_archetype_map(archetype<Tuple>& type){
 			using archetype_t = archetype<Tuple>;
 
+			fixed_open_hash_map<type_identity_index, savement> type_to_index_map{0};
+
 			auto insert = [&, this]<typename T>(){
 				static constexpr type_identity_index idx{unstable_type_identity_of<T>()};
 
 				auto itr = type_to_archetype.find(idx);
 				const bool requires_resize = (archetype_slices_.size() == archetype_slices_.capacity());
 
-				fixed_open_hash_map<type_identity_index, savement> type_to_index_map{0};
 
 				auto make_mark = [&]{
 					if(!requires_resize)return;
-					type_to_index_map = decltype(type_to_index_map){type_to_archetype.bucket_count()};
+					type_to_index_map.seemly_clear();
+					type_to_index_map.reserve_exact(type_to_archetype.bucket_count());
 					for (const auto & [key, value] : type_to_archetype){
 						type_to_index_map.try_emplace(key, value.data() - archetype_slices_.data(), value.size());
 					}
 				};
+
+
 
 				archetype_slice elem{
 					&type,
@@ -1866,9 +1255,8 @@ namespace mo_yanxi::game::ecs{
 					const savement savement{span.data() - archetype_slices_.data(), span.size()};
 					//already has a span:
 					if(const auto it = std::ranges::lower_bound(span, elem); it == span.end() || it->identity() != elem.identity()){
-						const auto foundIdx = std::to_address(it) - archetype_slices_.data();
 						make_mark();
-						archetype_slices_.insert(archetype_slices_.begin() + foundIdx, std::move(elem));
+						archetype_slices_.insert(archetype_slices_.begin() + (std::to_address(it) - archetype_slices_.data()), std::move(elem));
 
 						if(requires_resize){
 							for (auto& [key, value] : type_to_archetype){
@@ -1936,12 +1324,4 @@ namespace mo_yanxi::game::ecs{
 }
 
 // NOLINTEND(*-misplaced-const)
-
-template <>
-struct std::hash<mo_yanxi::game::ecs::entity_ref>{
-	static std::size_t operator()(const mo_yanxi::game::ecs::entity_ref& ref) noexcept{
-		static constexpr std::hash<const void*> hasher{};
-		return hasher(ref.id());
-	}
-};
 

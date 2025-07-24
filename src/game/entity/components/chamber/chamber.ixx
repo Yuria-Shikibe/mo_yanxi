@@ -9,6 +9,9 @@ export import :chamber;
 export import :grid;
 export import :chamber_meta;
 
+export import :energy_allocation;
+export import :grid_maneuver;
+
 namespace mo_yanxi::game::ecs::chamber{
 
 	const meta::chamber::grid_building* building_data::get_meta() const noexcept{
@@ -19,4 +22,9 @@ namespace mo_yanxi::game::ecs::chamber{
 		return g.tile_at(index.value()).building;
 	}
 
+	void maneuver_subsystem::update(const chamber_manifold& manifold) noexcept{
+		// manifold.manager.sliced_each([&](const maneuver_component& component, const building_data& data){
+		// 	component
+		// });
+	}
 }

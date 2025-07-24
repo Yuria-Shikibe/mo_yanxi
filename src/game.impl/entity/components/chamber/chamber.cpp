@@ -96,7 +96,7 @@ void energy_bar_drawer(const mo_yanxi::ui::elem& e, const mo_yanxi::ui::rect& r,
 
 void mo_yanxi::game::meta::chamber::basic_chamber::install(ecs::chamber::build_ref build_ref) const{
 	using namespace ecs::chamber;
-	auto& building = to_building(build_ref);
+	auto& building = building_cast(build_ref);
 
 	building.data().hit_point.reset(hit_point);
 	if(auto cons = get_energy_consumption()){

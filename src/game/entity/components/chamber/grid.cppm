@@ -233,6 +233,8 @@ namespace mo_yanxi::game::ecs::chamber{
 
 	class chamber_grid_fields{
 	public:
+		friend building_data;
+		friend building;
 		using grid = tile_grid;
 
 		struct in_viewports{
@@ -282,13 +284,12 @@ namespace mo_yanxi::game::ecs::chamber{
 	protected:
 		bool targeting_requested{};
 
-	public:
 		//TODO use reference counter?
 		//TODO private?
-
 		const meta::chamber::grid* meta_grid{};
+		bool energy_status_maybe_changed_flag_{};
 
-		bool energy_status_maybe_changed{};
+	public:
 		energy_allocator energy_allocator{};
 
 		hit_point hit_point{};
@@ -310,8 +311,16 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 
 		template <std::integral T>
-		[[nodiscard]] constexpr math::vec2 local_to_global(math::vector2<T> coord) const noexcept{
-			return (coord.template as<decltype(tile_size_integral)>() * tile_size_integral).template as<float>().add(tile_size / 2.f) | transform;
+		[[nodiscard]] constexpr math::vec2 tile_coord_to_global(math::vector2<T> coord) const noexcept{
+			return (coord.template as<decltype(tile_size_integral)>() * tile_size_integral).template as<float>() | transform;
+		}
+
+		bool check_power_state_changed() noexcept{
+			return std::exchange(energy_status_maybe_changed_flag_, false);
+		}
+
+		void notify_grid_power_state_maybe_changed() noexcept{
+			energy_status_maybe_changed_flag_ = true;
 		}
 
 		void update_transform(math::trans2 trans){
@@ -366,18 +375,6 @@ namespace mo_yanxi::game::ecs::chamber{
 
 		[[nodiscard]] explicit chamber_manifold(const meta::chamber::grid& grid);
 
-
-		//TODO make these only meta grid accessible?
-
-		template <tuple_spec Tuple>
-		void add_building_type(){
-			if constexpr (std::same_as<building_data, std::tuple_element_t<0, Tuple>>){
-				manager.add_archetype<Tuple>();
-			}else{
-				using building_ty = tuple_cat_t<std::tuple<building_data>, Tuple>;
-				manager.add_archetype<building_ty>();
-			}
-		}
 
 		template <tuple_spec Tuple, typename ...Args>
 		auto& add_building(tile_region region, Args&& ...args){
@@ -541,8 +538,8 @@ namespace mo_yanxi::game::ecs{
 
 		bool building_data::set_ideal_energy_acquisition(energy_acquisition acq){
 			if(acq != ideal_energy_acquisition){
-				grid().energy_status_maybe_changed |= true;
 				ideal_energy_acquisition = acq;
+				notify_grid_power_state_maybe_changed();
 				return true;
 			}
 			return false;
@@ -552,9 +549,20 @@ namespace mo_yanxi::game::ecs{
 			if(ideal_energy_acquisition.minimum_count == min && ideal_energy_acquisition.maximum_count == max)return false;
 			ideal_energy_acquisition.minimum_count = min;
 			ideal_energy_acquisition.maximum_count = max;
-			grid().energy_status_maybe_changed |= true;
+			notify_grid_power_state_maybe_changed();
 
 			return true;
+		}
+
+		bool building_data::set_ideal_energy_acquisition(float priority){
+			if(ideal_energy_acquisition.priority == priority)return false;
+			notify_grid_power_state_maybe_changed();
+
+			return true;
+		}
+
+		void building_data::notify_grid_power_state_maybe_changed() const noexcept{
+			grid().energy_status_maybe_changed_flag_ = true;
 		}
 
 		math::trans2 building_data::get_trans() const noexcept{

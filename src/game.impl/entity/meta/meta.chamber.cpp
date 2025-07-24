@@ -103,14 +103,14 @@ void mo_yanxi::game::meta::chamber::radar::draw(math::frect region, graphic::ren
 
 mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::radar::create_instance_chamber(
 	ecs::chamber::chamber_manifold& grid, math::point2 where) const{
-	return add_build<ecs::chamber::radar_build>(*this, grid, where, extent);
+	return add_build<ecs::chamber::radar_build, std::tuple<ecs::chamber::power_consumer_building_tag>>(*this, grid, where, extent);
 }
 
 void mo_yanxi::game::meta::chamber::radar::install(ecs::chamber::build_ref build_ref) const{
 	basic_chamber::install(build_ref);
 
 	using namespace ecs::chamber;
-	auto& building = to_building<radar_build>(build_ref);
+	auto& building = building_cast<radar_build>(build_ref);
 
 	building.meta.reload_duration = reload_duration;
 	building.meta.targeting_range_radius = this->targeting_range_radius;
@@ -122,14 +122,17 @@ void mo_yanxi::game::meta::chamber::radar::install(ecs::chamber::build_ref build
 
 void mo_yanxi::game::meta::chamber::radar::radar_instance_data::install(ecs::chamber::build_ref build_ref){
 	using namespace ecs::chamber;
-	auto& building = to_building<radar_build>(build_ref);
+	auto& building = building_cast<radar_build>(build_ref);
 
 	building.meta.transform.rot = this->rotation;
 }
 
-void mo_yanxi::game::meta::chamber::radar::radar_instance_data::draw(const basic_chamber& meta, math::frect region,
-                                                                     graphic::renderer_ui_ref renderer_ui, const graphic::camera2& camera) const{
-	chamber_instance_data::draw(meta, region, renderer_ui, camera);
+void mo_yanxi::game::meta::chamber::radar::radar_instance_data::draw(
+	const basic_chamber& meta,
+	math::frect region,
+	graphic::renderer_ui_ref renderer_ui,
+	const float camera_scale) const{
+	chamber_instance_data::draw(meta, region, renderer_ui, camera_scale);
 
 	auto& m = static_cast<const radar&>(meta);
 
@@ -143,7 +146,7 @@ void mo_yanxi::game::meta::chamber::radar::radar_instance_data::draw(const basic
 	static constexpr color to_color = colors::pale_green;
 	static constexpr color src_color = colors::red_dusted;
 
-	float stk = 3 / math::max(camera.get_scale(), 0.1f);
+	float stk = 3 / math::max(camera_scale, 0.1f);
 
 	float ratio = m.targeting_range_angular.length() / math::pi_2;
 	if(math::equal(ratio, 1.f)){

@@ -406,6 +406,11 @@ namespace mo_yanxi::game::ecs::system{
 				return std::get<manifold*>(tlp)->collider.index();
 			});
 
+		}
+
+		void apply_collision(){
+			auto rng = passed_entites.locked_range();
+
 			for (auto [meta, mf, motion, rigid] : rng){
 				collisionsPostProcess_3({meta->id(), mf, motion, rigid});
 			}

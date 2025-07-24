@@ -163,7 +163,7 @@ namespace mo_yanxi::game::meta::chamber{
 			const basic_chamber& meta,
 			math::frect region,
 			graphic::renderer_ui_ref renderer_ui,
-			const graphic::camera2& camera
+			const float camera_scale
 		) const{
 
 		}

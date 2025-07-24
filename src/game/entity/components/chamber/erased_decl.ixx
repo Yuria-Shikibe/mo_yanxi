@@ -22,7 +22,7 @@ namespace mo_yanxi::game::ecs::chamber{
 		unsigned minimum_count;
 		float priority;
 
-		constexpr unsigned get_append_count() const noexcept{
+		[[nodiscard]] constexpr unsigned get_append_count() const noexcept{
 			return maximum_count - minimum_count;
 		}
 

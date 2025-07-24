@@ -389,7 +389,7 @@ void main_loop(){
 	}
 
 	game::world::hud hud{};
-	// hud.focus_hud();
+	hud.focus_hud();
 
 	game::ecs::system::motion_system motion_system{};
 	game::ecs::system::renderer ecs_renderer{};
@@ -441,7 +441,7 @@ void main_loop(){
 
 		{
 			math::rand rand{};
-			for(int i = 0; i < 0; ++i){
+			for(int i = 0; i < 2; ++i){
 				using namespace game::ecs;
 
 				manifold mf{};
@@ -557,8 +557,7 @@ void main_loop(){
 		core::global::ui::root->layout();
 		core::global::ui::root->draw();
 
-
-		graphic::draw::world_acquirer acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
+		graphic::draw::world_acquirer<> acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
 		math::rect_box_posed rect2{math::vec2{200, 40}};
 
 		auto cursor_in_world = renderer_world.camera.get_screen_to_world(core::global::ui::root->get_current_focus().get_cursor_pos(), {}, true);
@@ -704,6 +703,9 @@ void main_loop(){
 			}
 
 			if(!core::global::timer.is_paused()){
+				world.collision_system.apply_collision();
+				//collision do things the last frame do, so before defer
+
 				world.component_manager.do_deferred();
 
 				world.component_manager.sliced_each([&](
@@ -727,12 +729,13 @@ void main_loop(){
 				motion_system.run(world.component_manager);
 				world.collision_system.insert_all(world.component_manager);
 
-				game::ecs::system::chamber{}.run(world);
-				game::ecs::system::projectile{}.run(world.component_manager, world.graphic_context);
-
 				async_collide = std::async(std::launch::async, [&]{
 					world.collision_system.run_collision_test(world.component_manager);
 				});
+
+				game::ecs::system::chamber{}.run(world);
+				game::ecs::system::projectile{}.run(world.component_manager, world.graphic_context);
+
 			}
 
 			ecs_renderer.filter_screen_space(world.component_manager, renderer_world.camera.get_viewport());

@@ -21,10 +21,12 @@ namespace mo_yanxi::game::ecs::system{
 					const auto valid = data.update_energy_state(dt);
 					assert(valid.power >= 0);
 					valid_sum += valid.power;
-					grid.energy_status_maybe_changed |= valid.changed;
+					if(valid.changed){
+						grid.notify_grid_power_state_maybe_changed();
+					}
 				});
 
-			if(std::exchange(grid.energy_status_maybe_changed, false)){
+			if(grid.check_power_state_changed()){
 				grid.energy_allocator.update_allocation(valid_sum);
 			}
 			grid.manager.sliced_each(
@@ -81,7 +83,7 @@ namespace mo_yanxi::game::ecs::system{
 												}
 											},
 											.trans = {
-												grid.local_to_global(
+												grid.tile_coord_to_global(
 													damage_event.local_coord.as<int>() + data.region().src)
 											},
 											.depth = 0,
@@ -91,7 +93,7 @@ namespace mo_yanxi::game::ecs::system{
 
 							data.hit_point.accept(data.building_damage_take);
 							if(data.energy_status && data.building_damage_take > 0){
-								grid.energy_status_maybe_changed |= true;
+								grid.notify_grid_power_state_maybe_changed();
 							}
 
 							grid.hit_point.accept(data.structural_damage_take);
