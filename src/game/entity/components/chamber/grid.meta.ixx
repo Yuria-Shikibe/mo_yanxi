@@ -9,6 +9,7 @@ import :chamber_meta;
 import mo_yanxi.game.meta.hitbox;
 import mo_yanxi.open_addr_hash_map;
 import mo_yanxi.algo;
+import mo_yanxi.algo.timsort;
 
 namespace mo_yanxi::game::meta::chamber{
 	export constexpr inline int tile_size_integral = ecs::chamber::tile_size_integral;
@@ -133,15 +134,12 @@ namespace mo_yanxi::game{
 
 				};
 
-
-				// quad_tree<const grid_building*, int> quad_tree_{};
 				std::vector<tile_structural_status> valid_indexed_points_{};
 				unsigned count{};
 
 				tile_structural_status& value_at(math::upoint2 pos, math::usize2 extent) noexcept{
 					return  valid_indexed_points_[pos.x + pos.y * extent.x];
 				}
-
 
 			public:
 				[[nodiscard]] const tile_structural_status& value_at(math::upoint2 pos, math::usize2 extent) const noexcept{
@@ -440,6 +438,145 @@ namespace mo_yanxi::game{
 			void draw(graphic::renderer_ui_ref renderer, const graphic::camera2& camera, math::point2 offset = {}, float opacity_scl = 1.f) const;
 
 			void dump(ecs::chamber::chamber_manifold& clear_grid_manifold) const;
+		};
+
+		export
+		struct grid_structural_statistic{
+		private:
+			struct structural_cluster{
+				std::vector<const grid_building*> buildings;
+
+				[[nodiscard]] structural_cluster() = default;
+
+				[[nodiscard]] explicit(false) structural_cluster(const grid_building* idt) : buildings{idt}{
+
+				}
+
+				[[nodiscard]] const grid_building* identity() const noexcept{
+					return buildings.front();
+				}
+
+				void add(const grid_building* b){
+					buildings.push_back(b);
+				}
+
+				auto size() const noexcept{
+					return buildings.size();
+				}
+			};
+
+			struct union_set_solver{
+				struct cluster_node{
+					const grid_building* identity{};
+					const grid_building* parent{};
+
+					[[nodiscard]] cluster_node() = default;
+
+					[[nodiscard]] explicit(false) cluster_node(const grid_building& building) : identity(&building), parent{identity}{
+
+					}
+
+					bool operator==(const cluster_node&) const noexcept = default;
+
+					auto operator<=>(const cluster_node& other) const noexcept{
+						return std::compare_three_way{}(identity, other.identity);
+					}
+				};
+
+				std::vector<cluster_node> structurals{};
+
+				[[nodiscard]] union_set_solver() = default;
+
+				[[nodiscard]] union_set_solver(const grid& grid) :
+					structurals{
+						std::from_range, grid.get_buildings() | std::views::filter([](const grid_building& b){
+							return b.get_meta_info().structural_adjacent_distance();
+						})
+					}{
+					algo::timsort(structurals);
+
+					const math::irect bound{grid.get_extent().as<int>()};
+					for(auto& structural : structurals){
+						const auto nearby = math::rect::get_proximity_of(
+							structural.identity->get_indexed_region().as<int>());
+						for(const auto& rect_ortho : nearby){
+							rect_ortho.each([&](math::point2 pos){
+								if(!bound.contains(pos)) return;
+								const auto building = grid.tile_at(pos.as<unsigned>()).building;
+								if(building && building->get_meta_info().is_structural()){
+									union_clusters(structural, (*this)[building]);
+								}
+							});
+						}
+					}
+				}
+
+				// 查找根节点（路径压缩）
+				cluster_node& find(cluster_node& c) noexcept{
+					if(c.parent != c.identity){
+						auto root = find((*this)[c.parent]);
+						c.parent = root.identity;
+					}
+					return (*this)[c.parent];
+				}
+
+				// 合并两个集群
+				void union_clusters(cluster_node& a, cluster_node& b) noexcept{
+					auto& rootA = find(a);
+					auto& rootB = find(b);
+
+					if(rootA != rootB){
+						rootB.parent = rootA.identity;
+					}
+				}
+
+				cluster_node& operator[](const grid_building* where) noexcept{
+					return std::ranges::lower_bound(structurals, where, {}, &cluster_node::identity).operator*();
+				}
+
+				// 获取所有连通分量的方法
+				[[nodiscard]] std::vector<structural_cluster> get_connected_components() {
+					std::vector<structural_cluster> result{};
+
+					for (const auto & structural : structurals){
+						if(structural.identity == structural.parent){
+							result.push_back({structural.identity});
+						}
+					}
+
+					std::ranges::sort(result, {}, &structural_cluster::identity);
+
+					for (auto& cluster : structurals) {
+						auto& root = find(cluster);
+						if(cluster.identity == root.identity)continue;
+						std::ranges::lower_bound(result, root.identity, {}, &structural_cluster::identity)->add(cluster.identity);
+					}
+
+					return result;
+				}
+			};
+
+			std::vector<structural_cluster> clusters_{};
+		public:
+
+			[[nodiscard]] grid_structural_statistic() = default;
+
+			[[nodiscard]] explicit(false) grid_structural_statistic(const grid& grid) : clusters_(union_set_solver{grid}.get_connected_components()){
+			}
+
+			[[nodiscard]] float get_structural_hitpoint() const noexcept{
+				std::size_t sum{};
+				std::size_t max_count{};
+
+				for (const auto & cluster : clusters_){
+					max_count = std::ranges::max(max_count, cluster.size());
+					sum += std::ranges::fold_left(cluster.buildings | std::views::transform([](const grid_building* b){
+						return b->get_meta_info().hit_point.max;
+					}), 0.f, std::plus{}) * cluster.size();
+				}
+
+				return static_cast<float>(static_cast<double>(sum) / static_cast<double>(max_count));
+			}
 		};
 	}
 }

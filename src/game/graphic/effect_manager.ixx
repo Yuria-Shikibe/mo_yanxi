@@ -137,6 +137,7 @@ namespace mo_yanxi::game::fx{
 				std::invoke(fn, effect);
 			}
 		}
+
 		template <std::invocable<pool_type::const_reference> Fn>
 		void each(Fn fn) const noexcept(std::is_nothrow_invocable_v<Fn, pool_type::const_reference>) {
 			for (auto && effect : active_pool){

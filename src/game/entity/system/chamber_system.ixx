@@ -38,12 +38,11 @@ namespace mo_yanxi::game::ecs::system{
 
 		void run(world::entity_top_world& top_world) const{
 			top_world.component_manager.sliced_each([&](
-				const component_manager& manager,
+				component_manager& manager,
 				const chunk_meta& meta,
 				ecs::chamber::chamber_manifold& grid,
 				const mech_motion& motion
 			){
-
 				grid.update_transform(motion.trans);
 
 				grid.manager.do_deferred();
@@ -125,6 +124,9 @@ namespace mo_yanxi::game::ecs::system{
 							if(data.building_damage_take > 0){
 								data.hit_point.accept(data.building_damage_take);
 								grid.hit_point.accept(data.building_damage_take);
+								if(grid.hit_point.is_killed()){
+									manager.mark_expired(meta.id());
+								}
 							}
 
 							if(data.hit_point.factor() < 1){

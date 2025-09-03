@@ -60,7 +60,7 @@ namespace mo_yanxi::game::ui{
 			});
 
 			hp_bar.set_value(data.hit_point.factor());
-			hp_bar.valid_range = data.hit_point.capability_range / data.hit_point.max;
+			hp_bar.valid_range = data.hit_point.capability_range;
 
 			if(reload_bar){
 				reload_bar->current_target_efficiency = data.get_efficiency();

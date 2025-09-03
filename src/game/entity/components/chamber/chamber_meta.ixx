@@ -233,6 +233,10 @@ namespace mo_yanxi::game::meta::chamber{
 			return 0;
 		}
 
+		[[nodiscard]] bool is_structural() const noexcept{
+			return structural_adjacent_distance() > 0;
+		}
+
 		virtual ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::chamber_manifold& grid, math::point2 where) const;
 
 		template <typename S>
@@ -257,7 +261,7 @@ namespace mo_yanxi::game::meta::chamber{
 
 	export constexpr basic_chamber empty_chamber{[]{
 		basic_chamber c{};
-		c.hit_point = {.max = 100, .capability_range = {50, 100}};
+		c.hit_point = {.max = 100};
 		c.extent = {1, 1};
 		return c;
 	}()};

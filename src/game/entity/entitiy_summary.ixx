@@ -19,6 +19,7 @@ import std;
 namespace mo_yanxi::game::ecs{
 	namespace desc{
 		export using grid_entity = std::tuple<
+			chunk_meta,
 			mech_motion,
 			manifold,
 			physical_rigid,
@@ -29,6 +30,7 @@ namespace mo_yanxi::game::ecs{
 		>;
 
 		export using projectile = std::tuple<
+			chunk_meta,
 			mech_motion,
 			manifold,
 			physical_rigid,
@@ -54,7 +56,6 @@ namespace mo_yanxi::game::ecs{
 			comps.hit_point = hit_point{
 				static_hit_point{
 					.max = 10000,
-					.capability_range = {2000, 8000}
 				},
 				10000,
 			};

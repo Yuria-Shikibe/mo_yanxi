@@ -122,7 +122,7 @@ void mo_yanxi::game::meta::chamber::basic_chamber::build_editor_ui(ui::table& ta
 	{
 		auto hpbar = table.end_line().create(ui::creation::general_canvas{
 				[this](const ui::elem& e, auto){
-					const auto [from, to] = hit_point.capability_range / hit_point.max;
+					const auto [from, to] = hit_point.capability_range;
 					const auto src = e.content_src_pos();
 					const auto [w, h] = e.content_size();
 					const auto opacity = e.gprop().get_opacity();
@@ -162,7 +162,7 @@ void mo_yanxi::game::meta::chamber::basic_chamber::build_editor_ui(ui::table& ta
 					l.set_text(
 						std::format(
 							"[{:.0f}, {:.0f}]#<[_><[#8888899ff>[Min Enable, Max Enable]",
-						hit_point.capability_range.from, hit_point.capability_range.to)
+						hit_point.capability_range.from * hit_point.max, hit_point.capability_range.to * hit_point.max)
 					);
 				}).cell().set_external({true, true}).pad.set_vert(6);
 			});

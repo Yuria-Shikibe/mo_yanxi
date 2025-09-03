@@ -10,10 +10,11 @@ namespace mo_yanxi::game::ecs{
 	struct static_hit_point{
 		float max{2000};
 
+		//TODO should it be ratio factor?
 		/**
 		 * @brief [disabled, from(minimal functionality), to(maximum ~), max]
 		 */
-		math::range capability_range{500, 1500};
+		math::range capability_range{0.25f, 0.75f};
 
 	};
 	export
@@ -36,7 +37,7 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		[[nodiscard]] float get_capability_factor() const noexcept{
-			return capability_range.normalize(cur);
+			return capability_range.normalize(cur / max);
 		}
 
 		[[nodiscard]] float factor() const noexcept{
@@ -53,6 +54,10 @@ namespace mo_yanxi::game::ecs{
 
 		void cure() noexcept{
 			cur = max;
+		}
+
+		[[nodiscard]] bool is_killed() const noexcept{
+			return cur == 0;
 		}
 
 		float cure_and_get_healed() noexcept{

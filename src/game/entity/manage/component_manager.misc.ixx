@@ -157,14 +157,14 @@ namespace mo_yanxi::game::ecs{
 	template <typename Pair, typename Ty>
 	struct find_if_first_equal : std::bool_constant<std::same_as<typename Pair::first_type, Ty>>{};
 
+
 	export
 	template <typename Tuple>
-		requires (is_tuple_v<Tuple>)
-	using tuple_to_comp_t = std::conditional_t<
-		std::same_as<std::tuple_element_t<0, Tuple>, chunk_meta>,
-		tuple_to_seq_chunk_t<tuple_cat_t<Tuple>>,
-		tuple_to_seq_chunk_t<tuple_cat_t<std::tuple<chunk_meta>, Tuple>>
-	>;
+	concept entity_component_seq = is_tuple_v<Tuple> && std::derived_from<std::tuple_element_t<0, Tuple>, chunk_meta>;
+
+	export
+	template <entity_component_seq Tuple>
+	using tuple_to_comp_t = tuple_to_seq_chunk_t<tuple_cat_t<Tuple>>;
 
 	template <typename T, typename D>
 	struct dump_base{

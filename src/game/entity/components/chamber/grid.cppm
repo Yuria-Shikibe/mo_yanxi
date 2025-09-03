@@ -394,13 +394,13 @@ namespace mo_yanxi::game::ecs::chamber{
 			}
 			if constexpr (std::tuple_size_v<Tuple> > 0){
 				if constexpr (std::same_as<building_data, std::tuple_element_t<0, Tuple>>){
-					return manager.create_entity_deferred<Tuple>(building_data{
+					return manager.create_entity_deferred<tuple_cat_t<std::tuple<chunk_meta>, Tuple>>(building_data{
 						region, this
 					}, std::forward<Args>(args)...);
 				}
 			}
 
-			using building_ty = tuple_cat_t<std::tuple<building_data>, Tuple>;
+			using building_ty = tuple_cat_t<std::tuple<chunk_meta, building_data>, Tuple>;
 			return manager.create_entity_deferred<building_ty>(building_data{
 				region, this
 			}, std::forward<Args>(args)...);
@@ -413,7 +413,7 @@ namespace mo_yanxi::game::ecs::chamber{
 				throw std::invalid_argument("invalid region");
 			}
 
-			return manager.create_entity_deferred<std::tuple<building_data, Building>>(building_data{
+			return manager.create_entity_deferred<std::tuple<chunk_meta, building_data, Building>>(building_data{
 				region, this
 			}, std::forward<Args>(args)...);
 		}

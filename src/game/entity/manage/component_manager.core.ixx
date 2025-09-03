@@ -195,41 +195,18 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
-	export
-	template <typename Tgt, typename EntityChunkDesc, typename ChunkPartial>
-		requires requires{
-		requires is_tuple_v<EntityChunkDesc>;
-		requires contained_in<Tgt, EntityChunkDesc>;
-		requires contained_in<std::remove_cvref_t<ChunkPartial>, EntityChunkDesc>;
-		}
-	[[nodiscard]] constexpr decltype(auto) chunk_neighbour_of(ChunkPartial& value) noexcept{
-
-
-		using Tup = tuple_cat_t<std::tuple<chunk_meta>, EntityChunkDesc>;
-		decltype(auto) rst = mo_yanxi::neighbour_of<Tgt, Tup, ChunkPartial>(value);
-#if DEBUG_CHECK
-		auto get_meta = [&]<typename C>() -> const chunk_meta& {
-			return mo_yanxi::neighbour_of<chunk_meta, C, ChunkPartial>(value);
-		};
-
-		const entity_id eid = get_meta.template operator()<Tup>().id();
-		assert(std::addressof(eid->at<Tgt>()) == std::addressof(rst));
-#endif
-		return rst;
-	}
 
 	export
-	template <typename EntityChunkDesc, typename ChunkPartial>
+	template <entity_component_seq EntityChunkDesc, typename ChunkPartial>
 		requires requires{
-		requires is_tuple_v<EntityChunkDesc>;
 		requires contained_in<std::remove_cvref_t<ChunkPartial>, EntityChunkDesc>;
 		}
-	[[nodiscard]] constexpr decltype(auto) chunk_of(ChunkPartial& value) noexcept{
-		using Tup = tuple_to_comp_t<tuple_cat_t<std::tuple<chunk_meta>, EntityChunkDesc>>;
+	[[nodiscard]] constexpr auto chunk_of(ChunkPartial& value) noexcept -> decltype(*mo_yanxi::seq_chunk_cast<tuple_to_seq_chunk_t<EntityChunkDesc>>(&value)) {
+		using Tup = tuple_to_seq_chunk_t<EntityChunkDesc>;
 		decltype(auto) rst = mo_yanxi::seq_chunk_cast<Tup>(&value);
 #if DEBUG_CHECK
 		auto get_meta = [&]<typename C>() -> const chunk_meta& {
-			return mo_yanxi::neighbour_of<chunk_meta, C, ChunkPartial>(value);
+			return mo_yanxi::neighbour_of<chunk_meta, C>(value);
 		};
 
 		const entity_id eid = get_meta.template operator()<Tup>().id();
@@ -238,13 +215,24 @@ namespace mo_yanxi::game::ecs{
 		return *rst;
 	}
 
+	export
+	template <typename Tgt, entity_component_seq EntityChunkDesc, typename ChunkPartial>
+		requires requires{
+		requires contained_in<Tgt, EntityChunkDesc>;
+		requires contained_in<std::remove_cvref_t<ChunkPartial>, EntityChunkDesc>;
+		}
+	[[nodiscard]] constexpr decltype(auto) chunk_neighbour_of(ChunkPartial& value) noexcept{
+		return get<Tgt>(ecs::chunk_of<EntityChunkDesc>(value));
+	}
+
+
 	template <typename TupleT>
 	struct archetype : archetype_base{
 		using raw_tuple = TupleT;
-		// using raw_tuple = std::tuple<int>;
+		// using raw_tuple = std::tuple<chunk_meta>;
 
 		using trait = archetype_trait<raw_tuple>;
-		using appended_tuple = tuple_cat_t<std::tuple<chunk_meta>, raw_tuple>;
+		using appended_tuple = raw_tuple;
 		using components = tuple_to_seq_chunk_t<appended_tuple>;
 		static constexpr std::size_t chunk_comp_count = std::tuple_size_v<appended_tuple>;
 
@@ -416,8 +404,8 @@ namespace mo_yanxi::game::ecs{
 			if constexpr (set_archetype)archetype_base::insert(eid);
 
 			[&] <std::size_t... I>(std::index_sequence<I...>){
-				(component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp)), ...);
-			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
+				(component_trait<std::tuple_element_t<I + 1, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp)), ...);
+			}(std::make_index_sequence<std::tuple_size_v<raw_tuple> - 1>());
 
 			trait::on_init(added_comp);
 			this->init(added_comp);
@@ -425,8 +413,8 @@ namespace mo_yanxi::game::ecs{
 			if(last_cap != chunks.capacity()){
 				for(components& prev_comp : chunks | std::views::reverse | std::views::drop(1)){
 					[&] <std::size_t... I>(std::index_sequence<I...>){
-						(component_trait<std::tuple_element_t<I, raw_tuple>>::on_relocate(get<0>(prev_comp), get<I + 1>(prev_comp)), ...);
-					}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
+						(component_trait<std::tuple_element_t<I + 1, raw_tuple>>::on_relocate(get<0>(prev_comp), get<I + 1>(prev_comp)), ...);
+					}(std::make_index_sequence<std::tuple_size_v<raw_tuple> - 1>());
 				}
 			}
 
@@ -454,8 +442,8 @@ namespace mo_yanxi::game::ecs{
 			trait::on_terminate(chunk);
 
 			[&] <std::size_t... I>(std::index_sequence<I...>){
-				(component_trait<std::tuple_element_t<I, raw_tuple>>::on_terminate(get<0>(chunk), get<I + 1>(chunk)), ...);
-			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
+				(component_trait<std::tuple_element_t<I + 1, raw_tuple>>::on_terminate(get<0>(chunk), get<I + 1>(chunk)), ...);
+			}(std::make_index_sequence<std::tuple_size_v<raw_tuple> - 1>());
 
 			if(idx == chunk_size - 1){
 				chunks.pop_back();
@@ -466,8 +454,8 @@ namespace mo_yanxi::game::ecs{
 				this->id_of_chunk(chunk)->chunk_index_ = idx;
 
 				[&] <std::size_t... I>(std::index_sequence<I...>){
-					(component_trait<std::tuple_element_t<I, raw_tuple>>::on_relocate(get<0>(chunk), get<I + 1>(chunk)), ...);
-				}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
+					(component_trait<std::tuple_element_t<I + 1, raw_tuple>>::on_relocate(get<0>(chunk), get<I + 1>(chunk)), ...);
+				}(std::make_index_sequence<std::tuple_size_v<raw_tuple> - 1>());
 
 				trait::on_relocate(chunk);
 			}
@@ -539,8 +527,8 @@ namespace mo_yanxi::game::ecs{
 				chunks.reserve(sz);
 				for(components& prev_comp : chunks){
 					[&] <std::size_t... I>(std::index_sequence<I...>){
-						(component_trait<std::tuple_element_t<I, raw_tuple>>::on_relocate(get<0>(prev_comp), get<I + 1>(prev_comp)), ...);
-					}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
+						(component_trait<std::tuple_element_t<I + 1, raw_tuple>>::on_relocate(get<0>(prev_comp), get<I + 1>(prev_comp)), ...);
+					}(std::make_index_sequence<std::tuple_size_v<raw_tuple> - 1>());
 				}
 			}
 
@@ -756,7 +744,7 @@ namespace mo_yanxi::game::ecs{
 		 * @brief deferred add entity, whose archtype must have been created
 		 * @return entity handle
 		 */
-		template <typename Tuple, typename... Args>
+		template <entity_component_seq Tuple, typename... Args>
 			requires (is_tuple_v<Tuple> && (contained_in<std::decay_t<Args>, Tuple> && ...))
 		auto& create_entity_deferred(Args&& ...args){
 			using raw_tuple_type = std::tuple<Args&& ...>;
@@ -766,7 +754,7 @@ namespace mo_yanxi::game::ecs{
 			constexpr std::size_t in_tuple_size = sizeof...(Args);
 
 			return [&] <std::size_t ...Idx>(std::index_sequence<Idx...>) -> auto& {
-				return this->create_entity_deferred<Tuple>(tuple_to_comp_t<Tuple>{chunk_meta{}, [&] <std::size_t I> (){
+				return this->create_entity_deferred<Tuple>(tuple_to_comp_t<Tuple>{[&] <std::size_t I> (){
 					using cur_type = std::tuple_element_t<I, Tuple>;
 					constexpr std::size_t mapped_cur_idx = tuple_index_v<cur_type, in_tuple>;
 

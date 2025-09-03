@@ -94,7 +94,7 @@ namespace mo_yanxi::game::ecs::chamber{
 			auto& chunk = ref->unchecked_get<desc::grid_entity>();
 
 			hitpoint_bar->set_value(chunk.hit_point.factor());
-			hitpoint_bar->normalized_valid_range = chunk.hit_point.capability_range / chunk.hit_point.max;
+			hitpoint_bar->normalized_valid_range = chunk.hit_point.capability_range;
 			{
 				auto& cmd = chunk.get<move_command>();
 				auto& motion = chunk.get<mech_motion>();

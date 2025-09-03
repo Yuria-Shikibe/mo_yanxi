@@ -955,18 +955,18 @@ namespace mo_yanxi::math{
 			}
 		}
 		template <std::predicate<vec_t> Fn>
-		FORCE_INLINE constexpr bool each_any(Fn func) const noexcept(std::is_nothrow_invocable_v<Fn, vec_t>)
+		[[nodiscard]] FORCE_INLINE constexpr auto each_any(Fn func) const noexcept(std::is_nothrow_invocable_v<Fn, vec_t>) -> std::invoke_result_t<Fn, vec_t>
 			requires std::integral<T>
 		{
 			for(T y = src.y; y < get_end_y(); ++y){
 				for(T x = src.x; x < get_end_x(); ++x){
-					if(std::invoke_r<bool>(func, vec_t{x, y})){
-						return true;
+					if(auto rst = std::invoke(func, vec_t{x, y})){
+						return rst;
 					}
 				}
 			}
 
-			return false;
+			return std::invoke_result_t<Fn, vec_t>{};
 		}
 
 
@@ -1032,6 +1032,7 @@ namespace mo_yanxi::math{
 	namespace rect{
 		export
 		template <typename T>
+			requires (!std::is_unsigned_v<T>)
 		std::array<rect_ortho<T>, 4> get_proximity_of(const rect_ortho<T>& region, T margin = T{1}){
 			if constexpr (!std::unsigned_integral<T>){
 				assert(margin >= 0);

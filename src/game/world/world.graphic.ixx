@@ -48,5 +48,9 @@ namespace mo_yanxi::game::world{
 				e.draw(ctx);
 			});
 		}
+
+		void clear_efx() noexcept{
+
+		}
 	};
 }

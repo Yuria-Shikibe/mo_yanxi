@@ -70,6 +70,6 @@ void mo_yanxi::game::ui::chamber_ui_elem::update(float delta_in_ticks){
 
 	if(hitpoint_bar){
 		hitpoint_bar->set_value(data.hit_point.factor());
-		hitpoint_bar->normalized_valid_range = data.hit_point.capability_range / data.hit_point.max;
+		hitpoint_bar->normalized_valid_range = data.hit_point.capability_range;
 	}
 }

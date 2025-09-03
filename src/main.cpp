@@ -94,7 +94,6 @@ import mo_yanxi.game.ecs.component.projectile.manifold;
 
 import mo_yanxi.game.ecs.system.collision;
 import mo_yanxi.game.ecs.system.motion_system;
-import mo_yanxi.game.ecs.system.grid_system;
 import mo_yanxi.game.ecs.system.renderer;
 import mo_yanxi.game.ecs.system.projectile;
 import mo_yanxi.game.ecs.system.chamber;
@@ -440,7 +439,7 @@ void main_loop(){
 			async_collide.get();
 		}
 
-		world.component_manager = {};
+		world.reset();
 
 		{
 			std::ifstream stream{R"(D:\projects\mo_yanxi\build\windows\x64\debug\test_grid.metagrid)", std::ios::binary};
@@ -470,6 +469,9 @@ void main_loop(){
 			}
 
 			chamber::chamber_manifold cmf{grid};
+			game::meta::chamber::grid_structural_statistic stat{grid};
+			cmf.hit_point = {stat.get_structural_hitpoint()};
+			cmf.hit_point.cure();
 
 			cmf.manager.sliced_each([](chamber::turret_build& b){
 				using namespace math;
@@ -659,7 +661,7 @@ void main_loop(){
 
 							draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
 							draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-												   (colors::red_dusted.create_lerp(colors::pale_green, tile.building.data().hit_point.get_capability_factor())).to_light(1.5f).set_a(
+												   (colors::red_dusted.create_lerp(tile.building.data().get_meta()->get_meta_info().is_structural() ? colors::pale_yellow : colors::pale_green, tile.building.data().hit_point.get_capability_factor())).to_light(1.5f).set_a(
 													   tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
 						});
 
