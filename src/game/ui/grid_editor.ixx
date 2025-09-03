@@ -76,10 +76,23 @@ namespace mo_yanxi::game{
 	}
 
 	auto get_mirrowed_region(const mirrow_axis_vec2& vec, const math::irect region){
-		auto v00 = region.vert_00();
-		auto v11 = region.vert_11();
+		const auto v00 = region.vert_00();
+		const auto v11 = region.vert_11();
 
-		std::array<math::irect, 4> array{region};
+		struct ret_v{
+			std::array<math::irect, 4> array{};
+			unsigned sz{};
+
+			auto begin() const noexcept {
+				return array.begin();
+			}
+
+			auto end() const noexcept {
+				return array.begin() + sz;
+			}
+		} ret{.sz = get_mirrowed_region_count(vec)};
+
+		ret.array[ret.sz - 1] = region;
 
 		static constexpr auto flip = [](int& coord, mirrow_axis axis){
 			auto dst = coord - axis.coord;
@@ -103,16 +116,16 @@ namespace mo_yanxi::game{
 		};
 
 		if(vec.x && vec.y){
-			array[1] = flip_x(v00, v11);
-			array[2] = flip_y(v00, v11);
-			array[3] = flip_y(array[1].vert_00(), array[1].vert_11());
+			ret.array[0] = flip_x(v00, v11);
+			ret.array[1] = flip_y(v00, v11);
+			ret.array[2] = flip_y(ret.array[1].vert_00(), ret.array[1].vert_11());
 		}else if(vec.x){
-			array[1] = flip_x(v00, v11);
+			ret.array[0] = flip_x(v00, v11);
 		}else if(vec.y){
-			array[1] = flip_y(v00, v11);
+			ret.array[0] = flip_y(v00, v11);
 		}
 
-		return std::ranges::owning_view{std::move(array)} | std::views::take(get_mirrowed_region_count(vec)) | std::views::reverse;
+		return ret;
 	}
 
 	struct mirrow_mode_channel{
@@ -235,6 +248,7 @@ namespace mo_yanxi::game{
 
 			bool focus_on_grid{};
 			mirrow_mode_channel mirrow_channel{};
+
 		private:
 			meta::chamber::ui_edit_context edit_context{};
 
@@ -280,6 +294,10 @@ namespace mo_yanxi::game{
 				reference = hitbox_transed;
 				reference.apply();
 				if(autoSetMesh)grid = meta::chamber::grid{reference};
+			}
+
+			void reset_editor() noexcept{
+				selected_building = nullptr;
 			}
 
 			[[nodiscard]] math::frect get_region_at(math::irect region_in_world) const noexcept;
@@ -529,7 +547,7 @@ namespace mo_yanxi::game{
 
 			[[nodiscard]] math::irect get_selected_place_region(mo_yanxi::math::usize2 extent, mo_yanxi::math::rect_ortho_trivial<float> rect) const noexcept;
 			[[nodiscard]] math::point2 get_current_tile_coord() const noexcept;
-			[[nodiscard]] math::point2 get_tile_coord(math::vec2 world_pos, math::usize2 extent) const noexcept;
+			[[nodiscard]] static math::point2 get_tile_coord(math::vec2 world_pos, math::usize2 extent) noexcept;
 		};
 
 		export struct grid_editor : table{

@@ -730,8 +730,14 @@ namespace mo_yanxi::game::ecs{
 
 		std::vector<std::unique_ptr<staging_add_base>> staging_adds{};
 
-	public:
 		float update_delta{};
+		unsigned clock{};
+
+	public:
+		void update_update_delta(float dlt) noexcept{
+			update_delta = dlt;
+			++clock;
+		}
 
 		auto get_archetypes() const noexcept{
 			return archetypes | std::views::values;
@@ -739,6 +745,11 @@ namespace mo_yanxi::game::ecs{
 
 		[[nodiscard]] FORCE_INLINE constexpr float get_update_delta() const noexcept{
 			return update_delta;
+		}
+
+
+		[[nodiscard]] FORCE_INLINE constexpr unsigned get_clock() const noexcept{
+			return clock;
 		}
 
 		/**

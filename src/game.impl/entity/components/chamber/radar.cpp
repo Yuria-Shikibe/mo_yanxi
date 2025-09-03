@@ -65,19 +65,21 @@ namespace mo_yanxi::game::ecs::chamber{
 		auto hdl = where.emplace<radar_ui>(eref);
 	}
 
-	void radar_build::update(const chunk_meta& chunk_meta, world::entity_top_world& top_world){
+	void radar_build::update(world::entity_top_world& top_world){
 		auto cpt = data().hit_point.get_capability_factor();
 		if(cpt > 0){
 			if(const auto rst =
-			math::forward_approach_then(reload, meta.reload_duration, get_update_delta() * cpt)){
+			math::forward_approach_then(reload, meta.reload_duration, get_update_delta() * cpt * data().get_efficiency())){
 				if(active){
 					reload = 0;
 
-					auto faction = chunk_meta.id()->at<faction_data>().faction;
+					auto& selfE = data().grid().self_entity();
+
+					auto faction = selfE.at<faction_data>().faction;
 
 					data().grid().grid_targets.index_candidates_by_distance(
 						top_world.collision_system.quad_tree(),
-						chunk_meta.id(),
+						selfE.id(),
 						get_local_to_global(meta.transform.vec),
 						meta.targeting_range_radius, [&](const collision_object& obj){
 							return obj.id->has<chamber_manifold>() && faction->is_hostile_to(obj.id->at<faction_data>().faction.get_id());

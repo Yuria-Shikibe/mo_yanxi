@@ -8,7 +8,6 @@ export module mo_yanxi.game.ecs.component.chamber.turret;
 export import mo_yanxi.game.ecs.component.chamber;
 export import mo_yanxi.game.meta.content_ref;
 export import mo_yanxi.game.meta.projectile;
-export import mo_yanxi.game.meta.chamber;
 export import mo_yanxi.game.meta.turret;
 
 import mo_yanxi.math;
@@ -22,12 +21,8 @@ namespace mo_yanxi::game::ecs{
 		constexpr float stand_by_reload = 120;
 		constexpr float re_target_reload = 20;
 
-		export
-		enum struct turret_state{
-			reloading,
-			shoot_staging,
-			shooting
-		};
+		export using turret_state = meta::turret::turret_state;
+
 
 		struct turret_cache{
 			float projectile_speed{};
@@ -36,8 +31,8 @@ namespace mo_yanxi::game::ecs{
 		math::optional_vec2<float> get_best_tile_of(const building_data& data) noexcept;
 
 		export
-		struct turret_build : building{
-			meta::turret::turret_body meta;
+		struct turret_build : building, upper_building_drawable_tag{
+			meta::turret::turret_body meta{};
 
 			math::trans2z transform{};
 			float rotate_torque{};
@@ -90,7 +85,7 @@ namespace mo_yanxi::game::ecs{
 			// 	burst_progress = 1;
 			// }
 
-			void shoot(math::trans2 shoot_offset, const chunk_meta& chunk_meta, world::entity_top_world& top_world) const;
+			void shoot(math::trans2 shoot_offset, world::entity_top_world& top_world) const;
 
 			[[nodiscard]] std::optional<float> get_estimate_target_rotation() const noexcept{
 				assert(target);
@@ -113,19 +108,19 @@ namespace mo_yanxi::game::ecs{
 				return std::nullopt;
 			}
 
-			void shoot_until(unsigned current_count, const chunk_meta& chunk_meta, world::entity_top_world& top_world){
+			void shoot_until(unsigned current_count, world::entity_top_world& top_world){
 				for(; shoot_index < current_count; ++shoot_index){
 					auto idx = meta.shoot_type.get_shoot_index(shoot_index);
 
 					for(unsigned i = 0; i < meta.shoot_type.offset.count; ++i){
 						auto off = meta.shoot_type[idx, i];
 
-						shoot(off, chunk_meta, top_world);
+						shoot(off, top_world);
 					}
 				}
 			}
 
-			void reload_turret(const float delta, const chunk_meta& chunk_meta, world::entity_top_world& top_world){
+			void reload_turret(const float delta, world::entity_top_world& top_world){
 				bool has_target = static_cast<bool>(target);
 				switch(state_){
 				case turret_state::reloading: if(has_target || meta.actively_reload){
@@ -161,7 +156,7 @@ namespace mo_yanxi::game::ecs{
 					auto total = meta.shoot_type.get_total_shoots();
 					auto next = meta.shoot_type.get_current_shoot_index(burst_reload);
 					auto nextIdx = math::min(next.salvo_index * meta.shoot_type.burst.count + next.burst_index, total);
-					shoot_until(nextIdx, chunk_meta, top_world);
+					shoot_until(nextIdx, top_world);
 					if(nextIdx == total){
 						burst_reload = 0;
 						shoot_index = 0;
@@ -193,7 +188,7 @@ namespace mo_yanxi::game::ecs{
 			bool update_subtarget() noexcept;
 
 		public:
-			void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world) override{
+			void update(world::entity_top_world& top_world) override{
 				if(!update_target()){
 					//TODO fetch target and update;
 					//update instantly
@@ -203,7 +198,7 @@ namespace mo_yanxi::game::ecs{
 				}
 
 				const auto dlt = top_world.component_manager.get_update_delta();
-				reload_turret(dlt, chunk_meta, top_world);
+				reload_turret(dlt, top_world);
 
 				if(target && subtarget_reload >= re_target_reload){
 					subtarget_reload = 0;
@@ -225,6 +220,8 @@ namespace mo_yanxi::game::ecs{
 				}
 
 			}
+
+			void draw_upper_building(world::graphic_context& graphic_context) const override;
 		};
 
 	}
@@ -236,7 +233,7 @@ namespace mo_yanxi::game::ecs{
 	};
 
 	template <>
-	struct component_custom_behavior<chamber::turret_build> : component_custom_behavior_base<chamber::turret_build>, chamber::building_trait_base<>{
+	struct component_custom_behavior<chamber::turret_build> : component_custom_behavior_base<chamber::turret_build>, chamber::building_trait_base<chamber::upper_building_drawable_tag>{
 	};
 
 }

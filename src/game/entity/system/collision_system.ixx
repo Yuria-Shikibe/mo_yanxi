@@ -22,8 +22,8 @@ import std;
 
 namespace mo_yanxi::game::ecs::system{
 
-	constexpr float MinimumSuccessAccuracy = 1. / 32.;
-	constexpr float MinimumFailedAccuracy = 1. / 32.;
+	constexpr float MinimumSuccessAccuracy = 1. / 16.;
+	constexpr float MinimumFailedAccuracy = 1. / 16.;
 
 	math::vec2 approachTest(
 		math::rect_box<float>& sbjBox, const math::vec2 sbjMove,
@@ -108,9 +108,9 @@ namespace mo_yanxi::game::ecs::system{
 			const auto sbj_mass = sbj.rigid->inertial_mass;
 			const auto obj_mass = obj.rigid->inertial_mass;
 
-			const auto scaled_mass = 1 / sbj_mass + 1 / obj_mass;
-			const auto sbj_rotational_inertia = sbj.manifold->hitbox.get_rotational_inertia(sbj_mass, sbj.rigid->rotational_inertia_scale);
-			const auto obj_rotational_inertia = obj.manifold->hitbox.get_rotational_inertia(obj_mass, obj.rigid->rotational_inertia_scale);
+			const auto scaled_mass = 1. / sbj_mass + 1. / obj_mass;
+			const auto sbj_rotational_inertia = sbj.rigid->rotational_inertia >= 0 ? sbj.rigid->rotational_inertia : sbj.manifold->hitbox.get_rotational_inertia(sbj_mass);
+			const auto obj_rotational_inertia = obj.rigid->rotational_inertia >= 0 ? obj.rigid->rotational_inertia : obj.manifold->hitbox.get_rotational_inertia(obj_mass);
 
 			const vec2 vert_hit_vel{rel_vel.copy().project_scaled(hit_normal)};
 			const vec2 hori_hit_vel{(rel_vel - vert_hit_vel)};

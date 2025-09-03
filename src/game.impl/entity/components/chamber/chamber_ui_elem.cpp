@@ -20,21 +20,6 @@ void mo_yanxi::game::ui::build_tile_status_drawer::draw(
 
 	auto building_max_individual = data.get_tile_individual_max_hitpoint();
 
-	acq.proj.mode_flag = draw::mode_flags::slide_line;
-	for(int y = 0; y < sz.y; ++y){
-		for(int x = 0; x < sz.x; ++x){
-			auto& status = data.tile_states[swap ? (x * sz.y + y) : (y * sz.x + x)];
-
-			auto rect = unit_rect.copy().scl_size(status.valid_structure_hit_point / building_max_individual, 1);
-			draw::fill::rect_ortho(acq.get(), rect.move(region.src + math::vector2{x, y}.as<float>() * unit_size),
-								   (status.valid_hit_point < building_max_individual *
-									ecs::chamber::tile_status::threshold_factor
-										? colors::danger
-										: colors::light_gray)
-										.to_neutralize_light().set_a(opacity));
-		}
-	}
-
 	acq.proj.mode_flag = draw::mode_flags::none;
 	float build_total_health_factor = data.hit_point.get_capability_factor();
 	for(int y = 0; y < sz.y; ++y){
@@ -42,6 +27,9 @@ void mo_yanxi::game::ui::build_tile_status_drawer::draw(
 			auto& status = data.tile_states[swap ? (x * sz.y + y) : (y * sz.x + x)];
 
 			auto rect = unit_rect.copy().scl_size(status.valid_hit_point / building_max_individual, 1);
+
+			acq.proj.mode_flag = data.category == ecs::chamber::building_data_category::structural ? draw::mode_flags::slide_line : draw::mode_flags::none;
+
 			draw::fill::rect_ortho(acq.get(), rect.move(region.src + math::vector2{x, y}.as<float>() * unit_size),
 				(colors::red_dusted.create_lerp(colors::pale_green, build_total_health_factor)).to_neutralize_light().set_a(opacity));
 		}

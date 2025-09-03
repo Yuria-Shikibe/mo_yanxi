@@ -44,78 +44,121 @@ namespace mo_yanxi::game::ecs::system{
 				const mech_motion& motion
 			){
 
-					grid.update_transform(motion.trans);
+				grid.update_transform(motion.trans);
 
-					grid.manager.do_deferred();
-					grid.manager.update_delta = manager.get_update_delta();
+				grid.manager.do_deferred();
+				grid.manager.update_update_delta(manager.get_update_delta());
 
-					grid.manager.sliced_each([&](
-						ecs::chamber::building& building){
-							building.update(meta, top_world);
-						});
+				grid.manager.sliced_each([&](
+					ecs::chamber::building& building){
+						building.update(top_world);
+					});
 
 
-					float dt = manager.get_update_delta();
+				float dt = manager.get_update_delta();
 
-					bool inbound = grid.get_wrap_bound().overlap(top_world.graphic_context.viewport());
-					grid.manager.sliced_each(
-						[&, dt](
-						ecs::chamber::building_data& data
-					){
-							// data.update_energy_state(dt);
+				const bool inbound = grid.get_wrap_bound().overlap(top_world.graphic_context.viewport());
 
-							if(inbound)
-								for(auto&& damage_event : data.damage_events){
-									top_world.graphic_context.create_efx().set_data(fx::effect_data{
-											.style = fx::poly_outlined_out{
-												.radius = {5, 25, math::interp::pow3Out},
-												.stroke = {4},
-												.palette = {
-													{graphic::colors::aqua.to_light()},
-													{graphic::colors::aqua.to_light()},
-													{graphic::colors::clear},
-													{
-														graphic::colors::aqua.create_lerp(
-															                      graphic::colors::white, .5f).
-														                      to_light().set_a(.5f),
-														graphic::colors::clear,
-													}
+				grid.manager.sliced_each(
+					[&, dt](
+					ecs::chamber::building_data& data
+				){
+						// data.update_energy_state(dt);
+
+						if(inbound)
+							for(auto&& damage_event : data.damage_events){
+								top_world.graphic_context.create_efx().set_data(fx::effect_data{
+										.style = fx::poly_outlined_out{
+											.radius = {5, 25, math::interp::pow3Out},
+											.stroke = {4},
+											.palette = {
+												{graphic::colors::aqua.to_light()},
+												{graphic::colors::aqua.to_light()},
+												{graphic::colors::clear},
+												{
+													graphic::colors::aqua.create_lerp(
+														                      graphic::colors::white, .5f).
+													                      to_light().set_a(.5f),
+													graphic::colors::clear,
 												}
-											},
-											.trans = {
-												grid.tile_coord_to_global(
-													damage_event.local_coord.as<int>() + data.region().src)
-											},
-											.depth = 0,
-											.duration = {60}
-										});
-								}
-
-							data.hit_point.accept(data.building_damage_take);
-							if(data.energy_status && data.building_damage_take > 0){
-								grid.notify_grid_power_state_maybe_changed();
+											}
+										},
+										.trans = {
+											grid.tile_coord_to_global(
+												damage_event.local_coord.as<int>() + data.region().src)
+										},
+										.depth = 0,
+										.duration = {60}
+									});
 							}
 
-							grid.hit_point.accept(data.structural_damage_take);
-
-							data.clear_hit_events();
-
-							auto hp = data.get_tile_individual_max_hitpoint();
-							float healed{};
-							for(auto& tile_state : data.tile_states){
-								math::approach_inplace_get_delta(tile_state.valid_structure_hit_point, hp,
-								                                 .5 * dt);
-
-								if(tile_state.valid_structure_hit_point > hp / 2){
-									healed += math::approach_inplace_get_delta(tile_state.valid_hit_point, hp,
-									                                           .5 * dt);
-								}
+						switch(data.category){
+						case ecs::chamber::building_data_category::general:{
+							if(data.building_damage_take > 0){
+								data.hit_point.accept(data.building_damage_take);
+								if(data.energy_status)grid.notify_grid_power_state_maybe_changed();
 							}
-							data.hit_point.heal(healed);
-						});
 
-					update_energy_state(grid, dt);
-				});
+							if(data.hit_point.factor() < 1){
+								const auto hp = data.get_tile_individual_max_hitpoint();
+
+								//TODO do set instead of delta check?
+								float healed{};
+								for(auto& tile_state : data.tile_states){
+									healed += math::approach_inplace_get_delta(tile_state.valid_hit_point, hp, .5 * dt);
+								}
+
+								if(healed > 0.f){
+									data.hit_point.heal(healed);
+								}else{
+									data.hit_point.cure();
+								}
+							}else{
+
+							}
+
+
+							break;
+						}
+
+						case ecs::chamber::building_data_category::structural:{
+							if(data.building_damage_take > 0){
+								data.hit_point.accept(data.building_damage_take);
+								grid.hit_point.accept(data.building_damage_take);
+							}
+
+							if(data.hit_point.factor() < 1){
+								const auto hp = data.get_tile_individual_max_hitpoint();
+
+								//TODO do set instead of delta check?
+								float healed{};
+								for(auto& tile_state : data.tile_states){
+									healed += math::approach_inplace_get_delta(tile_state.valid_hit_point, hp, .5 * dt);
+								}
+
+								if(healed > 0.f){
+									data.hit_point.heal(healed);
+								}else{
+									healed = data.hit_point.cure_and_get_healed();
+								}
+
+								grid.hit_point.heal(healed);
+							}
+
+							break;
+						}
+							default: break;
+						}
+
+
+						data.clear_hit_events();
+					});
+
+				update_energy_state(grid, dt);
+				if(manager.get_clock() & 4){
+					grid.update_maneuver();
+				}
+			});
 		}
 	};
 }

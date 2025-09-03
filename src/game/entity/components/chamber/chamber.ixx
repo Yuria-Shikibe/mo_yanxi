@@ -23,8 +23,15 @@ namespace mo_yanxi::game::ecs::chamber{
 	}
 
 	void maneuver_subsystem::update(const chamber_manifold& manifold) noexcept{
-		// manifold.manager.sliced_each([&](const maneuver_component& component, const building_data& data){
-		// 	component
-		// });
+		force_longitudinal_ = {};
+		force_transverse_ = {};
+		torque_ = {};
+		boost_ = {};
+		manifold.manager.sliced_each([this](const maneuver_component& component, const building_data& data){
+			force_longitudinal_ += component.force_longitudinal;
+			force_transverse_ += component.force_transverse;
+			torque_ += component.torque_absolute + component.torque * data.region().as<float>().get_center().length();
+			boost_ += component.boost;
+		});
 	}
 }

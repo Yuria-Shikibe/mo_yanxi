@@ -18,9 +18,9 @@ namespace mo_yanxi::game::ecs::system{
 				// component<physical_rigid>& rigid
 			){
 
-				motion.apply_and_reset(m.update_delta);
+				motion.apply_and_reset(m.get_update_delta());
 				if(auto rigid = meta.id()->try_get<physical_rigid>()){
-					motion.apply_drag(m.update_delta, rigid->drag);
+					motion.apply_drag(m.get_update_delta(), rigid->drag);
 				}
 			});
 		}

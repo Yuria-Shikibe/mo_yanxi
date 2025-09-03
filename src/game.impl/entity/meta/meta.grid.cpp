@@ -15,7 +15,7 @@ mo_yanxi::game::meta::chamber::grid::grid(const hitbox& hitbox){
 	bound.trunc_vert(tile_size).scl(1 / tile_size, 1 / tile_size);
 	extent_ = bound.extent().round<unsigned>();
 	origin_coord_ = -bound.src.round<int>();
-
+	structural_status_ = structural_status{extent_.as<int>()};
 
 	tiles_.resize(extent_.area());
 
@@ -79,13 +79,14 @@ void mo_yanxi::game::meta::chamber::grid::draw(
 			auto& info = (*this)[x, y];
 
 			if(info.is_idle()){
+				auto color = structural_status_.is_within_structural(math::upoint2{x, y}, extent_) ? colors::pale_yellow : colors::aqua;
 				auto sz = math::irect{tags::from_extent, off.copy().add(x, y), 1, 1}.as<float>().scl(tile_size, tile_size);
-				draw::fill::rect_ortho(acquirer.get(), sz, colors::aqua.copy().set_a(.25f * opacity_scl));
+				draw::fill::rect_ortho(acquirer.get(), sz, color.set_a(.25f * opacity_scl));
 			}else if (info.is_building_identity({x, y})){
 				acquirer.proj.mode_flag = {};
 
-				auto rg = info.building->get_indexed_region().as<int>().move(off).as<float>().scl(tile_size, tile_size);
-				draw::line::rect_ortho(acquirer, rg, 4, colors::aqua.copy_set_a(opacity_scl));
+				auto rg = info.building->get_indexed_region().as<int>().move(off).as<float>().scl(tile_size, tile_size).shrink(2);
+				draw::line::rect_ortho(acquirer, rg, 4, info.building->get_meta_info().get_edit_outline_color().set_a(opacity_scl));
 				info.building->get_meta_info().draw(rg, renderer, camera);
 				if(auto ist = info.building->get_instance_data()){
 					ist->draw(info.building->get_meta_info(), rg, renderer, camera.get_scale());

@@ -17,6 +17,12 @@ import mo_yanxi.game.content;
 import std;
 import mo_yanxi.game.meta.hitbox;
 
+namespace mo_yanxi::game::meta::chamber{
+	// bool is_building_placeable_at(const grid& grid){
+	//
+	// }
+}
+
 mo_yanxi::game::meta::hitbox_transed load_hitbox_from(const std::filesystem::path& path){
 	using namespace mo_yanxi;
 	using namespace game;
@@ -101,6 +107,7 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 		}
 
 	};
+
 
 	{
 		auto placement_drawer = [this, &acquirer](math::usize2 chamber_extent, math::raw_frect region, auto pred){
@@ -321,7 +328,7 @@ mo_yanxi::math::point2 mo_yanxi::game::ui::grid_editor_viewport::get_current_til
 }
 
 mo_yanxi::math::point2 mo_yanxi::game::ui::grid_editor_viewport::get_tile_coord(math::vec2 world_pos,
-	math::usize2 extent) const noexcept{
+	math::usize2 extent) noexcept{
 	math::vec2 off{};
 
 	off = ((extent * ecs::chamber::tile_size_integral).as<float>() - math::vec2{}.set(ecs::chamber::tile_size)) * 0.5f;
@@ -467,6 +474,7 @@ void mo_yanxi::game::ui::grid_editor::build_menu(){
 				}, [this](const creation::file_selector& s, grid_editor& self){
 					std::ifstream ifs(s.get_current_main_select().value(), std::ios::binary | std::ios::in);
 					meta::srl::read_grid(ifs, viewport->grid);
+					viewport->reset_editor();
 					return true;
 				}});
 			selector.set_cared_suffix({".metagrid"});

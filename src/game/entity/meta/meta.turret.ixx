@@ -2,12 +2,17 @@ module;
 
 #include "../src/ext/adapted_attributes.hpp"
 #include <plf_hive.h>
+
 export module mo_yanxi.game.meta.turret;
 
 export import mo_yanxi.game.meta.projectile;
 
 import mo_yanxi.math;
 import mo_yanxi.array_stack;
+import mo_yanxi.game.ecs.component.drawer;
+import mo_yanxi.graphic.image_manage;
+import mo_yanxi.graphic.draw.func;
+
 import std;
 
 namespace mo_yanxi::game::meta::turret{
@@ -56,6 +61,45 @@ namespace mo_yanxi::game::meta::turret{
 	struct shoot_index{
 		unsigned salvo_index;
 		unsigned burst_index;
+	};
+
+
+
+	export
+	enum struct turret_state : std::uint8_t{
+		reloading,
+		shoot_staging,
+		shooting
+	};
+
+	export
+	struct turret_param{
+		float reload_progress;
+		float shoot_progress;
+
+		turret_state state;
+	};
+
+	export
+	template <typename T, T def_value = T{}>
+	struct turret_param_expr{
+		using return_type = T;
+		static constexpr return_type default_value = def_value;
+	private:
+		return_type (*expr)(turret_param) noexcept = nullptr;
+
+	public:
+		[[nodiscard]] turret_param_expr() = default;
+
+		template <std::convertible_to<decltype(expr)> Fn>
+			requires (std::is_nothrow_invocable_r_v<return_type, Fn, turret_param>)
+		[[nodiscard]] explicit(false) turret_param_expr(Fn fn)
+			: expr(fn){
+		}
+
+		return_type operator()(turret_param param) const noexcept{
+			return expr ? expr(param) : default_value;
+		}
 	};
 
 	export
@@ -110,6 +154,83 @@ namespace mo_yanxi::game::meta::turret{
 	};
 
 	export
+	struct turret_base_component{
+		graphic::cached_image_region base_image{};
+		math::vec2 draw_extent{};
+
+		void set_extent_by_scale(const math::vec2 scale = {1, 1}) noexcept{
+			assert(base_image != nullptr);
+			draw_extent = base_image->uv.size.as<float>() * scale;
+		}
+
+		FORCE_INLINE void draw_impl(
+			ecs::drawer::draw_acquirer& acquirer, ecs::drawer::part_transform current_trans) const{
+			using namespace graphic;
+
+			if(base_image){
+				acquirer.proj.depth = current_trans.z_offset;
+				acquirer << base_image.get_cache();
+				draw::fill::rect(acquirer.get(), current_trans, draw_extent);
+			}
+		}
+
+	};
+
+
+	export
+	struct turret_light_component{
+		graphic::cached_image_region image{};
+		graphic::color color{};
+		turret_param_expr<float, 1.f> opacity_expr{};
+
+		FORCE_INLINE void draw_impl(
+			ecs::drawer::draw_acquirer& acquirer,
+			ecs::drawer::part_transform current_trans,
+			math::vec2 draw_extent,
+			const turret_param& param
+			) const{
+			using namespace graphic;
+
+			const auto opacity = opacity_expr(param);
+			if(image && opacity > 0){
+				acquirer.proj.depth = current_trans.z_offset;
+				acquirer << image.get_cache();
+				draw::fill::rect(acquirer.get(), current_trans, draw_extent, color.to_light().set_a(opacity));
+			}
+		}
+	};
+
+	export
+	struct turret_drawer{
+		ecs::drawer::part_transform transform{};
+		turret_param_expr<math::trans2> sub_transform{};
+
+		turret_base_component base_component{};
+		turret_light_component light_component{};
+		turret_light_component heat_component{};
+
+		//TODO use small vector?
+		std::vector<turret_drawer> sub_components{};
+
+		FORCE_INLINE void draw(
+			const world::graphic_context& draw_ctx,
+			ecs::drawer::part_transform current_trans,
+			const turret_param& param
+		) const{
+			current_trans = ecs::drawer::part_transform{sub_transform(param), 0} | transform | current_trans;
+			ecs::drawer::draw_acquirer acquirer{draw_ctx.renderer().batch};
+
+			base_component.draw_impl(acquirer, current_trans);
+			light_component.draw_impl(acquirer, current_trans, base_component.draw_extent, param);
+			heat_component.draw_impl(acquirer, current_trans, base_component.draw_extent, param);
+
+			for (const auto & sub_component : sub_components){
+				sub_component.draw(draw_ctx, current_trans, param);
+			}
+		}
+	};
+
+	export
 	struct turret_body{
 		std::string_view name{};
 		math::section<short> energy_section{};
@@ -129,5 +250,7 @@ namespace mo_yanxi::game::meta::turret{
 		// bool reload_while_shooting{};
 
 		shoot_type shoot_type{};
+
+		const turret_drawer* drawer{};
 	};
 }

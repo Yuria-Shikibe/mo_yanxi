@@ -249,7 +249,7 @@ namespace mo_yanxi::game{
 			const auto move = this->trans.vec - nextTrans.vec;
 
 			this->trans = nextTrans;
-			const float ang = move.equals({}, .2f) ? +0.f : move.angle_rad();
+			const float ang = move.equals({}, .2f) ? trans.rot : move.angle_rad();
 
 			const auto [cos, sin] = math::cos_sin(-ang);
 
@@ -688,12 +688,12 @@ namespace mo_yanxi::game{
 			});
 		}
 
-		[[nodiscard]] constexpr float get_rotational_inertia(
+		[[nodiscard]] constexpr double get_rotational_inertia(
 			const float mass,
 			const float scale = 1 / 12.0f,
 			const float lengthRadiusRatio = 0.25f
 		) const noexcept{
-			return std::ranges::fold_left(components, 1.0f, [mass, scale, lengthRadiusRatio](const float val, const hitbox_comp& pair){
+			return std::ranges::fold_left(components, 1.0, [mass, scale, lengthRadiusRatio](const double val, const hitbox_comp& pair){
 				return val + pair.box.get_rotational_inertia(mass, scale, lengthRadiusRatio) + mass * pair.trans.vec.length2();
 			});
 		}

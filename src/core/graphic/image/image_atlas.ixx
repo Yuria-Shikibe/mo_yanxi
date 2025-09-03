@@ -76,6 +76,11 @@ namespace mo_yanxi::graphic{
 			return region;
 		}
 
+		allocated_image_region& rotate(int times = 1) noexcept{
+			uv.rotate(times);
+			return *this;
+		}
+
 		[[nodiscard]] sub_page* get_page() const noexcept{
 			return page;
 		}
@@ -163,7 +168,7 @@ namespace mo_yanxi::graphic{
 	};
 
 	export
-	struct path_load{
+	struct bitmap_path_load{
 		std::string path{};
 
 		[[nodiscard]] math::usize2 get_extent() const{
@@ -218,7 +223,7 @@ namespace mo_yanxi::graphic{
 
 	export
 	struct image_load_description{
-		std::variant<path_load, sdf_load, bitmap_load> raw{};
+		std::variant<bitmap_path_load, sdf_load, bitmap_load> raw{};
 
 		[[nodiscard]] math::usize2 get_extent() const{
 			return std::visit([](const auto& v){
@@ -658,6 +663,12 @@ namespace mo_yanxi::graphic{
 		}
 
 		std::pair<allocated_image_region&, bool> register_named_region(
+			bitmap_path_load&& desc,
+			const bool is_protected = false){
+			return register_named_region(std::string_view{desc.path}, std::move(desc), is_protected);
+		}
+
+		std::pair<allocated_image_region&, bool> register_named_region(
 			std::string&& name,
 			vk::texture_source_prov auto bitmaps_prov,
 			math::usize2 extent,
@@ -757,7 +768,7 @@ namespace mo_yanxi::graphic{
 			const color clearColor = {},
 			const math::usize2 size = DefaultTexturePageSize,
 			const std::uint32_t margin = 4){
-			return pages.insert_or_assign(name, image_page{*async_image_loader_, size, clearColor, margin}).first->second;
+			return pages.try_emplace(name, image_page{*async_image_loader_, size, clearColor, margin}).first->second;
 		}
 
 		image_page& operator[](

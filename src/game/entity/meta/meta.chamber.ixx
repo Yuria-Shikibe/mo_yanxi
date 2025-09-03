@@ -21,6 +21,11 @@ import std;
 
 
 namespace mo_yanxi::game::meta::chamber{
+	struct chamber_with_energy_status : basic_chamber, ecs::chamber::energy_status{
+		[[nodiscard]] std::optional<energy_status> get_energy_consumption() const noexcept override{
+			return deduced_get_energy_consumption();
+		}
+	};
 
 	export
 	struct armor : basic_chamber{
@@ -28,12 +33,7 @@ namespace mo_yanxi::game::meta::chamber{
 	};
 
 	export
-	struct energy_generator : basic_chamber, ecs::chamber::energy_status{
-
-		[[nodiscard]] std::optional<ecs::chamber::energy_status> get_energy_consumption() const noexcept override{
-			return deduced_get_energy_consumption();
-		}
-
+	struct energy_generator : chamber_with_energy_status{
 		ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::chamber_manifold& grid, math::point2 where) const override;
 	};
 
@@ -46,7 +46,7 @@ namespace mo_yanxi::game::meta::chamber{
 
 
 	export
-	struct turret_base : basic_chamber, ecs::chamber::energy_status{
+	struct turret_base : chamber_with_energy_status{
 		friend basic_chamber;
 
 		struct turret_instance_data : chamber_instance_data{
@@ -63,10 +63,6 @@ namespace mo_yanxi::game::meta::chamber{
 			return transform.vec;
 		}
 
-		[[nodiscard]] std::optional<ecs::chamber::energy_status> get_energy_consumption() const noexcept override{
-			return deduced_get_energy_consumption();
-		}
-
 	protected:
 		[[nodiscard]] owner<turret_instance_data*> create_instance_data_impl() const override{
 			return new turret_instance_data{};
@@ -75,7 +71,7 @@ namespace mo_yanxi::game::meta::chamber{
 
 
 	export
-	struct radar : basic_chamber, ecs::chamber::energy_status{
+	struct radar : chamber_with_energy_status{
 		friend basic_chamber;
 
 		math::pos_trans2z transform{};
@@ -86,10 +82,6 @@ namespace mo_yanxi::game::meta::chamber{
 
 		[[nodiscard]] std::optional<math::vec2> get_part_offset() const noexcept override{
 			return transform.vec;
-		}
-
-		[[nodiscard]] std::optional<ecs::chamber::energy_status> get_energy_consumption() const noexcept override{
-			return deduced_get_energy_consumption();
 		}
 
 		void draw(math::frect region, graphic::renderer_ui_ref renderer_ui, const graphic::camera2& camera) const override;
@@ -119,11 +111,41 @@ namespace mo_yanxi::game::meta::chamber{
 	};
 
 
+	export
+	struct thurster : chamber_with_energy_status{
+		ecs::chamber::maneuver_component maneuver{};
+
+		ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::chamber_manifold& grid, math::point2 where) const override;
+
+		void install(ecs::chamber::build_ref build_ref) const override;
+	};
+
+	export
+	struct structural{
+
+	};
+
+	export
+	struct structural_joint : basic_chamber, structural{
+		ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::chamber_manifold& grid, math::point2 where) const override;
+
+		[[nodiscard]] unsigned structural_adjacent_distance() const noexcept override{
+			return 1;
+		}
+
+		[[nodiscard]] graphic::color get_edit_outline_color() const noexcept override{
+			return graphic::colors::ORANGE;
+		}
+	};
+
+
 	export using chamber_types = std::tuple<
 		turret_base
 	, radar
 	, armor
 	, energy_generator
+	, thurster
+	, structural_joint
 	>;
 
 

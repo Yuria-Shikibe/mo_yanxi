@@ -19,6 +19,7 @@ import mo_yanxi.game.ecs.component.chamber;
 import mo_yanxi.game.ecs.component.chamber.radar;
 import mo_yanxi.game.ecs.component.chamber.turret;
 import mo_yanxi.game.ecs.component.chamber.power_generator;
+import mo_yanxi.game.ecs.component.chamber.thurster;
 
 
 namespace mo_yanxi::io{
@@ -81,6 +82,26 @@ mo_yanxi::game::srl::chunk_serialize_handle mo_yanxi::game::meta::chamber::radar
 void mo_yanxi::game::meta::chamber::radar::radar_instance_data::read(std::ispanstream& bounded_stream){
 	chamber_instance_data::read(bounded_stream);
 	io::loader<radar_instance_data>::parse_from(bounded_stream, *this);
+}
+
+mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::thurster::create_instance_chamber(
+	ecs::chamber::chamber_manifold& grid, math::point2 where) const{
+	return add_build<
+		ecs::chamber::thurster_build, std::tuple<ecs::chamber::power_consumer_building_tag>
+	>(*this, grid, where, extent);
+}
+
+void mo_yanxi::game::meta::chamber::thurster::install(ecs::chamber::build_ref build_ref) const{
+	auto& building = building_cast<ecs::chamber::thurster_build>(build_ref);
+	building.meta.ideal_maneuver = maneuver;
+}
+
+mo_yanxi::game::ecs::chamber::build_ptr mo_yanxi::game::meta::chamber::structural_joint::create_instance_chamber(
+	ecs::chamber::chamber_manifold& grid, math::point2 where) const{
+	auto& chunk = grid.add_building<std::tuple<>>(ecs::chamber::tile_region{tags::from_extent, where, extent.as<int>()});
+	chunk.building_data::category = ecs::chamber::building_data_category::structural;
+
+	return nullptr;
 }
 
 

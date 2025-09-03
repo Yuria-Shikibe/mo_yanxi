@@ -51,5 +51,15 @@ namespace mo_yanxi::game::ecs{
 	    	cur = std::clamp<float>(cur + heal, 0, max);
 	    }
 
+		void cure() noexcept{
+			cur = max;
+		}
+
+		float cure_and_get_healed() noexcept{
+			auto delta = max - cur;
+			cur = max;
+			return delta;
+		}
+
 	};
 }

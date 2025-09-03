@@ -58,9 +58,13 @@ namespace mo_yanxi::game::ecs{
 				},
 				10000,
 			};
+
+			if(comps.get<physical_rigid>().rotational_inertia < 0){
+				comps.get<physical_rigid>().rotational_inertia = mf.hitbox.get_rotational_inertia(comps.get<physical_rigid>().inertial_mass);
+			}
 			// comps.faction = faction_0;
 
-			auto dump_ = dump(comps);
+			// auto dump_ = dump(comps);
 
 		}
 	};

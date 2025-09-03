@@ -22,8 +22,32 @@ import mo_yanxi.graphic.image_multi_region;
 import mo_yanxi.graphic.shaderc;
 
 import mo_yanxi.game.meta.projectile;
+import mo_yanxi.game.meta.turret;
+import mo_yanxi.core.global.assets;
 
 import std;
+
+namespace test{
+	using namespace mo_yanxi;
+	using namespace mo_yanxi::game::meta::turret;
+
+	export turret_drawer drawer;
+
+	void load(){
+		drawer = {
+			.base_component = {.base_image = core::global::assets::atlas["main"].register_named_region(graphic::bitmap_path_load{
+				R"(D:\projects\mo_yanxi\prop\assets\texture\test\turret\beam-laser-turret.png)"
+			}).first}
+		};
+
+
+		drawer.base_component.set_extent_by_scale({0.02f, 0.02f});
+	}
+
+	void dispose(){
+		drawer = {};
+	}
+}
 
 namespace test{
 	export void foot(){
@@ -104,6 +128,14 @@ namespace test{
 	}
 
 
+	export
+	void load_content(){
+		test::load();
+	}
+	export
+	void dispose_content(){
+		test::dispose();
+	}
 
 	export
 	mo_yanxi::game::meta::projectile projectile_meta = [](){

@@ -94,13 +94,21 @@ namespace mo_yanxi::game{
 		}
 	};
 
+
+	export
+	template <typename ItemTy, arithmetic T = float>
+	struct quad_tree;
+
 	template <typename ItemTy, arithmetic T = float>
 	struct quad_tree_node{
 		using arth_type = T;
 		using value_type = ItemTy;
 		using trait = quad_tree_trait<value_type, arth_type>;
-		using rect_type = typename trait::rect_type;
-		using vec_t = typename trait::vec_t;
+		using rect_type = trait::rect_type;
+		using vec_t = trait::vec_t;
+
+		friend quad_tree<value_type, arth_type>;
+
 
 		struct sub_nodes;
 
@@ -248,6 +256,15 @@ namespace mo_yanxi::game{
 		unsigned branch_size = 0;
 		bool leaf = true;
 
+		void update_pool(pool_type& pool) noexcept{
+			if(children.pool_){
+				children.pool_ = std::addressof(pool);
+			}
+
+			if(children)for(auto& val : children){
+				val.update_pool(pool);
+			}
+		}
 
 		[[nodiscard]] quad_tree_node() = default;
 
@@ -261,6 +278,10 @@ namespace mo_yanxi::game{
 
 		[[nodiscard]] unsigned size() const noexcept{
 			return branch_size;
+		}
+
+		[[nodiscard]] bool empty() const noexcept{
+			return branch_size == 0;
 		}
 
 		[[nodiscard]] bool is_leaf() const noexcept{
@@ -836,15 +857,20 @@ namespace mo_yanxi::game{
 		using node_type = quad_tree_node<ItemTy, T>;
 
 	private:
-		typename node_type::pool_type pool{};
+		node_type::pool_type pool{};
+		node_type::rect_type bound_{};
 
 		node_type* root{};
 	public:
 		[[nodiscard]] quad_tree() = default;
 
 		[[nodiscard]] explicit quad_tree(typename node_type::rect_type boundary)
-			: root(&pool.emplace(&pool, std::array{boundary, boundary, boundary, boundary})->at(0))
+			: bound_{boundary}, root(&pool.emplace(&pool, std::array{boundary, boundary, boundary, boundary})->at(0))
 		{}
+
+		node_type::rect_type bound() const noexcept{
+			return bound_;
+		}
 
 		constexpr node_type* operator->() noexcept{
 			return root;
@@ -853,11 +879,32 @@ namespace mo_yanxi::game{
 		constexpr const node_type* operator->() const noexcept{
 			return root;
 		}
+	private:
+
+		void reset_pools_on_move() noexcept{
+			if(root)root->update_pool(pool);
+		}
+	public:
 
 		quad_tree(const quad_tree& other) = delete;
 		quad_tree& operator=(const quad_tree& other) = delete;
-		quad_tree(quad_tree&& other) noexcept = default;
-		quad_tree& operator=(quad_tree&& other) noexcept = default;
+
+		quad_tree(quad_tree&& other) noexcept
+			: pool{std::move(other.pool)},
+				bound_(other.bound_),
+			  root{other.root}{
+			reset_pools_on_move();
+		}
+
+		quad_tree& operator=(quad_tree&& other) noexcept{
+			if(this == &other) return *this;
+			pool = std::move(other.pool);
+			bound_ = other.bound_;
+			root = other.root;
+
+			reset_pools_on_move();
+			return *this;
+		}
 	};
 
 }

@@ -17,7 +17,7 @@ namespace mo_yanxi::graphic::draw{
 	export using mode_flags = vk::vertices::mode_flag_bits;
 
 	export struct per_primitive_t{};
-	export per_primitive_t per_primitive;
+	export constexpr inline per_primitive_t per_primitive;
 
 
 	export

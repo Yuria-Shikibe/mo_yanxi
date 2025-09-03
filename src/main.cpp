@@ -100,6 +100,7 @@ import mo_yanxi.game.ecs.system.projectile;
 import mo_yanxi.game.ecs.system.chamber;
 
 import mo_yanxi.game.ecs.entitiy_decleration;
+import mo_yanxi.game.ecs.util;
 
 import mo_yanxi.game.ecs.component.chamber.radar;
 import mo_yanxi.game.ecs.component.chamber.turret;
@@ -359,7 +360,6 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 	}*/
 }
 
-
 void main_loop(){
 	using namespace mo_yanxi;
 
@@ -375,7 +375,7 @@ void main_loop(){
 	auto& renderer_ui = core::global::graphic::ui;
 	auto& merger = core::global::graphic::merger;
 
-	renderer_world.camera.set_scale_range({0.25f, 2.f});
+	renderer_world.camera.set_scale_range({0.2f, 2.f});
 
 	{
 		auto& g = renderer_ui.batch.emplace_batch_layer<graphic::layers::grid_drawer>();
@@ -390,6 +390,14 @@ void main_loop(){
 
 	game::world::hud hud{};
 	hud.focus_hud();
+
+	core::global::input.main_binds.register_bind(core::ctrl::key::F2, core::ctrl::act::press, [](auto){
+		core::global::ui::root->switch_scene_to("hud");
+	});
+
+	core::global::input.main_binds.register_bind(core::ctrl::key::F1, core::ctrl::act::press, [](auto){
+		core::global::ui::root->switch_scene_to("main");
+	});
 
 	game::ecs::system::motion_system motion_system{};
 	game::ecs::system::renderer ecs_renderer{};
@@ -412,78 +420,88 @@ void main_loop(){
 
 	test::set_swapchain_flusher();
 
-	graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.light.png)"}).first;
-	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
-	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
+	graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.light.png)"}).first;
+	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
+	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
 
 
 	using grided_entity_desc = game::ecs::desc::grid_entity;
 
 	using projectile_entity_desc = game::ecs::desc::projectile;
 
-
 	game::meta::chamber::grid grid{};
 	game::meta::hitbox_transed hitbox_transed{};
-	{
-		std::ifstream stream{R"(D:\projects\mo_yanxi\build\windows\x64\debug\test_grid.metagrid)", std::ios::binary};
-		game::meta::srl::read_grid(stream, grid);
-	}
-
-	{
-		std::ifstream stream{R"(D:\projects\mo_yanxi\build\windows\x64\debug\tes.hbox)", std::ios::binary};
-		io::loader<game::meta::hitbox_transed>::parse_from(stream, hitbox_transed);
-		hitbox_transed.apply();
-	}
-
-	{
 
 
+	std::future<void> async_collide{};
+
+	auto grid_loader = [&]{
+		if(async_collide.valid()){
+			async_collide.get();
+		}
+
+		world.component_manager = {};
 
 		{
-			math::rand rand{};
-			for(int i = 0; i < 2; ++i){
-				using namespace game::ecs;
-
-				manifold mf{};
-				math::trans2 trs = {{rand(4000.f), rand(2000.f)}, rand(180.f)};
-				mf.hitbox = game::hitbox{hitbox_transed};
-				//game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 4, chamber::tile_size * 4}}}};
-
-				faction_data faction_data{};
-				if(!(i & 1)){
-					faction_data.faction = game::faction_0;
-				}else{
-					faction_data.faction = game::faction_1;
-				}
-
-				chamber::chamber_manifold cmf{grid};
-
-				cmf.manager.sliced_each([](chamber::turret_build& b){
-					using namespace math;
-
-					auto& body = b.meta;
-					body.shoot_type.projectile = &test::projectile_meta;
-					body.shoot_type.burst = {.count = 1, .spacing = 5};
-					body.shoot_type.salvo = {.count = 3};
-					b.rotate_torque = 30;
-
-					body.range.to = 6000;
-				});
-
-				world.component_manager.create_entity_deferred<grided_entity_desc>(mech_motion{.trans = trs},
-					std::move(mf),
-					std::move(cmf),
-					std::move(faction_data),
-					physical_rigid{
-					.inertial_mass = 500000
-				});
-			}
+			std::ifstream stream{R"(D:\projects\mo_yanxi\build\windows\x64\debug\test_grid.metagrid)", std::ios::binary};
+			game::meta::srl::read_grid(stream, grid);
 		}
+
+		{
+			std::ifstream stream{R"(D:\projects\mo_yanxi\build\windows\x64\debug\tes.hbox)", std::ios::binary};
+			io::loader<game::meta::hitbox_transed>::parse_from(stream, hitbox_transed);
+			hitbox_transed.apply();
+		}
+
+		math::rand rand{};
+		for(int i = 0; i < 2; ++i){
+			using namespace game::ecs;
+
+			manifold mf{};
+			math::trans2 trs = {{rand(4000.f), rand(2000.f)}, rand(180.f)};
+			mf.hitbox = game::hitbox{hitbox_transed};
+			//game::hitbox{game::hitbox_comp{.box = {math::vec2{chamber::tile_size * 4, chamber::tile_size * 4}}}};
+
+			faction_data faction_data{};
+			if(!(i & 1)){
+				faction_data.faction = game::faction_0;
+			}else{
+				faction_data.faction = game::faction_1;
+			}
+
+			chamber::chamber_manifold cmf{grid};
+
+			cmf.manager.sliced_each([](chamber::turret_build& b){
+				using namespace math;
+
+				auto& body = b.meta;
+				body.shoot_type.projectile = &test::projectile_meta;
+				body.shoot_type.burst = {.count = 1, .spacing = 5};
+				body.shoot_type.salvo = {.count = 3};
+				b.rotate_torque = 30;
+
+				body.range.to = 6000;
+				body.drawer = &test::drawer;
+			});
+
+			world.component_manager.create_entity_deferred<grided_entity_desc>(mech_motion{.trans = trs},
+				std::move(mf),
+				std::move(cmf),
+				std::move(faction_data),
+				physical_rigid{
+				.inertial_mass = 500000
+			});
+		}
+	};
+
+	{
+		static auto l = grid_loader;
+		core::global::input.main_binds.register_bind(core::ctrl::key::R, core::ctrl::act::press, core::ctrl::mode::ctrl, [](auto){
+			l();
+		});
 
 		wgfx_input.register_bind(core::ctrl::key::Q, core::ctrl::act::press, +[](core::ctrl::packed_key_t, math::vec2 pos, game::world::graphic_context& ctx, game::ecs::component_manager& component_manager){
 			using namespace game::ecs;
-
-
 
 			auto hdl = game::meta::create(component_manager, test::projectile_meta);
 
@@ -526,10 +544,8 @@ void main_loop(){
 
 	world.component_manager.do_deferred();
 
-
 	std::size_t count{};
 	float dt{};
-	std::future<void> async_collide{};
 
 	core::global::timer.reset_time();
 	while(!context.window().should_close()){
@@ -546,7 +562,7 @@ void main_loop(){
 
 		core::global::input.update(core::global::timer.global_delta_tick());
 
-		world.component_manager.update_delta = core::global::timer.update_delta_tick();
+		world.component_manager.update_update_delta(core::global::timer.update_delta_tick());
 		world.graphic_context.update(core::global::timer.global_delta_tick(), core::global::timer.is_paused());
 		renderer_ui.set_time(core::global::timer.global_time());
 
@@ -557,6 +573,8 @@ void main_loop(){
 		core::global::ui::root->layout();
 		core::global::ui::root->draw();
 
+
+
 		graphic::draw::world_acquirer<> acquirer{renderer_world.batch, static_cast<const graphic::combined_image_region<graphic::uniformed_rect_uv>&>(base_region)};
 		math::rect_box_posed rect2{math::vec2{200, 40}};
 
@@ -564,42 +582,12 @@ void main_loop(){
 
 		auto dst = cursor_in_world - renderer_world.camera.get_viewport_center();
 
+
 		rect2.update({
 			cursor_in_world,
 			dst.angle_rad()});
 
 		{
-			/*{
-				//
-				for(int i = 0; i < 10; ++i){
-					acquirer << base_region;
-					acquirer.proj.depth = 1 - (static_cast<float>(i + 1) / 10.f - 0.04f);
-
-					auto off = math::vector2{i * 500, i * 400}.as<float>();
-
-					using namespace graphic::colors;
-
-					graphic::draw::fill::quad(
-						acquirer.get(),
-						off - math::vec2{100, 500} + math::vec2{0, 0}.rotate_deg(45.f),
-						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate_deg(45.f),
-						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate_deg(45.f),
-						off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate_deg(45.f),
-						white.copy()
-					);
-
-					acquirer << light_region;
-					acquirer.proj.slightly_decr_depth();
-					graphic::draw::fill::quad(
-						acquirer.get(),
-						off - math::vec2{100, 500} + math::vec2{0, 0}.rotate_deg(45.f),
-						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 0}.rotate_deg(45.f),
-						off - math::vec2{100, 500} + math::vec2{500 + i * 200.f, 5 + i * 100.f}.rotate_deg(45.f),
-						off - math::vec2{100, 500} + math::vec2{0, 5 + i * 100.f}.rotate_deg(45.f),
-						(white.copy() * 2).set_a((i + 3) / 10.f)
-					);
-				}
-			}*/
 
 			acquirer.proj.depth = 0.35f;
 
@@ -626,77 +614,88 @@ void main_loop(){
 			);
 		}
 
+
 		{
-			auto viewport = renderer_world.camera.get_viewport();
+			{
+				auto viewport = renderer_world.camera.get_viewport();
 
-			world.component_manager.sliced_each([&](
-				const game::ecs::chunk_meta& meta,
-			   game::ecs::manifold& manifold,
-			   game::ecs::mech_motion& motion
-			){
-			   if(!viewport.overlap_exclusive(manifold.hitbox.max_wrap_bound()))return;
+				world.component_manager.sliced_each([&](
+					const game::ecs::chunk_meta& meta,
+				   game::ecs::manifold& manifold,
+				   game::ecs::mech_motion& motion
+				){
+				   if(!viewport.overlap_exclusive(manifold.hitbox.max_wrap_bound()))return;
 
-			   using namespace graphic;
-			   for (const auto & comp : manifold.hitbox.get_comps()){
-				   draw::line::quad(acquirer, comp.box, 2, colors::white.to_light());
-				   draw::line::rect_ortho(acquirer, comp.box.get_bound(), 1, colors::CRIMSON);
-			   }
-			   draw::line::quad(acquirer, manifold.hitbox.ccd_wrap_box(), 1, colors::pale_green);
-			   draw::line::line_angle_center(acquirer.get(), motion.trans, 1000, 4);
-			   draw::line::line_angle_center(acquirer.get(), {motion.trans.vec, motion.trans.rot + math::pi_half}, 1000, 4);
-			   draw::line::line_angle(acquirer.get(), math::trans2{600} | motion.trans, 600, 8, colors::ORANGE);
-		   });
+				   using namespace graphic;
+				   for (const auto & comp : manifold.hitbox.get_comps()){
+					   draw::line::quad(acquirer, comp.box, 2, colors::white.to_light());
+					   draw::line::rect_ortho(acquirer, comp.box.get_bound(), 1, colors::CRIMSON);
+				   }
+				   draw::line::quad(acquirer, manifold.hitbox.ccd_wrap_box(), 1, colors::pale_green);
+				   draw::line::line_angle_center(acquirer.get(), motion.trans, 1000, 4);
+				   draw::line::line_angle_center(acquirer.get(), {motion.trans.vec, motion.trans.rot + math::pi_half}, 1000, 4);
+				   draw::line::line_angle(acquirer.get(), math::trans2{600} | motion.trans, 600, 8, colors::ORANGE);
+			   });
 
-			world.component_manager.sliced_each([&](
-				game::ecs::chamber::chamber_manifold& grid,
-				const game::ecs::mech_motion& motion
-			){
+				world.component_manager.sliced_each([&](
+					game::ecs::chamber::chamber_manifold& grid,
+					const game::ecs::mech_motion& motion
+				){
 
-					if(!grid.get_wrap_bound().overlap_rough(viewport) || !grid.get_wrap_bound().overlap_exact(viewport))return;
+						if(!grid.get_wrap_bound().overlap_rough(viewport) || !grid.get_wrap_bound().overlap_exact(viewport))return;
 
-					using namespace game::ecs;
-					using namespace graphic;
+						using namespace game::ecs;
+						using namespace graphic;
 
-					math::mat3 mat3{};
-					mat3.from_transform(grid.get_transform());
+						math::mat3 mat3{};
+						mat3.from_transform(grid.get_transform());
 
-					renderer_world.batch.push_proj(mat3);
+						renderer_world.batch.push_proj(mat3);
 
-					draw::line::quad(acquirer, grid.local_grid.get_wrap_bound(), 3, colors::AQUA_SKY.to_light());
+						draw::line::quad(acquirer, grid.local_grid.get_wrap_bound(), 3, colors::AQUA_SKY.to_light());
 
-				grid.local_grid.each_tile([&](const chamber::tile& tile){
-						if(!tile.building) return;
+					grid.local_grid.each_tile([&](const chamber::tile& tile){
+							if(!tile.building) return;
 
-						draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
-						draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-						                       (colors::red_dusted.create_lerp(colors::pale_green, tile.building.data().hit_point.get_capability_factor())).to_light(1.5f).set_a(
-							                       tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
-					});
-
-					grid.manager.sliced_each([&](const chamber::building_data& building_data){
-						draw::line::rect_ortho(acquirer, building_data.get_bound(), 3, colors::CRIMSON.to_light());
-					});
-
-					auto local_rect = grid.box_to_local(static_cast<const math::rect_box<float>&>(rect2));
-
-					bool any{};
-					grid.local_grid.quad_tree()->intersect_then(
-						local_rect, [&](const math::rect_box<float>& rect, math::frect region){
-							return !any && rect.overlap_rough(region) && rect.overlap_exact(region);
-						}, [&](const auto& rect, const chamber::tile& tile){
-							any = true;
+							draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
+							draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
+												   (colors::red_dusted.create_lerp(colors::pale_green, tile.building.data().hit_point.get_capability_factor())).to_light(1.5f).set_a(
+													   tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
 						});
 
-					if(true){
-						auto rst = grid.get_dst_sorted_tiles(rect2, (rect2[0] + rect2[3]) / 2, dst.normalize());
-						for (const auto& [idx, tile] : rst | std::views::enumerate){
-							draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-												   colors::aqua.create_lerp(colors::red_dusted, idx / static_cast<float>(rst.size())));
-						}
-					}
+						grid.manager.sliced_each([&](const chamber::building_data& building_data){
+							draw::line::rect_ortho(acquirer, building_data.get_bound(), 3, colors::CRIMSON.to_light());
+						});
 
-					renderer_world.batch.pop_proj();
-				});
+						auto local_rect = grid.box_to_local(static_cast<const math::rect_box<float>&>(rect2));
+
+						bool any{};
+						grid.local_grid.quad_tree()->intersect_then(
+							local_rect, [&](const math::rect_box<float>& rect, math::frect region){
+								return !any && rect.overlap_rough(region) && rect.overlap_exact(region);
+							}, [&](const auto& rect, const chamber::tile& tile){
+								any = true;
+							});
+
+						if(true){
+							auto rst = grid.get_dst_sorted_tiles(rect2, (rect2[0] + rect2[3]) / 2, dst.normalize());
+							for (const auto& [idx, tile] : rst | std::views::enumerate){
+								draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
+													   colors::aqua.create_lerp(colors::red_dusted, idx / static_cast<float>(rst.size())));
+							}
+						}
+
+
+						grid.manager.sliced_each([&](const chamber::upper_building_drawable_tag&, const chamber::building& building){
+							building.draw_upper_building(world.graphic_context);
+						});
+
+
+						renderer_world.batch.pop_proj();
+
+
+					});
+			}
 
 			if(async_collide.valid()){
 				async_collide.get();
@@ -710,18 +709,34 @@ void main_loop(){
 
 				world.component_manager.sliced_each([&](
 					game::ecs::move_command& cmd,
-					game::ecs::mech_motion& motion
+					game::ecs::mech_motion& motion,
+					const game::ecs::physical_rigid& rigid,
+					const game::ecs::chamber::chamber_manifold& chamber_manifold
 					){
+					const float a_accelMax = chamber_manifold.maneuver_subsystem.torque() / (rigid.rotational_inertia / 1E5);
 
-					constexpr float accelMax = .85f;
-					auto overhead = std::max(motion.overhead(accelMax), 12.f);
-					cmd.update(motion.trans, overhead * 1.65f, math::pi_2);
 					if(auto next = cmd.get_next(motion.trans, 0)){
+						math::angle approach = motion.pos().angle_to_rad(next->vec);
+						auto yaw_angle = approach - motion.trans.rot;
+
+						float accelMax = chamber_manifold.maneuver_subsystem.get_force_at(yaw_angle) / rigid.inertial_mass;
+						auto overhead = std::max(motion.overhead(accelMax), 12.f);
+						cmd.update(motion.trans, overhead * 1.65f, math::pi_2);
+
 						const auto v_accel = math::constrain_resolve::smooth_approach(next->vec - motion.pos(), motion.vel.vec, accelMax, 32.f);
-						const auto a_accel = math::constrain_resolve::smooth_approach(motion.pos().angle_to_rad(next->vec) - motion.trans.rot, motion.vel.rot, 0.001f, 0.f);
+
+
+						const auto a_accel = math::constrain_resolve::smooth_approach(
+							motion.pos().angle_to_rad(next->vec) - motion.trans.rot,
+							motion.vel.rot,
+							a_accelMax, 0.0f
+
+							);
 						motion.accel += {v_accel, a_accel};
 					}else{
-						motion.accel += motion.get_stop_accel(accelMax, 0.001f);
+						float accelMax = chamber_manifold.maneuver_subsystem.force_longitudinal() / rigid.inertial_mass;
+
+						motion.accel += motion.get_stop_accel(accelMax, a_accelMax);
 						//TODO make it stop
 					}
 					motion.vel.vec.limit_max_length(15);
@@ -777,9 +792,11 @@ int main(){
 
 
 	game::content::load();
+	test::load_content();
 
 	main_loop();
 
+	test::dispose_content();
 	core::global::ui::dispose();
 	assets::graphic::dispose();
 	core::global::assets::dispose();

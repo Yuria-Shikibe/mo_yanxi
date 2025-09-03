@@ -209,6 +209,10 @@ namespace mo_yanxi::game::meta::chamber{
 			return std::nullopt;
 		}
 
+		[[nodiscard]] virtual graphic::color get_edit_outline_color() const noexcept{
+			return graphic::colors::aqua;
+		}
+
 		virtual void draw(math::frect region, graphic::renderer_ui_ref renderer_ui, const graphic::camera2& camera) const{
 
 		}
@@ -224,6 +228,10 @@ namespace mo_yanxi::game::meta::chamber{
 		virtual void install(ecs::chamber::build_ref build_ref) const;
 
 		virtual void build_editor_ui(ui::table& table) const;
+
+		[[nodiscard]] virtual unsigned structural_adjacent_distance() const noexcept{
+			return 0;
+		}
 
 		virtual ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::chamber_manifold& grid, math::point2 where) const;
 

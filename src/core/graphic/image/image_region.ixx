@@ -34,6 +34,16 @@ namespace mo_yanxi::graphic{
 			return {vert11.x, vert00.y};
 		}
 
+		constexpr void rotate(const int times) noexcept{
+			switch(times & 0b11){
+				case 0: break;
+				case 1: *this = {v01(), v10()}; break;
+				case 2: *this = {v11(), v00()}; break;
+				case 3: *this = {v10(), v01()}; break;
+				default: std::unreachable();
+			}
+		}
+
 		template <std::derived_from<uniformed_rect_uv> Ty>
 		constexpr math::u32point2 get_sized_v00(this const Ty& self, const math::u32size2 size) noexcept{
 			const math::vec2 p = self.v00() * size.as<float>();

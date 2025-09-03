@@ -17,6 +17,7 @@ export import mo_yanxi.game.aiming;
 import mo_yanxi.concepts;
 
 import :energy_allocation;
+import :grid_maneuver;
 import :chamber;
 import :decl;
 
@@ -269,6 +270,8 @@ namespace mo_yanxi::game::ecs::chamber{
 		grid local_grid{};
 
 	private:
+		friend component_custom_behavior<chamber_manifold>;
+		entity_id self_entity_{};
 		/**
 		 * @brief local to global
 		 */
@@ -290,15 +293,23 @@ namespace mo_yanxi::game::ecs::chamber{
 		bool energy_status_maybe_changed_flag_{};
 
 	public:
+		maneuver_subsystem maneuver_subsystem{};
 		energy_allocator energy_allocator{};
 
 		hit_point hit_point{};
 		targeting_queue grid_targets{};
 		targeting_queue targets_secondary{};
 
+
+
 		[[nodiscard]] chamber_grid_fields() = default;
 
 		[[nodiscard]] explicit chamber_grid_fields(const meta::chamber::grid& grid) : meta_grid(std::addressof(grid)){}
+
+		[[nodiscard]] entity& self_entity() const noexcept{
+			assert(self_entity_ != nullptr);
+			return *self_entity_;
+		}
 
 		template <math::quad_like T>
 		[[nodiscard]] constexpr T box_to_local (const T& brief) const noexcept{
@@ -413,6 +424,10 @@ namespace mo_yanxi::game::ecs::chamber{
 			});
 		}
 
+		void update_maneuver() noexcept{
+			maneuver_subsystem.update(*this);
+		}
+
 		chamber_manifold(const chamber_manifold& other) = delete;
 
 		chamber_manifold(chamber_manifold&& other) noexcept
@@ -466,7 +481,6 @@ namespace mo_yanxi::game::ecs::chamber{
 namespace mo_yanxi::game::ecs{
 	using namespace chamber;
 
-
 	export
 	struct building_data_dump{
 		tile_region region{};
@@ -491,10 +505,7 @@ namespace mo_yanxi::game::ecs{
 	struct component_custom_behavior<chamber::building_data> : component_custom_behavior_base<chamber::building_data, building_data_dump>{
 
 		static void on_init(const chunk_meta& meta, value_type& comp){
-			comp.tile_states.resize(comp.region().area(), tile_status{
-				comp.get_tile_individual_max_hitpoint(),
-				comp.get_tile_individual_max_hitpoint()
-			});
+			comp.tile_states.resize(comp.region().area(), tile_status{comp.get_tile_individual_max_hitpoint()});
 			comp.grid().local_grid.insert(meta.id());
 
 			on_relocate(meta, comp);
@@ -511,7 +522,14 @@ namespace mo_yanxi::game::ecs{
 	};
 
 	template <>
-	struct component_custom_behavior<chamber::chamber_manifold> : component_custom_behavior_base<chamber::chamber_manifold, chamber_manifold_dump>{
+	struct component_custom_behavior<chamber_manifold> : component_custom_behavior_base<chamber_manifold, chamber_manifold_dump>{
+		static void on_init(const chunk_meta& meta, value_type& comp){
+			comp.self_entity_ = meta.id();
+		}
+
+		static void on_terminate(const chunk_meta& meta, value_type& comp){
+			comp.self_entity_ = nullptr;
+		}
 
 	};
 
@@ -528,7 +546,7 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		math::trans2 building::get_local_to_global_trans(math::vec2 p) const noexcept{
-			auto trs = data().get_trans();
+			const auto trs = data().get_trans();
 			return {p | trs, trs.rot};
 		}
 

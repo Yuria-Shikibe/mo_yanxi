@@ -38,7 +38,7 @@ namespace mo_yanxi::game::ecs{
 
 			void build_hud(ui::list& where, const entity_ref& eref) const override;
 
-			void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world) override;
+			void update(world::entity_top_world& top_world) override;
 
 		};
 	}

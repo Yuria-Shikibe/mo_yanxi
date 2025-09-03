@@ -179,6 +179,7 @@ namespace mo_yanxi{
 				return prev == 1;
 			}else{
 				//TODO should this marked as illegal?
+				if(reference_count == 0)__debugbreak();
 				assert(reference_count != 0);
 
 				--reference_count;

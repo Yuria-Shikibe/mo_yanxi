@@ -85,7 +85,7 @@ namespace mo_yanxi::game::ecs::chamber{
 
 	}
 
-	void turret_build::shoot(math::trans2 shoot_offset, const chunk_meta& chunk_meta, world::entity_top_world& top_world) const{
+	void turret_build::shoot(math::trans2 shoot_offset, world::entity_top_world& top_world) const{
 		if(meta.shoot_type.projectile){
 			auto hdl = meta::create(top_world.component_manager, *meta.shoot_type.projectile);
 			auto& comp = hdl.get_components();
@@ -94,7 +94,7 @@ namespace mo_yanxi::game::ecs::chamber{
 
 			hdl.set_initial_trans(trs);
 			hdl.set_initial_vel(trs.rot + math::rand{}(meta.shoot_type.angular_inaccuracy));
-			hdl.set_faction(chunk_meta.id()->at<faction_data>().faction);
+			hdl.set_faction(data().grid().self_entity().at<faction_data>().faction);
 		}
 
 	}
@@ -157,5 +157,21 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 
 		return false;
+	}
+
+	void turret_build::draw_upper_building(world::graphic_context& graphic_context) const{
+		using namespace graphic;
+
+		draw::world_acquirer acq{graphic_context.renderer().batch};
+		const math::trans2z trs{data().get_local_pos_offseted(this->transform.vec), rotation, transform.z_offset};
+		draw::line::line_angle(acq.get(), trs, 64, 8, colors::CRIMSON);
+
+		if(meta.drawer){
+			meta.drawer->draw(graphic_context, trs, {
+				.reload_progress = reload / meta.reload_duration,
+				// .shoot_progress = ,
+				.state = state_
+			});
+		}
 	}
 }

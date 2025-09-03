@@ -25,7 +25,11 @@ mo_yanxi::game::srl::chunk_serialize_handle mo_yanxi::game::meta::srl::write_gri
 		tile.set_placeable(grid_tile.placeable);
 	}
 
-	const auto& buildings = grid.get_buildings();
+	std::vector buildings{std::from_range, grid.get_buildings() | std::views::transform([](auto& v){return std::addressof(v);})};
+	std::ranges::partition(buildings, [](const chamber::grid_building* lhs) noexcept -> bool {
+		return lhs->get_meta_info().structural_adjacent_distance();
+	});
+
 	gridMsg.mutable_buildings()->Reserve(buildings.size());
 	std::vector<chunk_serialize_handle> instance_handles{};
 	instance_handles.reserve(std::ranges::count_if(buildings, &chamber::grid_building::has_instance_data));
@@ -33,10 +37,10 @@ mo_yanxi::game::srl::chunk_serialize_handle mo_yanxi::game::meta::srl::write_gri
 	srl_size instance_chunk_size{};
 	for (const auto & building : buildings){
 		auto& b = *gridMsg.add_buildings();
-		b.mutable_meta()->set_content_name(building.get_meta_info().name);
-		io::store(b.mutable_region(), building.get_indexed_region());
+		b.mutable_meta()->set_content_name(building->get_meta_info().name);
+		io::store(b.mutable_region(), building->get_indexed_region());
 
-		if(auto data = building.get_instance_data()){
+		if(auto data = building->get_instance_data()){
 			auto hdl = data->write(stream);
 
 			if(auto chunk_size = hdl.get_offset()){
@@ -46,6 +50,7 @@ mo_yanxi::game::srl::chunk_serialize_handle mo_yanxi::game::meta::srl::write_gri
 			}
 		}
 	}
+
 	srl_size chunk_head_size{gridMsg.ByteSizeLong()};
 
 	co_yield sizeof(srl_size) + chunk_head_size + instance_chunk_size;
@@ -103,12 +108,13 @@ void mo_yanxi::game::meta::srl::read_grid(std::istream& stream, chamber::grid& g
 			continue;
 		}
 
-		auto* build = grid.try_place_building_at(region.src, *meta);
-		if(!build){
+		if(!grid.is_building_basic_placeable_at(region)){
 			continue;
 		}
 
-		if(const auto instance = build->get_instance_data(); chunk_size && instance){
+		auto& build = grid.place_building_at(region.src, *meta);
+
+		if(const auto instance = build.get_instance_data(); chunk_size && instance){
 			read_to_buffer(stream, chunk_size, buffer);
 			std::ispanstream instance_data_reader{buffer};
 
@@ -116,7 +122,7 @@ void mo_yanxi::game::meta::srl::read_grid(std::istream& stream, chamber::grid& g
 				instance->read(instance_data_reader);
 			}catch(...){
 				//discard failed result, using default instead
-				build->reset_instance_data();
+				build.reset_instance_data();
 			}
 
 		}

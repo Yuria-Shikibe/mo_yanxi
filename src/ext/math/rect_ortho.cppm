@@ -954,6 +954,21 @@ namespace mo_yanxi::math{
 				}
 			}
 		}
+		template <std::predicate<vec_t> Fn>
+		FORCE_INLINE constexpr bool each_any(Fn func) const noexcept(std::is_nothrow_invocable_v<Fn, vec_t>)
+			requires std::integral<T>
+		{
+			for(T y = src.y; y < get_end_y(); ++y){
+				for(T x = src.x; x < get_end_x(); ++x){
+					if(std::invoke_r<bool>(func, vec_t{x, y})){
+						return true;
+					}
+				}
+			}
+
+			return false;
+		}
+
 
 		template <std::invocable<vec_t> Fn>
 		FORCE_INLINE constexpr void each_jump_src(Fn func) const noexcept(std::is_nothrow_invocable_v<Fn, vec_t>) requires
@@ -985,6 +1000,10 @@ namespace mo_yanxi::math{
 					rect_ortho{tags::unchecked, x + w, y + h, w, h},
 				};
 		}
+
+		explicit(false) operator rect_ortho_trivial<T>(){
+			return rect_ortho_trivial<T>{src, size_};
+		}
 	};
 
 
@@ -1009,4 +1028,59 @@ namespace mo_yanxi::math{
 			std::numeric_limits<T>::infinity(),
 			std::numeric_limits<T>::infinity(),
 		};
+
+	namespace rect{
+		export
+		template <typename T>
+		std::array<rect_ortho<T>, 4> get_proximity_of(const rect_ortho<T>& region, T margin = T{1}){
+			if constexpr (!std::unsigned_integral<T>){
+				assert(margin >= 0);
+			}
+
+			return {
+				rect_ortho<T>{tags::unchecked, tags::from_extent, region.vert_10(), {margin, region.height()}},
+				rect_ortho<T>{tags::unchecked, tags::from_extent, region.vert_01(), {region.width(), margin}},
+				rect_ortho<T>{tags::from_extent, region.vert_00(), -margin, region.height()},
+				rect_ortho<T>{tags::from_extent, region.vert_00(), region.width(), -margin},
+			};
+		}
+
+		// export
+		// irect get_indexed_wrap_of(
+		// usize2 extent,
+		// rect_ortho_trivial<float> rect) noexcept{
+		// 	const auto chamberSize = (extent * ecs::chamber::tile_size_integral).as<float>();
+		// 	const auto chamberSize = extent.as<float>();
+		// 	auto src = get_tile_coord(rect.src, extent);
+		// 	const auto src_in_world = (src * ecs::chamber::tile_size_integral).as<float>();
+		//
+		// 	auto ext = rect.get_abs_extent();
+		//
+		// 	if(rect.extent.x >= 0){
+		// 		ext.x += rect.src.x - src_in_world.x;
+		// 	}else{
+		// 		ext.x += src_in_world.x + chamberSize.x - rect.src.x;
+		// 	}
+		//
+		// 	if(rect.extent.y >= 0){
+		// 		ext.y += rect.src.y - src_in_world.y;
+		// 	}else{
+		// 		ext.y += src_in_world.y + chamberSize.y - rect.src.y;
+		// 	}
+		//
+		// 	math::isize2 size = (ext / (extent * ecs::chamber::tile_size_integral).as<float>()).trunc().as<int>().add(1)
+		// 			* extent.as<int>()
+		// 			* rect.extent.as<int>().sign();
+		//
+		// 	if(size.x < 0){
+		// 		src.x += extent.x;
+		// 	}
+		//
+		// 	if(size.y < 0){
+		// 		src.y += extent.y;
+		// 	}
+		//
+		// 	return math::irect{tags::from_extent, src, size};
+		// }
+	}
 }

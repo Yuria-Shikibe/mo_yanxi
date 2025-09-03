@@ -9,25 +9,48 @@ import mo_yanxi.type_register;
 import mo_yanxi.concepts;
 import mo_yanxi.seq_chunk;
 import mo_yanxi.strided_span;
+import mo_yanxi.basic_util;
 import std;
 
 namespace mo_yanxi::game::ecs{
+	struct spin_lock{
+	private:
+		std::binary_semaphore semaphore{1};
+
+	public:
+		void lock() noexcept{
+			semaphore.acquire();
+		}
+
+		void unlock() noexcept{
+			semaphore.release();
+		}
+
+		[[nodiscard]] bool try_lock() noexcept{
+			return semaphore.try_acquire();
+		}
+	};
+
 	export struct component_manager;
-	template <typename T = std::mutex>
+	template <typename T = spin_lock>
 	struct no_propagation_mutex : T{
 		[[nodiscard]] no_propagation_mutex() = default;
 
 		no_propagation_mutex(const no_propagation_mutex& other) noexcept{
+			mo_yanxi::assert_unlocked(other);
 		}
 
 		no_propagation_mutex(no_propagation_mutex&& other) noexcept{
+			mo_yanxi::assert_unlocked(other);
 		}
 
 		no_propagation_mutex& operator=(const no_propagation_mutex& other) noexcept{
+			mo_yanxi::assert_unlocked(other);
 			return *this;
 		}
 
 		no_propagation_mutex& operator=(no_propagation_mutex&& other) noexcept{
+			mo_yanxi::assert_unlocked(other);
 			return *this;
 		}
 	};

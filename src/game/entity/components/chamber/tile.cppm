@@ -64,35 +64,16 @@ namespace mo_yanxi::game::ecs{
 
 		export
 		struct tile_status{
-			static constexpr float threshold_factor = 1 / 4.f;
 			float valid_hit_point{};
-			float valid_structure_hit_point{};
 
-			constexpr tile_damage take_damage(float damage, float tile_max) noexcept{
-				float structure_damage_threshold = tile_max * threshold_factor;
+			constexpr float take_damage(float damage) noexcept{
 
-				float build_consumed;
 				if(damage >= valid_hit_point){
-					build_consumed = valid_hit_point;
-					valid_hit_point = 0;
+					return std::exchange(valid_hit_point, 0);
 				}else{
-					build_consumed = damage;
 					valid_hit_point -= damage;
+					return damage;
 				}
-
-				damage -= build_consumed;
-
-				float struct_consumes{};
-				if(valid_hit_point + build_consumed < structure_damage_threshold){
-					float factor = 1 - (valid_hit_point + build_consumed) / structure_damage_threshold;
-					auto dmg = factor * math::min(damage, valid_structure_hit_point);
-					auto last = valid_structure_hit_point;
-					valid_structure_hit_point -= dmg;
-					valid_structure_hit_point = math::max(valid_structure_hit_point, valid_hit_point);
-					struct_consumes = last - valid_structure_hit_point;
-				}
-
-				return {build_consumed, struct_consumes};
 			}
 		};
 
@@ -145,9 +126,18 @@ namespace mo_yanxi::game::ecs{
 
 			}
 
-			virtual void update(const chunk_meta& chunk_meta, world::entity_top_world& top_world){
+			virtual void draw_upper_building(world::graphic_context& graphic_context) const{
 
 			}
+
+			virtual void draw_chamber(world::graphic_context& graphic_context) const{
+
+			}
+
+			virtual void update(world::entity_top_world& top_world){
+
+			}
+
 		};
 
 		export
@@ -182,6 +172,18 @@ namespace mo_yanxi::game::ecs{
 		struct power_generator_building_tag{};
 
 		export
+		struct power_consumer_building_tag{};
+
+		export
+		struct upper_building_drawable_tag{};
+
+		export
+		enum class building_data_category{
+			general,
+			structural
+		};
+
+		export
 		struct building_data{
 			friend chamber_grid_fields;
 			friend chamber_manifold;
@@ -194,6 +196,8 @@ namespace mo_yanxi::game::ecs{
 			chamber_manifold* grid_{};
 
 		public:
+			building_data_category category{};
+
 			hit_point hit_point{};
 
 			std::vector<tile_damage_event> damage_events{};
@@ -204,7 +208,6 @@ namespace mo_yanxi::game::ecs{
 			//
 			std::vector<tile_status> tile_states{};
 			float building_damage_take{};
-			float structural_damage_take{};
 
 			energy_status energy_status{}; //TODO private?
 			energy_acquisition ideal_energy_acquisition{};
@@ -311,7 +314,7 @@ namespace mo_yanxi::game::ecs{
 
 			void clear_hit_events() noexcept{
 				damage_events.clear();
-				structural_damage_take = building_damage_take = 0;
+				building_damage_take = 0;
 			}
 
 
@@ -324,13 +327,12 @@ namespace mo_yanxi::game::ecs{
 				}
 
 				auto local = (coord - region_.src);
-				auto dmg = tile_states[local_to_index(local)].take_damage(sum, get_tile_individual_max_hitpoint());
+				auto dmg = tile_states[local_to_index(local)].take_damage(sum);
 
-				if(dmg.sum() > 0.){
-					building_damage_take += dmg.building_damage;
-					structural_damage_take += dmg.structural_damage;
+				if(dmg > 0.){
+					building_damage_take += dmg;
 					damage_events.emplace_back(local.as<unsigned short>(), sum);
-					total_damage.material_damage.direct -= dmg.sum();
+					total_damage.material_damage.direct -= dmg;
 					return damage_consume_result::success;
 				}else{
 					return damage_consume_result::hitpoint_exhaust;
@@ -366,11 +368,22 @@ namespace mo_yanxi::game::ecs{
 
 			[[nodiscard]] math::trans2 get_trans() const noexcept;
 
+			[[nodiscard]] math::trans2 get_trans_offseted(math::vec2 scale) const noexcept{
+				const auto trs = get_trans();
+				return {real_extent() * scale | trs, trs.rot};
+			}
+
+			[[nodiscard]] math::vec2 get_pos_offseted(math::vec2 scale) const noexcept{
+				return real_extent() * scale | get_trans();
+			}
+
+			[[nodiscard]] math::vec2 get_local_pos_offseted(const math::vec2 scale) const noexcept{
+				return (region_.extent().as<float>() * scale + region_.get_src().as<float>()) * tile_size;
+			}
+
 			[[nodiscard]] const meta::chamber::grid_building* get_meta() const noexcept;
 		};
 
-		export
-		struct power_consumer_building_tag{};
 
 	}
 

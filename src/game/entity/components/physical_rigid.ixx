@@ -72,7 +72,7 @@ export namespace mo_yanxi::game::ecs{
 	
 	struct physical_rigid{
 		float inertial_mass = 1000;
-		float rotational_inertia_scale = 1 / 12.0f;
+		// float rotational_inertia_scale = 1 / 12.0f;
 
 		/** @brief [0, 1]*/
 		float friction_coefficient = 0.35f;
@@ -83,5 +83,7 @@ export namespace mo_yanxi::game::ecs{
 		float collide_force_scale = 1.0f;
 
 		float drag{0.025f};
+
+		double rotational_inertia = -1.;
 	};
 }

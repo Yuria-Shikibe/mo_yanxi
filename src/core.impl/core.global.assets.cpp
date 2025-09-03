@@ -3,6 +3,7 @@ module mo_yanxi.core.global.assets;
 import mo_yanxi.graphic.draw;
 import mo_yanxi.font.typesetting;
 import mo_yanxi.vk.context;
+import std;
 
 void mo_yanxi::core::global::assets::init(void* vk_context_ptr){
 	auto& context = *static_cast<vk::context*>(vk_context_ptr);
@@ -34,6 +35,8 @@ void mo_yanxi::core::global::assets::init(void* vk_context_ptr){
 }
 
 void mo_yanxi::core::global::assets::dispose(){
-	atlas = {};
+	std::destroy_at(&atlas);
+	std::construct_at(&atlas);
+
 	font_manager = {};
 }

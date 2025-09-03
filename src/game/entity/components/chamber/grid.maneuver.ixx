@@ -4,8 +4,13 @@
 
 export module mo_yanxi.game.ecs.component.chamber:grid_maneuver;
 
+import mo_yanxi.math;
+
 namespace mo_yanxi::game::ecs::chamber{
+
 	export struct chamber_manifold;
+
+	//TODO make it independent component
 
 	export
 	struct maneuver_component{
@@ -17,6 +22,18 @@ namespace mo_yanxi::game::ecs::chamber{
 		 * @brief Torque always provide given value, no matter where the component is.
 		 */
 		float torque_absolute;
+
+		float boost;
+
+		constexpr maneuver_component operator*(float value) const noexcept{
+			return {
+				.force_longitudinal = force_longitudinal * value,
+				.force_transverse = force_transverse * value,
+				.torque = torque * value,
+				.torque_absolute = torque_absolute * value,
+				.boost = boost * value
+			};
+		}
 	};
 
 	export
@@ -25,7 +42,13 @@ namespace mo_yanxi::game::ecs::chamber{
 		float force_longitudinal_{};
 		float force_transverse_{};
 		float torque_{};
+		float boost_{};
 	public:
+		[[nodiscard]] float get_force_at(float yaw_angle_in_rad) const noexcept{
+			auto [cos, sin] = math::cos_sin(yaw_angle_in_rad);
+			return math::abs(cos) * force_longitudinal_ + math::abs(sin) * force_transverse_;
+		}
+
 		[[nodiscard]] float force_longitudinal() const noexcept{
 			return force_longitudinal_;
 		}

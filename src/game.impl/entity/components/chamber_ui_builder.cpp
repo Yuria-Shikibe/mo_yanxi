@@ -19,6 +19,7 @@ import std;
 namespace mo_yanxi::game::ecs::chamber{
 	struct chamber_ui : entity_info_table{
 		ui::stalled_bar* hitpoint_bar{};
+		ui::progress_bar* yaw_angle_bar{};
 
 		[[nodiscard]] chamber_ui(ui::scene* scene, group* group, const entity_ref& ref)
 			: entity_info_table(scene, group, ref){
@@ -41,6 +42,13 @@ namespace mo_yanxi::game::ecs::chamber{
 				txt->set_policy(font::typesetting::layout_policy::auto_feed_line);
 
 				txt.cell().set_pad({.top = 8});
+			}
+			{
+				auto txt = end_line().emplace<ui::progress_bar>();
+
+				txt.cell().set_pad({.top = 8});
+				txt.cell().set_height(50);
+				yaw_angle_bar = &txt.elem();
 			}
 
 			{
@@ -87,6 +95,22 @@ namespace mo_yanxi::game::ecs::chamber{
 
 			hitpoint_bar->set_value(chunk.hit_point.factor());
 			hitpoint_bar->normalized_valid_range = chunk.hit_point.capability_range / chunk.hit_point.max;
+			{
+				auto& cmd = chunk.get<move_command>();
+				auto& motion = chunk.get<mech_motion>();
+
+				if(auto next = cmd.get_next(motion.trans, 0)){
+					math::angle approach = motion.pos().angle_to_rad(next->vec);
+
+					auto yaw_angle = approach - motion.trans.rot;
+					yaw_angle_bar->update_progress((math::cos(yaw_angle) + 1) / 2, delta_in_ticks);
+				}else{
+					yaw_angle_bar->update_progress(1, delta_in_ticks);
+				}
+
+
+
+			}
 		}
 	};
 
