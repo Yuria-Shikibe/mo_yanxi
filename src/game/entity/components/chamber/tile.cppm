@@ -184,7 +184,7 @@ namespace mo_yanxi::game::ecs{
 		};
 
 		export
-		struct building_data{
+		struct building_data : chunk_meta{
 			friend chamber_grid_fields;
 			friend chamber_manifold;
 			friend ecs::component_custom_behavior<building_data>;
@@ -192,7 +192,6 @@ namespace mo_yanxi::game::ecs{
 
 		private:
 			tile_region region_{};
-			const chunk_meta* component_head_{};
 			chamber_manifold* grid_{};
 
 		public:
@@ -278,15 +277,15 @@ namespace mo_yanxi::game::ecs{
 			}
 
 			[[nodiscard]] const chunk_meta* get_component_head() const noexcept{
-				return component_head_;
+				return this;
 			}
 
 			[[nodiscard]] const entity& entity() const noexcept{
-				return *component_head_->id();
+				return *id();
 			}
 
 			[[nodiscard]] entity_id get_id() const noexcept{
-				return component_head_->id();
+				return id();
 			}
 
 			decltype(auto) operator[](this auto&& self, tile_coord global_pos) noexcept{
@@ -351,6 +350,9 @@ namespace mo_yanxi::game::ecs{
 
 		public:
 			void notify_grid_power_state_maybe_changed() const noexcept;
+
+			using chunk_meta::chunk_meta;
+
 			[[nodiscard]] building_data() = default;
 
 			[[nodiscard]] building_data(

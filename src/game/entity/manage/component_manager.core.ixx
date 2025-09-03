@@ -403,9 +403,10 @@ namespace mo_yanxi::game::ecs{
 			components& added_comp = chunks.emplace_back(std::move(comp));
 			if constexpr (set_archetype)archetype_base::insert(eid);
 
+
 			[&] <std::size_t... I>(std::index_sequence<I...>){
-				(component_trait<std::tuple_element_t<I + 1, raw_tuple>>::on_init(get<0>(added_comp), get<I + 1>(added_comp)), ...);
-			}(std::make_index_sequence<std::tuple_size_v<raw_tuple> - 1>());
+				(component_trait<std::tuple_element_t<I, raw_tuple>>::on_init(get<0>(added_comp), get<I>(added_comp)), ...);
+			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 
 			trait::on_init(added_comp);
 			this->init(added_comp);
@@ -413,8 +414,8 @@ namespace mo_yanxi::game::ecs{
 			if(last_cap != chunks.capacity()){
 				for(components& prev_comp : chunks | std::views::reverse | std::views::drop(1)){
 					[&] <std::size_t... I>(std::index_sequence<I...>){
-						(component_trait<std::tuple_element_t<I + 1, raw_tuple>>::on_relocate(get<0>(prev_comp), get<I + 1>(prev_comp)), ...);
-					}(std::make_index_sequence<std::tuple_size_v<raw_tuple> - 1>());
+						(component_trait<std::tuple_element_t<I, raw_tuple>>::on_relocate(get<0>(prev_comp), get<I>(prev_comp)), ...);
+					}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 				}
 			}
 
@@ -425,7 +426,19 @@ namespace mo_yanxi::game::ecs{
 		std::size_t insert(const entity_id eid) final {
 			if(!eid)return 0;
 
-			return this->insert<true>(components{eid});
+			if constexpr (requires{
+				components{eid};
+			}){
+				return this->insert<true>(components{eid});
+			}else if constexpr (std::is_default_constructible_v<components>){
+				components comps{};
+				chunk_meta& meta = get<chunk_meta>(comps);
+				meta.eid_ = eid;
+				return this->insert<true>(std::move(comps));
+			}else{
+				static_assert(false, "failed to construct components");
+			}
+
 		}
 
 		void erase(const entity_id e) final {
@@ -442,8 +455,8 @@ namespace mo_yanxi::game::ecs{
 			trait::on_terminate(chunk);
 
 			[&] <std::size_t... I>(std::index_sequence<I...>){
-				(component_trait<std::tuple_element_t<I + 1, raw_tuple>>::on_terminate(get<0>(chunk), get<I + 1>(chunk)), ...);
-			}(std::make_index_sequence<std::tuple_size_v<raw_tuple> - 1>());
+				(component_trait<std::tuple_element_t<I, raw_tuple>>::on_terminate(get<0>(chunk), get<I>(chunk)), ...);
+			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 
 			if(idx == chunk_size - 1){
 				chunks.pop_back();
@@ -454,8 +467,8 @@ namespace mo_yanxi::game::ecs{
 				this->id_of_chunk(chunk)->chunk_index_ = idx;
 
 				[&] <std::size_t... I>(std::index_sequence<I...>){
-					(component_trait<std::tuple_element_t<I + 1, raw_tuple>>::on_relocate(get<0>(chunk), get<I + 1>(chunk)), ...);
-				}(std::make_index_sequence<std::tuple_size_v<raw_tuple> - 1>());
+					(component_trait<std::tuple_element_t<I, raw_tuple>>::on_relocate(get<0>(chunk), get<I>(chunk)), ...);
+				}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 
 				trait::on_relocate(chunk);
 			}
@@ -527,8 +540,8 @@ namespace mo_yanxi::game::ecs{
 				chunks.reserve(sz);
 				for(components& prev_comp : chunks){
 					[&] <std::size_t... I>(std::index_sequence<I...>){
-						(component_trait<std::tuple_element_t<I + 1, raw_tuple>>::on_relocate(get<0>(prev_comp), get<I + 1>(prev_comp)), ...);
-					}(std::make_index_sequence<std::tuple_size_v<raw_tuple> - 1>());
+						(component_trait<std::tuple_element_t<I, raw_tuple>>::on_relocate(get<0>(prev_comp), get<I>(prev_comp)), ...);
+					}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 				}
 			}
 

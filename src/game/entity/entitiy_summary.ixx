@@ -42,6 +42,7 @@ namespace mo_yanxi::game::ecs{
 		>;
 
 		using View = tuple_to_comp_t<projectile>;
+
 	}
 
 	export

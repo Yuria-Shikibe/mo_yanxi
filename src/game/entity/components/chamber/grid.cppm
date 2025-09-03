@@ -394,13 +394,13 @@ namespace mo_yanxi::game::ecs::chamber{
 			}
 			if constexpr (std::tuple_size_v<Tuple> > 0){
 				if constexpr (std::same_as<building_data, std::tuple_element_t<0, Tuple>>){
-					return manager.create_entity_deferred<tuple_cat_t<std::tuple<chunk_meta>, Tuple>>(building_data{
+					return manager.create_entity_deferred<Tuple>(building_data{
 						region, this
 					}, std::forward<Args>(args)...);
 				}
 			}
 
-			using building_ty = tuple_cat_t<std::tuple<chunk_meta, building_data>, Tuple>;
+			using building_ty = tuple_cat_t<std::tuple<building_data>, Tuple>;
 			return manager.create_entity_deferred<building_ty>(building_data{
 				region, this
 			}, std::forward<Args>(args)...);
@@ -413,7 +413,7 @@ namespace mo_yanxi::game::ecs::chamber{
 				throw std::invalid_argument("invalid region");
 			}
 
-			return manager.create_entity_deferred<std::tuple<chunk_meta, building_data, Building>>(building_data{
+			return manager.create_entity_deferred<std::tuple<building_data, Building>>(building_data{
 				region, this
 			}, std::forward<Args>(args)...);
 		}
@@ -502,7 +502,8 @@ namespace mo_yanxi::game::ecs{
 	};
 
 	template <>
-	struct component_custom_behavior<chamber::building_data> : component_custom_behavior_base<chamber::building_data, building_data_dump>{
+	struct component_custom_behavior<building_data> : component_custom_behavior_base<building_data, building_data_dump>{
+		//using T = ecs::get_base_types<chamber::building_data>::type;
 
 		static void on_init(const chunk_meta& meta, value_type& comp){
 			comp.tile_states.resize(comp.region().area(), tile_status{comp.get_tile_individual_max_hitpoint()});
@@ -516,8 +517,9 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		static void on_relocate(const chunk_meta& meta, value_type& comp){
-			comp.component_head_ = std::addressof(meta);
-			if(auto b = meta.id()->try_get<building>())b->data_ = std::addressof(comp);
+			if(auto b = meta.id()->try_get<building>()){
+				b->data_ = std::addressof(comp);
+			}
 		}
 	};
 

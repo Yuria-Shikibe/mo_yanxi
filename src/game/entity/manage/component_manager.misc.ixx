@@ -160,7 +160,11 @@ namespace mo_yanxi::game::ecs{
 
 	export
 	template <typename Tuple>
-	concept entity_component_seq = is_tuple_v<Tuple> && std::derived_from<std::tuple_element_t<0, Tuple>, chunk_meta>;
+	concept entity_component_seq = is_tuple_v<Tuple> && std::derived_from<std::tuple_element_t<0, Tuple>, chunk_meta> && []{
+		return [] <std::size_t ...Idx>(std::index_sequence<Idx...>){
+			return (!std::derived_from<std::tuple_element_t<Idx + 1, Tuple>, chunk_meta> && ...);
+		}(std::make_index_sequence<std::tuple_size_v<Tuple> - 1>{});
+	}();
 
 	export
 	template <entity_component_seq Tuple>
@@ -227,6 +231,7 @@ namespace mo_yanxi::game::ecs{
 	template <typename T>
 	using unwrap_type = T::type;
 
+	// export
 	template <typename T>
 	struct get_base_types{
 		using direct_parent = decltype([]{
@@ -243,11 +248,24 @@ namespace mo_yanxi::game::ecs{
 			}
 		}())::type;
 
-		using type = tuple_cat_t<
+	private:
+		using type_raw = tuple_cat_t<
 			std::tuple<T>,
 			all_apply_to<tuple_cat_t,
 				unary_apply_to_tuple_t<unwrap_type,
 					unary_apply_to_tuple_t<get_base_types, direct_parent>>>>;
+
+		static constexpr bool should_contain_chunk_meta = !contained_in<chunk_meta, type_raw> && std::derived_from<T, chunk_meta>;
+	public:
+
+		using type = decltype([]{
+			if constexpr (should_contain_chunk_meta){
+				return std::type_identity<tuple_cat_t<std::tuple<chunk_meta>, type_raw>>{};
+			}else{
+				return std::type_identity<type_raw>{};
+			}
+		}())::type;
+
 	};
 
 	template <typename T>
@@ -266,7 +284,7 @@ namespace mo_yanxi::game::ecs{
 		};
 
 		static void on_init(const chunk_meta& meta, T& comp) {
-
+			if constexpr (std::same_as<T, chunk_meta>)return;
 			[&]<std::size_t ... I>(std::index_sequence<I...>){
 				([&]<std::size_t J>{
 					using Cur = std::tuple_element_t<J, base_types>;
@@ -281,6 +299,7 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		static void on_terminate(const chunk_meta& meta, T& comp) {
+			if constexpr (std::same_as<T, chunk_meta>)return;
 			[&]<std::size_t ... I>(std::index_sequence<I...>){
 				([&]<std::size_t J>{
 					using Cur = std::tuple_element_t<J, base_types>;
@@ -295,6 +314,7 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		static void on_relocate(const chunk_meta& meta, T& comp) {
+			if constexpr (std::same_as<T, chunk_meta>)return;
 			[&]<std::size_t ... I>(std::index_sequence<I...>){
 				([&]<std::size_t J>{
 					using Cur = std::tuple_element_t<J, base_types>;
