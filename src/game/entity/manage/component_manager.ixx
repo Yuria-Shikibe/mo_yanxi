@@ -155,6 +155,27 @@ namespace mo_yanxi::game::ecs{
 			}
 			return false;
 		}
+		/**
+		 * @brief drop the referenced entity if it is already erased
+		 */
+		template <bool check_inserted = false>
+		constexpr bool check_or_drop() noexcept{
+			if(!id_)return false;
+			else {
+				if(id_->is_expired()){
+					this->operator=(nullptr);
+					return false;
+				}
+
+				if constexpr (check_inserted){
+					if(!id_->is_inserted()){
+						return false;
+					}
+				}
+
+				return true;
+			}
+		}
 
 		[[nodiscard]] constexpr bool is_expired() const noexcept{
 			return id_ && id_->is_expired();

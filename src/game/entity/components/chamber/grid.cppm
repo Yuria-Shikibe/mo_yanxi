@@ -530,6 +530,8 @@ namespace mo_yanxi::game::ecs{
 		}
 
 		static void on_terminate(const chunk_meta& meta, value_type& comp){
+			comp.manager.do_deferred();
+
 			comp.self_entity_ = nullptr;
 		}
 

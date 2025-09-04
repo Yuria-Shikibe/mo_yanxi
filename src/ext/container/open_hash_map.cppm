@@ -334,6 +334,10 @@ namespace mo_yanxi{
 				std::construct_at(value.data(), std::forward<Args>(args)...);
 			}
 
+			constexpr void move_assign(mapped_type&& arg) noexcept(std::is_nothrow_move_assignable_v<mapped_type>){
+				*value.data() = std::move(arg);
+			}
+
 			kv_storage(const kv_storage& other)
 				: key{other.key}{
 				if(*this){
@@ -426,12 +430,18 @@ namespace mo_yanxi{
 			}
 
 			/*constexpr*/
-			auto& operator*() const noexcept{
-				return *this->operator->();
+			auto operator*() const noexcept{
+				if constexpr(addConst){
+					return std::pair<const key_type&, const mapped_type&>{current->key, *current->value.data()};
+				} else{
+					return std::pair<const key_type&, mapped_type&>{current->key, *current->value.data()};
+				}
 			}
 
 			/*constexpr*/
 			auto* operator->() const noexcept{
+				//TODO UB HERE
+
 				assert(current != sentinel);
 				if constexpr(addConst){
 					return std::launder(reinterpret_cast<const std::pair<const key_type, mapped_type>*>(std::to_address(current)));
@@ -614,7 +624,7 @@ namespace mo_yanxi{
 				itr->second = mapped_type{std::forward<Args>(args)...};
 				return std::pair{itr, false};
 			} else{
-				return this->emplace_impl(std::move(key), std::forward<Args>(args)...);
+				return this->template emplace_impl<true>(std::move(key), std::forward<Args>(args)...);
 			}
 		}
 
@@ -625,20 +635,28 @@ namespace mo_yanxi{
 				itr->second = mapped_type{std::forward<Args>(args)...};
 				return std::pair{itr, false};
 			} else{
-				return this->emplace_impl(key, std::forward<Args>(args)...);
+				return this->template emplace_impl<true>(key, std::forward<Args>(args)...);
 			}
 		}
 
 		template <typename... Args>
 			requires (std::constructible_from<mapped_type, Args...> && std::is_move_assignable_v<mapped_type>)
 		constexpr std::pair<iterator, bool> try_emplace(key_type&& key, Args&&... args){
-			return this->emplace_impl(std::move(key), std::forward<Args>(args)...);
+			if(auto itr = this->find_impl(key); itr != end()){
+				return std::pair{itr, false};
+			}
+
+			return this->template emplace_impl<true>(std::move(key), std::forward<Args>(args)...);
 		}
 
 		template <typename... Args>
 			requires (std::constructible_from<mapped_type, Args...> && std::is_move_assignable_v<mapped_type>)
 		constexpr std::pair<iterator, bool> try_emplace(const key_type& key, Args&&... args){
-			return this->emplace_impl(key, std::forward<Args>(args)...);
+			if(auto itr = this->find_impl(key); itr != end()){
+				return std::pair{itr, false};
+			}
+
+			return this->template emplace_impl<true>(key, std::forward<Args>(args)...);
 		}
 
 		template <typename K>
@@ -696,7 +714,7 @@ namespace mo_yanxi{
 		}
 
 	protected:
-		template <std::convertible_to<key_type> K, typename... Args>
+		template <bool assert_no_equal = false, std::convertible_to<key_type> K, typename... Args>
 			requires (std::constructible_from<mapped_type, Args...> && std::is_move_assignable_v<mapped_type>)
 		constexpr std::pair<iterator, bool> emplace_impl(K&& key, Args&&... args){
 			if(fixed_open_addr_hash_map::is_empty_key(key)){
@@ -712,9 +730,14 @@ namespace mo_yanxi{
 					kv.key = std::forward<K>(key);
 					size_++;
 					return {iterator(this, idx), true};
-				} else if(KeyEqualer(kv.key, key)){
-					return {iterator(this, idx), false};
 				}
+
+				if constexpr (!assert_no_equal){
+					if(KeyEqualer(kv.key, key)){
+						return {iterator(this, idx), false};
+					}
+				}
+
 			}
 		}
 

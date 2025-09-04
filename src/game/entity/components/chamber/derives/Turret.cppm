@@ -196,6 +196,7 @@ namespace mo_yanxi::game::ecs{
 					subtarget_reload = re_target_reload;
 					update_target();
 				}
+				sub_target.check_or_drop();
 
 				const auto dlt = top_world.component_manager.get_update_delta();
 				reload_turret(dlt, top_world);

@@ -63,6 +63,7 @@ namespace mo_yanxi::game::ecs{
 	export struct entity{
 
 	private:
+		friend component_manager;
 		template <typename TupleT>
 		friend struct archetype;
 		friend struct archetype_base;
@@ -71,9 +72,11 @@ namespace mo_yanxi::game::ecs{
 		// entity_id id_{};
 		std::atomic_size_t referenced_count{};
 		entity_data_chunk_index chunk_index_{invalid_chunk_idx};
+		unsigned expire_staging_counter_{};
+
+		type_identity_index type_{};
 
 		archetype_base* archetype_{};
-		type_identity_index type_{};
 
 	public:
 		[[nodiscard]] entity() = default;
@@ -401,7 +404,7 @@ namespace mo_yanxi::game::ecs{
 			eid->chunk_index_ = idx;
 			auto last_cap = chunks.capacity();
 			components& added_comp = chunks.emplace_back(std::move(comp));
-			if constexpr (set_archetype)archetype_base::insert(eid);
+			archetype_base::insert(eid);
 
 
 			[&] <std::size_t... I>(std::index_sequence<I...>){
@@ -409,6 +412,7 @@ namespace mo_yanxi::game::ecs{
 			}(std::make_index_sequence<std::tuple_size_v<raw_tuple>>());
 
 			trait::on_init(added_comp);
+			eid->expire_staging_counter_ = trait::expire_counter;
 			this->init(added_comp);
 
 			if(last_cap != chunks.capacity()){
@@ -867,6 +871,12 @@ namespace mo_yanxi::game::ecs{
 			return create_entity<std::tuple<Ts ...>>();
 		}
 	public:
+		void mark_expired_all(){
+			std::lock_guard _{entity_expire_mutex_};
+			for (auto & entity : entities){
+				to_expire.try_emplace(std::addressof(entity));
+			}
+		}
 
 		bool mark_expired(entity_id entity){
 			std::lock_guard _{entity_expire_mutex_};
@@ -904,29 +914,27 @@ namespace mo_yanxi::game::ecs{
 		void do_deferred_destroy(){
 			assert_unlocked(entity_expire_mutex_);
 
+
+			//TODO destroy expiration notify/check
+			expired.append_range(to_expire | std::views::keys);
+			to_expire.clear();
+
 			modifiable_erase_if(expired, [this](entity_id e){
-				if(e->get_ref_count() == 0){
-					//TODO should this always true?
-					const auto itr = entities.get_iterator(e);
-					if(itr != entities.end())entities.erase(itr);
-					return true;
+				if(e->expire_staging_counter_){
+					--e->expire_staging_counter_;
+				}else{
+					if(e->archetype_){
+						e->get_archetype()->erase(e);
+					}else if(e->get_ref_count() == 0){
+						const auto itr = entities.get_iterator(e);
+						if(itr != entities.end())entities.erase(itr);
+						return true;
+					}
+
 				}
 
 				return false;
 			});
-
-			//TODO destroy expiration notify/check
-			for (auto&& e : to_expire | std::views::keys){
-				e->get_archetype()->erase(e);
-
-				if(e->get_ref_count() > 0){
-					expired.push_back(e);
-				}else{
-					auto itr = entities.get_iterator(e);
-					if(itr != entities.end())entities.erase(itr);
-				}
-			}
-			to_expire.clear();
 		}
 
 		void deferred_destroy_no_reference_entities(){
@@ -1152,17 +1160,18 @@ namespace mo_yanxi::game::ecs{
 			static constexpr auto comp = std::less<void>{};
 
 			auto current_target{spans.front().front().identity()};
-			auto current_frontier = current_target;
+			auto current_max_frontier = current_target;
 			ranges[0] = spans[0];
 			for(std::size_t i = 1; i < std::tuple_size_v<Tuple>; ++i){
 				ranges[i] = spans[i];
 				const auto idt = ranges[i].front().identity();
 				current_target = std::max(current_target, idt, comp);
-				current_frontier = std::min(current_frontier, idt, comp);
+				current_max_frontier = std::min(current_max_frontier, idt, comp);
 			}
 
 			if constexpr (!std::same_as<ReserveFn, std::identity>)(void)std::invoke(reserve_fn, maximum_size);
 			while(true){
+				auto current_min_frontier = current_target;
 				for (auto&& rng : ranges){
 					//TODO will binary search(lower bound) faster?
 					if(comp(rng.front().identity(), current_target)){
@@ -1170,11 +1179,15 @@ namespace mo_yanxi::game::ecs{
 						if(rng.empty()){
 							return;
 						}
-						current_frontier = std::max(current_frontier, rng.front().identity(), comp);
+
+						current_max_frontier = std::max(current_max_frontier, rng.front().identity(), comp);
+						current_min_frontier = std::min(current_min_frontier, rng.front().identity(), comp);
 					}
 				}
 
-				if(current_frontier == current_target){
+				if(comp(current_target, current_max_frontier)){
+					current_target = current_max_frontier;
+				}else if(current_min_frontier == current_target){
 					if constexpr (ExclusiveSize > 0){
 						for (const auto& archetype_slice : ranges){
 							if(std::ranges::binary_search(exclusives, archetype_slice.front().identity())){
@@ -1217,10 +1230,8 @@ namespace mo_yanxi::game::ecs{
 
 						const auto idt = rng.front().identity();
 						current_target = std::max(current_target, idt, comp);
-						current_frontier = std::max(current_frontier, idt, comp);
+						current_max_frontier = std::max(current_max_frontier, idt, comp);
 					}
-				}else if(comp(current_target, current_frontier)){
-					current_target = current_frontier;
 				}
 			}
 		}
@@ -1271,7 +1282,7 @@ namespace mo_yanxi::game::ecs{
 						archetype_slices_.insert(archetype_slices_.begin() + (std::to_address(it) - archetype_slices_.data()), std::move(elem));
 
 						if(requires_resize){
-							for (auto& [key, value] : type_to_archetype){
+							for (auto&& [key, value] : type_to_archetype){
 								auto original_idx = type_to_index_map.at(key);
 								if(savement.off >= original_idx.off + original_idx.size){
 									value = {archetype_slices_.data() + original_idx.off, original_idx.size};
@@ -1282,7 +1293,7 @@ namespace mo_yanxi::game::ecs{
 								}
 							}
 						}else{
-							for (auto& [key, value] : type_to_archetype){
+							for (auto&& [key, value] : type_to_archetype){
 								if(savement.off >= value.data() + value.size() - archetype_slices_.data()){
 								}else if(savement.off + savement.size <= value.data() - archetype_slices_.data()){
 									value = {value.data() + 1, value.size()};
@@ -1296,7 +1307,7 @@ namespace mo_yanxi::game::ecs{
 					make_mark();
 					auto& inserted = archetype_slices_.emplace_back(std::move(elem));
 					if(requires_resize){
-						for (auto& [key, value] : type_to_archetype){
+						for (auto&& [key, value] : type_to_archetype){
 							auto original_idx = type_to_index_map.at(key);
 							value = {archetype_slices_.data() + original_idx.off, original_idx.size};
 						}

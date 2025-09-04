@@ -100,7 +100,7 @@ namespace mo_yanxi::game::ecs::chamber{
 	}
 
 	bool turret_build::update_target() noexcept{
-		if(target){
+		if(target.check_or_drop()){
 			if(
 				!target.update(transform.get_trans() | data().get_trans()) ||
 				!validate_target(target.local_pos())){

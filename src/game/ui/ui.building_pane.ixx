@@ -46,7 +46,7 @@ namespace mo_yanxi::game::ui{
 		}
 
 		void set_state(){
-			if(!entity)return;
+			if(!entity.check_or_drop())return;
 			auto& data = entity.data();
 			energy_bar.set_bar_state({
 				.power_current = data.get_energy_dynamic_status().power,
@@ -68,6 +68,7 @@ namespace mo_yanxi::game::ui{
 		}
 
 		void update(float delta_in_tick){
+
 			hp_bar.update(delta_in_tick);
 			if(energy_bar)energy_bar.update(delta_in_tick);
 			if(reload_bar)reload_bar->update(delta_in_tick);
@@ -163,6 +164,7 @@ namespace mo_yanxi::game::ui{
 		void on_focus_changed(bool is_focused) override;
 
 		void update(float delta_in_ticks) override{
+			if(entity.drop_if_expired())return;
 			list::update(delta_in_ticks);
 		}
 

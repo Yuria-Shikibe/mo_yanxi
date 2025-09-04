@@ -280,10 +280,12 @@ namespace mo_yanxi::game{
 			return static_cast<bool>(entity);
 		}
 
+		bool check_or_drop() noexcept{
+			return entity.check_or_drop();
+		}
 
 		bool update(math::trans2 self_transform) noexcept{
-			if(entity.is_expired()){
-				entity.reset();
+			if(!entity.check_or_drop()){
 				return false;
 			}
 

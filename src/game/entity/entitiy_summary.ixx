@@ -48,6 +48,12 @@ namespace mo_yanxi::game::ecs{
 	export
 	template <>
 	struct ecs::archetype_custom_behavior<desc::grid_entity> : archetype_custom_behavior_base<desc::grid_entity>{
+		static constexpr unsigned expire_counter = 1;
+
+		static void on_terminate(value_type& comps){
+			// std::println(std::cerr, "grid destoried");
+		}
+
 		static void on_init(value_type& comps){
 			auto [motion, mf] = get_unwrap_of<mech_motion, manifold>(comps);
 			mf.hitbox.set_trans_unchecked(motion.trans);

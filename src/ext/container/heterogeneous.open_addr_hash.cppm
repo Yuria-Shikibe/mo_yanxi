@@ -124,7 +124,7 @@ namespace mo_yanxi{
 
 		const V* try_find(const std::string_view key) const {
 			if(const auto itr = this->find(key); itr != this->end()){
-				return &itr->second;
+				return &itr.operator*().second;
 			}
 			return nullptr;
 		}

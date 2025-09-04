@@ -126,6 +126,9 @@ namespace mo_yanxi::game::ecs::system{
 								grid.hit_point.accept(data.building_damage_take);
 								if(grid.hit_point.is_killed()){
 									manager.mark_expired(meta.id());
+									grid.manager.mark_expired_all();
+									grid.manager.do_deferred_destroy();
+									return;
 								}
 							}
 

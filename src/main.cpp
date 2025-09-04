@@ -453,7 +453,7 @@ void main_loop(){
 		}
 
 		math::rand rand{};
-		for(int i = 0; i < 2; ++i){
+		for(int i = 0; i < 8; ++i){
 			using namespace game::ecs;
 
 			manifold mf{};

@@ -276,18 +276,6 @@ namespace mo_yanxi::game::ecs{
 				return *grid_;
 			}
 
-			[[nodiscard]] const chunk_meta* get_component_head() const noexcept{
-				return this;
-			}
-
-			[[nodiscard]] const entity& entity() const noexcept{
-				return *id();
-			}
-
-			[[nodiscard]] entity_id get_id() const noexcept{
-				return id();
-			}
-
 			decltype(auto) operator[](this auto&& self, tile_coord global_pos) noexcept{
 				return self.tile_states[self.local_to_index(global_pos - self.region_.src)];
 			}

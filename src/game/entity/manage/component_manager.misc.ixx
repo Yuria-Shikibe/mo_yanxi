@@ -55,6 +55,9 @@ namespace mo_yanxi::game::ecs{
 		}
 	};
 
+	export
+	template <typename TupleT>
+	struct archetype;
 
 	struct staging_add_base{
 		virtual ~staging_add_base() = default;
@@ -428,6 +431,16 @@ namespace mo_yanxi::game::ecs{
 
 		using dump_chunk = behavior::dump_chunk;
 		using serialize = archetype_serialize_info<T>;
+
+		static constexpr unsigned expire_counter = []{
+			if constexpr(requires{
+				behavior::expire_counter;
+			}){
+				return behavior::expire_counter;
+			} else{
+				return 0;
+			}
+		}();
 
 		static constexpr bool is_transient = serialize::is_transient;
 
