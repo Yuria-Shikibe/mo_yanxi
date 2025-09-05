@@ -117,7 +117,7 @@ namespace mo_yanxi::ui{
 	public:
 
 		template </*math::vector2<bool> fillParent = {true, false}, */elem_init_func Fn>
-		typename elem_init_func_trait<Fn>::elem_type& set_elem(Fn&& init){
+		typename elem_init_func_trait<Fn>::elem_type& function_init(Fn&& init){
 			this->item = elem_ptr{get_scene(), this, [&](typename elem_init_func_trait<Fn>::elem_type& e){
 
 				scroll_pane::modifyChildren(e);
@@ -129,6 +129,7 @@ namespace mo_yanxi::ui{
 
 			return static_cast<typename elem_init_func_trait<Fn>::elem_type&>(*this->item);
 		}
+
 		template <std::derived_from<elem> E>
 		E& emplace(){
 			this->item = elem_ptr{get_scene(), this, std::in_place_type<E>};

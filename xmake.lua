@@ -12,7 +12,6 @@ else
     set_runtimes("MD")
 end
 
-
 add_requires("glfw")
 --[[ , {configs = {
                              toolchains = "clang-cl"
@@ -34,6 +33,13 @@ add_requires("protobuf-cpp", {
     }
 })
 
+target("magic_enum")
+    set_kind("static")
+    set_languages("c++latest")
+
+    add_includedirs("submodules/magic_enum/include")
+    add_files("submodules/magic_enum/module/magic_enum.cppm", {install = true, public = true})
+target_end()
 
 target("protobuf_gen")
     set_kind("static")
@@ -46,7 +52,7 @@ target_end()
 target("mo_yanxi")
     set_kind("binary")
     set_extension(".exe")
-    set_languages("cxx23")
+    set_languages("c++latest")
     set_policy("build.c++.modules", true)
 
     if is_mode("debug") then
@@ -61,9 +67,11 @@ target("mo_yanxi")
     end
 
     add_deps("protobuf_gen")
+    --add_deps("magic_enum")
 
     add_defines("_MSVC_STL_HARDENING=1")
     add_defines("_MSVC_STL_DESTRUCTOR_TOMBSTONES=1")
+    add_defines("MAGIC_ENUM_USE_STD_MODULE")
 
 
     set_warnings("all")
@@ -89,6 +97,9 @@ target("mo_yanxi")
 
     add_includedirs("generate")
     add_includedirs("src")
+
+    add_includedirs("submodules/magic_enum/include")
+    --add_files("submodules/magic_enum/module/**.cppm")
 
     add_includedirs("submodules/VulkanMemoryAllocator/include")
     add_includedirs("submodules/plf_hive")
@@ -126,7 +137,7 @@ task("gen_ide_hintonly_cmake")
                                 :gsub("target_compile_features%(%s-.-cxx_std_26%s-%)%s*\n", "")
 --                                 :gsub("target_compile_options%(%s-.-%)%s*\n", "")
 
-        -- 在 project() 后插入 C++ 标准设置
+        ---- 在 project() 后插入 C++ 标准设置
         local found_project = false
         local new_content = cleaned:gsub("(project%s*%b())", function(capture)
             found_project = true

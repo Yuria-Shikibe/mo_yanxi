@@ -440,8 +440,14 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] constexpr bool is_disabled() const noexcept{ return disabled; }
 
-		[[nodiscard]] group* get_parent() const noexcept{
-			return parent;
+		template <std::derived_from<group> T = group, bool checked = false>
+		[[nodiscard]] T* get_parent() const noexcept{
+			if constexpr (checked && !std::same_as<T, group>){
+				return dynamic_cast<T*>(parent);
+			}else{
+				return static_cast<T*>(parent);
+			}
+
 		}
 
 		[[nodiscard]] group* get_root_parent() const noexcept;
@@ -567,7 +573,7 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] virtual bool contains_parent(math::vec2 cursorPos) const noexcept;
 
-		virtual void notify_layout_changed(spread_direction toDirection) noexcept;
+		/*virtual*/ void notify_layout_changed(spread_direction toDirection) noexcept;
 
 		virtual bool resize(const math::vec2 size/*, spread_direction Mask*/){
 			if(property.size.set_size(size)){

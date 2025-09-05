@@ -205,11 +205,15 @@ namespace mo_yanxi::ui{
 			notify_layout_changed(spread_direction::all_visible);
 		}
 
-		virtual elem_ptr exchange_element(std::size_t where, elem_ptr&& elem){
+		virtual elem_ptr exchange_element(std::size_t where, elem_ptr&& elem, bool isolated_notify){
 			assert(elem != nullptr);
 			if(where >= children.size())return {};
 
-			notify_layout_changed(spread_direction::all_visible);
+			if(isolated_notify){
+				notify_isolated_layout_changed();
+			}else{
+				notify_layout_changed(spread_direction::all_visible);
+			}
 			return std::exchange(children[where], std::move(elem));
 		}
 

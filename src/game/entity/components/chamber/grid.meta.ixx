@@ -18,7 +18,6 @@ namespace mo_yanxi::game::meta::chamber{
 	using chamber_meta = const basic_chamber*;
 
 
-
 	export
 	struct grid_building{
 	private:
@@ -73,6 +72,12 @@ namespace mo_yanxi::game::meta::chamber{
 			}
 		}
 	};
+
+
+	struct cascade_unqualified_buildings{
+		std::vector<math::upoint2> building_pos{};
+	};
+
 
 	export
 	struct grid_complex{
@@ -203,7 +208,6 @@ namespace mo_yanxi::game{
 
 			};
 
-
 			struct energy_status{
 				friend grid;
 
@@ -323,16 +327,36 @@ namespace mo_yanxi::game{
 				return &place_building_at(indexed_pos, info);
 			}
 
-			bool erase_building_at(const math::upoint2 indexed_pos) noexcept {
-				if(indexed_pos.beyond_equal(extent_))return false;
+			template <std::invocable<const grid_building&> Fn = std::identity>
+			cascade_unqualified_buildings erase_building_at(const math::upoint2 indexed_pos, Fn before_erase = {}) noexcept {
+				if(indexed_pos.beyond_equal(extent_))return {};
 
-				auto& tile = tile_at(indexed_pos);
+				const auto& tile = tile_at(indexed_pos);
 				auto* b = tile.building;
-				if(!b)return false;
+				if(!b)return {};
 
 				energy_status_.update_energy_status_on_erase(*b);
 				structural_status_.update_energy_status_on_erase(*b, extent_);
+				cascade_unqualified_buildings result{};
 
+				if(const auto dst = b->get_meta_info().structural_adjacent_distance()){
+					const auto region = b->get_indexed_region().as<int>().expand(dst).intersection_with({tags::unchecked, tags::from_extent, {}, extent_.as<int>()}).as<unsigned>();
+					region.each([&, this](math::upoint2 pos){
+						if(!std::as_const(structural_status_).value_at(pos, extent_).any()){
+							if(auto bd = tile_at(pos).building){
+								if(!std::ranges::contains(result.building_pos, bd->get_identity_pos())){
+									result.building_pos.push_back(bd->get_identity_pos());
+								}
+							}
+						}
+					});
+
+					std::erase_if(result.building_pos, [&, this](math::upoint2 pos){
+						return structural_status_.is_within_structural(tile_at(pos).building->get_indexed_region(), extent_);
+					});
+				}
+
+				std::invoke(before_erase, *b);
 				tile.building->get_indexed_region().each([this](const math::upoint2 p){
 					tile_at(p).building = nullptr;
 				});
@@ -340,7 +364,7 @@ namespace mo_yanxi::game{
 				const auto itr = buildings_.get_iterator(b);
 				assert(itr != buildings_.end());
 				buildings_.erase(itr);
-				return true;
+				return result;
 			}
 
 			[[nodiscard]] bool is_building_placeable_at(const index_coord indexed_pos, const basic_chamber& info) const noexcept{
@@ -363,7 +387,7 @@ namespace mo_yanxi::game{
 				return b;
 			}
 
-			bool is_building_basic_placeable_at(const math::urect region) const noexcept{
+			[[nodiscard]] bool is_building_basic_placeable_at(const math::urect region) const noexcept{
 				if(!math::urect{extent_}.contains_loose(region))return false;
 
 				for(auto y = region.src.y; y < region.get_end_y(); ++y){
@@ -379,20 +403,20 @@ namespace mo_yanxi::game{
 			bool is_building_structural_placeable_at(const index_coord indexed_pos, const basic_chamber& info) const noexcept{
 				const math::urect region{tags::from_extent, indexed_pos, info.extent};
 				if(auto dst = info.structural_adjacent_distance()){
-					if(!structural_status_.empty()){
-						if(
-							auto nearby = math::rect::get_proximity_of(region.as<int>());
-							std::ranges::none_of(nearby, [this](math::irect rect_ortho){
-
-							return rect_ortho.each_any([this](math::point2 pos){
-								if(pos.x < 0 || pos.y < 0)return false;
-								return (bool)std::as_const(structural_status_).value_at(pos.as<unsigned>(), extent_).is_source;
-							});
-
-						})){
-							return false;
-						}
-					}
+					// if(!structural_status_.empty()){
+					// 	if(
+					// 		auto nearby = math::rect::get_proximity_of(region.as<int>());
+					// 		std::ranges::none_of(nearby, [this](math::irect rect_ortho){
+					//
+					// 		return rect_ortho.each_any([this](math::point2 pos){
+					// 			if(pos.x < 0 || pos.y < 0)return false;
+					// 			return (bool)std::as_const(structural_status_).value_at(pos.as<unsigned>(), extent_).is_source;
+					// 		});
+					//
+					// 	})){
+					// 		return false;
+					// 	}
+					// }
 
 				}else{
 					if(!structural_status_.is_within_structural(region, extent_))return false;
@@ -462,6 +486,12 @@ namespace mo_yanxi::game{
 
 				auto size() const noexcept{
 					return buildings.size();
+				}
+
+				[[nodiscard]] float get_total_hitpoint() const noexcept{
+					return std::ranges::fold_left(buildings | std::views::transform([](const grid_building* b){
+						return b->get_meta_info().hit_point.max;
+					}), 0.f, std::plus{});
 				}
 			};
 
@@ -556,12 +586,26 @@ namespace mo_yanxi::game{
 				}
 			};
 
+			//clusters sort by identity
 			std::vector<structural_cluster> clusters_{};
 		public:
-
 			[[nodiscard]] grid_structural_statistic() = default;
 
 			[[nodiscard]] explicit(false) grid_structural_statistic(const grid& grid) : clusters_(union_set_solver{grid}.get_connected_components()){
+			}
+
+			[[nodiscard]] const structural_cluster& operator[](const grid_building* cluster_identity) const noexcept{
+				const auto itr = std::ranges::lower_bound(clusters_, cluster_identity, {}, &structural_cluster::identity);
+				assert(itr != clusters_.end());
+				return *itr;
+			}
+
+			[[nodiscard]] auto size() const noexcept{
+				return clusters_.size();
+			}
+
+			[[nodiscard]] std::span<const structural_cluster> get_clusters() const noexcept{
+				return clusters_;
 			}
 
 			[[nodiscard]] float get_structural_hitpoint() const noexcept{
@@ -575,7 +619,7 @@ namespace mo_yanxi::game{
 					}), 0.f, std::plus{}) * cluster.size();
 				}
 
-				return static_cast<float>(static_cast<double>(sum) / static_cast<double>(max_count));
+				return static_cast<float>(static_cast<double>(sum) / static_cast<double>(std::max<std::size_t>(max_count + clusters_.size() - 1, 1)));
 			}
 		};
 	}

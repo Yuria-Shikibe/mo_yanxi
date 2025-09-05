@@ -224,7 +224,7 @@ namespace mo_yanxi::ui{
 #if DEBUG_CHECK
 			return dynamic_cast<T&>(*direct_access.at(name));
 #else
-			return static_cast<T&>(direct_access.at(name));
+			return static_cast<T&>(*direct_access.at(name));
 #endif
 
 		}

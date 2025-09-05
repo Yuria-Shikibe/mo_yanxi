@@ -14,3 +14,6 @@
 [submodule "submodules/tim_sort"]
 	path = submodules/tim_sort
 	url = https://github.com/timsort/cpp-TimSort.git
+[submodule "submodules/magic_enum"]
+	path = submodules/magic_enum
+	url = https://github.com/Neargye/magic_enum.git

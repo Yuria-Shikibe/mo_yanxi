@@ -88,13 +88,15 @@ namespace mo_yanxi::ui{
 	export
 	template <std::derived_from<drawable> T>
 	struct single_image_frame : public elem{
+		using drawable_type = T;
+
 		image_display_style style{};
 
 	protected:
 		T drawable_{};
 
 	public:
-		[[nodiscard]] single_image_frame(scene* scene, group* group, T drawable = {}, const image_display_style& style = {})
+		[[nodiscard]] single_image_frame(scene* scene, group* group, drawable_type drawable = {}, const image_display_style& style = {})
 			: elem(scene, group), style(style), drawable_(std::move(drawable)){
 		}
 

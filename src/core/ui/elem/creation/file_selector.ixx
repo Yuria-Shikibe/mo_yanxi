@@ -348,7 +348,7 @@ namespace mo_yanxi::ui::creation{
 
 			auto pane = rtable->end_line().emplace<scroll_pane>();
 			pane->prop().set_empty_drawer();
-			entries = &pane->set_elem([](list& table){
+			entries = &pane->function_init([](list& table){
 				table.set_style();
 			});
 

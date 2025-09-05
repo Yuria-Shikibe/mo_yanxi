@@ -2,20 +2,21 @@ module;
 
 #include "srl/srl.game.hpp"
 #include "srl/srl.hpp"
+#include <magic_enum/magic_enum.hpp>
 
 module mo_yanxi.game.ui.grid_editor;
 
 import mo_yanxi.ui.graphic;
+import mo_yanxi.ui.elem.image_frame;
 import mo_yanxi.graphic.draw.multi_region;
 import mo_yanxi.graphic.layers.ui.grid_drawer;
 
-
 import mo_yanxi.game.meta.grid.srl;
-
 import mo_yanxi.game.content;
+import mo_yanxi.game.meta.hitbox;
 
 import std;
-import mo_yanxi.game.meta.hitbox;
+
 
 namespace mo_yanxi::game::meta::chamber{
 	// bool is_building_placeable_at(const grid& grid){
@@ -33,7 +34,7 @@ mo_yanxi::game::meta::hitbox_transed load_hitbox_from(const std::filesystem::pat
 	return meta;
 }
 
-void mo_yanxi::game::ui::grid_editor_viewport::grid_info_bar::draw_content(const ui::rect clipSpace) const{
+void mo_yanxi::game::ui::grid_info_bar::draw_content(const ui::rect clipSpace) const{
 	elem::draw_content(clipSpace);
 
 	auto& edit = get_editor();
@@ -64,6 +65,131 @@ void mo_yanxi::game::ui::grid_editor_viewport::grid_info_bar::draw_content(const
 
 }
 
+mo_yanxi::game::ui::grid_editor_viewport& mo_yanxi::game::ui::grid_detail_pane::get_viewport() const noexcept{
+	//button table -> scroll pane -> detail pane
+	return *get_parent<grid_editor_viewport>();
+}
+
+void mo_yanxi::game::ui::grid_detail_pane::clear_viewport_relevant_state() const noexcept{
+	get_viewport().subpanel_drawer = nullptr;
+}
+
+void mo_yanxi::game::ui::grid_detail_pane::build(){
+	set_style();
+	template_cell.margin.set(4);
+	{
+		auto pane = emplace<scroll_pane>();
+		pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.3f, 1.f}};
+		pane.cell().align = align::pos::top_right;
+
+
+		pane->set_style(ui::theme::styles::general_static);
+		pane->function_init([](ui::table& button_table){
+			button_table.name = "button_table";
+			button_table.set_style();
+
+			button_table.template_cell.set_height_from_scale();
+			button_table.template_cell.set_pad(4);
+
+			struct button final : ui::single_image_frame<ui::icon_drawable>{
+				[[nodiscard]] button(
+					scene* scene, group* group,
+					detail_pane_mode index)
+					: single_image_frame(scene, group, theme::icons::close), index(index){
+
+					set_tooltip_state({
+						.layout_info = tooltip_layout_info{
+							.follow = tooltip_follow::cursor,
+							.align_owner = {},
+							.align_tooltip = align::pos::top_right,
+						},
+						.min_hover_time = 5
+					}, [index](ui::table& l){
+						l.interactivity = interactivity::disabled;
+						l.set_style();
+						l.template_cell.set_external();
+
+						l.function_init([index](ui::label& label){
+							label.set_scale(.5f);
+							label.set_text(magic_enum::enum_name(index));
+						});
+					});
+				}
+
+				detail_pane_mode index{0};
+
+				grid_detail_pane& get_pane() const noexcept{
+					//button table -> scroll pane -> detail pane
+					return *get_parent()->get_parent()->get_parent<grid_detail_pane>();
+				}
+
+				void update(float delta_in_ticks) override{
+					auto& p = get_pane();
+					// disabled = p.get_viewport().grid.e
+					activated = p.current_mode_ == index;
+
+					single_image_frame::update(delta_in_ticks);
+				}
+
+				input_event::click_result on_click(const input_event::click click_event) override{
+					if(click_event.code.matches(core::ctrl::lmb_click)){
+						auto& p = get_pane();
+						p.set_mode(p.current_mode_ == index ? detail_pane_mode::monostate : index);
+					}
+
+					return input_event::click_result::intercepted;
+				}
+			};
+
+			for(auto i = 0u; i < static_cast<unsigned>(detail_pane_mode::monostate); ++i){
+				button_table.emplace<button>(detail_pane_mode{i})->set_style(ui::theme::styles::no_edge);
+				if(i & 1u){
+					button_table.end_line();
+				}
+			}
+
+			button_table.set_edge_pad(0);
+		});
+	}
+
+	auto pane = emplace<scroll_pane>();
+	pane.cell().region_scale = {tags::from_extent, math::vec2{}, math::vec2{.7f, 1.f}};
+	pane.cell().align = align::pos::top_left;
+}
+
+mo_yanxi::ui::elem_ptr mo_yanxi::game::ui::grid_detail_pane::prov(){
+	switch(current_mode_){
+	//
+	// case detail_pane_mode::statistic :{
+	// 	break;
+	// }
+	// case detail_pane_mode::power_state :{
+	// 	break;
+	// }
+	case detail_pane_mode::structural_state : return {get_scene(), this, std::in_place_type<grid_structural_panel>};
+	// case detail_pane_mode::maneuvering :{
+	// 	break;
+	// }
+	// case detail_pane_mode::corridor :{
+	// 	break;
+	// }
+	// case detail_pane_mode::defense_active :{
+	// 	break;
+	// }
+	// case detail_pane_mode::defense_passive :{
+	// 	break;
+	// }
+	case detail_pane_mode::monostate: return {};
+	default : return elem_ptr{get_scene(), this, [this](ui::label& l){
+			l.set_text(magic_enum::enum_name(current_mode_));
+			l.set_fit();
+		}};
+	}
+}
+
+mo_yanxi::game::ui::grid_editor_viewport& mo_yanxi::game::ui::grid_info_bar::get_editor() const{
+	return *static_cast<grid_editor_viewport*>(get_parent());
+}
 
 void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace) const{
 	viewport_begin();
@@ -250,6 +376,10 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 		}
 	}
 
+	if(subpanel_drawer){
+		subpanel_drawer(*this);
+	}
+
 	viewport_end();
 
 	static constexpr auto shadow = colors::black.copy().set_a(.85f);
@@ -262,8 +392,8 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 		draw::nine_patch(acquirer, theme::shapes::base, bound, shadow);
 	};
 
-	drawShadow(grid_info_bar_->get_bound());
-	grid_info_bar_->draw(clipSpace);
+	drawShadow(grid_detail_pane_->get_shadow_region());
+	grid_detail_pane_->draw(clipSpace);
 
 	if(selected_building != nullptr){
 		drawShadow(current_selected_building_info_pane_->get_bound());
@@ -413,6 +543,8 @@ void mo_yanxi::game::ui::grid_editor::build_menu(){
 					return s.get_current_main_select().has_value();
 				}, [](const creation::file_selector& s, grid_editor& self){
 					self.viewport->set_reference(load_hitbox_from(s.get_current_main_select().value()), true);
+					self.viewport->reset_editor();
+
 					return true;
 				}});
 			selector.set_cared_suffix({".hbox"});
@@ -471,10 +603,10 @@ void mo_yanxi::game::ui::grid_editor::build_menu(){
 			auto& selector = creation::create_file_selector(creation::file_selector_create_info{
 				*this, [](const creation::file_selector& s, const grid_editor&){
 					return s.get_current_main_select().has_value();
-				}, [this](const creation::file_selector& s, grid_editor& self){
+				}, [](const creation::file_selector& s, grid_editor& self){
 					std::ifstream ifs(s.get_current_main_select().value(), std::ios::binary | std::ios::in);
-					meta::srl::read_grid(ifs, viewport->grid);
-					viewport->reset_editor();
+					meta::srl::read_grid(ifs, self.viewport->grid);
+					self.viewport->reset_editor();
 					return true;
 				}});
 			selector.set_cared_suffix({".metagrid"});
@@ -523,7 +655,7 @@ void mo_yanxi::game::ui::grid_editor::build_menu(){
 			rst.elem.set_layout_policy(layout_policy::vert_major);
 			rst.elem.set_style();
 
-			rst.elem.set_elem([&, this](table& table){
+			rst.elem.function_init([&, this](table& table){
 				table.set_style();
 				chambers.each([&, this]<typename T>(std::in_place_type_t<T> tag, const decltype(chambers)::value_type& values){
 					for (auto basic_chamber : values){

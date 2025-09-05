@@ -244,11 +244,16 @@ namespace mo_yanxi::ui{
 			return cells.back().cell;
 		}
 
-		elem_ptr exchange_element(std::size_t where, elem_ptr&& elem) override{
+		elem_ptr exchange_element(std::size_t where, elem_ptr&& elem, bool isolated_notify) override{
 			assert(elem != nullptr);
 			if(where >= children.size())return {};
 
-			notify_layout_changed(spread_direction::all_visible);
+			if(isolated_notify){
+				notify_isolated_layout_changed();
+			}else{
+				notify_layout_changed(spread_direction::all_visible);
+			}
+
 			cells[where].element = elem.get();
 			return std::exchange(children[where], std::move(elem));
 		}

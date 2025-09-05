@@ -185,7 +185,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 
 		pane->set_layout_policy(ui::layout_policy::vert_major);
 
-		pane->set_elem([](ui::list& t){
+		pane->function_init([](ui::list& t){
 			t.template_cell.set_size(120);
 			t.template_cell.pad.set(5);
 			t.set_layout_policy(ui::layout_policy::vert_major);

@@ -162,7 +162,7 @@ namespace mo_yanxi::ui{
 
 	export
 	struct tooltip_create_info{
-		static constexpr float disable_auto_tooltip = -1.0f;
+		static constexpr float disable_auto_tooltip = std::numeric_limits<float>::infinity();
 		static constexpr float def_tooltip_hover_time = 25.0f;
 
 		tooltip_layout_info layout_info{};
@@ -172,7 +172,7 @@ namespace mo_yanxi::ui{
 		float min_hover_time{def_tooltip_hover_time};
 
 		[[nodiscard]] bool auto_build() const noexcept{
-			return min_hover_time >= 0.0f;
+			return std::isfinite(min_hover_time);
 		}
 	};
 	//

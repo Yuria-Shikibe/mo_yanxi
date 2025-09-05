@@ -89,17 +89,17 @@ namespace mo_yanxi::ui{
 
 		void call_switch(const unsigned idx){
 			if(last_index_ != no_switched){
-				auto element_at_last_index = exchange_element(content_index, std::move(sub_elements[idx]));
+				auto element_at_last_index = exchange_element(content_index, std::move(sub_elements[idx]), true);
 				sub_elements[idx] = std::exchange(sub_elements[last_index_], std::move(element_at_last_index));
 			}else{
-				sub_elements[idx] = exchange_element(content_index, std::move(sub_elements[idx]));
+				sub_elements[idx] = exchange_element(content_index, std::move(sub_elements[idx]), true);
 			}
 			last_index_ = idx;
 		}
 
 		void reset_switch(){
 			if(last_index_ != no_switched){
-				sub_elements[last_index_] = exchange_element(content_index, std::move(sub_elements[last_index_]));
+				sub_elements[last_index_] = exchange_element(content_index, std::move(sub_elements[last_index_]), true);
 				last_index_ = no_switched;
 			}
 		}
@@ -133,7 +133,7 @@ namespace mo_yanxi::ui{
 			button_menu_pane = std::to_address(pane);
 			button_menu_pane->set_layout_policy(layout_policy::vert_major);
 			button_menu_pane->set_style();
-			button_menu_pane->set_elem([](list& lst){
+			button_menu_pane->function_init([](list& lst){
 				lst.set_layout_policy(layout_policy::vert_major);
 				lst.template_cell.set_external();
 				lst.set_style();
@@ -177,8 +177,8 @@ namespace mo_yanxi::ui{
 		}
 
 	private:
-		elem_ptr exchange_element(const std::size_t where, elem_ptr&& elem) override{
-			return universal_group::exchange_element(where, std::move(elem));
+		elem_ptr exchange_element(const std::size_t where, elem_ptr&& elem, bool isolated_notify) override{
+			return universal_group::exchange_element(where, std::move(elem), isolated_notify);
 		}
 	};
 

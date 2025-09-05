@@ -212,7 +212,7 @@ void mo_yanxi::game::world::hud::hud_viewport::build_hud(){
 
 	{
 		auto pane = bed.emplace<scroll_pane>();
-		side_bar = &pane->set_elem([](list& t){
+		side_bar = &pane->function_init([](list& t){
 			t.set_style();
 			t.interactivity = interactivity::enabled;
 
@@ -233,7 +233,7 @@ void mo_yanxi::game::world::hud::hud_viewport::build_hud(){
 		pane.cell().margin.set(4);
 		pane.cell().align = align::pos::bottom_right;
 
-		button_bar = &pane->set_elem([](table& t){
+		button_bar = &pane->function_init([](table& t){
 			t.set_style();
 			t.interactivity = interactivity::enabled;
 
