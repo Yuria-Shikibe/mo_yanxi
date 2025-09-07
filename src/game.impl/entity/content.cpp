@@ -15,11 +15,13 @@ void mo_yanxi::game::content::load(){
 	{
 		auto& r = manager.emplace<basic_chamber, armor>("wall");
 		r.extent = {1, 1};
+		r.mass = 300;
 	}
 
 	{
 		auto& b = manager.emplace<basic_chamber, radar>("radar");
 		b.extent = {4, 4};
+		b.mass = 3500;
 		b.targeting_range_radius = {500, 6000};
 		// b.targeting_range_angular = {-math::pi_half / 3.f, math::pi_half / 3.f};
 		b.transform.vec = {.5f, .5f};
@@ -34,11 +36,13 @@ void mo_yanxi::game::content::load(){
 	{
 		auto& b = manager.emplace<basic_chamber, structural_joint>("structural_joint");
 		b.extent = {2, 2};
+		b.mass = 1000;
 	}
 
 	{
 		auto& b = manager.emplace<basic_chamber, turret_base>("turret");
 		b.extent = {2, 4};
+		b.mass = 2000;
 		b.power = -8;
 		b.charge_duration = 180;
 		// b. = {1200, 6000};
@@ -49,6 +53,7 @@ void mo_yanxi::game::content::load(){
 	{
 		auto& b = manager.emplace<basic_chamber, thurster>("thurster");
 		b.extent = {2, 2};
+		b.mass = 1200;
 		b.power = -3;
 		b.charge_duration = 60;
 		// b. = {1200, 6000};
@@ -65,6 +70,7 @@ void mo_yanxi::game::content::load(){
 	{
 		auto& b = manager.emplace<basic_chamber, energy_generator>("generator");
 		b.extent = {3, 2};
+		b.mass = 2500;
 		b.power = 8;
 		b.charge_duration = 60;
 		// b. = {1200, 6000};

@@ -5,10 +5,12 @@
 export module mo_yanxi.game.ecs.component.chamber:grid_maneuver;
 
 import mo_yanxi.math;
+import mo_yanxi.math.vector2;
 
 namespace mo_yanxi::game::ecs::chamber{
 
 	export struct chamber_manifold;
+	export struct building_data;
 
 	//TODO make it independent component
 
@@ -62,5 +64,12 @@ namespace mo_yanxi::game::ecs::chamber{
 		}
 
 		void update(const chamber_manifold& manifold) noexcept;
+
+		void append(const maneuver_component& component, const math::vec2 pos) noexcept{
+			force_longitudinal_ += component.force_longitudinal;
+			force_transverse_ += component.force_transverse;
+			torque_ += component.torque_absolute + component.torque * pos.length();
+			boost_ += component.boost;
+		}
 	};
 }

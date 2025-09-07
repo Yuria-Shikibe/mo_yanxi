@@ -1,3 +1,8 @@
+module;
+
+#include <cassert>
+
+#include "gch/small_vector.hpp"
 
 export module mo_yanxi.ui.elem.table;
 
@@ -6,6 +11,7 @@ export import mo_yanxi.ui.layout.cell;
 export import mo_yanxi.ui.celled_group;
 export import mo_yanxi.ui.util;
 import std;
+
 
 namespace mo_yanxi::ui{
 	using table_size_t = unsigned;
@@ -194,9 +200,16 @@ namespace mo_yanxi::ui{
 			//TODO when size in major is inf, pre acquire its size and try promote it to master,
 			// if failed to get a pre_acquire size to promote the table head, discard it
 
-			if(std::isinf(curSize.*major_target)){
+			/*if(std::isinf(curSize.*major_target))*/{
+				// auto remain_major = curSize.*major_target;
 				//TODO policy to allocate minor size
 				bool single_line = max_minor_size() == 1 && std::isfinite(valid_size.*minor_target);
+
+				gch::small_vector<float, 8> news;
+				if(!std::isinf(curSize.*major_target)){
+					news.resize(max_major_size());
+				}
+
 				for(auto&& [idx_minor, line] : view){
 					auto& head_minor = at_minor(idx_minor);
 
@@ -215,28 +228,62 @@ namespace mo_yanxi::ui{
 								}else{
 									ext.*extent_minor = stated_size{size_category::dependent};
 								}
-
 							}
 
-
 							if(auto size = elem.element->pre_acquire_size(ext)){
-								head_major.max_size.promote(size.value().*major_target);
+								if(std::isinf(curSize.*major_target)){
+									head_major.max_size.promote(size.value().*major_target);
+								}else{
+									news[idx_major] = std::max(size.value().*major_target, news[idx_major]);
+								}
+
+
 								head_minor.max_size.promote(
 									single_line ?
 									curSize.*minor_target :
 									math::min(size.value().*minor_target, curSize.*minor_target)
 									);
+
+								if(curSize.*major_target < 8 /*lesser should be meaningless*/){
+									goto END;
+								}
 							}
 						}
 					}
 				}
 
-				curSize.*major_target = 0;
+
+
+				if(std::isinf(curSize.*major_target)){
+					curSize.*major_target = 0;
+				}else{
+					float major_sum{};
+					for (float new_ : news){
+						major_sum += new_;
+					}
+					if(major_sum > 0){
+						if(const auto ratio = curSize.*major_target / major_sum; ratio < 1){
+							for (auto [midx, new_] : news | std::views::enumerate){
+								if(new_ > 0)at_major(midx).max_size = {size_category::mastering, new_ * ratio};
+							}
+							curSize.*major_target = 0;
+						}else{
+							for (auto [midx, new_] : news | std::views::enumerate){
+								if(new_ > 0)at_major(midx).max_size = {size_category::mastering, new_};
+							}
+							curSize.*major_target -= major_sum;
+						}
+					}
+				}
+
+				END:
+				(void)0;
 			}
 
 			float total_weight{};
 			for (auto& major : get_majors()){
 				if(!major.max_size.mastering()){
+					assert(major.max_size.type == size_category::passive);
 					total_weight += major.max_size.value;
 					major.max_size.value *= curSize.*major_target;
 				}
@@ -304,6 +351,8 @@ namespace mo_yanxi::ui{
 
 			return extent;
 		}
+
+
 	public:
 
 		math::vec2 allocate_cells(

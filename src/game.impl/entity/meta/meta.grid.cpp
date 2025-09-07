@@ -39,62 +39,21 @@ mo_yanxi::game::meta::chamber::grid::grid(const hitbox& hitbox){
 			}
 		}
 	}
+
+	total_mass_ = get_grid_mass(*this);
+	total_moment_of_inertia_ = get_grid_tile_moment_of_inertia(*this);
+}
+
+mo_yanxi::game::meta::chamber::grid::grid(const math::usize2 extent, const math::point2 origin_coord,
+	std::vector<grid_tile>&& tiles) noexcept:
+	origin_coord_(origin_coord), extent_(extent), tiles_(std::move(tiles)), structural_status_(extent.as<int>()){
+
+	total_mass_ = get_grid_mass(*this);
+	total_moment_of_inertia_ = get_grid_tile_moment_of_inertia(*this);
 }
 
 void mo_yanxi::game::meta::chamber::grid::move(math::point2 offset) noexcept{
 	origin_coord_ -= offset.as<int>();
-}
-
-void mo_yanxi::game::meta::chamber::grid::draw(
-	graphic::renderer_ui_ref renderer,
-	const graphic::camera2& camera, const math::point2 offset, float opacity_scl
-) const{
-	auto acquirer = ui::get_draw_acquirer(renderer);
-	using namespace graphic;
-	
-	acquirer.proj.set_layer(ui::draw_layers::base);
-	const auto [w, h] = get_extent();
-
-	{
-		const auto region = get_grid_region().move(offset).as<float>().scl(tile_size, tile_size);
-
-		const auto color = colors::gray.copy().set_a(.5f * opacity_scl);
-
-		for(unsigned x = 0; x <= w; ++x){
-			static constexpr math::vec2 off{tile_size, 0};
-			draw::line::line_ortho(acquirer.get(), region.vert_00() + off * x, region.vert_01() + off * x, 4, color, color);
-		}
-
-		for(unsigned y = 0; y <= h; ++y){
-			static constexpr math::vec2 off{0, tile_size};
-			draw::line::line_ortho(acquirer.get(), region.vert_00() + off * y, region.vert_10() + off * y, 4, color, color);
-		}
-	}
-
-	acquirer.proj.set_layer(ui::draw_layers::def);
-	acquirer.proj.mode_flag = draw::mode_flags::slide_line;
-	const auto off = get_origin_offset() + offset;
-	for(unsigned y = 0; y < h; ++y){
-		for(unsigned x = 0; x < w; ++x){
-			auto& info = (*this)[x, y];
-
-			if(info.is_idle()){
-				auto color = structural_status_.is_within_structural(math::upoint2{x, y}, extent_) ? colors::pale_yellow : colors::aqua;
-				auto sz = math::irect{tags::from_extent, off.copy().add(x, y), 1, 1}.as<float>().scl(tile_size, tile_size);
-				draw::fill::rect_ortho(acquirer.get(), sz, color.set_a(.25f * opacity_scl));
-			}else if (info.is_building_identity({x, y})){
-				acquirer.proj.mode_flag = {};
-
-				auto rg = info.building->get_indexed_region().as<int>().move(off).as<float>().scl(tile_size, tile_size).shrink(2);
-				draw::line::rect_ortho(acquirer, rg, 4, info.building->get_meta_info().get_edit_outline_color().set_a(opacity_scl));
-				info.building->get_meta_info().draw(rg, renderer, camera);
-				if(auto ist = info.building->get_instance_data()){
-					ist->draw(info.building->get_meta_info(), rg, renderer, camera.get_scale());
-				}
-				acquirer.proj.mode_flag = draw::mode_flags::slide_line;
-			}
-		}
-	}
 }
 
 void mo_yanxi::game::meta::chamber::grid::dump(ecs::chamber::chamber_manifold& clear_grid_manifold) const{

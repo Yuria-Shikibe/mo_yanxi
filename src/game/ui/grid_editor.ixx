@@ -33,7 +33,6 @@ import std;
 export import :sub_panels;
 
 namespace mo_yanxi::game{
-	// static
 
 	template <typename T, std::invocable<math::vector2<T>> Fn>
 	void each_tile(const math::rect_ortho<T>& region, const math::vector2<T> stride, Fn fn){
@@ -207,8 +206,6 @@ namespace mo_yanxi::game{
 			apply_to_axis(axis, pos);
 			return axis;
 		}
-
-
 	};
 
 	namespace ui{
@@ -219,6 +216,7 @@ namespace mo_yanxi::game{
 
 		enum struct detail_pane_mode : unsigned{
 			statistic,
+			grid,
 			power_state,
 			structural_state,
 			maneuvering,
@@ -258,17 +256,43 @@ namespace mo_yanxi::game{
 
 			[[nodiscard]] grid_editor_viewport& get_viewport() const noexcept;
 
-			void notify_update(const detail_pane_mode where) const{
+			bool notify_update(const detail_pane_mode where) const{
 				if(current_mode_ == where){
 					clear_viewport_relevant_state();
 					if(auto tgt = dynamic_cast<grid_editor_panel_base*>(children[1].get())){
-						tgt->refresh();
+						tgt->refresh(refresh_channel::all);
+						return true;
 					}
+				}
+
+				return false;
+			}
+			void notify_any_update() const{
+				if(current_mode_ == detail_pane_mode::maneuvering){
+					if(auto tgt = dynamic_cast<grid_editor_panel_base*>(children[1].get())){
+						tgt->refresh(refresh_channel::indirect);
+					}
+				}
+			}
+
+			[[nodiscard]] std::optional<graphic::color> get_override_color(const meta::chamber::grid_building& b) const noexcept{
+				switch(current_mode_){
+				case detail_pane_mode::power_state : if(auto usg = b.get_meta_info().get_energy_usage()){
+						return usg < 0 ? graphic::colors::red_dusted : graphic::colors::pale_green;
+					} else return std::nullopt;
+				case detail_pane_mode::maneuvering : if(b.get_meta_info().get_maneuver_comp()){
+						return graphic::colors::ACID;
+					} else return std::nullopt;
+				default : return std::nullopt;
 				}
 			}
 
 			void clear(){
 				set_mode(detail_pane_mode::monostate);
+			}
+
+			bool is_focused_on(detail_pane_mode mode) const noexcept{
+				return current_mode_ == mode;
 			}
 
 		private:
@@ -288,10 +312,44 @@ namespace mo_yanxi::game{
 				if(current_mode_ != detail_pane_mode::monostate){
 					exchange_element(1, prov(), true);
 					if(auto tgt = dynamic_cast<grid_editor_panel_base*>(children[1].get())){
-						tgt->refresh();
+						tgt->refresh(refresh_channel::all);
 					}
 				}
 				this->children[1]->visible = current_mode_ != detail_pane_mode::monostate;
+			}
+		};
+
+		struct building_state_changed_updator{
+		private:
+			std::bitset<std::to_underlying(detail_pane_mode::monostate)> types{};
+
+		public:
+			[[nodiscard]] building_state_changed_updator() = default;
+
+			void add(const meta::chamber::grid_building& building) noexcept{
+				if(building.get_meta_info().is_structural()){
+					types[std::to_underlying(detail_pane_mode::structural_state)] = true;
+				}
+
+				if(building.get_meta_info().get_energy_usage()){
+					types[std::to_underlying(detail_pane_mode::power_state)] = true;
+				}
+
+				if(building.get_meta_info().get_maneuver_comp()){
+					types[std::to_underlying(detail_pane_mode::maneuvering)] = true;
+				}
+			}
+
+			void submit(grid_detail_pane& pane) const{
+				bool updated = false;
+				for(auto i = 0u; i < types.size(); ++i){
+					if(types[i]){
+						updated |= pane.notify_update(detail_pane_mode{i});
+					}
+				}
+				if(!updated && types.any()){
+					pane.notify_any_update();
+				}
 			}
 		};
 
@@ -315,7 +373,6 @@ namespace mo_yanxi::game{
 			chamber_meta current_chamber{};
 			meta::chamber::grid_building* selected_building{};
 
-			bool focus_on_grid{};
 			mirrow_mode_channel mirrow_channel{};
 
 			std::move_only_function<void(const grid_editor_viewport&) const> subpanel_drawer{};
@@ -330,6 +387,10 @@ namespace mo_yanxi::game{
 				auto cur = get_transferred_pos(cur_in_screen);
 				auto mov = cur - operation_initial;
 				return mov.div(ecs::chamber::tile_size).round<int>();
+			}
+
+			[[nodiscard]] bool is_focused_on_grid() const noexcept{
+				return grid_detail_pane_->is_focused_on(detail_pane_mode::grid);
 			}
 
 		public:
@@ -382,27 +443,7 @@ namespace mo_yanxi::game{
 
 
 		private:
-			struct building_state_changed_updator{
-			private:
-				std::bitset<std::to_underlying(detail_pane_mode::monostate)> types{};
 
-			public:
-				[[nodiscard]] building_state_changed_updator() = default;
-
-				void add(const meta::chamber::grid_building& building) noexcept{
-					if(building.get_meta_info().is_structural()){
-						types[std::to_underlying(detail_pane_mode::structural_state)] = true;
-					}
-				}
-
-				void submit(grid_detail_pane& pane) const{
-					for(auto i = 0u; i < types.size(); ++i){
-						if(types[i]){
-							pane.notify_update(detail_pane_mode{i});
-						}
-					}
-				}
-			};
 
 			void update_selected_building(meta::chamber::grid_building* building){
 				auto& t = current_selected_building_info_pane_->get_item_unchecked<table>();
@@ -463,9 +504,34 @@ namespace mo_yanxi::game{
 				}
 			}
 
+		private:
+			template <typename Fn = std::identity, std::invocable<math::irect> RegionFn = std::identity>
+			void selection_each(math::usize2 extent, Fn fn = {}, RegionFn rfn = {}) const {
+				const auto raw_region = get_select_box(last_click_);
+				const auto tiled_region = get_selected_place_region(extent, raw_region);
+				const auto region = get_mirrowed_region(mirrow_channel.get_current_axis(), tiled_region);
+
+				for(const math::irect& place_region : region){
+					std::invoke(rfn, place_region);
+					if constexpr(!std::same_as<Fn, std::identity>){
+						game::each_tile(place_region, extent.as<int>(), [&, this](const math::point2 pos){
+							if(const auto idx = grid.coord_to_index(pos)){
+								if constexpr (std::invocable<Fn, math::upoint2>){
+									std::invoke(fn, *idx);
+								}else if constexpr (std::invocable<Fn, math::upoint2, math::point2>){
+									std::invoke(fn, *idx, pos);
+								}
+							}
+						});
+					}
+				}
+			}
+
+		public:
 			input_event::click_result on_click(const input_event::click click_event) override{
 
 				using namespace core::ctrl;
+
 				if (mirrow_channel.is_editing()){
 					if(click_event.code.matches(lmb_click)){
 						mirrow_channel.apply(get_world_pos_to_tile_coord(get_transferred_pos(click_event.pos)));
@@ -474,96 +540,93 @@ namespace mo_yanxi::game{
 					if(click_event.code.matches(rmb_click)){
 						mirrow_channel.erase();
 					}
-				}else if(focus_on_grid){
+				}else if(is_focused_on_grid()){
 					if(click_event.code.matches(lmb_click_no_mode)){
 						if(apply_grid_op(click_event.pos))goto fbk;
 					}
 
-					if(click_event.code.action() == act::release){
-						const auto region =
-							get_mirrowed_region(
-								mirrow_channel.get_current_axis(),
-								get_selected_place_region({1, 1}, get_select_box(last_click_)));
-
-						for(const auto& place_region : region){
-							each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
-								if(const auto idx = grid.coord_to_index(pos)){
-									switch(click_event.code.key()){
-									case mouse::LMB :{
-										grid[idx.value()].placeable = true;
-										break;
-									}
-									case mouse::RMB :{
-										if(!grid[idx.value()].building) grid[idx.value()].placeable = false;
-										break;
-									}
-									default : break;
-									}
+					if(click_event.code.on_release()){
+						selection_each({1, 1}, [&, this](math::upoint2 idx){
+							switch(click_event.code.key()){
+								case mouse::LMB :{
+									grid.set_placeable_at(idx, true);
+									break;
 								}
-							});
-						}
+								case mouse::RMB :{
+									grid.set_placeable_at(idx, false);
+									break;
+								}
+								default : break;
+							}
+						});
 					}
-
+				}else if(grid_detail_pane_->is_focused_on(detail_pane_mode::corridor)){
+					if(click_event.code.on_release()){
+						selection_each({1, 1}, [&, this](math::upoint2 idx){
+							switch(click_event.code.key()){
+								case mouse::LMB :{
+									grid.set_corridor_at(idx, true);
+									break;
+								}
+								case mouse::RMB :{
+									grid.set_corridor_at(idx, false);
+									break;
+								}
+								default : break;
+							}
+						});
+					}
 				}else{
 					if(last_click_ && click_event.code.on_release()){
 						switch(click_event.code.key()){
-						case mouse::LMB:
-							if(current_chamber){
-								for(const auto& place_region : get_mirrowed_region(
-									    mirrow_channel.get_current_axis(),
-									    get_selected_place_region(current_chamber->extent,
-									                              get_select_box(last_click_)))){
-									const meta::chamber::grid_building* any{};
-									each_tile(place_region, current_chamber->extent.as<int>(),
-									          [&, this](math::point2 pos){
-										          if(const auto idx = grid.coord_to_index(pos)){
-											          if(auto* b = grid.try_place_building_at(
-												          idx.value(), *current_chamber)){
-												          update_selected_building(b);
-											          	any = b;
-											          }
-										          }
-									          });
+						case mouse::LMB : if(current_chamber){
+								const meta::chamber::grid_building* any{};
 
-									if(any){
-										building_state_changed_updator upd{};
-										upd.add(*any);
-										upd.submit(*grid_detail_pane_);
-
+								selection_each(current_chamber->extent, [&, this](math::upoint2 idx){
+									if(auto* b = grid.try_place_building_at(idx, *current_chamber)){
+										update_selected_building(b);
+										any = b;
 									}
+								});
+
+								if(any){
+									building_state_changed_updator upd{};
+									upd.add(*any);
+									upd.submit(*grid_detail_pane_);
 								}
-							}else{
+							} else{
 								auto p = get_current_tile_coord();
 								if(auto idx = grid.coord_to_index(p)){
 									update_selected_building(grid[*idx].building);
 								}
 							}
 							break;
-						case mouse::RMB: {
-							for (const auto & place_region : get_mirrowed_region(mirrow_channel.get_current_axis(), get_selected_place_region({1, 1}, get_select_box(last_click_)))){
-								if(selected_building){
-									auto reg = selected_building->get_indexed_region().as<int>().move(grid.get_origin_offset());
-									if(reg.overlap_exclusive(place_region)){
-										update_selected_building(nullptr);
-									}
-								}
+						case mouse::RMB :{
+							building_state_changed_updator upd{};
 
-								building_state_changed_updator upd{};
-								each_tile(place_region, {1, 1}, [&, this](math::point2 pos){
-									if(const auto idx = grid.coord_to_index(pos)){
-										//TODO cascade consume until all done?
-										auto cascade = grid.erase_building_at(idx.value(), std::bind_front(&building_state_changed_updator::add, &upd));
-										for (const auto & building_po : cascade.building_pos){
-											grid.erase_building_at(building_po, std::bind_front(&building_state_changed_updator::add, &upd));
+							selection_each(
+								{1, 1},
+								[&, this](math::upoint2 idx){
+									auto cascade = grid.erase_building_at(
+										idx, std::bind_front(&building_state_changed_updator::add, &upd));
+									for(const auto& building_po : cascade.building_pos){
+										grid.erase_building_at(
+											building_po,
+											std::bind_front(&building_state_changed_updator::add, &upd));
+									}
+								}, [this](math::irect place_region){
+									if(selected_building){
+										const auto reg =
+											selected_building->get_indexed_region().as<int>().move(grid.get_origin_offset());
+										if(reg.overlap_exclusive(place_region)){
+											update_selected_building(nullptr);
 										}
 									}
 								});
-								upd.submit(*grid_detail_pane_);
-
-							}
+							upd.submit(*grid_detail_pane_);
 						}
-							break;
-						default: break;
+						break;
+						default : break;
 						}
 					}
 
@@ -584,7 +647,7 @@ namespace mo_yanxi::game{
 				if(mirrow_channel.is_editing()){
 					mirrow_channel.exit_edit();
 					return esc_flag::intercept;
-				}else if(focus_on_grid){
+				}else if(is_focused_on_grid()){
 					if(grid_op_ != operation::none){
 						grid_op_ = operation::none;
 						return esc_flag::intercept;
@@ -612,7 +675,7 @@ namespace mo_yanxi::game{
 					case core::ctrl::key::Space:
 						overview = !overview; break;
 					case core::ctrl::key::G:{
-						if(focus_on_grid){
+						if(is_focused_on_grid()){
 							if(grid_op_ == operation::move){
 								grid_op_ = operation::none;
 							}else{
@@ -652,7 +715,7 @@ namespace mo_yanxi::game{
 				return {cur};
 			}
 
-			[[nodiscard]] math::point2 get_world_to_tile(math::vec2 pos_in_world) const noexcept{
+			[[nodiscard]] static math::point2 get_world_to_tile(math::vec2 pos_in_world) noexcept{
 				return pos_in_world.div(ecs::chamber::tile_size).floor().round<int>();
 			}
 

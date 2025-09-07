@@ -854,12 +854,12 @@ namespace mo_yanxi::font::typesetting{
 
 		export void begin_subscript(glyph_layout& layout, parse_context& context){
 			context.push_scaled_offset({-0.025f, 0.105f});
-			context.push_scaled_current_size(0.55f);
+			context.push_scaled_current_size(0.6f);
 		}
 
 		export void begin_superscript(glyph_layout& layout, parse_context& context){
 			context.push_scaled_offset({-0.025f, -0.525f});
-			context.push_scaled_current_size(0.55f);
+			context.push_scaled_current_size(0.6f);
 		}
 
 		export void end_script(glyph_layout& layout, parse_context& context){
@@ -891,7 +891,12 @@ namespace mo_yanxi::font::typesetting{
 
 				if(name.starts_with('#')){
 					name.remove_prefix(1);
-					func::push_color(context, name);
+					if(name.empty()){
+						context.color_history.pop();
+					}else{
+						func::push_color(context, name);
+					}
+
 				}else if(std::isdigit(name[0])){
 					context.push_size({static_cast<glyph_size_type::value_type>(func::string_cast(name, 64)), 0});
 				}else if(name.starts_with('^')){

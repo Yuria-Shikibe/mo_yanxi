@@ -20,6 +20,11 @@ namespace mo_yanxi::graphic{
 	 *
 	 * TODO HDR support
 	 */
+
+	export
+	struct hsv{
+		float h, s, v;
+	};
 	export
 	struct color : math::vector4<float>{
 	public:
@@ -166,10 +171,10 @@ namespace mo_yanxi::graphic{
 			return c;
 		}
 
-		[[nodiscard]] FORCE_INLINE float diff(const color& other) const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr float diff(const color& other) const noexcept{
 			const auto lhsv = to_hsv();
 			const auto rhsv = other.to_hsv();
-			return math::abs(lhsv[0] - rhsv[0]) / 360 + math::abs(lhsv[1] - rhsv[1]) + math::abs(lhsv[2] - rhsv[2]);
+			return math::abs(lhsv.h - rhsv.h) / 360 + math::abs(lhsv.s - rhsv.s) + math::abs(lhsv.v - rhsv.v);
 		}
 
 		FORCE_INLINE constexpr color& set(const color& color) noexcept{
@@ -385,55 +390,55 @@ namespace mo_yanxi::graphic{
 		using hsv_t = std::array<float, 3>;
 
 		[[nodiscard]] FORCE_INLINE constexpr float hue() const noexcept{
-			return to_hsv()[0];
+			return to_hsv().h;
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr float saturation() const noexcept{
-			return to_hsv()[1];
+			return to_hsv().s;
 		}
 
 		[[nodiscard]] FORCE_INLINE constexpr float value() const noexcept{
-			return to_hsv()[2];
+			return to_hsv().v;
 		}
 
-		FORCE_INLINE color& from_hue(const float amount) noexcept{
-			hsv_t TMP_HSV = to_hsv();
-			TMP_HSV[0] = amount;
+		FORCE_INLINE constexpr color& from_hue(const float amount) noexcept{
+			auto TMP_HSV = to_hsv();
+			TMP_HSV.h = amount;
 			from_hsv(TMP_HSV);
 			return *this;
 		}
 
-		FORCE_INLINE color& from_saturation(const float amount) noexcept{
-			hsv_t TMP_HSV = to_hsv();
-			TMP_HSV[1] = amount;
+		FORCE_INLINE constexpr color& from_saturation(const float amount) noexcept{
+			auto TMP_HSV = to_hsv();
+			TMP_HSV.s = amount;
 			from_hsv(TMP_HSV);
 			return *this;
 		}
 
-		FORCE_INLINE color& from_value(const float amount) noexcept{
-			hsv_t TMP_HSV = to_hsv();
-			TMP_HSV[2] = amount;
+		FORCE_INLINE constexpr color& from_value(const float amount) noexcept{
+			auto TMP_HSV = to_hsv();
+			TMP_HSV.v = amount;
 			from_hsv(TMP_HSV);
 			return *this;
 		}
 
-		FORCE_INLINE color& shift_hue(const float amount) noexcept{
-			hsv_t TMP_HSV = to_hsv();
-			TMP_HSV[0] += amount;
+		FORCE_INLINE constexpr color& shift_hue(const float amount) noexcept{
+			auto TMP_HSV = to_hsv();
+			TMP_HSV.h += amount;
 			from_hsv(TMP_HSV);
 			return *this;
 		}
 
-		FORCE_INLINE color& shift_saturation(const float amount) noexcept{
-			hsv_t TMP_HSV = to_hsv();
-			TMP_HSV[1] += amount;
+		FORCE_INLINE constexpr color& shift_saturation(const float amount) noexcept{
+			auto TMP_HSV = to_hsv();
+			TMP_HSV.s += amount;
 			from_hsv(TMP_HSV);
 			return *this;
 		}
 
-		FORCE_INLINE color& shift_value(const float amount) noexcept{
-			hsv_t TMP_HSV = to_hsv();
-			TMP_HSV[2] += amount;
+		FORCE_INLINE constexpr color& shift_value(const float amount) noexcept{
+			auto TMP_HSV = to_hsv();
+			TMP_HSV.v += amount;
 			from_hsv(TMP_HSV);
 			return *this;
 		}
@@ -453,8 +458,8 @@ namespace mo_yanxi::graphic{
 			                   static_cast<rgba8_bits>(max_val * a));;
 		}
 
-		FORCE_INLINE color& from_hsv(const float h, const float s, const float v) noexcept{
-			const float x = std::fmod(h / 60.0f + 6, static_cast<float>(6));
+		FORCE_INLINE constexpr color& from_hsv(const float h, const float s, const float v) noexcept{
+			const float x = math::mod(h / 60.0f + 6, static_cast<float>(6));
 			const int i = static_cast<int>(x);
 			const float f = x - static_cast<float>(i);
 			const float p = v * (1 - s);
@@ -489,8 +494,8 @@ namespace mo_yanxi::graphic{
 			return clamp();
 		}
 
-		FORCE_INLINE color& from_hsv(const hsv_t hsv) noexcept{
-			return from_hsv(hsv[0], hsv[1], hsv[2]);
+		FORCE_INLINE constexpr color& from_hsv(const hsv hsv) noexcept{
+			return from_hsv(hsv.h, hsv.s, hsv.v);
 		}
 
 		FORCE_INLINE constexpr color HSVtoRGB(const float h, const float s, const float v, const float alpha) noexcept{
@@ -505,33 +510,33 @@ namespace mo_yanxi::graphic{
 			return c;
 		}
 
-		[[nodiscard]] FORCE_INLINE constexpr hsv_t to_hsv() const noexcept{
-			hsv_t hsv{};
+		[[nodiscard]] FORCE_INLINE constexpr hsv to_hsv() const noexcept{
+			hsv hsv{};
 
 			const float maxV = math::max(math::max(r, g), b);
 			const float minV = math::min(math::min(r, g), b);
 			if(const float range = maxV - minV; range == 0){
-				hsv[0] = 0;
+				hsv.h = 0;
 			} else if(maxV == r){
-				hsv[0] = std::fmod(60 * (g - b) / range + 360, 360.0f);
+				hsv.h = math::mod(60 * (g - b) / range + 360, 360.0f);
 			} else if(maxV == g){
-				hsv[0] = 60 * (b - r) / range + 120;
+				hsv.h = 60 * (b - r) / range + 120;
 			} else{
-				hsv[0] = 60 * (r - g) / range + 240;
+				hsv.h = 60 * (r - g) / range + 240;
 			}
 
 			if(maxV > 0){
-				hsv[1] = 1 - minV / maxV;
+				hsv.s = 1 - minV / maxV;
 			} else{
-				hsv[1] = 0;
+				hsv.s = 0;
 			}
 
-			hsv[2] = maxV;
+			hsv.v = maxV;
 
 			return hsv;
 		}
 
-		[[nodiscard]] FORCE_INLINE bool equals(const color& other) const noexcept{
+		[[nodiscard]] FORCE_INLINE constexpr bool equals(const color& other) const noexcept{
 			static constexpr float tolerance = 0.5f / max_val_f;
 			return
 				math::equal(r, other.r, tolerance) &&
@@ -540,7 +545,7 @@ namespace mo_yanxi::graphic{
 				math::equal(a, other.a, tolerance);
 		}
 
-		constexpr color& HSVtoRGB(float h, float s, float v, color& targetColor) noexcept{
+		[[deprecated]] constexpr color& HSVtoRGB(float h, float s, float v, color& targetColor) noexcept{
 			if(h == 360) h = 359;
 			h = math::max(0.0f, math::min(360.0f, h));
 			s = math::max(0.0f, math::min(100.0f, s));

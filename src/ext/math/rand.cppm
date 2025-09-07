@@ -65,7 +65,7 @@ export namespace mo_yanxi::math {
 			set_state(seed0, seed1);
 		}
 		
-		constexpr std::size_t next() noexcept {
+		constexpr std::uint64_t next() noexcept {
 			seed_t s1       = this->seed0;
 			const seed_t s0 = this->seed1;
 			this->seed0       = s0;
@@ -73,7 +73,7 @@ export namespace mo_yanxi::math {
 			return (this->seed1 = s1 ^ s0 ^ s1 >> 17ull ^ s0 >> 26ull) + s0;
 		}
 
-		constexpr std::size_t operator ()() noexcept{
+		constexpr std::uint64_t operator ()() noexcept{
 			return next();
 		}
 
@@ -119,11 +119,11 @@ export namespace mo_yanxi::math {
 		 * @param n_exclusive the positive bound on the random number to be returned.
 		 * @return (0, n]
 		 */
-		constexpr std::size_t next(const std::size_t n_exclusive) noexcept {
+		constexpr std::uint64_t next(const std::uint64_t n_exclusive) noexcept {
 			assert(n_exclusive != 0);
 			for(;;) {
-				const std::size_t bits  = next() >> 1ull;
-				const std::size_t value = bits % n_exclusive;
+				const std::uint64_t bits  = next() >> 1ull;
+				const std::uint64_t value = bits % n_exclusive;
 				if(bits >= value + (n_exclusive - 1)) return value;
 			}
 		}

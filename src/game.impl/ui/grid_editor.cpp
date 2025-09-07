@@ -14,14 +14,90 @@ import mo_yanxi.graphic.layers.ui.grid_drawer;
 import mo_yanxi.game.meta.grid.srl;
 import mo_yanxi.game.content;
 import mo_yanxi.game.meta.hitbox;
+import mo_yanxi.math.rand;
 
 import std;
 
 
 namespace mo_yanxi::game::meta::chamber{
-	// bool is_building_placeable_at(const grid& grid){
-	//
-	// }
+	struct default_color_prov{
+		std::optional<graphic::color> operator()(auto&&) const noexcept{
+			return std::nullopt;
+		}
+	};
+
+	static_assert(std::invocable<default_color_prov, const grid_building&>);
+	static_assert(std::invocable<default_color_prov, const grid_tile&>);
+
+	template <
+		std::invocable<const grid_building&> BuildingColorProvFn = default_color_prov,
+		std::invocable<const grid_tile&> TileColorProvFn = default_color_prov
+	>
+	void draw_grid(
+		const grid& grid,
+		graphic::renderer_ui_ref renderer,
+		const graphic::camera2& camera,
+		math::point2 offset = {},
+		float opacity_scl = 1.f,
+		BuildingColorProvFn fn = {},
+		TileColorProvFn tfn = {}
+		){
+		auto acquirer = ui::get_draw_acquirer(renderer);
+		using namespace graphic;
+
+		acquirer.proj.set_layer(ui::draw_layers::base);
+		const auto [w, h] = grid.get_extent();
+
+		{
+			const auto region = grid.get_grid_region().move(offset).as<float>().scl(tile_size, tile_size);
+
+			const auto color = colors::gray.copy().set_a(.5f * opacity_scl);
+
+			for(unsigned x = 0; x <= w; ++x){
+				static constexpr math::vec2 off{tile_size, 0};
+				draw::line::line_ortho(acquirer.get(), region.vert_00() + off * x, region.vert_01() + off * x, 4, color, color);
+			}
+
+			for(unsigned y = 0; y <= h; ++y){
+				static constexpr math::vec2 off{0, tile_size};
+				draw::line::line_ortho(acquirer.get(), region.vert_00() + off * y, region.vert_10() + off * y, 4, color, color);
+			}
+		}
+
+		acquirer.proj.set_layer(ui::draw_layers::def);
+		acquirer.proj.mode_flag = draw::mode_flags::slide_line;
+		const auto off = grid.get_origin_offset() + offset;
+		for(unsigned y = 0; y < h; ++y){
+			for(unsigned x = 0; x < w; ++x){
+				auto& info = grid[x, y];
+				std::optional<color> opt_grid_color = std::invoke(tfn, info);
+				if(info.is_idle() || opt_grid_color){
+					color tileC;
+					if(!opt_grid_color){
+						tileC = grid.is_within_structural(math::upoint2{x, y}) ? colors::pale_yellow : colors::aqua;
+					}else{
+						tileC = *opt_grid_color;
+					}
+					tileC.mul_a(.25f * opacity_scl);
+
+					auto sz = math::irect{tags::from_extent, off.copy().add(x, y), 1, 1}.as<float>().scl(tile_size, tile_size);
+					draw::fill::rect_ortho(acquirer.get(), sz, tileC);
+				}
+
+				if (info.is_building_identity({x, y})){
+					acquirer.proj.mode_flag = {};
+
+					auto rg = info.building->get_indexed_region().as<int>().move(off).as<float>().scl(tile_size, tile_size).shrink(2);
+					draw::line::rect_ortho(acquirer, rg, 4, std::invoke_r<std::optional<color>>(fn, *info.building).value_or(info.building->get_meta_info().get_edit_outline_color()).set_a(opacity_scl));
+					info.building->get_meta_info().draw(rg, renderer, camera);
+					if(auto ist = info.building->get_instance_data()){
+						ist->draw(info.building->get_meta_info(), rg, renderer, camera.get_scale());
+					}
+					acquirer.proj.mode_flag = draw::mode_flags::slide_line;
+				}
+			}
+		}
+	}
 }
 
 mo_yanxi::game::meta::hitbox_transed load_hitbox_from(const std::filesystem::path& path){
@@ -61,7 +137,6 @@ void mo_yanxi::game::ui::grid_info_bar::draw_content(const ui::rect clipSpace) c
 	for(unsigned i = 0; i < max_consume; ++i){
 		draw::fill::rect_ortho(acquirer.get(max_consume), rect{tags::from_extent, src.copy().add(width, i * height), width, height}.shrink(2), colors::red_dusted);
 	}
-
 
 }
 
@@ -163,11 +238,9 @@ mo_yanxi::ui::elem_ptr mo_yanxi::game::ui::grid_detail_pane::prov(){
 	// case detail_pane_mode::statistic :{
 	// 	break;
 	// }
-	// case detail_pane_mode::power_state :{
-	// 	break;
-	// }
+	case detail_pane_mode::power_state : return {get_scene(), this, std::in_place_type<power_state_panel>};
 	case detail_pane_mode::structural_state : return {get_scene(), this, std::in_place_type<grid_structural_panel>};
-	// case detail_pane_mode::maneuvering :{
+	case detail_pane_mode::maneuvering : return {get_scene(), this, std::in_place_type<maneuvering_panel>};
 	// 	break;
 	// }
 	// case detail_pane_mode::corridor :{
@@ -198,19 +271,23 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 	auto acquirer{mo_yanxi::ui::get_draw_acquirer(r)};
 
 	{
+		//draw grid
 		batch_layer_guard guard(r.batch, std::in_place_type<layers::grid_drawer>);
 
 		draw::fill::rect_ortho(acquirer.get(), camera.get_viewport(), colors::black.copy().set_a(.35));
 	}
 
-	acquirer.proj.set_layer(ui::draw_layers::base);
+	{
+		//draw hitbox reference
+		acquirer.proj.set_layer(ui::draw_layers::base);
 
-	for(const auto& comp : reference){
-		draw::line::quad_expanded(acquirer, comp.crop().view_as_quad(), -4, colors::light_gray.copy().set_a(.35));
+		for(const auto& comp : reference){
+			draw::line::quad_expanded(acquirer, comp.crop().view_as_quad(), -4, colors::light_gray.copy().set_a(.35));
+		}
+
+		acquirer.proj.mode_flag = {};
+		acquirer.proj.set_layer(ui::draw_layers::def);
 	}
-
-	acquirer.proj.mode_flag = {};
-	acquirer.proj.set_layer(ui::draw_layers::def);
 
 
 	auto mirrow_axis_drawer = [&, this](mirrow_axis_vec2 vec, float opacity = 1.f){
@@ -231,79 +308,60 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 		if(vec.y){
 			draw::line::line_angle_center(acquirer.get(), {center, math::pi_half}, 1E5, 4, colors::ACID.copy_set_a(opacity));
 		}
-
 	};
 
 
 	{
-		auto placement_drawer = [this, &acquirer](math::usize2 chamber_extent, math::raw_frect region, auto pred){
-			const auto regions =
-							get_mirrowed_region(
-								mirrow_channel.get_current_axis(),
-								get_selected_place_region(chamber_extent, region));
-
-			for (const auto & place_region : regions){
+		auto placement_drawer = [this, &acquirer](math::usize2 chamber_extent, auto pred){
+			this->selection_each(chamber_extent, [&](math::upoint2 idx, math::point2 pos){
+				if(pred(idx)){
+					draw::fill::rect_ortho(acquirer.get(), get_region_at({tags::from_extent, pos, chamber_extent.as<int>()}).shrink(4), colors::pale_green.copy().set_a(.5f));
+				}
+			}, [&](math::irect place_region){
+				acquirer.proj.mode_flag = {};
 				draw::line::rect_ortho(acquirer, get_region_at(place_region), 4, colors::pale_green);
-
-				auto chamber_sz = chamber_extent.as<int>();
-
 				acquirer.proj.mode_flag = draw::mode_flags::slide_line;
-				game::each_tile(place_region, chamber_sz, [&, this](math::point2 pos){
-					if(auto idxp = grid.coord_to_index(pos)){
-						if(pred(*idxp)){
-							draw::fill::rect_ortho(acquirer.get(), get_region_at({tags::from_extent, pos, chamber_sz}).shrink(4), colors::pale_green.copy().set_a(.5f));
-						}
-					}
-				});
-				acquirer.proj.mode_flag = {};
-			}
+			});
+			acquirer.proj.mode_flag = {};
 		};
 
-		auto remove_drawer = [this, &acquirer](math::raw_frect region, auto pred){
-			const auto regions =
-							get_mirrowed_region(
-								mirrow_channel.get_current_axis(),
-								get_selected_place_region({1, 1}, region));
-
-			for (const auto & place_region : regions){
+		auto remove_drawer = [this, &acquirer](auto pred){
+			this->selection_each({1, 1}, [&](math::upoint2 idx, math::point2 pos){
+				if(pred(idx)){
+					draw::fill::rect_ortho(acquirer.get(), get_region_at({pos, 1, 1}).shrink(4), colors::red_dusted.copy().set_a(.5f));
+				}
+			}, [&](const math::irect& place_region){
+				acquirer.proj.mode_flag = {};
 				draw::line::rect_ortho(acquirer, get_region_at(place_region), 4, colors::red_dusted);
-
 				acquirer.proj.mode_flag = draw::mode_flags::slide_line;
-				game::each_tile(place_region, math::isize2{1, 1}, [&, this](math::point2 pos){
-					if(auto idxp = grid.coord_to_index(pos)){
-						if(pred(*idxp)){
-							draw::fill::rect_ortho(acquirer.get(), get_region_at({pos, 1, 1}).shrink(4), colors::red_dusted.copy().set_a(.5f));
-						}
-					}
-				});
-				acquirer.proj.mode_flag = {};
-			}
+			});
+			acquirer.proj.mode_flag = {};
 		};
 
+		static constexpr auto prov = [](const meta::chamber::grid_building&){
+			return std::optional{colors::gray.copy().set_a(.65)};
+		};
 
-		if(focus_on_grid){
+		if(is_focused_on_grid()){
 			if(grid_op_ == operation::move){
 				auto mov = get_grid_edit_offset(get_scene()->get_cursor_pos());
-				grid.draw(r, camera, {}, .5f);
-				grid.draw(r, camera, mov);
+				meta::chamber::draw_grid(grid, r, camera, {}, .5f, prov);
+				meta::chamber::draw_grid(grid, r, camera, mov, 1.f, prov);
 				mirrow_axis_drawer(get_moved_axis(mirrow_channel.get_current_axis(), mov), .75f);
 			}else{
-				grid.draw(r, camera);
+				meta::chamber::draw_grid(grid, r, camera, {}, 1.f, prov);
 
 				if(last_click_ && get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift){
-					math::rect_ortho_trivial rect{get_select_box(last_click_)};
-
 					if(get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
-						placement_drawer({1, 1}, rect, [this](math::upoint2 idx){
+						placement_drawer({1, 1}, [this](math::upoint2 idx){
 							return !grid[idx].placeable;
 						});
 					}else if(get_scene()->is_mouse_pressed(core::ctrl::mouse::RMB)){
-						remove_drawer(rect, [this](math::upoint2 idx){
+						remove_drawer([this](math::upoint2 idx){
 							return grid[idx].placeable && grid[idx].building == nullptr;
 						});
 					}
 				}
-
 
 				if (!last_click_ || get_scene()->get_input_mode() == 0){
 					for (const auto & mirrowed_region : get_mirrowed_region(
@@ -318,8 +376,57 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 					}
 				}
 			}
+		}else if(grid_detail_pane_->is_focused_on(detail_pane_mode::corridor)){
+			meta::chamber::draw_grid(
+				grid, r, camera, {}, 1.f, prov,
+				[this](const meta::chamber::grid_tile& tile) -> std::optional<color>{
+					if(tile.is_corridor){
+						if(tile.building){
+							const auto cid = grid.get_tile_corridor_id(tile.corridor_group_id);
+							const auto hue = math::rand{cid}.next<float>();
+
+							return colors::pale_green.copy().shift_hue(math::lerp(-1.f, 1.f, hue) * 60).set_a(3.f);
+
+						}else{
+							return colors::red_dusted.copy().set_a(tile.placeable ? 1.f : .5f);
+						}
+					} else{
+						if(!tile.placeable) return std::nullopt;
+						return tile.building
+							       ? colors::gray
+							       : colors::dark_gray.copy().set_a(.75);
+					}
+				}
+			);
+
+
+			if(last_click_ && get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift){
+				if(get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
+					placement_drawer({1, 1}, [this](math::upoint2 idx){
+						return !grid[idx].is_corridor;
+					});
+				}else if(get_scene()->is_mouse_pressed(core::ctrl::mouse::RMB)){
+					remove_drawer([this](math::upoint2 idx){
+						return grid[idx].is_corridor;
+					});
+				}
+			}
+
+			if (!last_click_ || get_scene()->get_input_mode() == 0){
+				for (const auto & mirrowed_region : get_mirrowed_region(
+					mirrow_channel.get_current_axis(),
+					math::irect{
+						tags::from_extent,
+						get_world_pos_to_tile_coord(get_transferred_cursor_pos()),
+						1, 1})){
+					if((grid.coord_to_index(mirrowed_region.vert_00()))){
+						draw::line::rect_ortho(acquirer, get_region_at(mirrowed_region), 4, colors::pale_green.copy().set_a(.5f));
+					}
+				}
+			}
+
 		}else{
-			grid.draw(r, camera);
+			meta::chamber::draw_grid(grid, r, camera, {}, 1.f, std::bind_front(&grid_detail_pane::get_override_color, grid_detail_pane_));
 
 			if (current_chamber && (!last_click_ || get_scene()->get_input_mode() == 0)){
 				auto extent = current_chamber->extent.as<int>();
@@ -340,16 +447,15 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 			}
 
 			if(last_click_ && get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift){
-				math::rect_ortho_trivial rect{get_select_box(last_click_)};
 
 				if(current_chamber && get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
-					placement_drawer(current_chamber->extent, rect, [this](math::upoint2 idx){
+					placement_drawer(current_chamber->extent, [this](math::upoint2 idx){
 						return grid.is_building_placeable_at(idx, *current_chamber);
 					});
 				}
 
 				if(get_scene()->is_mouse_pressed(core::ctrl::mouse::RMB)){
-					remove_drawer(rect, [this](math::upoint2 idx){
+					remove_drawer([this](math::upoint2 idx){
 						return grid[idx].building != nullptr;
 					});
 				}
@@ -366,8 +472,6 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 	}
 
 	{
-
-
 		if(mirrow_channel.is_editing()){
 			mirrow_axis_drawer(mirrow_channel.get_temp_axis(get_world_pos_to_tile_coord(get_transferred_cursor_pos())));
 			mirrow_axis_drawer(mirrow_channel.get_current_axis(), .3f);
@@ -381,6 +485,8 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 	}
 
 	viewport_end();
+
+	//add ui shadows
 
 	static constexpr auto shadow = colors::black.copy().set_a(.85f);
 	auto drawShadow = [&](const ui::rect bound){
@@ -622,21 +728,6 @@ void mo_yanxi::game::ui::grid_editor::build_menu(){
 			sep.cell().pad.set_vert(4);
 			sep.cell().margin.set_hori(8);
 		}
-	}
-
-
-	{
-		auto b = side_menu->end_line().emplace<button<label>>();
-
-		b->set_style(theme::styles::side_bar_whisper);
-		b->set_fit();
-		b->set_text("edit grid");
-		b->set_button_callback(button_tags::general, [this]{
-			viewport->focus_on_grid = !viewport->focus_on_grid;
-		});
-		b->checkers.setActivatedProv([this]{
-			return viewport->focus_on_grid;
-		});
 	}
 
 	{

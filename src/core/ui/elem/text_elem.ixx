@@ -27,6 +27,7 @@ namespace mo_yanxi::ui{
 		bool fit{};
 
 	public:
+		std::optional<graphic::color> text_color_scl{};
 		align::pos text_entire_align{align::pos::top_left};
 
 		[[nodiscard]] label(scene* scene, group* group)
@@ -68,16 +69,21 @@ namespace mo_yanxi::ui{
 			}
 		}
 
-		void set_fit(){
+		void set_fit(float max_scale){
 			if(!fit){
 				set_policy(font::typesetting::layout_policy::reserve);
 				glyph_layout.set_clamp_size(math::vectors::constant2<float>::inf_positive_vec2);
 
 				fit = true;
+				scale = max_scale;
 
 				text_expired = true;
 				notify_isolated_layout_changed();
 			}
+		}
+
+		void set_fit(){
+			set_fit(std::numeric_limits<float>::infinity());
 		}
 
 		void set_scale(float scale){
@@ -133,18 +139,20 @@ namespace mo_yanxi::ui{
 		}
 
 		math::vec2 layout_text(math::vec2 bound){
+			if(bound.area() < 1)return {};
 			if(fit){
 				if(text_expired){
 					glyph_layout.clear();
-					parser->operator()(glyph_layout, scale);
+					parser->operator()(glyph_layout, 1);
 					text_expired = false;
 				}
 
 				const auto sz = glyph_layout.extent();
 				const auto scaled = align::get_fit_embed_scale(sz, bound.copy().max({1, 1}));
-				glyph_layout.scale(scaled);
+				const auto srcsz = glyph_layout.extent();
+				glyph_layout.scale(std::min(scaled, scale));
 
-				auto [w, h] = glyph_layout.extent();
+				auto [w, h] = srcsz * scaled;
 				math::vec2 rst{
 					std::isfinite(bound.x) ? bound.x : w,
 					std::isfinite(bound.y) ? bound.y : h

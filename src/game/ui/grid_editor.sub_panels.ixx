@@ -14,6 +14,30 @@ namespace mo_yanxi::game::ui{
 	export struct grid_editor_viewport;
 
 
+	template <typename T, std::size_t depth = 1>
+		requires (depth > 0)
+	struct nested_panel_base{
+	protected:
+		T& get_main_panel(this const auto& self) noexcept{
+			auto p = static_cast<const elem&>(self).get_parent();
+			for(auto i = 1; i < depth; ++i){
+				p = p->get_parent();
+			}
+
+#if DEBUG_CHECK
+			return dynamic_cast<T&>(*p);
+#else
+			return static_cast<T&>(*p);
+#endif
+		}
+	};
+
+
+	enum struct refresh_channel{
+		all,
+		indirect,
+	};
+
 	struct grid_editor_panel_base{
 	protected:
 		friend grid_detail_pane;
@@ -23,7 +47,7 @@ namespace mo_yanxi::game::ui{
 			return get(static_cast<const elem&>(self));
 		}
 
-		virtual void refresh(){
+		virtual void refresh(refresh_channel channel){
 
 		}
 
@@ -36,7 +60,7 @@ namespace mo_yanxi::game::ui{
 		meta::chamber::grid_structural_statistic statistic{};
 
 	public:
-		struct entry : ui::table{
+		struct entry : ui::table, nested_panel_base<grid_structural_panel, 3>{
 			const meta::chamber::grid_building* identity{};
 
 			[[nodiscard]] entry(scene* scene, group* group, const meta::chamber::grid_building* identity)
@@ -49,10 +73,6 @@ namespace mo_yanxi::game::ui{
 			void on_focus_changed(bool is_focused) override;
 
 		private:
-			[[nodiscard]] grid_structural_panel& get_main_panel() const noexcept{
-				return *get_parent()->get_parent()->get_parent<grid_structural_panel, DEBUG_CHECK>();
-			}
-
 			void build();
 		};
 
@@ -62,10 +82,51 @@ namespace mo_yanxi::game::ui{
 			build();
 		}
 
-		void refresh() override;
+		void refresh(refresh_channel channel) override;
 
 	private:
 		list& get_entries_list() const noexcept;
+		void build();
+	};
+
+	struct power_state_panel : ui::list, grid_editor_panel_base{
+
+	private:
+		struct bar_drawer : ui::elem, nested_panel_base<power_state_panel>{
+			using elem::elem;
+
+			void draw_content(const rect clipSpace) const override;
+
+		};
+
+	public:
+		[[nodiscard]] power_state_panel(scene* scene, group* parent)
+			: list(scene, parent){
+			build();
+		}
+
+		void refresh(refresh_channel channel) override;
+
+	private:
+		void build();
+
+	};
+
+	struct maneuvering_panel : ui::list, grid_editor_panel_base{
+	private:
+		ecs::chamber::maneuver_subsystem subsystem{};
+
+	public:
+		[[nodiscard]] maneuvering_panel(scene* scene, group* parent)
+			: list(scene, parent){
+			build();
+		}
+
+		void refresh(refresh_channel channel) override;
+
+	private:
+
+	private:
 		void build();
 	};
 }

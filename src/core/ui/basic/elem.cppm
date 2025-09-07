@@ -617,7 +617,7 @@ namespace mo_yanxi::ui{
 			layout_state.clear();
 		}
 
-		void exhaustedLayout(){
+		void exhausted_layout(){
 			std::size_t count{};
 			while(layout_state.is_changed() || layout_state.is_children_changed()){
 				layout();
@@ -846,6 +846,26 @@ namespace mo_yanxi::ui{
 	};
 
 	void iterateAll_DFSImpl(math::vec2 cursorPos, std::vector<elem*>& selected, elem* current);
+
+	export
+	template <std::derived_from<elem> D, std::derived_from<elem> B>
+	D& elem_cast(B& b){
+#if DEBUG_CHECK
+		return dynamic_cast<D&>(b);
+#else
+		return static_cast<D&>(b);
+#endif
+	}
+
+	export
+	template <std::derived_from<elem> D, std::derived_from<elem> B>
+	const D& elem_cast(const B& b){
+#if DEBUG_CHECK
+		return dynamic_cast<const D&>(b);
+#else
+		return static_cast<const D&>(b);
+#endif
+	}
 
 	export
 	namespace util{

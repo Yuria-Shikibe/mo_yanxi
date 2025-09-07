@@ -23,6 +23,7 @@ mo_yanxi::game::srl::chunk_serialize_handle mo_yanxi::game::meta::srl::write_gri
 	for (const auto & grid_tile : grid.get_tiles()){
 		auto& tile = *gridMsg.add_tiles();
 		tile.set_placeable(grid_tile.placeable);
+		tile.set_is_corridor(grid_tile.is_corridor);
 	}
 
 	std::vector buildings{std::from_range, grid.get_buildings() | std::views::transform([](auto& v){return std::addressof(v);})};
@@ -88,6 +89,13 @@ void mo_yanxi::game::meta::srl::read_grid(std::istream& stream, chamber::grid& g
 		}
 
 		grid = {extent, origin_coord, std::move(tiles)};
+
+		for(unsigned idx = 0; idx < grid.get_tiles().size(); ++idx){
+			math::upoint2 pos{idx % extent.x, idx / extent.x};
+			grid.set_corridor_at(pos, gridMsg.tiles(idx).is_corridor());
+		}
+
+		grid.optimal_corridor_group_id();
 	}
 
 	for (const auto & building : gridMsg.buildings()){

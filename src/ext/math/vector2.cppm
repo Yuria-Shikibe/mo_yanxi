@@ -1007,6 +1007,10 @@ namespace mo_yanxi::math{
 		// 	return std::weak_ordering::equivalent;
 		// }
 
+		[[nodiscard]] PURE_FN FORCE_INLINE bool within(const vector2 src, const vector2 dst) const noexcept{
+			return x >= src.x && y >= src.y && x < dst.x && y < dst.y;
+		}
+
 		template <mo_yanxi::arithmetic TN>
 		[[nodiscard]] PURE_FN  FORCE_INLINE constexpr vector2<TN> as() const noexcept{
 			if constexpr (std::same_as<TN, T>){

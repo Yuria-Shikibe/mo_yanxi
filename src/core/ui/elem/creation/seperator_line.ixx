@@ -42,6 +42,10 @@ namespace mo_yanxi::ui::creation{
 			}
 			rst.cell.saturate = true;
 		}
+
+		void operator()(const cell_create_result<elem_type, partial_mastering_cell> rst) const noexcept{
+			rst.cell.set_size(stroke);
+		}
 	};
 
 	export

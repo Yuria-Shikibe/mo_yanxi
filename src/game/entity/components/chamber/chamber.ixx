@@ -19,7 +19,7 @@ namespace mo_yanxi::game::ecs::chamber{
 		auto& g = *this->grid().meta_grid;
 		auto index = g.coord_to_index(region_.src);
 
-		return g.tile_at(index.value()).building;
+		return g[index.value()].building;
 	}
 
 	void maneuver_subsystem::update(const chamber_manifold& manifold) noexcept{
@@ -28,10 +28,8 @@ namespace mo_yanxi::game::ecs::chamber{
 		torque_ = {};
 		boost_ = {};
 		manifold.manager.sliced_each([this](const maneuver_component& component, const building_data& data){
-			force_longitudinal_ += component.force_longitudinal;
-			force_transverse_ += component.force_transverse;
-			torque_ += component.torque_absolute + component.torque * data.region().as<float>().get_center().length();
-			boost_ += component.boost;
+			append(component, data.region().as<float>().get_center());
 		});
 	}
+
 }

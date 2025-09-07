@@ -8,6 +8,7 @@ import "game.meta.proto";
 
 message grid_tile{
   bool placeable = 1;
+  bool is_corridor = 2;
 }
 
 message grid_building{

@@ -629,9 +629,14 @@ namespace mo_yanxi::math{
 		template <mo_yanxi::arithmetic T1, mo_yanxi::arithmetic T2>
 		FORCE_INLINE constexpr rect_ortho& scl(const T1 xScl, const T2 yScl) noexcept{
 			(void)this->scl_pos<T1, T2>(xScl, yScl);
-			(void)this->scl_size<T1, T2>(xScl, yScl);
+			return this->scl_size<T1, T2>(xScl, yScl);
 
-			return *this;
+		}
+		template <mo_yanxi::arithmetic Ty>
+		FORCE_INLINE constexpr rect_ortho& scl(const Ty scl) noexcept{
+			(void)this->scl_pos<Ty, Ty>(scl, scl);
+
+			return this->scl_size<Ty, Ty>(scl, scl);
 		}
 
 		template <mo_yanxi::arithmetic N>

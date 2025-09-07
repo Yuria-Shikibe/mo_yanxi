@@ -115,6 +115,10 @@ namespace mo_yanxi::game::meta::chamber{
 	struct thurster : chamber_with_energy_status{
 		ecs::chamber::maneuver_component maneuver{};
 
+		[[nodiscard]] const ecs::chamber::maneuver_component* get_maneuver_comp() const noexcept override{
+			return &maneuver;
+		}
+
 		ecs::chamber::build_ptr create_instance_chamber(ecs::chamber::chamber_manifold& grid, math::point2 where) const override;
 
 		void install(ecs::chamber::build_ref build_ref) const override;

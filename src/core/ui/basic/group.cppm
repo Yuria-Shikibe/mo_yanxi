@@ -256,11 +256,7 @@ namespace mo_yanxi::ui{
 
 		template <std::derived_from<elem> Ty = elem>
 		[[nodiscard]] Ty& at(std::size_t index) const noexcept{
-#if DEBUG_CHECK
-			return dynamic_cast<Ty&>(*children.at(index));
-#else
-			return static_cast<Ty&>(*children.at(index));
-#endif
+			return elem_cast<Ty>(*children.at(index));
 		}
 
 	protected:

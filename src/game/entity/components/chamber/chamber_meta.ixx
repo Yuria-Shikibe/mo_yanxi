@@ -5,6 +5,7 @@ module;
 export module mo_yanxi.game.ecs.component.chamber:chamber_meta;
 
 import :decl;
+import :grid_maneuver;
 
 export import mo_yanxi.game.ecs.component.chamber.general;
 export import mo_yanxi.game.srl;
@@ -180,8 +181,9 @@ namespace mo_yanxi::game::meta::chamber{
 	struct basic_chamber{
 		std::string_view name;
 		category category;
-
 		math::usize2 extent;
+
+		unsigned mass;
 		ecs::static_hit_point hit_point;
 
 		bool has_placement_direction;
@@ -211,6 +213,10 @@ namespace mo_yanxi::game::meta::chamber{
 
 		[[nodiscard]] virtual graphic::color get_edit_outline_color() const noexcept{
 			return graphic::colors::aqua;
+		}
+
+		[[nodiscard]] virtual const ecs::chamber::maneuver_component* get_maneuver_comp() const noexcept{
+			return nullptr;
 		}
 
 		virtual void draw(math::frect region, graphic::renderer_ui_ref renderer_ui, const graphic::camera2& camera) const{

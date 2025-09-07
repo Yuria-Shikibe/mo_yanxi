@@ -42,7 +42,12 @@ std::optional<mo_yanxi::font::typesetting::layout_pos_t> mo_yanxi::ui::label::ge
 
 void mo_yanxi::ui::label::draw_text() const{
 	draw_acquirer acquirer{graphic::renderer_from_erased(get_renderer()).batch};
-	graphic::draw::glyph_layout(acquirer, glyph_layout, get_glyph_abs_src(), property.graphic_data.get_opacity() * (disabled ? 0.3f : 1.f));
+	if(text_color_scl){
+		graphic::draw::glyph_layout(acquirer, glyph_layout, get_glyph_abs_src(), *text_color_scl, property.graphic_data.get_opacity() * (disabled ? 0.3f : 1.f));
+	}else{
+		graphic::draw::glyph_layout(acquirer, glyph_layout, get_glyph_abs_src(), property.graphic_data.get_opacity() * (disabled ? 0.3f : 1.f));
+	}
+
 }
 
 void mo_yanxi::ui::label::draw_content(const rect clipSpace) const{

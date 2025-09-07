@@ -959,14 +959,17 @@ namespace mo_yanxi::math {
 	 * @param b the second value.
 	 * @param tolerance represent an upper bound below which the two values are considered equal.
 	 */
-	export MATH_ATTR bool equal(const float a, const float b, const float tolerance) noexcept {
+	export MATH_ATTR constexpr bool equal(const float a, const float b, const float tolerance) noexcept {
 		return abs(a - b) <= tolerance;
 	}
 
 	export
 	template <arithmetic T>
-	MATH_ATTR T mod(const T x, const T n) noexcept {
+	MATH_ATTR constexpr T mod(const T x, const T n) noexcept {
 		if constexpr(std::floating_point<T>) {
+			if consteval{
+				return x - static_cast<T>(static_cast<long long>(x / n)) * n;
+			}
 			return std::fmod(x, n);
 		} else {
 			return x % n;
