@@ -13,6 +13,13 @@ else
 end
 
 add_requires("glfw")
+add_requires("spirv-cross")
+if is_mode("debug") then
+    add_requireconfs("spirv-cross", {configs = {runtimes = "MDd", debug = true}})
+else
+    add_requireconfs("spirv-cross", {configs = {runtimes = "MD", debug = false}})
+end
+
 --[[ , {configs = {
                              toolchains = "clang-cl"
                          }}) ]]
@@ -90,6 +97,7 @@ target("mo_yanxi")
     add_files("src/**.cpp")
 
     add_packages("glfw")
+    add_packages("spirv-cross")
     add_packages("msdfgen")
     add_packages("freetype")
 

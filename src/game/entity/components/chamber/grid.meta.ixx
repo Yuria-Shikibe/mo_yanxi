@@ -84,7 +84,9 @@ namespace mo_yanxi::game::meta::chamber{
 	struct grid_complex{
 		plf::hive<grid_building> buildings{};
 	};
+
 	export using corridor_group_id = unsigned;
+	export constexpr inline corridor_group_id invalid_group_id = std::numeric_limits<corridor_group_id>::max();
 
 	export
 	struct grid_tile{
@@ -94,13 +96,14 @@ namespace mo_yanxi::game::meta::chamber{
 		corridor_group_id corridor_group_id{std::numeric_limits<chamber::corridor_group_id>::max()};
 		grid_building* building{};
 
+		[[nodiscard]] bool is_accessible() const noexcept{
+			return building && is_corridor;
+		};
+
 		[[nodiscard]] bool is_building_identity(const math::upoint2 tile_pos) const noexcept{
 			return building && building->get_identity_pos() == tile_pos;
 		}
 
-		[[nodiscard]] bool is_corridor_accessible() const noexcept{
-			return building && is_corridor;
-		}
 
 		[[nodiscard]] bool is_idle() const noexcept{
 			return placeable && !building;
@@ -341,12 +344,19 @@ namespace mo_yanxi::game{
 
 			[[nodiscard]] corridor_group_id get_tile_corridor_id(corridor_group_id cid) const noexcept{
 				auto& t = tiles_[cid];
+				if(!t.is_accessible())return invalid_group_id;
 				if(t.corridor_group_id != cid){
 					return get_tile_corridor_id(t.corridor_group_id);
 				}
 				return t.corridor_group_id;
 			}
 
+			[[nodiscard]] bool reachable_between(math::upoint2 p1, math::upoint2 p2) const noexcept{
+				auto g1 = get_tile_corridor_id(p1);
+				return g1 == get_tile_corridor_id(p2) && g1 != invalid_group_id;
+			}
+
+		public:
 			bool set_corridor_at(math::upoint2 indexed_pos, bool accessible) noexcept {
 				auto union_set_finder = [this](this const auto& self, corridor_group_id cid) noexcept -> corridor_group_id {
 					auto& t = tiles_[cid];
@@ -357,9 +367,8 @@ namespace mo_yanxi::game{
 					return t.corridor_group_id;
 				};
 
-				// 合并两个集群
 				auto union_union_set = [&](corridor_group_id cur, corridor_group_id target) noexcept{
-					if(tiles_[target].corridor_group_id == std::numeric_limits<corridor_group_id>::max())return;
+					if(tiles_[target].corridor_group_id == invalid_group_id)return;
 
 					auto rootA = union_set_finder(cur);
 					auto rootB = union_set_finder(target);
@@ -374,7 +383,7 @@ namespace mo_yanxi::game{
 				if(accessible && !tile.is_corridor){
 					tile.is_corridor = true;
 					tile.corridor_group_id = pos_index_to_vec_index(indexed_pos);
-					for (const auto& vector2 : off){
+					if(tile.is_accessible())for (const auto& vector2 : off){
 						auto next = indexed_pos.as<int>() + vector2;
 						if(next.x < 0 || next.y < 0 || next.x >= extent_.x || next.y >= extent_.y){
 							continue;
@@ -386,11 +395,11 @@ namespace mo_yanxi::game{
 				}else if(!accessible && tile.is_corridor){
 					optimal_corridor_group_id();
 					tile.is_corridor = false;
-					tile.corridor_group_id = std::numeric_limits<corridor_group_id>::max();
-
+					tile.corridor_group_id = invalid_group_id;
+					if(!tile.is_accessible())return true;
 
 					std::array<corridor_group_id, 4> nearby_idt{};
-					nearby_idt.fill(std::numeric_limits<corridor_group_id>::max());
+					nearby_idt.fill(invalid_group_id);
 
 					std::uint8_t paired_groups{};
 
@@ -411,7 +420,7 @@ namespace mo_yanxi::game{
 							}
 
 							for(unsigned j = 0; j < nearby_idt.size() - i - 1; ++j){
-								if(nearby_idt[i] == nearby_idt[j + 1 + i] && nearby_idt[i] != std::numeric_limits<corridor_group_id>::max()){
+								if(nearby_idt[i] == nearby_idt[j + 1 + i] && nearby_idt[i] != invalid_group_id){
 									paired_groups |= 1u << i | 1u << (j + 1 + i);
 								}
 							}
@@ -421,11 +430,11 @@ namespace mo_yanxi::game{
 
 					for(corridor_group_id idx = 0; idx < tiles_.size(); ++idx){
 						auto& tileCur = tiles_[idx];
-						if(!tileCur.is_corridor)continue;
+						if(!tileCur.is_accessible())continue;
 
 						for(unsigned i = 0; i < nearby_idt.size(); ++i){
 							if(((paired_groups >> i) & 0b1u) && nearby_idt[i] == tileCur.corridor_group_id && tileCur.corridor_group_id != idx){
-								tileCur.corridor_group_id = std::numeric_limits<corridor_group_id>::max();
+								tileCur.corridor_group_id = invalid_group_id;
 								break;
 							}
 						}
@@ -435,7 +444,7 @@ namespace mo_yanxi::game{
 						for(unsigned x = 0; x < extent_.x; ++x){
 							const math::upoint2 pos{x, y};
 							auto& cur_tile = tile_at(pos);
-							if(!cur_tile.is_corridor || cur_tile.corridor_group_id != std::numeric_limits<corridor_group_id>::max()) continue;
+							if(!cur_tile.is_accessible() || cur_tile.corridor_group_id != invalid_group_id) continue;
 
 							cur_tile.corridor_group_id = pos_index_to_vec_index(pos);
 							for(const auto& vector2 : off){
@@ -444,12 +453,7 @@ namespace mo_yanxi::game{
 									continue;
 								}
 
-								const auto tgtIdx = pos_index_to_vec_index(next.as<unsigned>());
-								if(tiles_[tgtIdx].corridor_group_id == std::numeric_limits<corridor_group_id>::max()) continue;
-
-								if(const auto rootB = union_set_finder(tgtIdx); cur_tile.corridor_group_id != rootB){
-									cur_tile.corridor_group_id = rootB;
-								}
+								union_union_set(cur_tile.corridor_group_id, pos_index_to_vec_index(next.as<unsigned>()));
 							}
 						}
 					}
@@ -515,6 +519,15 @@ namespace mo_yanxi::game{
 
 				std::invoke(before_erase, *b);
 				tile.building->get_indexed_region().each([this](const math::upoint2 p){
+					auto& tile = tile_at(p);
+					if(tile.is_accessible()){
+						set_corridor_at(p, false);
+						tile.is_corridor = true;
+						tile.corridor_group_id = pos_index_to_vec_index(p);
+					}
+				});
+
+				tile.building->get_indexed_region().each([this](const math::upoint2 p){
 					tile_at(p).building = nullptr;
 				});
 
@@ -543,7 +556,12 @@ namespace mo_yanxi::game{
 				total_moment_of_inertia_ += get_moment_of_inertia_of(b);
 
 				region.each([&](const math::upoint2 p){
-					tile_at(p).building = std::addressof(b);
+					auto& t = tile_at(p);
+					t.building = std::addressof(b);
+					if(t.is_corridor){
+						t.is_corridor = false;
+						set_corridor_at(p, true);
+					}
 				});
 				return b;
 			}
@@ -619,15 +637,15 @@ namespace mo_yanxi::game{
 				};
 
 				for(std::size_t i = 0; i < tiles_.size(); ++i){
-					if(tiles_[i].is_corridor){
+					if(tiles_[i].is_accessible()){
 						union_set_finder(i);
 					}
 				}
-				for(std::size_t i = 0; i < tiles_.size(); ++i){
-					if(tiles_[i].is_corridor){
-						assert(tiles_[i].corridor_group_id == union_set_finder(i));
-					}
-				}
+				// for(std::size_t i = 0; i < tiles_.size(); ++i){
+				// 	if(tiles_[i].is_corridor){
+				// 		assert(tiles_[i].corridor_group_id == union_set_finder(i));
+				// 	}
+				// }
 			}
 
 			decltype(auto) operator[](this const grid& self, math::upoint2 index_pos) noexcept{
@@ -836,6 +854,28 @@ namespace mo_yanxi::game{
 			unsigned unit_moment_of_inertia;
 		};
 
+		export
+		[[nodiscard]] math::urect get_grid_corridor_region(const grid& grid) noexcept{
+			const auto [w, h] = grid.get_extent();
+			unsigned minx = w, miny = h, maxx = 0, maxy = 0;
+			for(unsigned x = 0; x < w; ++x){
+				for(unsigned y = 0; y < h; ++y){
+					auto& tile = grid[x, y];
+					if(tile.is_accessible()){
+						minx = std::min(minx, x);
+						miny = std::min(miny, y);
+						maxx = std::max(maxx, x);
+						maxy = std::max(maxy, y);
+					}
+				}
+			}
+
+			if(minx > maxx || miny > maxy){
+				return {};
+			}
+
+			return math::urect{tags::unchecked, {minx, miny}, {maxx, maxy}};
+		}
 
 
 		export

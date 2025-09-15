@@ -79,8 +79,9 @@ void mo_yanxi::game::meta::srl::read_grid(std::istream& stream, chamber::grid& g
 		}
 	}
 
+	auto extent = io::extract<math::u32size2>(gridMsg.extent());
+
 	{
-		auto extent = io::extract<math::u32size2>(gridMsg.extent());
 		auto origin_coord = io::extract<math::i32point2>(gridMsg.origin_coord());
 
 		std::vector<chamber::grid_tile> tiles{extent.area()};
@@ -90,12 +91,6 @@ void mo_yanxi::game::meta::srl::read_grid(std::istream& stream, chamber::grid& g
 
 		grid = {extent, origin_coord, std::move(tiles)};
 
-		for(unsigned idx = 0; idx < grid.get_tiles().size(); ++idx){
-			math::upoint2 pos{idx % extent.x, idx / extent.x};
-			grid.set_corridor_at(pos, gridMsg.tiles(idx).is_corridor());
-		}
-
-		grid.optimal_corridor_group_id();
 	}
 
 	for (const auto & building : gridMsg.buildings()){
@@ -135,4 +130,12 @@ void mo_yanxi::game::meta::srl::read_grid(std::istream& stream, chamber::grid& g
 
 		}
 	}
+
+
+	for(unsigned idx = 0; idx < grid.get_tiles().size(); ++idx){
+		math::upoint2 pos{idx % extent.x, idx / extent.x};
+		grid.set_corridor_at(pos, gridMsg.tiles(idx).is_corridor());
+	}
+
+	grid.optimal_corridor_group_id();
 }

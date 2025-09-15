@@ -18,6 +18,7 @@ import mo_yanxi.vk.util.uniform;
 import mo_yanxi.graphic.post_processor.bloom;
 import mo_yanxi.graphic.post_processor.ssao;
 import mo_yanxi.graphic.post_processor.oit_blender;
+import mo_yanxi.graphic.post_processor.anti_aliasing;
 
 import std;
 
@@ -333,38 +334,38 @@ namespace mo_yanxi::graphic{
 					post_process_socket{
 						.image = oit_image_head.get_image(),
 						.view = oit_image_head.get_image_view(),
-						.layout = VK_IMAGE_LAYOUT_GENERAL,
+						.src_layout = VK_IMAGE_LAYOUT_GENERAL,
 						.queue_family_index = context().graphic_family()
 					},
 					post_process_socket{
 						.image = depth,
 						.view = depth_view_d32f,
-						.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+						.src_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 						.queue_family_index = context().graphic_family()
 					},
 					post_process_socket{
 						.image = draw_attachments.color_base.get_image(),
 						.view = draw_attachments.color_base.get_image_view(),
-						.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+						.src_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 						.queue_family_index = context().graphic_family()
 					},
 					post_process_socket{
 						.image = draw_attachments.color_light.get_image(),
 						.view = draw_attachments.color_light.get_image_view(),
-						.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+						.src_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 						.queue_family_index = context().graphic_family()
 					},
 				}, {
 					post_process_socket{
 						.image = mid_attachments.color_base.get_image(),
 						.view = mid_attachments.color_base.get_image_view(),
-						.layout = VK_IMAGE_LAYOUT_GENERAL,
+						.src_layout = VK_IMAGE_LAYOUT_GENERAL,
 						.queue_family_index = context().compute_family()
 					},
 					post_process_socket{
 						.image = mid_attachments.color_light.get_image(),
 						.view = mid_attachments.color_light.get_image_view(),
-						.layout = VK_IMAGE_LAYOUT_GENERAL,
+						.src_layout = VK_IMAGE_LAYOUT_GENERAL,
 						.queue_family_index = context().compute_family()
 					},
 				});
@@ -489,8 +490,10 @@ namespace mo_yanxi::graphic{
 		//
 		// //Post Process
 		vk::storage_image merge_result{};
+		vk::storage_image aa_result{};
 		bloom_post_processor bloom{};
 		ssao_post_processor ssao{};
+		anti_aliasing anti_alias{};
 
 		[[nodiscard]] renderer_world() = default;
 
@@ -500,6 +503,9 @@ namespace mo_yanxi::graphic{
 			renderer(context, export_target, "renderer.world"),
 			batch(context),
 			merge_result{
+				context.get_allocator(), context.get_extent(), 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+			},
+			aa_result{
 				context.get_allocator(), context.get_extent(), 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
 			},
 
@@ -514,12 +520,17 @@ namespace mo_yanxi::graphic{
 				assets::graphic::shaders::comp::ssao,
 				assets::graphic::samplers::blit_sampler
 			},
+			anti_alias{
+				context, std::bit_cast<math::usize2>(context.get_extent()),
+				assets::graphic::shaders::comp::anti_aliasing,
+				assets::graphic::samplers::blit_sampler
+			},
 			merge_descriptor_layout(context.get_device(), [](vk::descriptor_layout_builder& builder){
 				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
-				builder.push_seq(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT);
+				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 			}),
 
 			merge_descriptor_buffer{
@@ -540,8 +551,9 @@ namespace mo_yanxi::graphic{
 			set_merger_state();
 			set_bloom_state();
 			set_ssao_state();
+			set_aa_state();
 
-			set_export(merge_result);
+			set_export(aa_result);
 		}
 
 		void update(float delta_in_tick){
@@ -560,6 +572,7 @@ namespace mo_yanxi::graphic{
 			batch.resize(extent);
 
 			merge_result.resize(extent);
+			aa_result.resize(extent);
 
 			{
 				const auto cmd = context().get_transient_compute_command_buffer();
@@ -573,6 +586,11 @@ namespace mo_yanxi::graphic{
 					{extent.width, extent.height},
 					false);
 
+				anti_alias.resize(
+					cmd,
+					{extent.width, extent.height},
+					false);
+
 				init_layout(cmd);
 			}
 
@@ -580,8 +598,9 @@ namespace mo_yanxi::graphic{
 			set_merger_state();
 			set_bloom_state();
 			set_ssao_state();
+			set_aa_state();
 
-			set_export(merge_result);
+			set_export(aa_result);
 		}
 
 		void post_process() const{
@@ -591,7 +610,8 @@ namespace mo_yanxi::graphic{
 					batch.oit_blender.get_main_command_buffer(),
 					ssao.get_main_command_buffer(),
 					bloom.get_main_command_buffer(),
-					merge_command.get()
+					merge_command.get(),
+					anti_alias.get_main_command_buffer()
 				});
 		}
 
@@ -612,7 +632,7 @@ namespace mo_yanxi::graphic{
 				graphic::post_process_socket{
 					.image = batch.mid_attachments.color_light.get_image(),
 					.view = batch.mid_attachments.color_light.get_image_view(),
-					.layout = VK_IMAGE_LAYOUT_GENERAL,
+					.src_layout = VK_IMAGE_LAYOUT_GENERAL,
 					.queue_family_index = context().compute_family(),
 				}
 			});
@@ -624,7 +644,7 @@ namespace mo_yanxi::graphic{
 			.set_storage_image(1, batch.mid_attachments.color_base.get_image_view())
 			.set_storage_image(2, batch.mid_attachments.color_light.get_image_view())
 			.set_storage_image(3, bloom.get_output().view)
-			.set_image(4, ssao.get_output().view, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, assets::graphic::samplers::blit_sampler);
+			.set_storage_image(4, ssao.get_output().view);
 
 		}
 
@@ -633,28 +653,35 @@ namespace mo_yanxi::graphic{
 				post_process_socket{
 					.image = batch.depth,
 					.view = batch.depth_view_d32f,
-					.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+					.src_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 					.queue_family_index = context().graphic_family()
 				}});
+		}
+
+		void set_aa_state(){
+			anti_alias.set_input({
+				post_process_socket{
+					.image = merge_result.get_image(),
+					.view = merge_result.get_image_view(),
+					.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+					.queue_family_index = context().compute_family()
+				}});
+
+			anti_alias.set_output({
+				post_process_socket{
+					.image = aa_result.get_image(),
+					.view = aa_result.get_image_view(),
+					.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+					.queue_family_index = context().compute_family()
+				}});
+
+			anti_alias.after_set_sockets();
 		}
 
 		void create_merge_commands(){
 			vk::scoped_recorder scoped_recorder{merge_command, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
 			vk::cmd::dependency_gen dependency{};
-
-			// for(std::size_t i = 0; i < world_batch_attachments::size - 1; ++i){
-			// 	dependency.push(
-			// 		batch.mid_attachments[i].get_image(),
-			// 		VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-			// 		VK_ACCESS_2_SHADER_READ_BIT,
-			// 		VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-			// 		VK_ACCESS_2_SHADER_READ_BIT,
-			// 		VK_IMAGE_LAYOUT_GENERAL,
-			// 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			// 		vk::image::default_image_subrange
-			// 	);
-			// }
 
 			dependency.apply(scoped_recorder);
 

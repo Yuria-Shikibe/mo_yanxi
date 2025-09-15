@@ -46,6 +46,10 @@ namespace mo_yanxi::vk{
 			  }(this->image.get(), image_view_create_info)){
 		}
 
+		explicit operator bool() const noexcept{
+			return static_cast<bool>(image);
+		}
+
 		[[nodiscard]] const vk::image& get_image() const noexcept{
 			return image;
 		}
@@ -379,7 +383,6 @@ namespace mo_yanxi::vk{
 
 	private:
 		VkImageUsageFlags usage{};
-
 		VkFormat format{};
 		std::uint32_t mip_level{};
 
@@ -391,7 +394,8 @@ namespace mo_yanxi::vk{
 			const VkExtent2D extent,
 			const std::uint32_t mip_level = 1,
 			const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM,
-			const VkImageUsageFlags usage = default_usage)
+			const VkImageUsageFlags usage = default_usage
+			)
 			: combined_image({
 				                 allocator,
 				                 {extent.width, extent.height, 1},

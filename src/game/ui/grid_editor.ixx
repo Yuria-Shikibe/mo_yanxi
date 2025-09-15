@@ -30,7 +30,7 @@ import mo_yanxi.game.ecs.component.hitbox;
 
 import std;
 
-export import :sub_panels;
+import :sub_panels;
 
 namespace mo_yanxi::game{
 
@@ -369,15 +369,20 @@ namespace mo_yanxi::game{
 			using index_coord = math::upoint2;
 
 			meta::chamber::grid grid{};
-
+			meta::chamber::path_finder path_finder{};
 			chamber_meta current_chamber{};
 			meta::chamber::grid_building* selected_building{};
 
-			mirrow_mode_channel mirrow_channel{};
 
 			std::move_only_function<void(const grid_editor_viewport&) const> subpanel_drawer{};
 
 		private:
+			std::optional<math::point2> path_src{};
+			std::optional<math::point2> path_dst{};
+			meta::chamber::ideal_path_finder_request* current_request{};
+
+			mirrow_mode_channel mirrow_channel{};
+
 			meta::chamber::ui_edit_context edit_context{};
 
 			math::vec2 operation_initial{};
@@ -438,9 +443,6 @@ namespace mo_yanxi::game{
 			[[nodiscard]] math::frect get_region_at(math::urect region_in_index) const noexcept{
 				return get_region_at(region_in_index.as<int>().move(grid.get_origin_offset()));
 			}
-
-			[[nodiscard]] static math::point2 get_world_pos_to_tile_coord(math::vec2 coord) noexcept;
-
 
 		private:
 
@@ -562,19 +564,50 @@ namespace mo_yanxi::game{
 					}
 				}else if(grid_detail_pane_->is_focused_on(detail_pane_mode::corridor)){
 					if(click_event.code.on_release()){
-						selection_each({1, 1}, [&, this](math::upoint2 idx){
-							switch(click_event.code.key()){
-								case mouse::LMB :{
-									grid.set_corridor_at(idx, true);
-									break;
+						if(click_event.code.mode() & mode::alt){
+							auto p = get_world_pos_to_tile_coord(get_transferred_cursor_pos());
+							setter:
+							if(!path_src){
+								path_src = p;
+							}else{
+								if(!path_dst){
+									path_dst = p;
+
+									if(
+										auto
+											srcidx = grid.coord_to_index(*path_src),
+											dstidx = grid.coord_to_index(*path_dst);
+										srcidx && dstidx){
+										if(current_request){
+											path_finder.reacquire_path(*current_request, grid, *srcidx, *dstidx);
+										}else{
+											current_request = path_finder.acquire_path(grid, *srcidx, *dstidx);
+										}
+
+									}
+								}else{
+									path_src = path_dst = std::nullopt;
+									goto setter;
 								}
-								case mouse::RMB :{
-									grid.set_corridor_at(idx, false);
-									break;
-								}
-								default : break;
 							}
-						});
+
+
+						}else{
+							selection_each({1, 1}, [&, this](math::upoint2 idx){
+								switch(click_event.code.key()){
+									case mouse::LMB :{
+										grid.set_corridor_at(idx, true);
+										break;
+									}
+									case mouse::RMB :{
+										grid.set_corridor_at(idx, false);
+										break;
+									}
+									default : break;
+								}
+							});
+						}
+
 					}
 				}else{
 					if(last_click_ && click_event.code.on_release()){
@@ -715,7 +748,8 @@ namespace mo_yanxi::game{
 				return {cur};
 			}
 
-			[[nodiscard]] static math::point2 get_world_to_tile(math::vec2 pos_in_world) noexcept{
+			[[nodiscard]] static math::point2 get_world_pos_to_tile_coord(math::vec2 pos_in_world) noexcept{
+
 				return pos_in_world.div(ecs::chamber::tile_size).floor().round<int>();
 			}
 

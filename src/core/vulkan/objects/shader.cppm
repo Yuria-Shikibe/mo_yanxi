@@ -14,6 +14,8 @@ export namespace mo_yanxi::vk{
 	private:
 		exclusive_handle_member<VkDevice> device{};
 		VkShaderStageFlagBits declStage{};
+		std::vector<std::uint32_t> binary{};
+		std::string name{};
 
 	public:
 		static constexpr std::array ShaderType{
@@ -30,17 +32,20 @@ export namespace mo_yanxi::vk{
 			createShaderModule(code);
 		}
 
-		[[nodiscard]] shader_module(VkDevice device, const std::string_view path) : device(device){
-			const std::filesystem::path p{path};
-			createShaderModule(p);
-			declShaderStage(p);
-		}
-		[[nodiscard]] shader_module(VkDevice device, const std::filesystem::path& path) : device(device){
+		[[nodiscard]] shader_module(VkDevice device, const std::filesystem::path& path) : device(device), name(path.stem().string()){
 			createShaderModule(path);
 			declShaderStage(path);
 		}
 
+		[[nodiscard]] shader_module(VkDevice device, const std::string_view path) : shader_module(device, std::filesystem::path{path}){
+
+		}
+
 		[[nodiscard]] shader_module() = default;
+
+		[[nodiscard]] std::string_view get_name() const noexcept{
+			return name;
+		}
 
 		[[nodiscard]] VkDevice get_device() const noexcept{
 			return device;
@@ -116,6 +121,8 @@ export namespace mo_yanxi::vk{
 			if(auto rst = vkCreateShaderModule(device, &createInfo, nullptr, &handle)){
 				throw vk_error(rst, "Failed to create shader module!");
 			}
+
+			binary = std::vector<std::uint32_t>{std::from_range, code};
 		}
 
 		void createShaderModule(const std::filesystem::path& file){
@@ -124,6 +131,11 @@ export namespace mo_yanxi::vk{
 			}
 
 			createShaderModule(io::read_bytes<std::uint32_t>(file).value());
+		}
+
+	public:
+		[[nodiscard]] std::span<const std::uint32_t> get_binary() const noexcept{
+			return binary;
 		}
 	};
 

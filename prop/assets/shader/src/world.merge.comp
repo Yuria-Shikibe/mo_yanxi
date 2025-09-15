@@ -8,25 +8,13 @@ layout (set = 0, binding = 0, rgba32f) restrict uniform writeonly image2D target
 layout (set = 0, binding = 1, rgba32f) restrict uniform readonly image2D tex_base;
 layout (set = 0, binding = 2, rgba32f) restrict uniform readonly image2D tex_light_src;
 layout (set = 0, binding = 3, rgba32f) restrict uniform readonly image2D tex_light_bloom;
-layout (set = 0, binding = 4) uniform sampler2D tex_ssao;
+layout (set = 0, binding = 4, rgba32f) restrict uniform readonly image2D tex_ssao;
 
 const vec3 tent_kernal[9] = {
     vec3(-1,  1, 1.f / 16.f), vec3(0,  1, 2.f / 16.f), vec3(1,  1, 1.f / 16.f),
     vec3(-1,  0, 2.f / 16.f), vec3(0,  0, 4.f / 16.f), vec3(1,  0, 2.f / 16.f),
     vec3(-1, -1, 1.f / 16.f), vec3(0, -1, 2.f / 16.f), vec3(1, -1, 1.f / 16.f)
 };
-
-vec4 blur(const vec2 where, const vec2 size_inv, const float scale, sampler2D tex){
-    vec4 color = vec4(0);
-
-    for(int i = 0; i < 9; ++i){
-        vec3 ker = vec3(tent_kernal[i]);
-        vec4 sampled = texture(tex, where + scale * ker.xy * size_inv);
-        color += sampled * ker.z;
-    }
-
-    return color;
-}
 
 float smooth_max(float a, float b, float k) {
     float m = max(a, b);
@@ -55,8 +43,9 @@ void main() {
     const vec2 size_inv = vec2(1) / vec2(imageSize(target));
     const vec2 uv = (vec2(pos) + vec2(0.5f, 0.5f)) * size_inv;
 
+
     vec4 color_base = imageLoad(tex_base, pos);
-    vec4 color_ssao = blur(uv, size_inv, 1.25f, tex_ssao);
+    vec4 color_ssao = imageLoad(tex_ssao, pos);
     vec4 color_light_src = imageLoad(tex_light_src, pos);
     vec4 color_light_bloom = imageLoad(tex_light_bloom, pos);
 
@@ -68,7 +57,7 @@ void main() {
 
 
     float light_factor = smoothstep(0.0f, 0.25f, color_light_bloom.a + color_light_src.a);
-    occlusion = min(occlusion + light_factor * .5f, 1.f);
+//    occlusion = min(occlusion + light_factor * .5f, 1.f);
     occlusion = mix(1., occlusion, smoothstep(0.35f, 1.f, color_base.a));
     // 应用SSAO到基础颜色（可根据需求调整遮蔽强度）
     vec3 shaded_base = color_base.rgb * mix(1., occlusion, color_base.a);

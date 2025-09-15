@@ -14,14 +14,14 @@ import std;
 namespace mo_yanxi::game::ecs{
 	using arth_type = float;
 
+	using variant_t = std::variant<
+		std::monostate,
+		math::trans2,
+		entity_ref
+	>;
 
 	export
 	struct reference_target{
-		using variant_t = std::variant<
-			std::monostate,
-			math::trans2,
-			entity_ref
-		>;
 
 		[[nodiscard]] std::optional<mo_yanxi::math::trans2> get_target_trans() const noexcept;
 

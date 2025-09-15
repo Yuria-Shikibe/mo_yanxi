@@ -5,6 +5,7 @@
 export module mo_yanxi.game.ecs.component.ui.builder;
 
 export import mo_yanxi.game.ecs.component.manage;
+export import mo_yanxi.ui.primitives;
 export import mo_yanxi.ui.elem.table;
 export import mo_yanxi.ui.elem.list;
 import mo_yanxi.ui.action.generic;
@@ -12,7 +13,9 @@ import mo_yanxi.ui.action.generic;
 import std;
 
 namespace mo_yanxi::game::ecs{
-	export struct entity_info_table : ui::table{
+	export struct entity_info_table;
+
+	struct entity_info_table : ::mo_yanxi::ui::table{
 	protected:
 		entity_ref ref{};
 

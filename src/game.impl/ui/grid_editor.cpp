@@ -399,7 +399,6 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 				}
 			);
 
-
 			if(last_click_ && get_scene()->get_input_mode() & core::ctrl::mode::ctrl_shift){
 				if(get_scene()->is_mouse_pressed(core::ctrl::mouse::LMB)){
 					placement_drawer({1, 1}, [this](math::upoint2 idx){
@@ -424,6 +423,26 @@ void mo_yanxi::game::ui::grid_editor_viewport::draw_content(const rect clipSpace
 					}
 				}
 			}
+
+			if(path_dst && current_request->try_wait_done()){
+				auto pth = current_request->get_path();
+				for (auto && seq : pth){
+					math::irect rect{tags::from_extent, seq.as<int>() + grid.get_origin_offset(), 1, 1};
+					draw::fill::rect_ortho(acquirer.get(), get_region_at(rect), colors::PURPLE.copy().set_a(.3f));
+				}
+			}
+
+			if(path_src){
+				math::irect rect{tags::from_extent, *path_src, 1, 1};
+				draw::line::rect_ortho(acquirer, get_region_at(rect), 6, colors::CRIMSON.copy().set_a(.5f));
+			}
+
+			if(path_dst){
+				math::irect rect{tags::from_extent, *path_dst, 1, 1};
+				draw::line::rect_ortho(acquirer, get_region_at(rect), 6, colors::ORANGE.copy().set_a(.5f));
+			}
+
+
 
 		}else{
 			meta::chamber::draw_grid(grid, r, camera, {}, 1.f, std::bind_front(&grid_detail_pane::get_override_color, grid_detail_pane_));
@@ -512,9 +531,6 @@ mo_yanxi::math::frect mo_yanxi::game::ui::grid_editor_viewport::get_region_at(ma
 	return region_in_world.as<float>();
 }
 
-mo_yanxi::math::point2 mo_yanxi::game::ui::grid_editor_viewport::get_world_pos_to_tile_coord(math::vec2 coord) noexcept{
-	return coord.div(ecs::chamber::tile_size).floor().as<int>();
-}
 
 
 mo_yanxi::math::irect mo_yanxi::game::ui::grid_editor_viewport::get_selected_place_region(

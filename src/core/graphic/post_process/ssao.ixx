@@ -96,7 +96,7 @@ namespace mo_yanxi::graphic{
 				VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 				VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 				VK_ACCESS_2_SHADER_READ_BIT,
-				input.layout,
+				input.src_layout,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				image::depth_image_subrange,
 				input.queue_family_index,
@@ -173,6 +173,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		void resize(VkCommandBuffer command_buffer, const math::usize2 size, bool record_command) override{
+			post_processor::resize(command_buffer, size, record_command);
 			init_image_state(command_buffer);
 			(void)vk::buffer_mapper{uniform_buffer}.load(size);
 			if(record_command)record_commands();
@@ -221,7 +222,7 @@ namespace mo_yanxi::graphic{
 			outputs[0] = {
 				.image = ssao_result,
 				.view = ssao_result_view,
-				.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				.src_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				.queue_family_index = context_->compute_family()
 			};
 

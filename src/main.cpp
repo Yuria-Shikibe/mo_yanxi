@@ -113,11 +113,17 @@ import mo_yanxi.game.ui.grid_editor;
 import mo_yanxi.game.content;
 import mo_yanxi.game.meta.grid.srl;
 
+
+import mo_yanxi.graphic.shader_reflect;
+import mo_yanxi.graphic.post_process_graph;
+
+
+
 import test;
-
-
 import std;
 
+#pragma region MAIN
+#if 0
 
 void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& atlas){
 	using namespace std::literals;
@@ -775,31 +781,184 @@ void main_loop(){
 	if(async_collide.valid())async_collide.get();
 
 	context.wait_on_device();
+}
+#endif
+#pragma endregion ;
 
+void graph_test(){
+
+	using namespace mo_yanxi;
+	using namespace mo_yanxi::game;
+	using namespace mo_yanxi::graphic;
+	graphic::post_process_graph graph{core::global::graphic::context};
+	{
+		const post_process_meta bloom_meta = []{
+			post_process_meta meta{
+				assets::graphic::shaders::comp::bloom,
+				{
+					{{0}, {0, no_slot}},
+					{{1}, {no_slot, 0}},
+					{{2}, {no_slot, 0}},
+					{{3}, {no_slot, 0}},
+				}
+			};
+
+			auto& req = meta.sockets.at_out<resource_desc::image_requirement>(0);
+			req.ownership = resource_desc::ownership_type::exclusive;
+			req.mip_levels = 6;
+			req.scaled_times = 0;
+
+			return meta;
+		}();
+
+
+		auto& oit = graph.add_stage({assets::graphic::shaders::comp::oit_blend, post_process_stage_inout_map{
+			{{0}, 0, no_slot},
+			{{1}, 1, no_slot},
+			{{2}, 2, no_slot},
+			{{3}, 3, no_slot},
+			{{4}, 4, no_slot},
+			{{5}, 5, 0},
+			{{6}, 6, 1},
+		}});
+
+		auto& world_bloom = graph.add_stage(bloom_meta);
+
+		auto& ssao = graph.add_stage({assets::graphic::shaders::comp::ssao, {
+			{{0}, 0, no_slot},
+			{{1}, no_slot, 0}
+		}});
+
+		auto& world_merge = graph.add_stage({assets::graphic::shaders::comp::world_merge, {
+			{{0}, no_slot, 0},
+			{{1}, 0, no_slot},
+			{{2}, 1, no_slot},
+			{{3}, 2, no_slot},
+			{{4}, 3, no_slot},
+		}});
+
+		auto& anti_alias = graph.add_stage({assets::graphic::shaders::comp::anti_aliasing, {
+			{{1}, 0, no_slot},
+			{{2}, no_slot, 0},
+		}});
+
+		auto& ui_bloom = graph.add_stage(bloom_meta);
+
+		auto& final_merge = graph.add_stage({assets::graphic::shaders::comp::result_merge, {
+			{{0}, no_slot, 0},
+			{{1}, 0, no_slot},
+			{{2}, 1, no_slot},
+			{{3}, 2, no_slot},
+			{{4}, 3, no_slot},
+		}});
+
+		final_merge.add_dep({pass_dependency{
+			.id = &ui_bloom,
+			.dst_idx = 3
+		}, {
+			.id = &anti_alias,
+		}});
+
+		anti_alias.add_dep({
+			.id = &world_merge
+		});
+
+		world_merge.add_dep({
+			{
+				.id = &ssao,
+				.dst_idx = 3
+			}, {
+				.id = &world_bloom,
+				.dst_idx = 2
+			}, {
+				.id = &oit,
+				.src_idx = 1,
+				.dst_idx = 1
+			}, {
+				.id = &oit,
+				.src_idx = 0,
+				.dst_idx = 0
+			}});
+		world_bloom.add_dep({
+			.id = &oit,
+			.src_idx = 1
+		});
+
+		// world_bloom->add_image_requirement({
+		// 	.mip_levels = 6,
+		// 	.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+		// }, {{0, 1}, {0, 2}, {0, 3}});
+
+		using namespace resource_desc;
+		graph.add_output(&final_merge, {
+			external_resource{0, false, external_image{}}});
+
+		graph.add_input(&oit, {
+			                external_resource{0, true, external_buffer{}},
+			                external_resource{1, false, external_image{}},
+			                external_resource{2, true, external_image{}},
+			                external_resource{3, true, external_image{}},
+			                external_resource{4, true, external_image{}},
+			                external_resource{5, false, external_image{}},
+			                external_resource{6, false, external_image{}},
+		                });
+
+
+		graph.add_input(&ssao, {
+			external_resource{0, true, external_image{}}
+		});
+
+		graph.add_input(&ui_bloom, {
+			external_resource{0, true, external_image{}}
+		});
+		graph.add_input(&final_merge, {
+			external_resource{1, true, external_image{}},
+			external_resource{2, true, external_image{}}
+		});
+
+
+		// ui_bloom->add_image_requirement({
+		// 	.mip_levels = 6,
+		// 	.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+		// }, {{0, 1}, {0, 2}, {0, 3}});
+
+	}
+
+	graph.sort();
+	graph.check_sockets_connection();
+	graph.analysis_minimal_allocation();
+	graph.print_resource_reference();
+	graph.resize(core::global::graphic::context.get_extent());
 
 }
 
 int main(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
+	using namespace mo_yanxi::graphic;
 
 	test::init_assets();
 	test::compile_shaders();
-
+	//
 	core::glfw::init();
 	core::global::graphic::init_vk();
 	core::global::assets::init(&core::global::graphic::context);
 	assets::graphic::load(core::global::graphic::context);
-	core::global::ui::init();
 
+	graph_test();
+	// graphic::shader_reflection reflection{assets::graphic::shaders::comp::bloom.get_binary()};
+	// reflection.foo();
+	// core::global::ui::init();
+	//
+	//
+	// game::content::load();
+	// test::load_content();
+	//
+	// main_loop();
+	//
+	// test::dispose_content();
+	// core::global::ui::dispose();
 
-	game::content::load();
-	test::load_content();
-
-	main_loop();
-
-	test::dispose_content();
-	core::global::ui::dispose();
 	assets::graphic::dispose();
 	core::global::assets::dispose();
 	core::global::graphic::dispose();

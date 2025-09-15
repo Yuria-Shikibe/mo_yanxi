@@ -1,6 +1,144 @@
 module mo_yanxi.game.ui.grid_editor;
 import mo_yanxi.ui.graphic;
 import mo_yanxi.format;
+import mo_yanxi.algo;
+
+namespace mo_yanxi::game::meta::chamber{
+	void ideal_path_finder_request::update(path_finder& finder){
+		using node = path_node;
+
+		if(state != path_find_request_state::running){
+			return;
+		}
+
+		for(int i = 0; i < 8; ++i){
+			if (!open_list.empty()) {
+				node* current = open_list.top();
+				open_list.pop();
+
+				// 到达终点
+				if (current->pos == dest) {
+					// 回溯路径
+					ideal_path.seq.reserve(iteration);
+					node* temp = current;
+					while (temp != nullptr) {
+						ideal_path.seq.push_back(temp->pos.as<unsigned>());
+						temp = temp->parent;
+					}
+					std::ranges::reverse(ideal_path.seq);
+					state = path_find_request_state::finished;
+					set_collapsed(finder);
+					return;
+				}
+
+				current->is_optimal = true;
+
+				static constexpr math::ivec2 mov[]{
+					{ 1,  0},
+					{ 0,  1},
+					{-1,  0},
+					{ 0, -1},
+				};
+
+				auto& grid = *this->target_grid;
+				for (const auto m : mov) {
+					auto next = current->pos + m;
+					if(!next.within({}, grid.get_extent().as<int>()))continue;
+
+					if (!grid[next.as<unsigned>()].is_accessible()) {
+						continue;
+					}
+
+					const auto it = all_nodes.find(next);
+
+					// 计算 tentative_g
+					float tentative_g = current->cost + /*grid[next.as<unsigned>()].*/ + 1;
+
+					if (it == all_nodes.end()) {
+						float h_val = heuristic(next);
+						auto& next_node = all_nodes[next] = node(next, tentative_g, h_val, current);;
+						open_list.push(&next_node);
+					} else{
+						if(it->second.is_optimal){
+							continue;
+						}
+
+						if (node* existing_node = &it->second; tentative_g < existing_node->cost) {
+							existing_node->cost = tentative_g;
+							existing_node->parent = current;
+
+							open_list.push(existing_node);
+						}
+					}
+				}
+
+
+		++iteration;
+			}else{
+				state = path_find_request_state::failed;
+				set_collapsed(finder);
+				return;
+			}
+		}
+	}
+
+	void ideal_path_finder_request::set_collapsed(path_finder& finder) noexcept{
+		algo::erase_unique_unstable(finder.pendings, this);
+		is_collapsed.store(true);
+		is_collapsed.notify_all();
+	}
+
+	ideal_path_finder_request* path_finder::acquire_path(const grid& grid, math::upoint2 initial, math::upoint2 dest){
+
+		const auto& src = grid[initial];
+		if(!src.is_accessible())return nullptr;
+		const auto& dst = grid[initial];
+		if(!dst.is_accessible())return nullptr;
+
+		if(!grid.reachable_between(initial, dest)){
+			return nullptr;
+		}
+
+		ideal_path_finder_request* request{};
+		{
+			semaphore_acq_guard acq_guard{requests_lock};
+			request = std::addressof(*requests_.emplace(grid, initial, dest));
+		}
+
+		{
+			semaphore_acq_guard acq_guard{pending_lock};
+			pendings.push_back(request);
+		}
+
+
+		try_init_thread();
+
+		return request;
+	}
+
+	bool path_finder::reacquire_path(ideal_path_finder_request& last_request, const grid& grid, math::upoint2 initial,
+	                                 math::upoint2 dest){
+
+		const auto& src = grid[initial];
+		if(!src.is_accessible())return false;
+		const auto& dst = grid[initial];
+		if(!dst.is_accessible())return false;
+
+		if(!grid.reachable_between(initial, dest)){
+			return false;
+		}
+
+		{
+			semaphore_acq_guard acq_guard{pending_lock};
+			if(!std::ranges::contains(pendings, &last_request)){
+				pendings.push_back(&last_request);
+			}
+			last_request.reset(grid, initial, dest);
+		}
+
+		return true;
+	}
+}
 
 namespace mo_yanxi::game::ui{
 	grid_editor_viewport& grid_editor_panel_base::get(const elem& self) noexcept{

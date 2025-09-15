@@ -1280,10 +1280,26 @@ namespace mo_yanxi::math{
 
 }
 
-
+// export
 template <typename T>
 struct std::hash<mo_yanxi::math::vector2<T>>{
-	constexpr std::size_t operator()(mo_yanxi::math::vector2<T>::const_pass_t v) const noexcept{
+	static std::size_t operator()(mo_yanxi::math::vector2<T>::const_pass_t v) noexcept{
+		return v.hash_value();
+	}
+};
+
+export
+template <>
+struct std::hash<mo_yanxi::math::vector2<int>>{
+	static std::size_t operator()(mo_yanxi::math::vector2<int>::const_pass_t v) noexcept{
+		return v.hash_value();
+	}
+};
+
+export
+template <>
+struct std::hash<mo_yanxi::math::vector2<unsigned>>{
+	static std::size_t operator()(mo_yanxi::math::vector2<unsigned>::const_pass_t v) noexcept{
 		return v.hash_value();
 	}
 };

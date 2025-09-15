@@ -29,9 +29,9 @@ import mo_yanxi.snap_shot;
 import mo_yanxi.history_stack;
 
 import std;
+using editor_box_meta = mo_yanxi::game::meta::hitbox::comp;
 
 namespace mo_yanxi::game{
-	using editor_box_meta = meta::hitbox::comp;
 
 	struct editor_scalable_box_meta : editor_box_meta{
 		math::vec2 scale{1, 1};

@@ -37,7 +37,7 @@ namespace mo_yanxi::graphic{
 	struct post_process_socket{
 		VkImage image;
 		VkImageView view;
-		VkImageLayout layout;
+		VkImageLayout src_layout;
 		std::uint32_t queue_family_index;
 
 		explicit(false) operator vk::image_handle() const noexcept{

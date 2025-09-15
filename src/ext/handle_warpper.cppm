@@ -54,7 +54,7 @@ export namespace mo_yanxi{
 
 		[[nodiscard]] constexpr explicit(false) operator T() const noexcept{ return handle; }
 
-		[[nodiscard]] constexpr explicit(false) operator bool() const noexcept{ return handle != nullptr; }
+		[[nodiscard]] constexpr explicit operator bool() const noexcept{ return handle != nullptr; }
 
 		[[nodiscard]] constexpr T operator->() const noexcept{ return handle; }
 

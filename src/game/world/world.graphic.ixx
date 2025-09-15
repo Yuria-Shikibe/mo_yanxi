@@ -6,6 +6,8 @@ export module mo_yanxi.game.world.graphic;
 
 export import mo_yanxi.graphic.renderer.world;
 export import mo_yanxi.game.graphic.effect.manager;
+export import mo_yanxi.math.rect_ortho;
+export import mo_yanxi.graphic.camera;
 
 namespace mo_yanxi::game::world{
 	export

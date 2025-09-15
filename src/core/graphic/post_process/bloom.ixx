@@ -75,7 +75,7 @@ namespace mo_yanxi::graphic{
 			    from_graphic ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_SHADER_WRITE_BIT,
 			    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 			    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-			    input.layout,
+			    input.src_layout,
 			    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			    image::default_image_subrange
 			);
@@ -161,7 +161,7 @@ namespace mo_yanxi::graphic{
 				from_graphic ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT : VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 				from_graphic ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_SHADER_WRITE_BIT,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				input.layout,
+				input.src_layout,
 				image::default_image_subrange
 			);
 		}
@@ -273,7 +273,7 @@ namespace mo_yanxi::graphic{
 			outputs[0] = {
 				.image = output_image.get_image(),
 				.view = output_image.get_image_view(),
-				.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				.src_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				.queue_family_index = context_->compute_family()
 			};
 

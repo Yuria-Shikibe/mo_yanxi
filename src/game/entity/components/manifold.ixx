@@ -8,7 +8,8 @@ export module mo_yanxi.game.ecs.component.manifold;
 export import mo_yanxi.game.ecs.component.hitbox;
 export import mo_yanxi.game.ecs.component.physical_property;
 export import mo_yanxi.game.ecs.component.manage;
- import mo_yanxi.game.quad_tree_interface;
+import mo_yanxi.game.quad_tree_interface;
+import mo_yanxi.math.vector2;
 
 export import mo_yanxi.array_stack;
 

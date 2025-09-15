@@ -727,7 +727,7 @@ namespace mo_yanxi::graphic{
 				graphic::post_process_socket{
 					.image = batch.blit_light.get_image(),
 					.view = batch.blit_light.get_image_view(),
-					.layout = VK_IMAGE_LAYOUT_GENERAL,
+					.src_layout = VK_IMAGE_LAYOUT_GENERAL,
 					.queue_family_index = context().compute_family(),
 				}
 			});

@@ -10,6 +10,9 @@ import std;
 
 namespace mo_yanxi::game::fx{
 	export
+	struct effect_manager;
+
+	export
 	struct effect_manager{
 		using pool_type = plf::hive<effect>;
 	private:
