@@ -64,6 +64,25 @@ namespace mo_yanxi{
 	overload(Fs&&...) -> overload<std::decay_t<Fs>...>;
 
 	export
+	template<typename... Fs>
+	struct narrow_overload : private Fs... {
+		template <typename ...Args>
+		constexpr explicit(false) narrow_overload(Args&&... fs) : Fs{std::forward<Args>(fs)}... {}
+
+		using Fs::operator()...;
+
+		template <typename ...Args>
+		static void operator()(Args&&... args){
+			(void)((void)args, ...);
+			throw std::bad_variant_access{};
+		}
+	};
+
+	export
+	template<typename... Fs>
+	narrow_overload(Fs&&...) -> narrow_overload<std::decay_t<Fs>...>;
+
+	export
 	template<typename Ret, typename... Fs>
 		requires (std::is_void_v<Ret> || std::is_default_constructible_v<Ret>)
 	struct overload_def_noop : private Fs... {

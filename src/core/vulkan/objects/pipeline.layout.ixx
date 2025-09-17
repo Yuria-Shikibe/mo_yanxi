@@ -118,6 +118,14 @@ namespace mo_yanxi::vk{
 		descriptor_layout(
 			VkDevice device,
 			const VkDescriptorSetLayoutCreateFlags flag,
+			const descriptor_layout_builder& builder
+		) : device{device}{
+			create(flag, builder);
+		}
+
+		descriptor_layout(
+			VkDevice device,
+			const VkDescriptorSetLayoutCreateFlags flag,
 			std::regular_invocable<descriptor_layout&, descriptor_layout_builder&> auto func
 		) : device{device}{
 			descriptor_layout_builder builder{};

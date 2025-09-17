@@ -35,6 +35,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		binding_info binding_info_of(const spirv_cross::Resource& resource) const noexcept{
+
 			return {compiler_.get_decoration(resource.id, spv::DecorationBinding), compiler_.get_decoration(resource.id, spv::DecorationDescriptorSet)};
 		}
 

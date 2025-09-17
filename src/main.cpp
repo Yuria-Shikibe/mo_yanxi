@@ -116,6 +116,7 @@ import mo_yanxi.game.meta.grid.srl;
 
 import mo_yanxi.graphic.shader_reflect;
 import mo_yanxi.graphic.post_process_graph;
+import mo_yanxi.graphic.post_process_graph.generic_post_process_pass;
 
 
 
@@ -812,7 +813,7 @@ void graph_test(){
 		}();
 
 
-		auto& oit = graph.add_stage({assets::graphic::shaders::comp::oit_blend, post_process_stage_inout_map{
+		auto& oit = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::oit_blend, post_process_stage_inout_map{
 			{{0}, 0, no_slot},
 			{{1}, 1, no_slot},
 			{{2}, 2, no_slot},
@@ -822,14 +823,14 @@ void graph_test(){
 			{{6}, 6, 1},
 		}});
 
-		auto& world_bloom = graph.add_stage(bloom_meta);
+		auto& world_bloom = graph.add_stage<post_process_stage>(bloom_meta);
 
-		auto& ssao = graph.add_stage({assets::graphic::shaders::comp::ssao, {
+		auto& ssao = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::ssao, {
 			{{0}, 0, no_slot},
 			{{1}, no_slot, 0}
 		}});
 
-		auto& world_merge = graph.add_stage({assets::graphic::shaders::comp::world_merge, {
+		auto& world_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::world_merge, {
 			{{0}, no_slot, 0},
 			{{1}, 0, no_slot},
 			{{2}, 1, no_slot},
@@ -837,14 +838,14 @@ void graph_test(){
 			{{4}, 3, no_slot},
 		}});
 
-		auto& anti_alias = graph.add_stage({assets::graphic::shaders::comp::anti_aliasing, {
+		auto& anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
 			{{1}, 0, no_slot},
 			{{2}, no_slot, 0},
 		}});
 
-		auto& ui_bloom = graph.add_stage(bloom_meta);
+		auto& ui_bloom = graph.add_stage<post_process_stage>(bloom_meta);
 
-		auto& final_merge = graph.add_stage({assets::graphic::shaders::comp::result_merge, {
+		auto& final_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::result_merge, {
 			{{0}, no_slot, 0},
 			{{1}, 0, no_slot},
 			{{2}, 1, no_slot},
@@ -889,6 +890,8 @@ void graph_test(){
 		// 	.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
 		// }, {{0, 1}, {0, 2}, {0, 3}});
 
+		constexpr bool to_switch = false;
+
 		using namespace resource_desc;
 		graph.add_output(&final_merge, {
 			external_resource{0, false, external_image{}}});
@@ -896,24 +899,25 @@ void graph_test(){
 		graph.add_input(&oit, {
 			                external_resource{0, true, external_buffer{}},
 			                external_resource{1, false, external_image{}},
-			                external_resource{2, true, external_image{}},
-			                external_resource{3, true, external_image{}},
-			                external_resource{4, true, external_image{}},
+			                external_resource{2, to_switch, external_image{}},
+			                external_resource{3, to_switch, external_image{}},
+			                external_resource{4, to_switch, external_image{}},
 			                external_resource{5, false, external_image{}},
 			                external_resource{6, false, external_image{}},
 		                });
 
 
 		graph.add_input(&ssao, {
-			external_resource{0, true, external_image{}}
+			external_resource{0, to_switch, external_image{}}
 		});
 
 		graph.add_input(&ui_bloom, {
-			external_resource{0, true, external_image{}}
+			external_resource{0, to_switch, external_image{}}
 		});
+
 		graph.add_input(&final_merge, {
-			external_resource{1, true, external_image{}},
-			external_resource{2, true, external_image{}}
+			external_resource{1, to_switch, external_image{}},
+			external_resource{2, to_switch, external_image{}}
 		});
 
 
@@ -928,8 +932,12 @@ void graph_test(){
 	graph.check_sockets_connection();
 	graph.analysis_minimal_allocation();
 	graph.print_resource_reference();
-	graph.resize(core::global::graphic::context.get_extent());
+	graph.resize();
 
+	graph.create_command();
+	vk::fence fence{core::global::graphic::context.get_device(), false};
+	vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {graph.get_main_command_buffer()}, fence);
+	fence.wait_and_reset();
 }
 
 int main(){

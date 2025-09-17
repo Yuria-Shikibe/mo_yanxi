@@ -14,6 +14,7 @@ export module mo_yanxi.graphic.post_process_graph;
 import mo_yanxi.vk.shader;
 import mo_yanxi.vk.image_derives;
 import mo_yanxi.vk.context;
+import mo_yanxi.vk.command_buffer;
 import mo_yanxi.graphic.shader_reflect;
 import mo_yanxi.meta_programming;
 import mo_yanxi.basic_util;
@@ -22,7 +23,7 @@ import mo_yanxi.math.vector2;
 import std;
 
 namespace mo_yanxi::graphic{
-	constexpr VkFormat convertImageFormatToVkFormat(spv::ImageFormat imageFormat) noexcept{
+	export constexpr VkFormat convertImageFormatToVkFormat(spv::ImageFormat imageFormat) noexcept{
 		switch(imageFormat){
 		case spv::ImageFormatUnknown : return VK_FORMAT_UNDEFINED;
 		case spv::ImageFormatRgba8 : return VK_FORMAT_R8G8B8A8_UNORM;
@@ -64,7 +65,7 @@ namespace mo_yanxi::graphic{
 		}
 	}
 
-	std::size_t get_buffer_size(
+	export std::size_t get_buffer_size(
 		const spirv_cross::Compiler& compiler,
 		const spirv_cross::Resource& resource){
 		const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
@@ -114,7 +115,7 @@ namespace mo_yanxi::graphic{
 	// using post_process_id = unsigned;
 	using shader_binary = std::span<const std::uint32_t>;
 
-	using inout_index = unsigned;
+	export using inout_index = unsigned;
 	export constexpr inout_index no_slot = std::numeric_limits<inout_index>::max();
 
 
@@ -124,7 +125,7 @@ namespace mo_yanxi::graphic{
 			image, buffer, unknown
 		};
 
-
+		export
 		enum struct image_decr{
 			unknown,
 			sampler = 1,
@@ -138,7 +139,7 @@ namespace mo_yanxi::graphic{
 		enum struct ownership_type{
 			shared,
 			exclusive,
-			// internal
+			external
 		};
 
 		export constexpr unsigned dependent = std::numeric_limits<unsigned>::max();
@@ -150,6 +151,7 @@ namespace mo_yanxi::graphic{
 		export
 		constexpr inline image_req_index no_req_spec = std::numeric_limits<image_req_index>::max();
 
+		export
 		template <typename T>
 		T value_or(T val, T alternative) noexcept{
 			if(val == no_req_spec){
@@ -193,6 +195,7 @@ namespace mo_yanxi::graphic{
 			std::size_t element_size;
 		};
 
+		export
 		struct stage_resource_desc{
 			using variant_tuple = std::tuple<image_desc, buffer_desc>;
 			using variant_t = std::variant<image_desc, buffer_desc>;
@@ -229,6 +232,7 @@ namespace mo_yanxi::graphic{
 			}
 		};
 
+		export
 		template <typename T, std::predicate<const T&, const T&> Pr = std::less<T>>
 		T get_optional_max(T l, T r, T optional_spec_value, Pr pred = {}) noexcept {
 			if(l == optional_spec_value && r == optional_spec_value)return optional_spec_value;
@@ -240,7 +244,7 @@ namespace mo_yanxi::graphic{
 		export
 		struct image_requirement{
 			image_desc desc{};
-			ownership_type ownership{};
+			// ownership_type ownership{};
 			VkImageUsageFlags usage{};
 			unsigned mip_levels{no_req_spec};
 			unsigned scaled_times{no_req_spec};
@@ -256,8 +260,19 @@ namespace mo_yanxi::graphic{
 				desc.decoration |= other.desc.decoration;
 
 				mip_levels = get_optional_max(mip_levels, other.mip_levels, no_req_spec);
-				ownership = ownership_type{std::max(std::to_underlying(ownership), std::to_underlying(other.ownership))};
+				// ownership = ownership_type{std::max(std::to_underlying(ownership), std::to_underlying(other.ownership))};
 				usage |= other.usage;
+			}
+
+			[[nodiscard]] VkAccessFlags2 get_image_access() const noexcept{
+				switch(desc.decoration){
+				case image_decr::sampler : return VK_ACCESS_2_SHADER_READ_BIT;
+				case image_decr::read : return VK_ACCESS_2_SHADER_READ_BIT;
+				case image_decr::write : return VK_ACCESS_2_SHADER_WRITE_BIT;
+				case image_decr::read | image_decr::write : return VK_ACCESS_2_SHADER_READ_BIT |
+						VK_ACCESS_2_SHADER_WRITE_BIT;
+				default : return VK_ACCESS_2_NONE;
+				}
 			}
 
 			[[nodiscard]] image_requirement max(const image_requirement& other_in_same_partition) const noexcept{
@@ -309,10 +324,10 @@ namespace mo_yanxi::graphic{
 		struct resource_requirement{
 			using variant_tuple = std::tuple<image_requirement, buffer_requirement>;
 			using variant_t = std::variant<image_requirement, buffer_requirement>;
-			variant_t requirement{};
+			variant_t desc{};
 
 			[[nodiscard]] resource_type type() const noexcept{
-				return resource_type{static_cast<std::underlying_type_t<resource_type>>(requirement.index())};
+				return resource_type{static_cast<std::underlying_type_t<resource_type>>(desc.index())};
 			}
 
 			[[nodiscard]] std::string_view type_name() const noexcept{
@@ -320,7 +335,7 @@ namespace mo_yanxi::graphic{
 			}
 
 			[[nodiscard]] bool is_type_valid_equal_to(const resource_requirement& req) const noexcept{
-				return requirement.index() == req.requirement.index();
+				return desc.index() == req.desc.index();
 			}
 
 			/**
@@ -344,7 +359,7 @@ namespace mo_yanxi::graphic{
 					[](const buffer_requirement& l, const buffer_requirement& r) -> ret {
 						return std::nullopt;
 					}
-				}, requirement, req.requirement);
+				}, desc, req.desc);
 			}
 
 			void promote(const resource_requirement& other){
@@ -357,7 +372,7 @@ namespace mo_yanxi::graphic{
 					},
 					[](buffer_requirement& l, const buffer_requirement& r) {
 					}
-				}, requirement, other.requirement);
+				}, desc, other.desc);
 			}
 
 
@@ -367,36 +382,36 @@ namespace mo_yanxi::graphic{
 			template <typename T>
 				requires std::constructible_from<variant_t, T&&>
 			[[nodiscard]] explicit(false) resource_requirement(T&& desc)
-				: requirement(std::forward<T>(desc)){
+				: desc(std::forward<T>(desc)){
 			}
 
-			[[nodiscard]] explicit(false) resource_requirement(const stage_resource_desc& desc){
+			[[nodiscard]] explicit(false) resource_requirement(const stage_resource_desc& sdesc){
 				std::visit(overload{
 					[](std::monostate){},
-					[this](const image_desc& desc){
-						auto& ty = requirement.emplace<image_requirement>(desc);
-						ty.usage = desc.get_required_usage();
+					[this](const image_desc& idesc){
+						auto& ty = desc.emplace<image_requirement>(idesc);
+						ty.usage = idesc.get_required_usage();
 					},
 					[this](const buffer_desc&){
-						requirement.emplace<buffer_requirement>();
+						desc.emplace<buffer_requirement>();
 					}
-				}, desc.desc);
+				}, sdesc.desc);
 			}
 
 			bool is(resource_type type) const noexcept{
-				return requirement.index() == std::to_underlying(type);
+				return desc.index() == std::to_underlying(type);
 			}
 
 			template <typename T>
 				requires contained_in<T, variant_tuple>
 			auto get_if() const noexcept{
-				return std::get_if<T>(&requirement);
+				return std::get_if<T>(&desc);
 			}
 
 			template <typename T, typename S>
 				requires contained_in<T, variant_tuple>
 			auto& get(this S& self) noexcept{
-				return std::get<T>(self.requirement);
+				return std::get<T>(self.desc);
 			}
 
 			bool is_compatibility_part_equal_to(const resource_requirement& other_in_same_partition) const noexcept{
@@ -408,11 +423,12 @@ namespace mo_yanxi::graphic{
 					[](const buffer_requirement& l, const buffer_requirement& r) static  {
 						return true;
 					}
-				}, this->requirement, other_in_same_partition.requirement);
+				}, this->desc, other_in_same_partition.desc);
 			}
 
 		};
 
+		export
 		struct resource_requirement_partial_greater_comp{
 
 			 static bool operator()(const resource_requirement& l, const resource_requirement& o) noexcept{
@@ -429,7 +445,7 @@ namespace mo_yanxi::graphic{
 						 throw std::runtime_error("Incompatible resource type");
 						 return std::strong_ordering::equal;
 					 }
-				 }, l.requirement, o.requirement));
+				 }, l.desc, o.desc));
 			}
 
 			// static bool operator==(const resource_requirement& l, const resource_requirement& o) noexcept{
@@ -438,6 +454,7 @@ namespace mo_yanxi::graphic{
 		};
 
 
+		export
 		image_desc extract_image_state(const spirv_cross::CompilerGLSL& complier,
 		                               const spirv_cross::Resource& resource){
 			image_decr decr{};
@@ -471,14 +488,15 @@ namespace mo_yanxi::graphic{
 				};
 		}
 
+		export
 		template <typename T>
 		struct stage_data : binding_info{
 			T desc;
 		};
 
-		using stage_image = stage_data<image_desc>;
-		using stage_ubo = stage_data<ubo_desc>;
-		using stage_sbo = stage_data<ubo_desc>;
+		export using stage_image = stage_data<image_desc>;
+		export using stage_ubo = stage_data<ubo_desc>;
+		export using stage_sbo = stage_data<ubo_desc>;
 
 
 		export
@@ -503,6 +521,10 @@ namespace mo_yanxi::graphic{
 			[[nodiscard]] resource_type type() const noexcept{
 				return resource_type{static_cast<std::underlying_type_t<resource_type>>(desc.index())};
 			}
+
+			VkImageLayout get_layout() const noexcept{
+				return std::get<external_image>(desc).expected_layout;
+			}
 		};
 
 
@@ -511,10 +533,12 @@ namespace mo_yanxi::graphic{
 			in, out, inout
 		};
 
+		export
 		struct bound_stage_resource : stage_resource_desc, binding_info{
 		};
 
 
+		export
 		struct image_entity{
 			vk::image_handle handle{};
 			vk::storage_image image{};
@@ -535,10 +559,13 @@ namespace mo_yanxi::graphic{
 					requirement.desc.format == VK_FORMAT_UNDEFINED ? VK_FORMAT_R8G8B8A8_UNORM : requirement.desc.format,
 					requirement.usage
 				};
+
+				handle = image;
 			}
 
 		};
 
+		export
 		struct buffer_entity{
 
 			void allocate(vk::context& context){
@@ -546,6 +573,7 @@ namespace mo_yanxi::graphic{
 			}
 		};
 
+		export
 		struct resource_entity{
 			using variant_t = std::variant<image_entity, buffer_entity>;
 			resource_requirement requirement{};
@@ -582,6 +610,42 @@ namespace mo_yanxi::graphic{
 
 			buffer_entity& as_buffer(){
 				return std::get<buffer_entity>(resource);
+			}
+		};
+
+		export
+		struct image_entity_state{
+			VkImageLayout current_layout{};
+		};
+
+		export
+		struct buffer_entity_state{
+
+		};
+
+		export
+		struct entity_state{
+			using variant_t = std::variant<image_entity_state, buffer_entity_state>;
+			variant_t desc{};
+
+			[[nodiscard]] resource_type type() const noexcept{
+				return static_cast<resource_type>(desc.index());
+			}
+
+			[[nodiscard]] entity_state() = default;
+
+			[[nodiscard]] explicit(false) entity_state(const external_resource& ext){
+				std::visit(overload{
+					[this](const external_image& image){
+						auto& s = desc.emplace<image_entity_state>();
+						s.current_layout = image.expected_layout;
+					},
+					[](const external_buffer& buffer){}
+				}, ext.desc);
+			}
+
+			VkImageLayout get_layout() const noexcept{
+				return std::get<image_entity_state>(desc).current_layout;
 			}
 		};
 	}
@@ -705,6 +769,7 @@ namespace mo_yanxi::graphic{
 		gch::small_vector<unsigned> out{};
 	};
 
+	export
 	struct inout_data{
 		static constexpr std::size_t sso = 4;
 		using index_slot_type = gch::small_vector<inout_index, sso>;
@@ -769,6 +834,24 @@ namespace mo_yanxi::graphic{
 			auto sidx = input_slots[inIdx];
 			if(sidx >= data.size()) return std::nullopt;
 			return data[sidx];
+		}
+
+	private:
+		auto get_valid_of(index_slot_type inout_data::* which) const noexcept {
+			return (this->*which) | std::views::enumerate | std::views::filter([](auto&& t){
+				auto&& [idx, v] = t;
+				return v != no_slot;
+			});
+		}
+
+	public:
+
+		auto get_valid_in() const noexcept{
+			return get_valid_of(&inout_data::input_slots);
+		}
+
+		auto get_valid_out() const noexcept{
+			return get_valid_of(&inout_data::output_slots);
 		}
 
 
@@ -852,11 +935,15 @@ namespace mo_yanxi::graphic{
 	public:
 		gch::small_vector<pass_dependency> dependencies{};
 
-		[[nodiscard]] pass() = default;
+		[[nodiscard]] pass(vk::context& ctx){};
 
 		virtual ~pass() = default;
 
 		virtual inout_data& sockets() noexcept = 0;
+
+		virtual void post_init(vk::context& context){
+
+		}
 
 		[[nodiscard]] const inout_data& sockets() const noexcept{
 			return const_cast<pass*>(this)->sockets();
@@ -871,127 +958,20 @@ namespace mo_yanxi::graphic{
 		}
 	};
 
-	export
-	struct post_process_stage;
-
-	export
-	struct post_process_meta{
-		friend post_process_stage;
-
-	private:
-		const vk::shader_module* shader_{};
-		post_process_stage_inout_map inout_map_{};
-
-		gch::small_vector<resource_desc::stage_ubo> uniform_buffers_{};
-		gch::small_vector<resource_desc::bound_stage_resource> resources_{};
-
-	public:
-		inout_data sockets{};
-
-		[[nodiscard]] post_process_meta() = default;
-
-		[[nodiscard]] post_process_meta(const vk::shader_module& shader, const post_process_stage_inout_map& inout_map)
-			: shader_(&shader),
-			  inout_map_(inout_map){
-			inout_map_.compact_check();
-
-			const shader_reflection refl{shader.get_binary()};
-			for(const auto& input : refl.resources().storage_images){
-				resources_.push_back({resource_desc::extract_image_state(refl.compiler(), input), refl.binding_info_of(input)});
-			}
-
-			for(const auto& input : refl.resources().sampled_images){
-				resources_.push_back({resource_desc::extract_image_state(refl.compiler(), input), refl.binding_info_of(input)});
-			}
-
-			for(const auto& input : refl.resources().uniform_buffers){
-				uniform_buffers_.push_back({refl.binding_info_of(input), get_buffer_size(refl.compiler(), input)});
-			}
-
-			for(const auto& input : refl.resources().storage_buffers){
-				resources_.push_back(
-					{resource_desc::buffer_desc{get_buffer_size(refl.compiler(), input)}, refl.binding_info_of(input)});
-			}
-
-			for(const auto& pass : inout_map.connection){
-				if(!std::ranges::contains(resources_, pass.binding)){
-					throw std::invalid_argument("pass does not exist");
-				}
-			}
-
-			sockets.data.reserve(resources_.size());
-			sockets.uniform_buffers.reserve(uniform_buffers_.size());
-			for(const auto& pass : inout_map_.connection){
-				if(auto itr = std::ranges::find(resources_, pass.binding); itr != std::ranges::end(resources_)){
-					sockets.add(pass, *itr);
-				}
-			}
-		}
-
-		resource_desc::stage_resource_desc& operator[](binding_info binding) noexcept{
-			if(auto itr = std::ranges::find(resources_, binding); itr != resources_.end()){
-				return *itr;
-			}
-			throw std::out_of_range("pass does not exist");
-		}
-
-
-		[[nodiscard]] std::string_view name() const noexcept{
-			return shader_->get_name();
-		}
-
-
-		void visit_in(inout_index index, std::invocable<resource_desc::bound_stage_resource&> auto fn){
-			for(const auto& connection : inout_map_.connection){
-				if(connection.slot.in == index){
-					std::invoke(fn, (*this)[connection.binding]);
-				}
-			}
-		}
-
-		void visit_out(inout_index index, std::invocable<resource_desc::bound_stage_resource&> auto fn){
-			for(const auto& connection : inout_map_.connection){
-				if(connection.slot.out == index){
-					std::invoke(fn, (*this)[connection.binding]);
-				}
-			}
-		}
-
-		template <typename Fn>
-		void visit_in(inout_index index, Fn fn){
-			using ArgTy = std::remove_cvref_t<typename function_arg_at_last<Fn>::type>;
-			for(const auto& connection : inout_map_.connection){
-				if(connection.slot.in == index){
-					std::invoke(fn, (*this)[connection.binding].get<ArgTy>());
-				}
-			}
-		}
-
-		template <typename Fn>
-		void visit_out(inout_index index, Fn fn){
-			using ArgTy = std::remove_cvref_t<typename function_arg_at_last<Fn>::type>;
-			for(const auto& connection : inout_map_.connection){
-				if(connection.slot.out == index){
-					std::invoke(fn, (*this)[connection.binding].get<ArgTy>());
-				}
-			}
-		}
-	};
-
 	namespace post_graph{
 		struct pass_identity{
-			const pass* stage{};
+			const pass* where{};
 			const pass* external_target{nullptr};
 			inout_index slot_in{no_slot};
 			inout_index slot_out{no_slot};
 
 			const pass* operator->() const noexcept{
-				return stage;
+				return where;
 			}
 
 			bool operator==(const pass_identity& i) const noexcept{
-				if(stage == i.stage){
-					if(stage == nullptr){
+				if(where == i.where){
+					if(where == nullptr){
 						return slot_out == i.slot_out && slot_in == i.slot_in;
 					}else{
 						return true;
@@ -1006,18 +986,21 @@ namespace mo_yanxi::graphic{
 					return idx == no_slot ? std::string(epn) : std::format("{}", idx);
 				};
 
-				return std::format("[{}] {} [{}]", fmt_slot(endpoint_name, slot_in), std::string(stage ? stage->get_identity_name() : "endpoint"), fmt_slot(endpoint_name, slot_out));
+				return std::format("[{}] {} [{}]", fmt_slot(endpoint_name, slot_in), std::string(where ? where->get_identity_name() : "endpoint"), fmt_slot(endpoint_name, slot_out));
 			}
 		};
+
 
 
 		struct resource_lifebound{
 			resource_desc::resource_requirement requirement{};
 
+
+
 			bool external_spec{false};
 			std::vector<pass_identity> passed_by{};
 
-			unsigned assigned_resource_index{no_slot};
+			resource_desc::resource_entity *used_entity{nullptr};
 
 			[[nodiscard]] explicit resource_lifebound(const resource_desc::resource_requirement& requirement)
 				: requirement(requirement){
@@ -1047,9 +1030,13 @@ namespace mo_yanxi::graphic{
 
 		struct pass_identity_hasher{
 			static std::size_t operator()(const pass_identity& idt) noexcept{
-				auto p0 = std::bit_cast<std::uintptr_t>(idt.stage);
-				auto p1 = std::bit_cast<std::size_t>(idt.external_target) ^ static_cast<std::size_t>(idt.slot_out) ^ (static_cast<std::size_t>(idt.slot_in) << 31);
-				return std::hash<std::size_t>{}(p0 ^ p1);
+				if(idt.where){
+					auto p0 = std::bit_cast<std::uintptr_t>(idt.where);
+					return std::hash<std::size_t>{}(p0);
+				}else{
+					auto p1 = std::bit_cast<std::size_t>(idt.external_target) ^ static_cast<std::size_t>(idt.slot_out) ^ (static_cast<std::size_t>(idt.slot_in) << 31);
+					return std::hash<std::size_t>{}(p1);
+				}
 			}
 		};
 
@@ -1070,9 +1057,9 @@ namespace mo_yanxi::graphic{
 					if(
 						auto another = std::ranges::find(indices, itr->source_out(), &record_pair::index);
 						itr->source_out() != no_slot && another != indices.end()){
-						const auto view = itr->passed_by | std::views::reverse;
+						const auto view = itr->passed_by;
 						const auto mismatch = std::ranges::mismatch(
-							another->life_bound->passed_by | std::views::reverse, view);
+							another->life_bound->passed_by, view);
 						for(auto& pass : std::ranges::subrange{mismatch.in2, view.end()}){
 							another->life_bound->passed_by.push_back(pass);
 						}
@@ -1092,106 +1079,23 @@ namespace mo_yanxi::graphic{
 	export
 	struct post_process_graph;
 
-	export
-	struct post_process_stage : pass{
-		friend post_process_graph;
-
-	private:
-		post_process_meta meta_{};
-
-	public:
-		[[nodiscard]] post_process_stage() = default;
-
-		[[nodiscard]] explicit(false) post_process_stage(post_process_meta&& meta)
-			: pass(),
-			  meta_(std::move(meta)){
-			for(const auto& resource : meta_.resources_){
-				auto slots = meta_.inout_map_[static_cast<const binding_info&>(resource)].value();
-				//
-				// if(auto res = resource.get_if<image_desc>()){
-				// 	if(slots.has_in()){
-				// 		resize_to_fit_and_set(input_image_requirements, slots.in, res->get_requirement());
-				// 	}
-				// 	if(slots.has_out()){
-				// 		resize_to_fit_and_set(output_image_requirements, slots.in, res->get_requirement());
-				// 	}
-				// }
-			}
-		}
-
-		inout_data& sockets() noexcept override{
-			return meta_.sockets;
-		}
-
-		[[nodiscard]] std::string_view get_name() const noexcept override{
-			return meta_.name();
-		}
-
-		[[nodiscard]] const vk::shader_module& shader() const{
-			return *meta_.shader_;
-		}
-
-		// void add_image_requirement(image_requirement req, std::initializer_list<binding_info> served_bindings){
-		// 	auto idx = requirements.size();
-		// 	requirements.push_back(req);
-		// 	for (const auto & binding : served_bindings){
-		// 		(*this)[std::in_place_type<image_desc>, binding].desc.req_index	= idx;
-		// 	}
-		// }
-
-		void add_dep(pass_dependency dep){
-			dependencies.push_back(dep);
-		}
-
-		void add_dep(std::initializer_list<pass_dependency> dep){
-			dependencies.append(dep);
-		}
-
-
-		// template <typename S, typename T>
-		// stage_data<T>* find(this S&& self, std::in_place_type_t<T>, binding_info binding) noexcept{
-		// 	if constexpr (std::same_as<T, image_desc>){
-		// 		if(auto itr = std::ranges::find(self.storage_images, binding); itr != std::ranges::end(self.storage_images)){
-		// 			return &static_cast<stage_data<T>&>(*itr);
-		// 		}
-		//
-		// 		if(auto itr = std::ranges::find(self.sampled_images, binding); itr != std::ranges::end(self.sampled_images)){
-		// 			return &static_cast<stage_data<T>&>(*itr);
-		// 		}
-		//
-		// 		return nullptr;
-		// 	}else if constexpr (std::same_as<T, ubo_desc>){
-		// 		if(auto itr = std::ranges::find(self.uniform_buffers, binding); itr != std::ranges::end(self.uniform_buffers)){
-		// 			return &static_cast<stage_data<T>&>(*itr);
-		// 		}
-		//
-		// 		return nullptr;
-		// 	}else{
-		// 		static_assert(false, "unknown desc type");
-		// 	}
-		// }
-		//
-		//
-		// template <typename S, typename T>
-		// stage_data<T>& operator[](this S&& self, std::in_place_type_t<T> tag, binding_info binding) noexcept{
-		// 	auto ptr = self.find(tag, binding);
-		// 	if(ptr == nullptr)throw std::out_of_range("");
-		// 	return *(ptr);
-		// }
-	};
-
-
 	struct pass_resource_reference{
 		std::vector<const resource_desc::resource_entity*> inputs{};
 		std::vector<const resource_desc::resource_entity*> outputs{};
 
 		void set_in(inout_index idx, const resource_desc::resource_entity* res){
 			inputs.resize(std::max<std::size_t>(idx + 1, inputs.size()));
+			assert(inputs[idx] == nullptr);
+			for (const auto & input : inputs){
+				assert(input != res);
+			}
 			inputs[idx] = res;
+
 		}
 
 		void set_out(inout_index idx, const resource_desc::resource_entity* res){
 			outputs.resize(std::max<std::size_t>(idx + 1, outputs.size()));
+			assert(outputs[idx] == nullptr);
 			outputs[idx] = res;
 		}
 
@@ -1214,20 +1118,20 @@ namespace mo_yanxi::graphic{
 		std::unordered_map<pass*, pass_resource_reference> resource_ref{};
 		math::u32size2 extent{};
 
+		vk::command_buffer main_command_buffer{};
+
 	public:
 		[[nodiscard]] post_process_graph() = default;
 
 		[[nodiscard]] explicit post_process_graph(vk::context& context)
-			: context_(&context){
+			: context_(&context), main_command_buffer{context_->get_compute_command_pool().obtain()}{
 		}
 
-		post_process_stage& add_stage(post_process_meta&& shader){
-			auto& ref = *stages.emplace_back(std::make_unique<post_process_stage>(std::move(shader)));
-			return static_cast<post_process_stage&>(ref);
-		}
-
-		post_process_stage& add_stage(const post_process_meta& shader){
-			return add_stage(post_process_meta{shader});
+		template <std::derived_from<pass> T, typename ...Args>
+			requires (std::constructible_from<T, vk::context&, Args&& ...>)
+		T& add_stage(Args&& ...args){
+			auto& ref = *stages.emplace_back(std::make_unique<T>(*context_, std::forward<Args>(args) ...));
+			return static_cast<T&>(ref);
 		}
 
 		void add_output(pass* from, std::initializer_list<resource_desc::external_resource> externals){
@@ -1299,6 +1203,7 @@ namespace mo_yanxi::graphic{
 			for (auto&& [idx, unique_ptr] : stages | std::views::enumerate){
 				unique_ptr.release();
 				unique_ptr.reset(sorted[idx]);
+				unique_ptr->post_init(*context_);
 			}
 		}
 
@@ -1435,10 +1340,10 @@ namespace mo_yanxi::graphic{
 
 					if(is_done(res_bnd)) continue;
 
-					if(auto ext_itr = external_inputs.find(const_cast<pass*>(cur_head.stage)); ext_itr != external_inputs.end()){
+					if(auto ext_itr = external_inputs.find(const_cast<pass*>(cur_head.where)); ext_itr != external_inputs.end()){
 						for(const auto& entry : ext_itr->second){
 							if(entry.slot == cur_head.slot_in){
-								res_bnd.passed_by.push_back(pass_identity{nullptr, cur_head.stage, no_slot, entry.slot});
+								res_bnd.passed_by.push_back(pass_identity{nullptr, cur_head.where, no_slot, entry.slot});
 
 								if(entry.external_spec){
 									res_bnd.external_spec = true;
@@ -1454,23 +1359,40 @@ namespace mo_yanxi::graphic{
 			for(auto& lifebound : result.bounds){
 				std::ranges::reverse(lifebound.passed_by);
 			}
-
-			for(const auto& lifebound : result.bounds){
-				std::print("Completed<{:5}>: {:6}  ",
-					lifebound.passed_by.front().slot_in == no_slot,
-					lifebound.requirement.type_name()
-				);
-
-				std::print("{:n:}", lifebound.passed_by | std::views::transform([](const pass_identity& value){
-					return value.format("Tml");
-				}));
-
-				std::println();
-			}
+			//
+			// for(const auto& lifebound : result.bounds){
+			// 	std::print("Completed<{:5}>: {:6}  ",
+			// 		lifebound.passed_by.front().slot_in == no_slot,
+			// 		lifebound.requirement.type_name()
+			// 	);
+			//
+			// 	std::print("{:n:}", lifebound.passed_by | std::views::transform([](const pass_identity& value){
+			// 		return value.format("Tml");
+			// 	}));
+			//
+			// 	std::println();
+			// }
 
 			result.unique();
-
-
+			//
+			// std::println();
+			// std::println();
+			//
+			// for(const auto& lifebound : result.bounds){
+			// 	std::print("Completed<{:5}>: {:6}  ",
+			// 		lifebound.passed_by.front().slot_in == no_slot,
+			// 		lifebound.requirement.type_name()
+			// 	);
+			//
+			// 	std::print("{:n:}", lifebound.passed_by | std::views::transform([](const pass_identity& value){
+			// 		return value.format("Tml");
+			// 	}));
+			//
+			// 	std::println();
+			// }
+			// std::println();
+			// std::println();
+			// std::fflush(stdout);
 
 			return result;
 		}
@@ -1481,7 +1403,18 @@ namespace mo_yanxi::graphic{
 
 			using namespace post_graph;
 			using namespace resource_desc;
-			std::unordered_map<pass_identity, std::vector<resource_lifebound*>, pass_identity_hasher> req_per_stage{};
+
+			struct lifebound_ref{
+				resource_lifebound* bound{};
+				unsigned* assigned_resource_index{nullptr};
+
+				const resource_requirement& requirement() const noexcept{
+					return bound->requirement;
+				}
+			};
+
+			std::vector<unsigned> lifebound_assignments(life_bounds.bounds.size(), no_slot);
+			std::unordered_map<pass_identity, std::vector<lifebound_ref>, pass_identity_hasher> req_per_stage{};
 
 			struct req_partial_eq{
 				static bool operator()(const resource_requirement& l, const resource_requirement& r) noexcept {
@@ -1533,7 +1466,7 @@ namespace mo_yanxi::graphic{
 				std::ranges::for_each(minimal_requirements_per_partition, &partition::reset_marks);
 			};
 
-			for (auto& image : life_bounds.bounds){
+			for (auto&& [idx, image] : life_bounds.bounds | std::views::enumerate){
 				if(image.external_spec)continue;
 				if(auto category = get_partition_itr(image.requirement); category == minimal_requirements_per_partition.end()){
 					auto& vec = minimal_requirements_per_partition.emplace_back();
@@ -1541,20 +1474,23 @@ namespace mo_yanxi::graphic{
 				}
 
 				for (const auto & passed_by : image.passed_by){
-					req_per_stage[passed_by].push_back(&image);
+					req_per_stage[passed_by].push_back({&image, &lifebound_assignments[idx]});
 				}
 			}
 
+			reset_markers();
+
 			for (const auto & [pass, reqs] : req_per_stage){
 				for (const auto& req : reqs){
-					auto partition_itr = get_partition_itr(req->requirement);
+					auto partition_itr = get_partition_itr(req.bound->requirement);
+
 					for (auto && [candidate, selected] : std::views::zip(partition_itr->requirements, partition_itr->selection_mark)){
 						if(selected)continue;
 						selected = true;
 						goto skip0;
 					}
 
-					partition_itr->add(req->requirement);
+					partition_itr->add(req.bound->requirement);
 
 					skip0:
 					(void)0;
@@ -1570,23 +1506,23 @@ namespace mo_yanxi::graphic{
 			static constexpr resource_requirement_partial_greater_comp comp{};
 
 			for (auto&& [pass, reqs] : req_per_stage){
-				std::ranges::sort(reqs, comp, &resource_lifebound::requirement);
+				std::ranges::sort(reqs, comp, &lifebound_ref::requirement);
 			}
 
-			for (const auto & [pass, reqs] : req_per_stage){
+			for (auto & [pass, reqs] : req_per_stage){
 				for (const auto& req : reqs){
-					if(req->assigned_resource_index != no_slot){
+					if(*req.assigned_resource_index != no_slot){
 						//lifebound already bound, capture it first
-						auto partition_itr = get_partition_itr(req->requirement);
-						partition_itr->selection_mark[req->assigned_resource_index] = true;
+						auto partition_itr = get_partition_itr(req.requirement());
+						partition_itr->selection_mark[*req.assigned_resource_index] = true;
 					}
 				}
 
 
-				for (const auto& req : reqs){
-					if(req->assigned_resource_index != no_slot)continue;
+				for (auto& req : reqs){
+					if(*req.assigned_resource_index != no_slot)continue;
 
-					auto partition_itr = get_partition_itr(req->requirement);
+					auto partition_itr = get_partition_itr(req.requirement());
 
 					std::ranges::sort(partition_itr->indices, [&](unsigned l, unsigned r){
 						return comp(partition_itr->requirements[l], partition_itr->requirements[r]);
@@ -1597,9 +1533,9 @@ namespace mo_yanxi::graphic{
 						auto& selected = partition_itr->selection_mark[candidate];
 
 						if(selected)continue;
-						if(comp(req->requirement, partition_itr->requirements[candidate])){
+						if(comp(req.requirement(), partition_itr->requirements[candidate])){
 							selected = true;
-							req->assigned_resource_index = candidate;
+							*req.assigned_resource_index = candidate;
 							goto skip;
 						}
 					}
@@ -1609,8 +1545,8 @@ namespace mo_yanxi::graphic{
 						auto& selected_2 = partition_itr->selection_mark[candidate];
 						if(selected_2)continue;
 						selected_2 = true;
-						req->assigned_resource_index = candidate;
-						partition_itr->requirements[candidate].promote(req->requirement);
+						*req.assigned_resource_index = candidate;
+						partition_itr->requirements[candidate].promote(req.requirement());
 						goto skip;
 					}
 
@@ -1636,6 +1572,27 @@ namespace mo_yanxi::graphic{
 				}
 			}
 
+			for (auto& reqs : req_per_stage | std::views::values){
+				for (const auto& req : reqs){
+					if(req.bound->external_spec || req.bound->used_entity != nullptr)continue;
+					assert(*req.assigned_resource_index != no_slot);
+					auto& pt = *get_partition_itr(req.requirement());
+					req.bound->used_entity = &local_resources[pt.prefix_sum + *req.assigned_resource_index];
+
+					for (const auto & passed_by : req.bound->passed_by){
+						if(!passed_by.where)continue;
+						auto& ref = resource_ref[const_cast<pass*>(passed_by.where)];
+						if(passed_by.slot_in != no_slot){
+							ref.set_in(passed_by.slot_in, req.bound->used_entity);
+						}
+
+						if(passed_by.slot_out != no_slot){
+							ref.set_out(passed_by.slot_out, req.bound->used_entity);
+						}
+					}
+				}
+			}
+
 			{
 				//assign borrowed resources
 				for (const auto & req : life_bounds.bounds){
@@ -1644,37 +1601,19 @@ namespace mo_yanxi::graphic{
 				}
 
 				for (const auto & [idx, req] : life_bounds.bounds | std::views::filter(&resource_lifebound::external_spec) | std::views::enumerate){
+					req.used_entity = &borrowed_resources[idx];
+
 					for (const auto & passed_by : req.passed_by){
-						if(!passed_by.stage)continue;
-						auto& ref = resource_ref[const_cast<pass*>(passed_by.stage)];
+						if(!passed_by.where)continue;
+						auto& ref = resource_ref[const_cast<pass*>(passed_by.where)];
+
 						if(passed_by.slot_in != no_slot){
-							ref.set_in(passed_by.slot_in, &borrowed_resources[idx]);
+							ref.set_in(passed_by.slot_in, req.used_entity);
 						}
 
 						if(passed_by.slot_out != no_slot){
-							ref.set_in(passed_by.slot_out, &borrowed_resources[idx]);
+							ref.set_out(passed_by.slot_out, req.used_entity);
 						}
-					}
-				}
-			}
-
-			for (const auto & req : life_bounds.bounds){
-				if(req.external_spec){
-					continue;
-				}
-
-				auto& pt = *get_partition_itr(req.requirement);
-
-				assert(req.assigned_resource_index != no_slot);
-				for (const auto & passed_by : req.passed_by){
-					if(!passed_by.stage)continue;
-					auto& ref = resource_ref[const_cast<pass*>(passed_by.stage)];
-					if(passed_by.slot_in != no_slot){
-						ref.set_in(passed_by.slot_in, &local_resources[pt.prefix_sum + req.assigned_resource_index]);
-					}
-
-					if(passed_by.slot_out != no_slot){
-						ref.set_in(passed_by.slot_out, &local_resources[pt.prefix_sum + req.assigned_resource_index]);
 					}
 				}
 			}
@@ -1694,7 +1633,7 @@ namespace mo_yanxi::graphic{
 				for (const auto & [idx, res] : ref.outputs | std::views::enumerate){
 					if(res){
 						auto& vec = inouts[res];
-						if(auto itr = std::ranges::find(vec, pass, &post_graph::pass_identity::stage); itr != vec.end()){
+						if(auto itr = std::ranges::find(vec, pass, &post_graph::pass_identity::where); itr != vec.end()){
 							itr->slot_out = idx;
 						}else{
 							vec.push_back(post_graph::pass_identity{pass, nullptr, no_slot, static_cast<inout_index>(idx)});
@@ -1723,11 +1662,122 @@ namespace mo_yanxi::graphic{
 		void resize(VkExtent2D size){
 			resize(std::bit_cast<math::u32size2>(size));
 		}
+		void resize(){
+			resize(context_->get_extent());
+		}
 
 		void allocate(){
 			for (auto & local_resource : local_resources){
 				local_resource.allocate(*context_, std::bit_cast<VkExtent2D>(extent));
 			}
+		}
+
+		void create_command(){
+			using namespace resource_desc;
+			std::unordered_map<const resource_entity*, entity_state> res_states{};
+
+			auto try_get_layout = [&](const resource_entity* entity){
+				if(const auto itr = res_states.find(entity); itr != res_states.end()){
+					return itr->second.get_layout();
+				}
+				return VK_IMAGE_LAYOUT_UNDEFINED;
+			};
+
+			vk::scoped_recorder scoped_recorder{main_command_buffer};
+
+			vk::cmd::dependency_gen dependency_gen{};
+
+			for (const auto & stage : stages){
+				auto& inout = stage->sockets();
+				auto& ref = resource_ref.at(stage.get());
+				//
+				// if(auto to_this_itr = external_inputs.find(stage.get()); to_this_itr != external_inputs.end()){
+				// 	for (const auto & res : to_this_itr->second){
+				// 		auto [itr, rst] = res_states.try_emplace(ref.inputs[res.slot], entity_state{res});
+				// 		// assert(rst);
+				// 	}
+				// }
+
+				for (const auto& [in_idx, data_idx] : inout.get_valid_in()){
+					auto rentity = ref.inputs[in_idx];
+					auto& cur_req = inout.data[data_idx];
+
+					assert(rentity != nullptr);
+
+					std::visit(narrow_overload{
+						[&](const image_requirement& r, const image_entity& entity){
+
+							if(auto to_this_itr = external_inputs.find(stage.get()); to_this_itr != external_inputs.end()){
+								for (const auto & res : to_this_itr->second){
+									if(res.slot == in_idx)res_states.insert_or_assign(ref.inputs[res.slot], entity_state{res});
+								}
+							}
+
+							dependency_gen.push(
+								entity.handle.image,
+								VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+								VK_ACCESS_2_NONE,
+								VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+								r.get_image_access(),
+								try_get_layout(rentity),
+								cur_req.get<image_requirement>().desc.get_expected_layout(),
+								{
+									.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+									.baseMipLevel = 0,
+									.levelCount = value_or(r.mip_levels, 1u),
+									.baseArrayLayer = 0,
+									.layerCount = 1
+								}
+							);
+
+							std::get<image_entity_state>(res_states[rentity].desc).current_layout = r.desc.get_expected_layout();
+
+						},
+						[&](const buffer_requirement& r, const buffer_entity& entity){
+
+						}
+					}, rentity->requirement.desc, rentity->resource);
+
+
+					//TODO pass command record
+				}
+
+				if(auto from_this_itr = external_outputs.find(stage.get()); from_this_itr != external_outputs.end()){
+					for (const auto & res : from_this_itr->second){
+						auto rentity = ref.outputs[res.slot];
+
+						std::visit(narrow_overload{
+						[&](const image_requirement& r, const image_entity& entity){
+							dependency_gen.push(
+								entity.handle.image,
+								VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+								VK_ACCESS_2_NONE,
+								VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+								r.get_image_access(),
+								try_get_layout(rentity),
+								res.get_layout(),
+								{
+									.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+									.baseMipLevel = 0,
+									.levelCount = value_or(r.mip_levels, 1u),
+									.baseArrayLayer = 0,
+									.layerCount = 1
+								}
+							);
+						},
+						[&](const buffer_requirement& r, const buffer_entity& entity){
+
+						}
+					}, rentity->requirement.desc, rentity->resource);
+					}
+				}
+				dependency_gen.apply(scoped_recorder);
+
+			}
+		}
+
+		VkCommandBuffer get_main_command_buffer() const noexcept{
+			return main_command_buffer;
 		}
 
 		// pass& operator[](post_process_id id) noexcept{
