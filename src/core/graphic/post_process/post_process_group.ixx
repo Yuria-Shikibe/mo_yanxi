@@ -166,12 +166,6 @@ namespace mo_yanxi::graphic{
 			VkFormat format{VK_FORMAT_UNDEFINED};
 			unsigned dim{no_req_spec};
 
-			[[nodiscard]] VkImageLayout get_expected_layout() const noexcept{
-				return decoration == image_decr::sampler
-					       ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-					       : VK_IMAGE_LAYOUT_GENERAL;
-			}
-
 			[[nodiscard]] VkImageUsageFlags get_required_usage() const noexcept{
 				VkImageUsageFlags rst{};
 				if(decoration == image_decr::sampler){
@@ -246,6 +240,11 @@ namespace mo_yanxi::graphic{
 			image_desc desc{};
 			// ownership_type ownership{};
 			VkImageUsageFlags usage{};
+
+			VkImageLayout override_format{};
+			VkImageLayout override_output_format{};
+
+
 			unsigned mip_levels{no_req_spec};
 			unsigned scaled_times{no_req_spec};
 
@@ -263,6 +262,20 @@ namespace mo_yanxi::graphic{
 				// ownership = ownership_type{std::max(std::to_underlying(ownership), std::to_underlying(other.ownership))};
 				usage |= other.usage;
 			}
+
+
+			[[nodiscard]] VkImageLayout get_expected_layout() const noexcept{
+				if(override_format)return override_format;
+				return desc.decoration == image_decr::sampler
+						   ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+						   : VK_IMAGE_LAYOUT_GENERAL;
+			}
+
+			[[nodiscard]] VkImageLayout get_expected_layout_on_output() const noexcept{
+				if(override_output_format)return override_output_format;
+				return get_expected_layout();
+			}
+
 
 			[[nodiscard]] VkAccessFlags2 get_image_access() const noexcept{
 				switch(desc.decoration){
@@ -576,13 +589,13 @@ namespace mo_yanxi::graphic{
 		export
 		struct resource_entity{
 			using variant_t = std::variant<image_entity, buffer_entity>;
-			resource_requirement requirement{};
+			resource_requirement overall_req{};
 			variant_t resource{};
 
 			[[nodiscard]] resource_entity() = default;
 
 			[[nodiscard]] explicit resource_entity(const resource_requirement& requirement)
-				: requirement(requirement){
+				: overall_req(requirement){
 				switch(requirement.type()){
 				case resource_type::image : resource.emplace<image_entity>();
 					break;
@@ -594,14 +607,14 @@ namespace mo_yanxi::graphic{
 
 			void allocate(vk::context& context, VkExtent2D extent){
 				std::visit(overload{[&](image_entity& v){
-					v.allocate(context, extent, requirement.get<image_requirement>());
+					v.allocate(context, extent, overall_req.get<image_requirement>());
 				}, [&](buffer_entity& v){
 					v.allocate(context);
 				}}, resource);
 			}
 
 			[[nodiscard]] resource_type type() const noexcept{
-				return requirement.type();
+				return overall_req.type();
 			}
 
 			image_entity& as_image(){
@@ -627,6 +640,8 @@ namespace mo_yanxi::graphic{
 		struct entity_state{
 			using variant_t = std::variant<image_entity_state, buffer_entity_state>;
 			variant_t desc{};
+
+			VkAccessFlags2 last_access{};
 
 			[[nodiscard]] resource_type type() const noexcept{
 				return static_cast<resource_type>(desc.index());
@@ -996,8 +1011,9 @@ namespace mo_yanxi::graphic{
 			resource_desc::resource_requirement requirement{};
 
 
+			resource_desc::ownership_type ownership{};
 
-			bool external_spec{false};
+			// bool external_spec{false};
 			std::vector<pass_identity> passed_by{};
 
 			resource_desc::resource_entity *used_entity{nullptr};
@@ -1083,6 +1099,16 @@ namespace mo_yanxi::graphic{
 		std::vector<const resource_desc::resource_entity*> inputs{};
 		std::vector<const resource_desc::resource_entity*> outputs{};
 
+		bool has_in(inout_index index) const noexcept{
+			if(index >= inputs.size()) return false;
+			return inputs[index] != nullptr;
+		}
+
+		bool has_out(inout_index index) const noexcept{
+			if(index >= outputs.size()) return false;
+			return outputs[index] != nullptr;
+		}
+
 		void set_in(inout_index idx, const resource_desc::resource_entity* res){
 			inputs.resize(std::max<std::size_t>(idx + 1, inputs.size()));
 			assert(inputs[idx] == nullptr);
@@ -1113,7 +1139,8 @@ namespace mo_yanxi::graphic{
 
 		std::unordered_map<pass*, std::vector<resource_desc::external_resource>> external_outputs{};
 		std::unordered_map<pass*, std::vector<resource_desc::external_resource>> external_inputs{};
-		std::vector<resource_desc::resource_entity> local_resources{};
+		std::vector<resource_desc::resource_entity> shared_resources{};
+		std::vector<resource_desc::resource_entity> exclusive_resources{};
 		std::vector<resource_desc::resource_entity> borrowed_resources{};
 		std::unordered_map<pass*, pass_resource_reference> resource_ref{};
 		math::u32size2 extent{};
@@ -1276,7 +1303,9 @@ namespace mo_yanxi::graphic{
 				for(const auto& entry : desc){
 					auto& rst = result.bounds.emplace_back(inout.at_out(entry.slot));
 					if(entry.external_spec){
-						rst.external_spec = true;
+						rst.ownership = resource_desc::ownership_type::external;
+					}else{
+						rst.ownership = resource_desc::ownership_type::exclusive;
 					}
 					rst.passed_by.push_back({nullptr, node_id, entry.slot, no_slot});
 					auto& next = rst.passed_by.emplace_back(pass);
@@ -1346,7 +1375,9 @@ namespace mo_yanxi::graphic{
 								res_bnd.passed_by.push_back(pass_identity{nullptr, cur_head.where, no_slot, entry.slot});
 
 								if(entry.external_spec){
-									res_bnd.external_spec = true;
+									res_bnd.ownership = resource_desc::ownership_type::external;
+								}else{
+									res_bnd.ownership = resource_desc::ownership_type::exclusive;
 								}
 
 								break;
@@ -1374,25 +1405,6 @@ namespace mo_yanxi::graphic{
 			// }
 
 			result.unique();
-			//
-			// std::println();
-			// std::println();
-			//
-			// for(const auto& lifebound : result.bounds){
-			// 	std::print("Completed<{:5}>: {:6}  ",
-			// 		lifebound.passed_by.front().slot_in == no_slot,
-			// 		lifebound.requirement.type_name()
-			// 	);
-			//
-			// 	std::print("{:n:}", lifebound.passed_by | std::views::transform([](const pass_identity& value){
-			// 		return value.format("Tml");
-			// 	}));
-			//
-			// 	std::println();
-			// }
-			// std::println();
-			// std::println();
-			// std::fflush(stdout);
 
 			return result;
 		}
@@ -1466,118 +1478,119 @@ namespace mo_yanxi::graphic{
 				std::ranges::for_each(minimal_requirements_per_partition, &partition::reset_marks);
 			};
 
-			for (auto&& [idx, image] : life_bounds.bounds | std::views::enumerate){
-				if(image.external_spec)continue;
-				if(auto category = get_partition_itr(image.requirement); category == minimal_requirements_per_partition.end()){
-					auto& vec = minimal_requirements_per_partition.emplace_back();
-					vec.add(image.requirement);
-				}
+			static constexpr resource_requirement_partial_greater_comp comp{};
 
-				for (const auto & passed_by : image.passed_by){
-					req_per_stage[passed_by].push_back({&image, &lifebound_assignments[idx]});
-				}
-			}
-
-			reset_markers();
-
-			for (const auto & [pass, reqs] : req_per_stage){
-				for (const auto& req : reqs){
-					auto partition_itr = get_partition_itr(req.bound->requirement);
-
-					for (auto && [candidate, selected] : std::views::zip(partition_itr->requirements, partition_itr->selection_mark)){
-						if(selected)continue;
-						selected = true;
-						goto skip0;
+			{
+				//cal shared requirements
+				for (auto&& [idx, image] : life_bounds.bounds | std::views::enumerate){
+					if(image.ownership != ownership_type::shared)continue;
+					if(auto category = get_partition_itr(image.requirement); category == minimal_requirements_per_partition.end()){
+						auto& vec = minimal_requirements_per_partition.emplace_back();
+						vec.add(image.requirement);
 					}
 
-					partition_itr->add(req.bound->requirement);
-
-					skip0:
-					(void)0;
+					for (const auto & passed_by : image.passed_by){
+						req_per_stage[passed_by].push_back({&image, &lifebound_assignments[idx]});
+					}
 				}
 
 				reset_markers();
-			}
 
-			for (auto && p : minimal_requirements_per_partition){
-				p.indices = {std::from_range, std::views::iota(0uz, p.requirements.size())};
-			}
+				for (const auto & [pass, reqs] : req_per_stage){
+					for (const auto& req : reqs){
+						auto partition_itr = get_partition_itr(req.bound->requirement);
 
-			static constexpr resource_requirement_partial_greater_comp comp{};
+						for (auto && [candidate, selected] : std::views::zip(partition_itr->requirements, partition_itr->selection_mark)){
+							if(selected)continue;
+							selected = true;
+							goto skip0;
+						}
 
-			for (auto&& [pass, reqs] : req_per_stage){
-				std::ranges::sort(reqs, comp, &lifebound_ref::requirement);
-			}
+						partition_itr->add(req.bound->requirement);
 
-			for (auto & [pass, reqs] : req_per_stage){
-				for (const auto& req : reqs){
-					if(*req.assigned_resource_index != no_slot){
-						//lifebound already bound, capture it first
-						auto partition_itr = get_partition_itr(req.requirement());
-						partition_itr->selection_mark[*req.assigned_resource_index] = true;
+						skip0:
+						(void)0;
 					}
+
+					reset_markers();
 				}
 
+				for (auto && p : minimal_requirements_per_partition){
+					p.indices = {std::from_range, std::views::iota(0uz, p.requirements.size())};
+				}
 
-				for (auto& req : reqs){
-					if(*req.assigned_resource_index != no_slot)continue;
+				for (auto&& [pass, reqs] : req_per_stage){
+					std::ranges::sort(reqs, comp, &lifebound_ref::requirement);
+				}
 
-					auto partition_itr = get_partition_itr(req.requirement());
-
-					std::ranges::sort(partition_itr->indices, [&](unsigned l, unsigned r){
-						return comp(partition_itr->requirements[l], partition_itr->requirements[r]);
-					});
-
-
-					for (auto& candidate : partition_itr->indices){
-						auto& selected = partition_itr->selection_mark[candidate];
-
-						if(selected)continue;
-						if(comp(req.requirement(), partition_itr->requirements[candidate])){
-							selected = true;
-							*req.assigned_resource_index = candidate;
-							goto skip;
+				for (auto & [pass, reqs] : req_per_stage){
+					for (const auto& req : reqs){
+						if(*req.assigned_resource_index != no_slot){
+							//lifebound already bound, capture it first
+							auto partition_itr = get_partition_itr(req.requirement());
+							partition_itr->selection_mark[*req.assigned_resource_index] = true;
 						}
 					}
 
-					//No currently compatibled, promote the minimal found one to fit
-					for (unsigned candidate : partition_itr->indices | std::views::reverse){
-						auto& selected_2 = partition_itr->selection_mark[candidate];
-						if(selected_2)continue;
-						selected_2 = true;
-						*req.assigned_resource_index = candidate;
-						partition_itr->requirements[candidate].promote(req.requirement());
-						goto skip;
+					for (auto& req : reqs){
+						if(*req.assigned_resource_index != no_slot)continue;
+
+						auto partition_itr = get_partition_itr(req.requirement());
+
+						std::ranges::sort(partition_itr->indices, [&](unsigned l, unsigned r){
+							return comp(partition_itr->requirements[l], partition_itr->requirements[r]);
+						});
+
+
+						for (auto& candidate : partition_itr->indices){
+							auto& selected = partition_itr->selection_mark[candidate];
+
+							if(selected)continue;
+							if(comp(req.requirement(), partition_itr->requirements[candidate])){
+								selected = true;
+								*req.assigned_resource_index = candidate;
+								goto skip;
+							}
+						}
+
+						//No currently compatibled, promote the minimal found one to fit
+						for (unsigned candidate : partition_itr->indices | std::views::reverse){
+							auto& selected_2 = partition_itr->selection_mark[candidate];
+							if(selected_2)continue;
+							selected_2 = true;
+							*req.assigned_resource_index = candidate;
+							partition_itr->requirements[candidate].promote(req.requirement());
+							goto skip;
+						}
+
+						throw std::runtime_error{"unmatched req"};
+
+						skip:
+						(void)0;
 					}
 
-					throw std::runtime_error{"unmatched req"};
-
-					skip:
-					(void)0;
+					reset_markers();
 				}
-
-				reset_markers();
 			}
 
-
+			unsigned prefix_sum{};
 			{
-				unsigned prefix_sum{};
 				for (auto & pt : minimal_requirements_per_partition){
 					pt.prefix_sum = prefix_sum;
 					prefix_sum += pt.requirements.size();
 
 					for (const auto& requirement : pt.requirements){
-						local_resources.push_back(resource_entity{requirement});
+						shared_resources.push_back(resource_entity{requirement});
 					}
 				}
 			}
 
 			for (auto& reqs : req_per_stage | std::views::values){
 				for (const auto& req : reqs){
-					if(req.bound->external_spec || req.bound->used_entity != nullptr)continue;
+					if(req.bound->used_entity != nullptr)continue;
 					assert(*req.assigned_resource_index != no_slot);
 					auto& pt = *get_partition_itr(req.requirement());
-					req.bound->used_entity = &local_resources[pt.prefix_sum + *req.assigned_resource_index];
+					req.bound->used_entity = &shared_resources[pt.prefix_sum + *req.assigned_resource_index];
 
 					for (const auto & passed_by : req.bound->passed_by){
 						if(!passed_by.where)continue;
@@ -1594,13 +1607,44 @@ namespace mo_yanxi::graphic{
 			}
 
 			{
+				//assign exclusive resources
+				for (const auto & req : life_bounds.bounds){
+					if(req.ownership != ownership_type::exclusive)continue;
+					exclusive_resources.push_back(resource_entity{req.requirement});
+				}
+
+				for (const auto & [idx, req] : life_bounds.bounds
+					| std::views::filter([](const resource_lifebound& b){return b.ownership == ownership_type::exclusive;})
+					| std::views::enumerate){
+
+					req.used_entity = &exclusive_resources[idx];
+
+					for (const auto & passed_by : req.passed_by){
+						if(!passed_by.where)continue;
+						auto& ref = resource_ref[const_cast<pass*>(passed_by.where)];
+
+						if(passed_by.slot_in != no_slot){
+							ref.set_in(passed_by.slot_in, req.used_entity);
+						}
+
+						if(passed_by.slot_out != no_slot){
+							ref.set_out(passed_by.slot_out, req.used_entity);
+						}
+					}
+				}
+			}
+
+			{
 				//assign borrowed resources
 				for (const auto & req : life_bounds.bounds){
-					if(!req.external_spec)continue;
+					if(req.ownership != ownership_type::external)continue;
 					borrowed_resources.push_back(resource_entity{req.requirement});
 				}
 
-				for (const auto & [idx, req] : life_bounds.bounds | std::views::filter(&resource_lifebound::external_spec) | std::views::enumerate){
+
+				for (const auto & [idx, req] : life_bounds.bounds
+					| std::views::filter([](const resource_lifebound& b){return b.ownership == ownership_type::external;})
+					| std::views::enumerate){
 					req.used_entity = &borrowed_resources[idx];
 
 					for (const auto & passed_by : req.passed_by){
@@ -1621,7 +1665,7 @@ namespace mo_yanxi::graphic{
 
 		void print_resource_reference() const {
 			std::println();
-			std::println("Resource Requirements: {}", local_resources.size());
+			std::println("Resource Requirements: {}", shared_resources.size());
 
 			std::map<const resource_desc::resource_entity*, std::vector<post_graph::pass_identity>> inouts{};
 			for (const auto & [pass, ref] : resource_ref){
@@ -1644,7 +1688,7 @@ namespace mo_yanxi::graphic{
 			}
 
 			for (const auto & [res, user] : inouts){
-				std::println("Res[{:0>2}]<{}>: ", res - local_resources.data(), res->requirement.type_name());
+				std::println("Res[{:0>2}]<{}>: ", res - shared_resources.data(), res->overall_req.type_name());
 				std::println("{:n:}", user | std::views::transform([](const post_graph::pass_identity& value){
 					return value.format("None");
 				}));
@@ -1667,7 +1711,10 @@ namespace mo_yanxi::graphic{
 		}
 
 		void allocate(){
-			for (auto & local_resource : local_resources){
+			for (auto & local_resource : shared_resources){
+				local_resource.allocate(*context_, std::bit_cast<VkExtent2D>(extent));
+			}
+			for (auto & local_resource : exclusive_resources){
 				local_resource.allocate(*context_, std::bit_cast<VkExtent2D>(extent));
 			}
 		}
@@ -1690,13 +1737,6 @@ namespace mo_yanxi::graphic{
 			for (const auto & stage : stages){
 				auto& inout = stage->sockets();
 				auto& ref = resource_ref.at(stage.get());
-				//
-				// if(auto to_this_itr = external_inputs.find(stage.get()); to_this_itr != external_inputs.end()){
-				// 	for (const auto & res : to_this_itr->second){
-				// 		auto [itr, rst] = res_states.try_emplace(ref.inputs[res.slot], entity_state{res});
-				// 		// assert(rst);
-				// 	}
-				// }
 
 				for (const auto& [in_idx, data_idx] : inout.get_valid_in()){
 					auto rentity = ref.inputs[in_idx];
@@ -1706,13 +1746,13 @@ namespace mo_yanxi::graphic{
 
 					std::visit(narrow_overload{
 						[&](const image_requirement& r, const image_entity& entity){
-
 							if(auto to_this_itr = external_inputs.find(stage.get()); to_this_itr != external_inputs.end()){
 								for (const auto & res : to_this_itr->second){
 									if(res.slot == in_idx)res_states.insert_or_assign(ref.inputs[res.slot], entity_state{res});
 								}
 							}
 
+							auto layout = cur_req.get<image_requirement>().get_expected_layout();
 							dependency_gen.push(
 								entity.handle.image,
 								VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
@@ -1720,7 +1760,7 @@ namespace mo_yanxi::graphic{
 								VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 								r.get_image_access(),
 								try_get_layout(rentity),
-								cur_req.get<image_requirement>().desc.get_expected_layout(),
+								layout,
 								{
 									.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 									.baseMipLevel = 0,
@@ -1729,25 +1769,28 @@ namespace mo_yanxi::graphic{
 									.layerCount = 1
 								}
 							);
+							dependency_gen.apply(scoped_recorder);
 
-							std::get<image_entity_state>(res_states[rentity].desc).current_layout = r.desc.get_expected_layout();
+							std::get<image_entity_state>(res_states[rentity].desc).current_layout = layout;
 
 						},
 						[&](const buffer_requirement& r, const buffer_entity& entity){
 
 						}
-					}, rentity->requirement.desc, rentity->resource);
-
-
-					//TODO pass command record
+					}, rentity->overall_req.desc, rentity->resource);
 				}
 
-				if(auto from_this_itr = external_outputs.find(stage.get()); from_this_itr != external_outputs.end()){
-					for (const auto & res : from_this_itr->second){
-						auto rentity = ref.outputs[res.slot];
+				//modify output image layout, as output initialization
+				for (const auto& [out_idx, data_idx] : inout.get_valid_out()){
+					auto rentity = ref.outputs[out_idx];
+					auto& cur_req = inout.data[data_idx];
 
-						std::visit(narrow_overload{
+					assert(rentity != nullptr);
+
+					std::visit(narrow_overload{
 						[&](const image_requirement& r, const image_entity& entity){
+							auto layout = cur_req.get<image_requirement>().get_expected_layout();
+
 							dependency_gen.push(
 								entity.handle.image,
 								VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
@@ -1755,7 +1798,7 @@ namespace mo_yanxi::graphic{
 								VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 								r.get_image_access(),
 								try_get_layout(rentity),
-								res.get_layout(),
+								layout,
 								{
 									.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 									.baseMipLevel = 0,
@@ -1764,14 +1807,90 @@ namespace mo_yanxi::graphic{
 									.layerCount = 1
 								}
 							);
+							dependency_gen.apply(scoped_recorder);
+
+							std::get<image_entity_state>(res_states[rentity].desc).current_layout = layout;
 						},
 						[&](const buffer_requirement& r, const buffer_entity& entity){
 
 						}
-					}, rentity->requirement.desc, rentity->resource);
-					}
+					}, rentity->overall_req.desc, rentity->resource);
 				}
-				dependency_gen.apply(scoped_recorder);
+
+				//TODO pass command record
+
+
+				//restore output final format, transition if any should be done within the pass
+
+				for (const auto& [out_idx, data_idx] : inout.get_valid_in()){
+					auto rentity = ref.inputs[out_idx];
+					auto& cur_req = inout.data[data_idx];
+
+					assert(rentity != nullptr);
+
+					std::visit(narrow_overload{
+						[&](const image_requirement& r, const image_entity& entity){
+							auto layout = cur_req.get<image_requirement>().get_expected_layout_on_output();
+							std::get<image_entity_state>(res_states[rentity].desc).current_layout = layout;
+						},
+						[&](const buffer_requirement& r, const buffer_entity& entity){
+
+						}
+					}, rentity->overall_req.desc, rentity->resource);
+				}
+
+				for (const auto& [out_idx, data_idx] : inout.get_valid_out()){
+					auto rentity = ref.outputs[out_idx];
+					auto& cur_req = inout.data[data_idx];
+
+					assert(rentity != nullptr);
+
+					std::visit(narrow_overload{
+						[&](const image_requirement& r, const image_entity& entity){
+							auto layout = cur_req.get<image_requirement>().get_expected_layout_on_output();
+							std::get<image_entity_state>(res_states[rentity].desc).current_layout = layout;
+						},
+						[&](const buffer_requirement& r, const buffer_entity& entity){
+
+						}
+					}, rentity->overall_req.desc, rentity->resource);
+				}
+
+
+				// if(auto from_this_itr = external_outputs.find(stage.get()); from_this_itr != external_outputs.end()){
+				// 	for (const auto & res : from_this_itr->second){
+				// 		auto rentity = ref.outputs[res.slot];
+				//
+				// 		std::visit(narrow_overload{
+				// 		[&](const image_requirement& r, const image_entity& entity){
+				// 			// dependency_gen.push(
+				// 			// 	entity.handle.image,
+				// 			// 	VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+				// 			// 	VK_ACCESS_2_NONE,
+				// 			// 	VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				// 			// 	r.get_image_access(),
+				// 			// 	try_get_layout(rentity),
+				// 			// 	res.get_layout(),
+				// 			// 	{
+				// 			// 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				// 			// 		.baseMipLevel = 0,
+				// 			// 		.levelCount = value_or(r.mip_levels, 1u),
+				// 			// 		.baseArrayLayer = 0,
+				// 			// 		.layerCount = 1
+				// 			// 	}
+				// 			// );
+				//
+				// 			std::get<image_entity_state>(res_states[rentity].desc).current_layout = res.get_layout();
+				//
+				// 		},
+				// 		[&](const buffer_requirement& r, const buffer_entity& entity){
+				//
+				// 		}
+				// 	}, rentity->overall_req.desc, rentity->resource);
+				// 	}
+				// }
+				// dependency_gen.apply(scoped_recorder);
+
 
 			}
 		}

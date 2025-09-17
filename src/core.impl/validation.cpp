@@ -24,6 +24,10 @@ VkBool32 mo_yanxi::vk::validationCallback(
 	std::println(std::cerr, "{}", str);
 	print_stack_trace(std::cerr, 1);
 
+#ifdef _MSC_VER
+	__debugbreak();
+#endif
+
 	return false;
 }
 

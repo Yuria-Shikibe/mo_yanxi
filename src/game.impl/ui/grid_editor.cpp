@@ -17,6 +17,7 @@ import mo_yanxi.game.meta.hitbox;
 import mo_yanxi.math.rand;
 
 import std;
+// import magic_enum;
 
 
 namespace mo_yanxi::game::meta::chamber{
@@ -42,7 +43,7 @@ namespace mo_yanxi::game::meta::chamber{
 		BuildingColorProvFn fn = {},
 		TileColorProvFn tfn = {}
 		){
-		auto acquirer = ui::get_draw_acquirer(renderer);
+		auto acquirer = mo_yanxi::ui::get_draw_acquirer(renderer);
 		using namespace graphic;
 
 		acquirer.proj.set_layer(ui::draw_layers::base);

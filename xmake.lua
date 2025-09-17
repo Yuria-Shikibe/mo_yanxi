@@ -78,7 +78,7 @@ target("mo_yanxi")
 
     add_defines("_MSVC_STL_HARDENING=1")
     add_defines("_MSVC_STL_DESTRUCTOR_TOMBSTONES=1")
-    add_defines("MAGIC_ENUM_USE_STD_MODULE")
+    --add_defines("MAGIC_ENUM_USE_STD_MODULE")
 
 
     set_warnings("all")

@@ -791,8 +791,11 @@ void graph_test(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
 	using namespace mo_yanxi::graphic;
+	using namespace resource_desc;
+
 	graphic::post_process_graph graph{core::global::graphic::context};
 	{
+
 		const post_process_meta bloom_meta = []{
 			post_process_meta meta{
 				assets::graphic::shaders::comp::bloom,
@@ -805,13 +808,13 @@ void graph_test(){
 			};
 
 			auto& req = meta.sockets.at_out<resource_desc::image_requirement>(0);
-			req.ownership = resource_desc::ownership_type::exclusive;
+
+			req.override_format = req.override_output_format = VK_IMAGE_LAYOUT_GENERAL;
 			req.mip_levels = 6;
 			req.scaled_times = 0;
 
 			return meta;
 		}();
-
 
 		auto& oit = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::oit_blend, post_process_stage_inout_map{
 			{{0}, 0, no_slot},
@@ -829,7 +832,7 @@ void graph_test(){
 			{{0}, 0, no_slot},
 			{{1}, no_slot, 0}
 		}});
-
+		//
 		auto& world_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::world_merge, {
 			{{0}, no_slot, 0},
 			{{1}, 0, no_slot},
@@ -837,13 +840,12 @@ void graph_test(){
 			{{3}, 2, no_slot},
 			{{4}, 3, no_slot},
 		}});
+		//
 
 		auto& anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
 			{{1}, 0, no_slot},
 			{{2}, no_slot, 0},
 		}});
-
-		auto& ui_bloom = graph.add_stage<post_process_stage>(bloom_meta);
 
 		auto& final_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::result_merge, {
 			{{0}, no_slot, 0},
@@ -853,17 +855,42 @@ void graph_test(){
 			{{4}, 3, no_slot},
 		}});
 
+		auto& ui_bloom = graph.add_stage<post_process_stage>(bloom_meta);
+
+		//
+		constexpr bool to_switch = false;
+		graph.add_input(&final_merge, {
+			external_resource{1, to_switch, external_image{}},
+			external_resource{2, to_switch, external_image{}},
+		});
+
+		graph.add_output(&final_merge, {
+							 external_resource{0, false, external_image{}}});
+
 		final_merge.add_dep({pass_dependency{
 			.id = &ui_bloom,
 			.dst_idx = 3
-		}, {
-			.id = &anti_alias,
-		}});
+		},
+			{.id = &anti_alias,}
+		});
+
+
+		graph.add_input(&ui_bloom, {
+			external_resource{0, to_switch, external_image{}}
+		});
 
 		anti_alias.add_dep({
 			.id = &world_merge
 		});
 
+
+		// graph.add_input(&world_merge, {
+		// 	external_resource{0, to_switch, external_image{}},
+		// 	external_resource{1, to_switch, external_image{}},
+		// 	external_resource{2, to_switch, external_image{}},
+		// 	external_resource{3, to_switch, external_image{}},
+		// });
+		//
 		world_merge.add_dep({
 			{
 				.id = &ssao,
@@ -890,11 +917,6 @@ void graph_test(){
 		// 	.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
 		// }, {{0, 1}, {0, 2}, {0, 3}});
 
-		constexpr bool to_switch = false;
-
-		using namespace resource_desc;
-		graph.add_output(&final_merge, {
-			external_resource{0, false, external_image{}}});
 
 		graph.add_input(&oit, {
 			                external_resource{0, true, external_buffer{}},
@@ -915,10 +937,6 @@ void graph_test(){
 			external_resource{0, to_switch, external_image{}}
 		});
 
-		graph.add_input(&final_merge, {
-			external_resource{1, to_switch, external_image{}},
-			external_resource{2, to_switch, external_image{}}
-		});
 
 
 		// ui_bloom->add_image_requirement({
