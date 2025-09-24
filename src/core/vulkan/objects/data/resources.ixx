@@ -118,6 +118,11 @@ namespace mo_yanxi::vk{
 			return buffer_borrow{*this, get_address(), off, size};
 		}
 
+		buffer_borrow borrow(VkDeviceSize off) const noexcept{
+			assert(off < get_size());
+			return buffer_borrow{*this, get_address(), off, get_size() - off};
+		}
+
 		buffer_borrow borrow() const noexcept{
 			return buffer_borrow{*this, get_address(), 0, get_size()};
 		}

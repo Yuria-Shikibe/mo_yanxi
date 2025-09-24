@@ -1,9 +1,10 @@
 module;
 
 #include <vulkan/vulkan.h>
+
 #include <spirv_cross/spirv_cross.hpp>
-// #include <magic_enum/magic_enum.hpp>
 #include <gch/small_vector.hpp>
+
 #include <spirv_cross/spirv_glsl.hpp>
 
 
@@ -15,12 +16,15 @@ import mo_yanxi.vk.shader;
 import mo_yanxi.vk.image_derives;
 import mo_yanxi.vk.context;
 import mo_yanxi.vk.command_buffer;
+import mo_yanxi.vk.resources;
 import mo_yanxi.graphic.shader_reflect;
 import mo_yanxi.meta_programming;
 import mo_yanxi.basic_util;
 import mo_yanxi.math.vector2;
+import mo_yanxi.referenced_ptr;
 
 import std;
+import <plf_hive.h>;
 
 namespace mo_yanxi::graphic{
 	export constexpr VkFormat convertImageFormatToVkFormat(spv::ImageFormat imageFormat) noexcept{
@@ -98,12 +102,12 @@ namespace mo_yanxi::graphic{
 
 
 	template <typename C>
-	std::strong_ordering connect_three_way_result(C cur) noexcept{
+	constexpr std::strong_ordering connect_three_way_result(C cur) noexcept{
 		return cur;
 	}
 
 	template <typename C, typename ...T>
-	std::strong_ordering connect_three_way_result(C cur, T... rst) noexcept{
+	constexpr std::strong_ordering connect_three_way_result(C cur, T... rst) noexcept{
 		if(std::is_eq(cur)){
 			return graphic::connect_three_way_result(rst...);
 		}else{
@@ -241,8 +245,15 @@ namespace mo_yanxi::graphic{
 			// ownership_type ownership{};
 			VkImageUsageFlags usage{};
 
-			VkImageLayout override_format{};
-			VkImageLayout override_output_format{};
+			/**
+			 * @brief explicitly specfied expected initial layout of the image
+			 */
+			VkImageLayout override_layout{};
+
+			/**
+			 * @brief explicitly specfied expected final layout of the image
+			 */
+			VkImageLayout override_output_layout{};
 
 
 			unsigned mip_levels{no_req_spec};
@@ -259,20 +270,25 @@ namespace mo_yanxi::graphic{
 				desc.decoration |= other.desc.decoration;
 
 				mip_levels = get_optional_max(mip_levels, other.mip_levels, no_req_spec);
+				if(desc.format == VK_FORMAT_UNDEFINED)desc.format = other.desc.format;
+				assert(desc.format == other.desc.format);
 				// ownership = ownership_type{std::max(std::to_underlying(ownership), std::to_underlying(other.ownership))};
 				usage |= other.usage;
 			}
 
+			bool is_sampled_image() const noexcept{
+				return desc.decoration == image_decr::sampler;
+			}
 
 			[[nodiscard]] VkImageLayout get_expected_layout() const noexcept{
-				if(override_format)return override_format;
+				if(override_layout)return override_layout;
 				return desc.decoration == image_decr::sampler
 						   ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 						   : VK_IMAGE_LAYOUT_GENERAL;
 			}
 
 			[[nodiscard]] VkImageLayout get_expected_layout_on_output() const noexcept{
-				if(override_output_format)return override_output_format;
+				if(override_output_layout)return override_output_layout;
 				return get_expected_layout();
 			}
 
@@ -301,36 +317,21 @@ namespace mo_yanxi::graphic{
 					desc.dim <=> other_in_same_partition.desc.dim
 				);
 			}
-			
-			[[nodiscard]] bool is_compatibility_part_equal_to(const image_requirement& other_in_same_partition) const noexcept{
-				return
-					is_compatibility_part_compare_to_impl(other_in_same_partition, std::ranges::equal_to{})
-					&& usage == other_in_same_partition.usage
-				;
-			}
-
-			[[nodiscard]] bool is_compatibility_part_greater_to(const image_requirement& other_in_same_partition) const noexcept{
-				return
-					is_compatibility_part_compare_to_impl(other_in_same_partition, std::ranges::greater{})
-					&& ((usage & other_in_same_partition.usage)  ==  other_in_same_partition.usage)
-				;
-			}
-
-		private:
-			template <typename T>
-			[[nodiscard]] bool is_compatibility_part_compare_to_impl(const image_requirement& other_in_same_partition, T op) const noexcept{
-				return true
-					&& std::invoke(op, mip_levels, other_in_same_partition.mip_levels)
-					// && std::invoke(op, ownership, other_in_same_partition.ownership)
-					// && std::invoke(op, usage, other_in_same_partition.usage)
-					&& std::invoke(op, desc.dim, other_in_same_partition.desc.dim)
-					// && desc.decoration == other_in_same_partition.desc.decoration
-				;
-			}
 		};
 
 		export
 		struct buffer_requirement{
+			VkDeviceSize size;
+
+
+			void promote(const buffer_requirement& other){
+				size = std::max(size, other.size);
+			}
+
+
+			[[nodiscard]] std::strong_ordering compatibility_three_way_compare(const buffer_requirement& other_in_same_partition) const noexcept{
+				return size <=> other_in_same_partition.size;
+			}
 		};
 
 		export
@@ -363,7 +364,10 @@ namespace mo_yanxi::graphic{
 				return std::visit<ret>(overload_def_noop{
 					std::in_place_type<ret>,
 					[](const image_requirement& l, const image_requirement& r) -> ret {
-						if(l.scaled_times != r.scaled_times && (l.scaled_times != no_req_spec && r.scaled_times != no_req_spec)){
+						if(
+							(l.scaled_times != r.scaled_times && (l.scaled_times != no_req_spec && r.scaled_times != no_req_spec) ||
+							(l.desc.format != r.desc.format && (l.desc.format != VK_FORMAT_UNDEFINED && r.desc.format != VK_FORMAT_UNDEFINED))
+						)){
 							return "Size Incompatible";
 						}
 
@@ -384,6 +388,7 @@ namespace mo_yanxi::graphic{
 						l.promote(r);
 					},
 					[](buffer_requirement& l, const buffer_requirement& r) {
+						l.promote(r);
 					}
 				}, desc, other.desc);
 			}
@@ -431,10 +436,10 @@ namespace mo_yanxi::graphic{
 				return std::visit<bool>(overload_def_noop{
 					std::in_place_type<bool>,
 					[](const image_requirement& l, const image_requirement& r) static {
-						return l.is_compatibility_part_equal_to(r);
+						return std::is_eq(l.compatibility_three_way_compare(r));
 					},
 					[](const buffer_requirement& l, const buffer_requirement& r) static  {
-						return true;
+						return std::is_eq(l.compatibility_three_way_compare(r));
 					}
 				}, this->desc, other_in_same_partition.desc);
 			}
@@ -455,8 +460,7 @@ namespace mo_yanxi::graphic{
 						 return l.compatibility_three_way_compare(r);
 					 },
 					 [](const buffer_requirement& l, const buffer_requirement& r) static  {
-						 throw std::runtime_error("Incompatible resource type");
-						 return std::strong_ordering::equal;
+						 return l.compatibility_three_way_compare(r);
 					 }
 				 }, l.desc, o.desc));
 			}
@@ -490,7 +494,7 @@ namespace mo_yanxi::graphic{
 
 			return image_desc{
 					.decoration = decr,
-					.format = convertImageFormatToVkFormat(type.image.format),
+					// .format = convertImageFormatToVkFormat(type.image.format),
 					.dim = static_cast<unsigned>(type.image.dim == spv::Dim1D
 						                             ? 1
 						                             : type.image.dim == spv::Dim2D
@@ -512,33 +516,6 @@ namespace mo_yanxi::graphic{
 		export using stage_sbo = stage_data<ubo_desc>;
 
 
-		export
-		struct external_image{
-			vk::image_handle handle{};
-			VkImageLayout expected_layout{};
-		};
-
-		export
-		struct external_buffer{
-			vk::image_handle handle{};
-		};
-
-		export
-		struct external_resource{
-			using variant_t = std::variant<external_image, external_buffer>;
-
-			inout_index slot{no_slot};
-			bool external_spec{};
-			variant_t desc{};
-
-			[[nodiscard]] resource_type type() const noexcept{
-				return resource_type{static_cast<std::underlying_type_t<resource_type>>(desc.index())};
-			}
-
-			VkImageLayout get_layout() const noexcept{
-				return std::get<external_image>(desc).expected_layout;
-			}
-		};
 
 
 		export
@@ -553,11 +530,11 @@ namespace mo_yanxi::graphic{
 
 		export
 		struct image_entity{
-			vk::image_handle handle{};
-			vk::storage_image image{};
+			vk::image_handle image{};
+			vk::storage_image handle{};
 
 			[[nodiscard]] bool is_local() const noexcept{
-				return static_cast<bool>(image);
+				return static_cast<bool>(handle);
 			}
 
 			void allocate(vk::context& context, VkExtent2D extent2D, const image_requirement& requirement){
@@ -565,7 +542,7 @@ namespace mo_yanxi::graphic{
 				extent2D.width >>= div_times;
 				extent2D.height >>= div_times;
 
-				image = vk::storage_image{
+				handle = vk::storage_image{
 					context.get_allocator(),
 					extent2D,
 					vk::get_recommended_mip_level(extent2D, value_or<std::uint32_t>(requirement.mip_levels, 1u)),
@@ -573,16 +550,20 @@ namespace mo_yanxi::graphic{
 					requirement.usage
 				};
 
-				handle = image;
+				image = handle;
 			}
 
 		};
 
 		export
 		struct buffer_entity{
+			vk::storage_buffer handle{};
+			vk::buffer_borrow buffer{};
 
-			void allocate(vk::context& context){
+			void allocate(vk::context& context, VkDeviceSize size){
+				handle = vk::storage_buffer{context.get_allocator(), size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT};
 
+				buffer = handle.borrow();
 			}
 		};
 
@@ -605,12 +586,20 @@ namespace mo_yanxi::graphic{
 				}
 			}
 
-			void allocate(vk::context& context, VkExtent2D extent){
-				std::visit(overload{[&](image_entity& v){
-					v.allocate(context, extent, overall_req.get<image_requirement>());
-				}, [&](buffer_entity& v){
-					v.allocate(context);
-				}}, resource);
+			auto& to_image(this auto& self){
+				return std::get<resource_desc::image_entity>(self.resource);
+			}
+
+			void allocate_buffer(vk::context& context, VkDeviceSize size){
+				if(auto res = std::get_if<buffer_entity>(&resource)){
+					res->allocate(context, size);
+				}
+			}
+
+			void allocate_image(vk::context& context, VkExtent2D extent){
+				if(auto res = std::get_if<image_entity>(&resource)){
+					res->allocate(context, extent, overall_req.get<image_requirement>());
+				}
 			}
 
 			[[nodiscard]] resource_type type() const noexcept{
@@ -623,6 +612,83 @@ namespace mo_yanxi::graphic{
 
 			buffer_entity& as_buffer(){
 				return std::get<buffer_entity>(resource);
+			}
+		};
+
+
+		export
+		struct external_image{
+			VkImageLayout expected_layout{};
+			vk::image_handle handle{};
+		};
+
+		export
+		struct external_buffer{
+			vk::buffer_borrow handle{};
+		};
+
+		export
+		struct explicit_resource : referenced_object_base{
+			using variant_t = std::variant<external_image, external_buffer, std::monostate>;
+
+			variant_t desc{std::monostate{}};
+
+			[[nodiscard]] explicit_resource() = default;
+
+			[[nodiscard]] explicit explicit_resource(const variant_t& desc)
+				: desc(desc){
+			}
+
+			[[nodiscard]] bool is_external_spec() const noexcept{
+				return type() != resource_type::unknown;
+			}
+
+			[[nodiscard]] resource_type type() const noexcept{
+				return resource_type{static_cast<std::underlying_type_t<resource_type>>(desc.index())};
+			}
+
+			[[nodiscard]] VkImageLayout get_layout() const noexcept{
+				if(auto img = std::get_if<external_image>(&desc)){
+					return img->expected_layout;
+				}
+				return VK_IMAGE_LAYOUT_UNDEFINED;
+			}
+
+			// void set_from_entity(const resource_entity& entity){
+			// 	std::visit(narrow_overload{
+			// 		[](external_image& image, const image_entity& entity){
+			// 			image.handle = entity.image;
+			// 		},
+			// 		[](external_buffer& buffer, const buffer_entity& entity){
+			// 			buffer.handle = entity.buffer;
+			// 		}
+			// 	}, desc, entity.resource);
+			// }
+		};
+
+		export
+		struct explicit_resource_usage{
+			referenced_ptr<explicit_resource, false> resource{};
+			inout_index slot{no_slot};
+
+			[[nodiscard]] explicit_resource_usage() = default;
+
+			[[nodiscard]] explicit_resource_usage(explicit_resource& resource,
+				inout_index slot)
+				: resource(resource),
+				  slot(slot){
+			}
+
+			[[nodiscard]] ownership_type get_ownership() const noexcept{
+				if(resource->is_external_spec()){
+					return ownership_type::external;
+				}else{
+					return resource->get_ref_count() > 1 ? ownership_type::shared : ownership_type::exclusive;
+				}
+			}
+
+			bool is_local() const noexcept{
+				return !resource->is_external_spec();
 			}
 		};
 
@@ -649,13 +715,15 @@ namespace mo_yanxi::graphic{
 
 			[[nodiscard]] entity_state() = default;
 
-			[[nodiscard]] explicit(false) entity_state(const external_resource& ext){
-				std::visit(overload{
+			[[nodiscard]] explicit(false) entity_state(const explicit_resource& ext){
+				std::visit(narrow_overload{
 					[this](const external_image& image){
 						auto& s = desc.emplace<image_entity_state>();
 						s.current_layout = image.expected_layout;
 					},
-					[](const external_buffer& buffer){}
+					[](const external_buffer& buffer){
+
+					}
 				}, ext.desc);
 			}
 
@@ -946,33 +1014,6 @@ namespace mo_yanxi::graphic{
 		inout_index dst_idx;
 	};
 
-	struct pass{
-	public:
-		gch::small_vector<pass_dependency> dependencies{};
-
-		[[nodiscard]] pass(vk::context& ctx){};
-
-		virtual ~pass() = default;
-
-		virtual inout_data& sockets() noexcept = 0;
-
-		virtual void post_init(vk::context& context){
-
-		}
-
-		[[nodiscard]] const inout_data& sockets() const noexcept{
-			return const_cast<pass*>(this)->sockets();
-		}
-
-		[[nodiscard]] virtual std::string_view get_name() const noexcept{
-			return {};
-		}
-
-		[[nodiscard]] std::string get_identity_name() const noexcept{
-			return std::format("({:#X}){}", static_cast<std::uint16_t>(std::bit_cast<std::uintptr_t>(this)), get_name());
-		}
-	};
-
 	namespace post_graph{
 		struct pass_identity{
 			const pass* where{};
@@ -996,15 +1037,8 @@ namespace mo_yanxi::graphic{
 				return false;
 			}
 
-			std::string format(std::string_view endpoint_name = "Tml") const {
-				static constexpr auto fmt_slot = [](std::string_view epn, inout_index idx) -> std::string {
-					return idx == no_slot ? std::string(epn) : std::format("{}", idx);
-				};
-
-				return std::format("[{}] {} [{}]", fmt_slot(endpoint_name, slot_in), std::string(where ? where->get_identity_name() : "endpoint"), fmt_slot(endpoint_name, slot_out));
-			}
+			std::string format(std::string_view endpoint_name = "Tml") const;
 		};
-
 
 
 		struct resource_lifebound{
@@ -1092,21 +1126,49 @@ namespace mo_yanxi::graphic{
 		};
 	}
 
+
 	export
 	struct post_process_graph;
 
+	export
 	struct pass_resource_reference{
 		std::vector<const resource_desc::resource_entity*> inputs{};
 		std::vector<const resource_desc::resource_entity*> outputs{};
 
-		bool has_in(inout_index index) const noexcept{
+		[[nodiscard]] bool has_in(inout_index index) const noexcept{
 			if(index >= inputs.size()) return false;
 			return inputs[index] != nullptr;
 		}
 
-		bool has_out(inout_index index) const noexcept{
+		[[nodiscard]] bool has_out(inout_index index) const noexcept{
 			if(index >= outputs.size()) return false;
 			return outputs[index] != nullptr;
+		}
+
+		[[nodiscard]] const resource_desc::resource_entity* get_in_if(inout_index index) const noexcept{
+			if(index >= inputs.size()) return nullptr;
+			return inputs[index];
+		}
+
+		[[nodiscard]] const resource_desc::resource_entity* get_out_if(inout_index index) const noexcept{
+			if(index >= outputs.size()) return nullptr;
+			return outputs[index];
+		}
+
+		[[nodiscard]] const resource_desc::resource_entity& at_in(inout_index index) const {
+			if(auto res = get_in_if(index)){
+				return *res;
+			}else{
+				throw std::out_of_range("resource not found");
+			}
+		}
+
+		[[nodiscard]] const resource_desc::resource_entity& at_out(inout_index index) const {
+			if(auto res = get_out_if(index)){
+				return *res;
+			}else{
+				throw std::out_of_range("resource not found");
+			}
 		}
 
 		void set_in(inout_index idx, const resource_desc::resource_entity* res){
@@ -1131,19 +1193,76 @@ namespace mo_yanxi::graphic{
 		}
 	};
 
+	struct pass{
+	protected:
+		static constexpr math::u32size2 compute_group_unit_size2{16, 16};
+
+		constexpr static math::u32size2 get_work_group_size(math::u32size2 image_size) noexcept{
+			return image_size.add(compute_group_unit_size2.copy().sub(1u, 1u)).div(compute_group_unit_size2);
+		}
+
+	public:
+		gch::small_vector<pass_dependency> dependencies{};
+
+		[[nodiscard]] explicit pass(vk::context& ctx){};
+
+		pass(const pass& other) = delete;
+		pass(pass&& other) noexcept = delete;
+		pass& operator=(const pass& other) = delete;
+		pass& operator=(pass&& other) noexcept = delete;
+
+		virtual ~pass() = default;
+
+		virtual inout_data& sockets() noexcept = 0;
+
+		virtual void post_init(vk::context& context, const math::u32size2 extent){
+
+		}
+
+		virtual void record_command(
+			vk::context& context,
+			const pass_resource_reference* resources,
+			math::u32size2 extent,
+			VkCommandBuffer buffer){
+
+		}
+
+		virtual void reset_resources(vk::context& context, const pass_resource_reference* resources, const math::u32size2 extent){
+
+		}
+
+
+		[[nodiscard]] const inout_data& sockets() const noexcept{
+			return const_cast<pass*>(this)->sockets();
+		}
+
+		[[nodiscard]] virtual std::string_view get_name() const noexcept{
+			return {};
+		}
+
+		[[nodiscard]] std::string get_identity_name() const noexcept{
+			return std::format("({:#X}){}", static_cast<std::uint16_t>(std::bit_cast<std::uintptr_t>(this)), get_name());
+		}
+	};
+
 	struct post_process_graph{
 	private:
 		vk::context* context_{};
 
 		std::vector<std::unique_ptr<pass>> stages{};
 
-		std::unordered_map<pass*, std::vector<resource_desc::external_resource>> external_outputs{};
-		std::unordered_map<pass*, std::vector<resource_desc::external_resource>> external_inputs{};
+		//TODO integrate there with pass?
+		std::unordered_map<pass*, std::vector<resource_desc::explicit_resource_usage>> external_outputs{};
+		std::unordered_map<pass*, std::vector<resource_desc::explicit_resource_usage>> external_inputs{};
+		std::unordered_map<pass*, pass_resource_reference> resource_ref{};
+
 		std::vector<resource_desc::resource_entity> shared_resources{};
 		std::vector<resource_desc::resource_entity> exclusive_resources{};
 		std::vector<resource_desc::resource_entity> borrowed_resources{};
-		std::unordered_map<pass*, pass_resource_reference> resource_ref{};
-		math::u32size2 extent{};
+
+		plf::hive<resource_desc::explicit_resource> explicit_resources{};
+
+		math::u32size2 extent_{};
 
 		vk::command_buffer main_command_buffer{};
 
@@ -1161,14 +1280,31 @@ namespace mo_yanxi::graphic{
 			return static_cast<T&>(ref);
 		}
 
-		void add_output(pass* from, std::initializer_list<resource_desc::external_resource> externals){
+		void add_output(pass* from, std::initializer_list<resource_desc::explicit_resource_usage> externals){
 			external_outputs[from].append_range(externals);
 		}
 
-		void add_input(pass* to, std::initializer_list<resource_desc::external_resource> externals){
+		void add_output(pass* from, std::initializer_list<std::pair<resource_desc::explicit_resource, inout_index>> externals){
+			for (const auto & [res, slot] : externals){
+				auto& resref = add_explicit_resource({res});
+				external_outputs[from].push_back({resref, slot});
+			}
+		}
+
+		void add_input(pass* to, std::initializer_list<resource_desc::explicit_resource_usage> externals){
 			external_inputs[to].append_range(externals);
 		}
 
+		void add_input(pass* from, std::initializer_list<std::pair<resource_desc::explicit_resource, inout_index>> externals){
+			for (const auto & [res, slot] : externals){
+				auto& resref = add_explicit_resource({res});
+				external_inputs[from].push_back({resref, slot});
+			}
+		}
+
+		auto& add_explicit_resource(resource_desc::explicit_resource res){
+			return *explicit_resources.insert(std::move(res));
+		}
 
 		void sort(){
 			if(external_outputs.empty()){
@@ -1230,7 +1366,6 @@ namespace mo_yanxi::graphic{
 			for (auto&& [idx, unique_ptr] : stages | std::views::enumerate){
 				unique_ptr.release();
 				unique_ptr.reset(sorted[idx]);
-				unique_ptr->post_init(*context_);
 			}
 		}
 
@@ -1238,7 +1373,6 @@ namespace mo_yanxi::graphic{
 		void check_sockets_connection() const{
 			for(const auto& stage : stages){
 				auto& inout = stage->sockets();
-				std::vector<inout_data> depends{};
 
 				std::unordered_map<inout_index, resource_desc::resource_requirement*> resources{inout.input_slots.size()};
 				for(const auto& [idx, data_idx] : inout.input_slots | std::views::enumerate){
@@ -1271,7 +1405,12 @@ namespace mo_yanxi::graphic{
 				if(auto itr = external_inputs.find(stage.get()); itr != external_inputs.end()){
 					for(const auto& res : itr->second){
 						if(auto ritr = resources.find(res.slot); ritr != resources.end()){
-							if(ritr->second->type() == res.type()){
+							if(res.is_local()){
+								resources.erase(ritr);
+								continue;
+							}
+
+							if(ritr->second->type() == res.resource->type()){
 								resources.erase(ritr);
 							} else{
 								//TODO type mismatch error
@@ -1302,11 +1441,8 @@ namespace mo_yanxi::graphic{
 
 				for(const auto& entry : desc){
 					auto& rst = result.bounds.emplace_back(inout.at_out(entry.slot));
-					if(entry.external_spec){
-						rst.ownership = resource_desc::ownership_type::external;
-					}else{
-						rst.ownership = resource_desc::ownership_type::exclusive;
-					}
+					rst.ownership = entry.get_ownership();
+
 					rst.passed_by.push_back({nullptr, node_id, entry.slot, no_slot});
 					auto& next = rst.passed_by.emplace_back(pass);
 					next.slot_out = entry.slot;
@@ -1373,12 +1509,7 @@ namespace mo_yanxi::graphic{
 						for(const auto& entry : ext_itr->second){
 							if(entry.slot == cur_head.slot_in){
 								res_bnd.passed_by.push_back(pass_identity{nullptr, cur_head.where, no_slot, entry.slot});
-
-								if(entry.external_spec){
-									res_bnd.ownership = resource_desc::ownership_type::external;
-								}else{
-									res_bnd.ownership = resource_desc::ownership_type::exclusive;
-								}
+								res_bnd.ownership = entry.get_ownership();
 
 								break;
 							}
@@ -1410,6 +1541,10 @@ namespace mo_yanxi::graphic{
 		}
 
 	public:
+		const resource_desc::resource_entity& out_at(const pass* p, inout_index index) const {
+			return resource_ref.at(const_cast<pass*>(p)).at_out(index);
+		}
+
 		void analysis_minimal_allocation(){
 			auto life_bounds = get_resource_lifebounds();
 
@@ -1524,13 +1659,16 @@ namespace mo_yanxi::graphic{
 				}
 
 				for (auto & [pass, reqs] : req_per_stage){
-					for (const auto& req : reqs){
-						if(*req.assigned_resource_index != no_slot){
-							//lifebound already bound, capture it first
-							auto partition_itr = get_partition_itr(req.requirement());
-							partition_itr->selection_mark[*req.assigned_resource_index] = true;
+					for (auto& reqs_inner : req_per_stage | std::views::values){
+						for (const auto& req : reqs_inner){
+							if(*req.assigned_resource_index != no_slot){
+								//lifebound already bound, capture it first
+								auto partition_itr = get_partition_itr(req.requirement());
+								partition_itr->selection_mark[*req.assigned_resource_index] = true;
+							}
 						}
 					}
+
 
 					for (auto& req : reqs){
 						if(*req.assigned_resource_index != no_slot)continue;
@@ -1549,6 +1687,7 @@ namespace mo_yanxi::graphic{
 							if(comp(req.requirement(), partition_itr->requirements[candidate])){
 								selected = true;
 								*req.assigned_resource_index = candidate;
+
 								goto skip;
 							}
 						}
@@ -1559,6 +1698,7 @@ namespace mo_yanxi::graphic{
 							if(selected_2)continue;
 							selected_2 = true;
 							*req.assigned_resource_index = candidate;
+
 							partition_itr->requirements[candidate].promote(req.requirement());
 							goto skip;
 						}
@@ -1696,9 +1836,68 @@ namespace mo_yanxi::graphic{
 			}
 		}
 
+
+		void post_init(){
+			for (const auto & stage : stages){
+				stage->post_init(*context_, extent_);
+			}
+		}
+
+		void update_external_resources() noexcept{
+			static constexpr auto get_resource = [](std::vector<resource_desc::resource_entity>& range, const resource_desc::resource_entity* ptr) -> resource_desc::resource_entity* {
+				static constexpr auto lt = std::ranges::less{};
+				static constexpr auto gteq = std::ranges::greater_equal{};
+				if( gteq(ptr, range.data()) && lt(ptr, range.data() + range.size())){
+					return range.data() + (ptr - range.data());
+				}else{
+					return nullptr;
+				}
+			};
+
+			static constexpr auto update = [](const resource_desc::explicit_resource& external_resource, resource_desc::resource_entity& entity){
+				using namespace resource_desc;
+				std::visit(narrow_overload{
+					[](const external_buffer& ext, buffer_entity& ent){
+						ent.buffer = ext.handle;
+					}, [](const external_image& ext, image_entity& ent){
+						ent.image = ext.handle;
+					}
+				}, external_resource.desc, entity.resource);
+			};
+
+			for (auto& [pass, ref] : resource_ref){
+				for (const auto & [slot, entity] : ref.inputs | std::views::enumerate){
+					if(entity == nullptr)continue;
+					const auto res = get_resource(borrowed_resources, entity);
+					if(!res)continue;
+
+					for (const auto & external : external_inputs.at(pass)){
+						if(external.slot == slot){
+							update(*external.resource, *res);
+							break;
+						}
+					}
+				}
+
+				for (const auto & [slot, entity] : ref.outputs | std::views::enumerate){
+					if(entity == nullptr)continue;
+					const auto res = get_resource(borrowed_resources, entity);
+					if(!res)continue;
+
+					for (const auto & external : external_outputs.at(pass)){
+						if(external.slot == slot){
+							update(*external.resource, *res);
+							break;
+						}
+					}
+				}
+
+			}
+		}
+
 		void resize(math::u32size2 size){
-			if(extent != size){
-				extent = size;
+			if(extent_ != size){
+				extent_ = size;
 				allocate();
 			}
 		}
@@ -1712,11 +1911,29 @@ namespace mo_yanxi::graphic{
 
 		void allocate(){
 			for (auto & local_resource : shared_resources){
-				local_resource.allocate(*context_, std::bit_cast<VkExtent2D>(extent));
+				local_resource.allocate_image(*context_, std::bit_cast<VkExtent2D>(extent_));
 			}
 			for (auto & local_resource : exclusive_resources){
-				local_resource.allocate(*context_, std::bit_cast<VkExtent2D>(extent));
+				local_resource.allocate_image(*context_, std::bit_cast<VkExtent2D>(extent_));
 			}
+
+			for (const auto & stage : stages){
+				const pass_resource_reference* ref{};
+				if(auto itr = resource_ref.find(stage.get()); itr != resource_ref.end()){
+					ref = &itr->second;
+				}
+
+				stage->reset_resources(*context_, ref, extent_);
+			}
+
+			// for (auto && [pass, spec] : external_outputs){
+			// 	for (auto & external_resource : spec){
+			// 		if(external_resource.get_ownership() == resource_desc::ownership_type::external)continue;
+			// 		auto& ref = resource_ref.at(pass);
+			// 		auto out = ref.outputs[external_resource.slot];
+			// 		external_resource.resource->set_from_entity(*out);
+			// 	}
+			// }
 		}
 
 		void create_command(){
@@ -1730,7 +1947,7 @@ namespace mo_yanxi::graphic{
 				return VK_IMAGE_LAYOUT_UNDEFINED;
 			};
 
-			vk::scoped_recorder scoped_recorder{main_command_buffer};
+			vk::scoped_recorder scoped_recorder{main_command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
 			vk::cmd::dependency_gen dependency_gen{};
 
@@ -1748,13 +1965,15 @@ namespace mo_yanxi::graphic{
 						[&](const image_requirement& r, const image_entity& entity){
 							if(auto to_this_itr = external_inputs.find(stage.get()); to_this_itr != external_inputs.end()){
 								for (const auto & res : to_this_itr->second){
-									if(res.slot == in_idx)res_states.insert_or_assign(ref.inputs[res.slot], entity_state{res});
+									if(res.slot == in_idx && !res.is_local()){
+										res_states.insert_or_assign(ref.inputs[res.slot], entity_state{*res.resource});
+									}
 								}
 							}
 
 							auto layout = cur_req.get<image_requirement>().get_expected_layout();
 							dependency_gen.push(
-								entity.handle.image,
+								entity.image.image,
 								VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
 								VK_ACCESS_2_NONE,
 								VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
@@ -1769,7 +1988,6 @@ namespace mo_yanxi::graphic{
 									.layerCount = 1
 								}
 							);
-							dependency_gen.apply(scoped_recorder);
 
 							std::get<image_entity_state>(res_states[rentity].desc).current_layout = layout;
 
@@ -1792,7 +2010,7 @@ namespace mo_yanxi::graphic{
 							auto layout = cur_req.get<image_requirement>().get_expected_layout();
 
 							dependency_gen.push(
-								entity.handle.image,
+								entity.image.image,
 								VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
 								VK_ACCESS_2_NONE,
 								VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
@@ -1807,7 +2025,6 @@ namespace mo_yanxi::graphic{
 									.layerCount = 1
 								}
 							);
-							dependency_gen.apply(scoped_recorder);
 
 							std::get<image_entity_state>(res_states[rentity].desc).current_layout = layout;
 						},
@@ -1816,9 +2033,10 @@ namespace mo_yanxi::graphic{
 						}
 					}, rentity->overall_req.desc, rentity->resource);
 				}
+				dependency_gen.apply(scoped_recorder);
 
 				//TODO pass command record
-
+				stage->record_command(*context_, &ref, extent_, scoped_recorder);
 
 				//restore output final format, transition if any should be done within the pass
 
@@ -1854,43 +2072,17 @@ namespace mo_yanxi::graphic{
 
 						}
 					}, rentity->overall_req.desc, rentity->resource);
+
+					if(auto to_this_itr = external_outputs.find(stage.get()); to_this_itr != external_outputs.end()){
+						for (const auto & res : to_this_itr->second){
+							if(res.resource->get_layout() == VK_IMAGE_LAYOUT_UNDEFINED)continue;
+							if(res.slot == out_idx){
+								//TODO layout transition to output expected
+							}
+						}
+					}
 				}
-
-
-				// if(auto from_this_itr = external_outputs.find(stage.get()); from_this_itr != external_outputs.end()){
-				// 	for (const auto & res : from_this_itr->second){
-				// 		auto rentity = ref.outputs[res.slot];
-				//
-				// 		std::visit(narrow_overload{
-				// 		[&](const image_requirement& r, const image_entity& entity){
-				// 			// dependency_gen.push(
-				// 			// 	entity.handle.image,
-				// 			// 	VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
-				// 			// 	VK_ACCESS_2_NONE,
-				// 			// 	VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				// 			// 	r.get_image_access(),
-				// 			// 	try_get_layout(rentity),
-				// 			// 	res.get_layout(),
-				// 			// 	{
-				// 			// 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				// 			// 		.baseMipLevel = 0,
-				// 			// 		.levelCount = value_or(r.mip_levels, 1u),
-				// 			// 		.baseArrayLayer = 0,
-				// 			// 		.layerCount = 1
-				// 			// 	}
-				// 			// );
-				//
-				// 			std::get<image_entity_state>(res_states[rentity].desc).current_layout = res.get_layout();
-				//
-				// 		},
-				// 		[&](const buffer_requirement& r, const buffer_entity& entity){
-				//
-				// 		}
-				// 	}, rentity->overall_req.desc, rentity->resource);
-				// 	}
-				// }
-				// dependency_gen.apply(scoped_recorder);
-
+				dependency_gen.apply(scoped_recorder);
 
 			}
 		}
@@ -1907,4 +2099,16 @@ namespace mo_yanxi::graphic{
 		// 	return *stages.at(id);
 		// }
 	};
+}
+
+module : private;
+
+namespace  mo_yanxi::graphic::post_graph{
+	std::string pass_identity::format(std::string_view endpoint_name) const{
+		static constexpr auto fmt_slot = [](std::string_view epn, inout_index idx) -> std::string {
+			return idx == no_slot ? std::string(epn) : std::format("{}", idx);
+		};
+
+		return std::format("[{}] {} [{}]", fmt_slot(endpoint_name, slot_in), std::string(where ? where->get_identity_name() : "endpoint"), fmt_slot(endpoint_name, slot_out));
+	}
 }

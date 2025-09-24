@@ -25,6 +25,7 @@ import mo_yanxi.math.constrained_system;
 import mo_yanxi.vk.context;
 import mo_yanxi.vk.batch;
 
+import mo_yanxi.vk.validation;
 import mo_yanxi.vk.vertex_info;
 import mo_yanxi.vk.ext;
 
@@ -117,6 +118,8 @@ import mo_yanxi.game.meta.grid.srl;
 import mo_yanxi.graphic.shader_reflect;
 import mo_yanxi.graphic.post_process_graph;
 import mo_yanxi.graphic.post_process_graph.generic_post_process_pass;
+import mo_yanxi.graphic.post_process_graph.bloom;
+import mo_yanxi.graphic.post_processor.oit_blender;
 
 
 
@@ -792,6 +795,11 @@ void graph_test(){
 	using namespace mo_yanxi::game;
 	using namespace mo_yanxi::graphic;
 	using namespace resource_desc;
+	vk::storage_buffer oit_mock_buffer{core::global::graphic::context.get_allocator(),
+		get_oit_buffer_size(core::global::graphic::context.get_extent()),
+						VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+
+	};
 
 	graphic::post_process_graph graph{core::global::graphic::context};
 	{
@@ -801,17 +809,25 @@ void graph_test(){
 				assets::graphic::shaders::comp::bloom,
 				{
 					{{0}, {0, no_slot}},
-					{{1}, {no_slot, 0}},
+					{{1}, {1, no_slot}},
 					{{2}, {no_slot, 0}},
 					{{3}, {no_slot, 0}},
 				}
 			};
+			{
+				auto& req = meta.sockets.at_out<resource_desc::image_requirement>(0);
 
-			auto& req = meta.sockets.at_out<resource_desc::image_requirement>(0);
+				req.mip_levels = 6;
+				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
+				req.scaled_times = 0;
+			}
+			{
+				auto& req = meta.sockets.at_in<resource_desc::image_requirement>(1);
 
-			req.override_format = req.override_output_format = VK_IMAGE_LAYOUT_GENERAL;
-			req.mip_levels = 6;
-			req.scaled_times = 0;
+				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
+				req.mip_levels = 6;
+				req.scaled_times = 0;
+			}
 
 			return meta;
 		}();
@@ -826,12 +842,18 @@ void graph_test(){
 			{{6}, 6, 1},
 		}});
 
+		oit.set_sampler_at_binding(2, assets::graphic::samplers::blit_sampler);
+		// oit.set_sampler_at(2, assets::graphic::samplers::blit_sampler);
+
 		auto& world_bloom = graph.add_stage<post_process_stage>(bloom_meta);
 
 		auto& ssao = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::ssao, {
 			{{0}, 0, no_slot},
 			{{1}, no_slot, 0}
 		}});
+
+		ssao.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
+
 		//
 		auto& world_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::world_merge, {
 			{{0}, no_slot, 0},
@@ -856,16 +878,19 @@ void graph_test(){
 		}});
 
 		auto& ui_bloom = graph.add_stage<post_process_stage>(bloom_meta);
+		ui_bloom.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
+		world_bloom.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
 
 		//
 		constexpr bool to_switch = false;
 		graph.add_input(&final_merge, {
-			external_resource{1, to_switch, external_image{}},
-			external_resource{2, to_switch, external_image{}},
+			{explicit_resource{}, 1},
+			{explicit_resource{}, 2},
 		});
 
 		graph.add_output(&final_merge, {
-							 external_resource{0, false, external_image{}}});
+			{{}, 0}
+		});
 
 		final_merge.add_dep({pass_dependency{
 			.id = &ui_bloom,
@@ -876,7 +901,7 @@ void graph_test(){
 
 
 		graph.add_input(&ui_bloom, {
-			external_resource{0, to_switch, external_image{}}
+			{{}, 0}
 		});
 
 		anti_alias.add_dep({
@@ -907,6 +932,7 @@ void graph_test(){
 				.src_idx = 0,
 				.dst_idx = 0
 			}});
+
 		world_bloom.add_dep({
 			.id = &oit,
 			.src_idx = 1
@@ -917,24 +943,23 @@ void graph_test(){
 		// 	.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
 		// }, {{0, 1}, {0, 2}, {0, 3}});
 
+		auto& oit_buffer = graph.add_explicit_resource(explicit_resource{external_buffer{oit_mock_buffer.borrow(16)}});
 
 		graph.add_input(&oit, {
-			                external_resource{0, true, external_buffer{}},
-			                external_resource{1, false, external_image{}},
-			                external_resource{2, to_switch, external_image{}},
-			                external_resource{3, to_switch, external_image{}},
-			                external_resource{4, to_switch, external_image{}},
-			                external_resource{5, false, external_image{}},
-			                external_resource{6, false, external_image{}},
+			                explicit_resource_usage{oit_buffer, 0},
+		                });
+		graph.add_input(&oit, {
+			                {{}, 1},
+			                {{}, 2},
+			                {{}, 3},
+			                {{}, 4},
+			                {{}, 5},
+			                {{}, 6},
 		                });
 
 
 		graph.add_input(&ssao, {
-			external_resource{0, to_switch, external_image{}}
-		});
-
-		graph.add_input(&ui_bloom, {
-			external_resource{0, to_switch, external_image{}}
+			{{}, 0}
 		});
 
 
@@ -949,16 +974,182 @@ void graph_test(){
 	graph.sort();
 	graph.check_sockets_connection();
 	graph.analysis_minimal_allocation();
+	graph.update_external_resources();
 	graph.print_resource_reference();
+	graph.post_init();
 	graph.resize();
 
 	graph.create_command();
 	vk::fence fence{core::global::graphic::context.get_device(), false};
-	vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {graph.get_main_command_buffer()}, fence);
-	fence.wait_and_reset();
+
+	while(!core::global::graphic::context.window().should_close()){
+		core::global::graphic::context.window().poll_events();
+
+		vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {graph.get_main_command_buffer()}, fence);
+		fence.wait_and_reset();
+		core::global::graphic::context.flush();
+	}
+
 }
 
+
+void graph_small_test(){
+
+
+	using namespace mo_yanxi;
+	using namespace mo_yanxi::game;
+	using namespace mo_yanxi::graphic;
+	using namespace resource_desc;
+	vk::storage_buffer oit_mock_buffer{core::global::graphic::context.get_allocator(),
+		get_oit_buffer_size(core::global::graphic::context.get_extent()),
+						VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+
+	};
+
+	graphic::post_process_graph graph{core::global::graphic::context};
+
+	// graph.add_explicit_resource(explicit_resource{false, external_image{}});
+
+
+	auto& final_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::result_merge, {
+		{{0}, no_slot, 0},
+		{{1}, 0, no_slot},
+		{{2}, 1, no_slot},
+		{{3}, 2, no_slot},
+		{{4}, 3, no_slot},
+	}});
+
+	final_merge.sockets().at_out(0).get<image_requirement>().desc.format = VK_FORMAT_R8G8B8A8_UNORM;
+
+	{
+		const post_process_meta bloom_meta = []{
+			post_process_meta meta{
+				assets::graphic::shaders::comp::bloom,
+				{
+						{{0}, {0, no_slot}},
+						{{1}, {1, no_slot}},
+						{{2}, {no_slot, 0}},
+						{{3}, {no_slot, 0}},
+					}
+			};
+			{
+				auto& req = meta.sockets.at_out<resource_desc::image_requirement>(0);
+
+				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
+				req.mip_levels = 6;
+				req.scaled_times = 0;
+				req.desc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+			}
+
+			{
+				auto& req = meta.sockets.at_in<resource_desc::image_requirement>(1);
+
+				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
+				req.mip_levels = 6;
+				req.scaled_times = 0;
+				req.desc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+			}
+
+			return meta;
+		}();
+
+		auto& anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
+			{{1}, 0, no_slot},
+			{{2}, no_slot, 0},
+		}});
+		anti_alias.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+
+		auto& ui_bloom = graph.add_stage<bloom_pass>(bloom_meta);
+		ui_bloom.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
+		ui_bloom.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+
+		graph.add_input(&final_merge, {
+			{{}, 1},
+			{{}, 2},
+		});
+
+		graph.add_output(&final_merge, {{{}, 0}});
+
+		final_merge.add_dep({pass_dependency{
+			.id = &ui_bloom,
+			.dst_idx = 3
+		},
+			{.id = &anti_alias,}
+		});
+
+
+		graph.add_input(&ui_bloom, {
+			{{}, 0},
+			{{}, 1},
+		});
+
+		graph.add_input(&anti_alias, {
+			{{}, 0}
+		});
+	}
+
+	graph.sort();
+	graph.check_sockets_connection();
+	graph.analysis_minimal_allocation();
+	graph.update_external_resources();
+	graph.print_resource_reference();
+	graph.post_init();
+	graph.resize();
+
+
+	graph.create_command();
+
+	core::global::graphic::context.register_post_resize("test", [&](window_instance::resize_event event){
+		graph.resize();
+		graph.create_command();
+
+	   core::global::graphic::context.set_staging_image(
+		   {
+			   .image = std::get<image_entity>(graph.out_at(&final_merge, 0).resource).image.image,
+			   .extent = core::global::graphic::context.get_extent(),
+			   .clear = false,
+			   .owner_queue_family = core::global::graphic::context.compute_family(),
+			   .src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			   .src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			   .dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			   .dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			   .src_layout = VK_IMAGE_LAYOUT_GENERAL,
+			   .dst_layout = VK_IMAGE_LAYOUT_GENERAL
+		   }, false);
+   });
+
+	core::global::graphic::context.set_staging_image({
+		.image = std::get<image_entity>(graph.out_at(&final_merge, 0).resource).image.image,
+		.extent = core::global::graphic::context.get_extent(),
+		.clear = false,
+		.owner_queue_family = core::global::graphic::context.compute_family(),
+		.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+		.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+		.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+		.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+	});
+
+	vk::fence fence{core::global::graphic::context.get_device(), false};
+	while(!core::global::graphic::context.window().should_close()){
+		core::global::graphic::context.window().poll_events();
+
+		vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {graph.get_main_command_buffer()}, fence);
+		fence.wait_and_reset();
+		core::global::graphic::context.flush();
+	}
+
+	core::global::graphic::context.wait_on_device();
+}
+
+
 int main(){
+	if(auto ptr = std::getenv("NSIGHT"); ptr != nullptr && std::strcmp(ptr, "1") == 0){
+		mo_yanxi::vk::enable_validation_layers = false;
+	}
+
+
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
 	using namespace mo_yanxi::graphic;
@@ -971,7 +1162,13 @@ int main(){
 	core::global::assets::init(&core::global::graphic::context);
 	assets::graphic::load(core::global::graphic::context);
 
-	graph_test();
+	//
+	// while(!core::global::graphic::context.window().should_close()){
+	// 	core::global::graphic::context.window().poll_events();
+	// }
+	//
+	// core::global::graphic::context.wait_on_device();
+	graph_small_test();
 	// graphic::shader_reflection reflection{assets::graphic::shaders::comp::bloom.get_binary()};
 	// reflection.foo();
 	// core::global::ui::init();

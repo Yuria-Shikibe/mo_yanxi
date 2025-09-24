@@ -26,7 +26,7 @@ namespace mo_yanxi::vk{
 	std::vector<const char*> get_required_extensions(){
 		auto extensions = get_required_extensions_glfw();
 
-		if constexpr(enable_validation_layers){
+		if(enable_validation_layers){
 			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 		}
 
@@ -80,7 +80,7 @@ namespace mo_yanxi::vk{
 			// createInfo.pNext = &validation_features_ext;
 			createInfo.pApplicationInfo = &app_info;
 
-			if constexpr(enable_validation_layers){
+			if(enable_validation_layers){
 				if(!checkValidationLayerSupport(used_validation_layers)){
 					throw std::runtime_error("validation layers requested, but not available!");
 				}

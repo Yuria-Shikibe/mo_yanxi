@@ -11,11 +11,21 @@ namespace mo_yanxi::vk{
 	export std::add_pointer_t<decltype(vkGetDescriptorSetLayoutSizeEXT)> getDescriptorSetLayoutSizeEXT = nullptr;
 	export std::add_pointer_t<decltype(vkGetDescriptorSetLayoutBindingOffsetEXT)> getDescriptorSetLayoutBindingOffsetEXT
 		= nullptr;
-	export std::add_pointer_t<decltype(vkGetDescriptorEXT)> getDescriptorEXT = nullptr;
+	export std::add_pointer_t<decltype(vkGetDescriptorEXT)> getDescriptorEXT_ = nullptr;
 	export std::add_pointer_t<decltype(vkCmdDrawMeshTasksEXT)> drawMeshTasksEXT = nullptr;
 
 	std::add_pointer_t<decltype(vkCmdBindDescriptorBuffersEXT)> PFN_cmdBindDescriptorBuffersEXT = nullptr;
 	std::add_pointer_t<decltype(vkCmdSetDescriptorBufferOffsetsEXT)> PFN_cmdSetDescriptorBufferOffsetsEXT = nullptr;
+
+	export void getDescriptorEXT(
+		VkDevice                                    device,
+		const VkDescriptorGetInfoEXT*               pDescriptorInfo,
+		size_t                                      dataSize,
+		void*                                       pDescriptor){
+		assert(pDescriptorInfo != nullptr);
+		assert(pDescriptor != nullptr);
+		getDescriptorEXT_(device, pDescriptorInfo, dataSize, pDescriptor);
+	}
 
 	namespace cmd{
 		constexpr std::uint32_t MaxStackBufferSize = 16;
@@ -165,7 +175,7 @@ namespace mo_yanxi::vk{
 		getPhysicalDeviceProperties2KHR = LoadFuncPtr(instance, vkGetPhysicalDeviceProperties2KHR);
 		getDescriptorSetLayoutSizeEXT = LoadFuncPtr(instance, vkGetDescriptorSetLayoutSizeEXT);
 		getDescriptorSetLayoutBindingOffsetEXT = LoadFuncPtr(instance, vkGetDescriptorSetLayoutBindingOffsetEXT);
-		getDescriptorEXT = LoadFuncPtr(instance, vkGetDescriptorEXT);
+		getDescriptorEXT_ = LoadFuncPtr(instance, vkGetDescriptorEXT);
 		drawMeshTasksEXT = LoadFuncPtr(instance, vkCmdDrawMeshTasksEXT);
 		PFN_cmdBindDescriptorBuffersEXT = LoadFuncPtr(instance, vkCmdBindDescriptorBuffersEXT);
 		PFN_cmdSetDescriptorBufferOffsetsEXT = LoadFuncPtr(instance, vkCmdSetDescriptorBufferOffsetsEXT);

@@ -9,7 +9,7 @@ import mo_yanxi.handle_wrapper;
 import std;
 
 namespace mo_yanxi::vk{
-	export constexpr bool enable_validation_layers{DEBUG_CHECK};
+	export inline bool enable_validation_layers{DEBUG_CHECK};
 
 	export constexpr std::array used_validation_layers{
 		(const char*)"VK_LAYER_KHRONOS_validation",
@@ -65,7 +65,7 @@ namespace mo_yanxi::vk{
 				VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
 			) : instance(instance){
 
-			if constexpr (enable_validation_layers){
+			if (enable_validation_layers){
 				const VkDebugUtilsMessengerCreateInfoEXT createInfo{
 					.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 					.pNext = nullptr,
@@ -85,7 +85,7 @@ namespace mo_yanxi::vk{
 		}
 
 		~validation_entry(){
-			if constexpr (enable_validation_layers){
+			if (enable_validation_layers){
 				if(instance)DestroyDebugUtilsMessengerEXT(instance, callback, nullptr);
 			}
 		}

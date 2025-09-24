@@ -6,7 +6,6 @@ module;
 #include <spirv_cross/spirv_glsl.hpp>
 #include <gch/small_vector.hpp>
 
-
 export module mo_yanxi.graphic.post_process_graph.generic_post_process_pass;
 
 export import mo_yanxi.graphic.post_process_graph;
@@ -17,6 +16,10 @@ export import mo_yanxi.vk.pipeline.layout;
 export import mo_yanxi.vk.resources;
 export import mo_yanxi.vk.context;
 export import mo_yanxi.vk.uniform_buffer;
+export import mo_yanxi.vk.descriptor_buffer;
+
+import std;
+import mo_yanxi.basic_util;
 
 namespace mo_yanxi::graphic{
 	export
@@ -45,8 +48,6 @@ namespace mo_yanxi::graphic{
 			: shader_(&shader),
 			  inout_map_(inout_map){
 			inout_map_.compact_check();
-
-
 
 			const shader_reflection refl{shader.get_binary()};
 
@@ -149,35 +150,161 @@ namespace mo_yanxi::graphic{
 				}
 			}
 		}
+
+		auto get_local_uniform_buffer() const noexcept{
+			return uniform_buffers_ | std::views::filter([](const resource_desc::stage_ubo& ubo){
+				return ubo.set == 0;
+			});
+		}
 	};
 
 	export
 	struct post_process_stage : pass{
 		friend post_process_graph;
 
-	private:
+	protected:
 		post_process_meta meta_{};
 
 		vk::descriptor_layout descriptor_layout_{};
 		vk::pipeline_layout pipeline_layout_{};
-		vk::uniform_buffer uniform_buffer_{};
 		vk::pipeline pipeline_{};
+
+
+		std::vector<vk::uniform_buffer> uniform_buffers_{};
+
+		std::unordered_map<binding_info, VkSampler> samplers_{};
+
+		vk::descriptor_buffer descriptor_buffer_{};
 
 	public:
 		[[nodiscard]] explicit(false) post_process_stage(vk::context& ctx, post_process_meta&& meta)
 			: pass(ctx),
 			  meta_(std::move(meta)){
-
-		}
-
-		void post_init(vk::context& ctx) override{
-			descriptor_layout_ = {ctx.get_device(), 0, meta_.descriptor_layout_builder_};
-			pipeline_layout_ = vk::pipeline_layout{ctx.get_device(), 0, {descriptor_layout_}};
-			pipeline_ = vk::pipeline{ctx.get_device(), pipeline_layout_, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, meta_.shader_->get_create_info()};
 		}
 
 		[[nodiscard]] explicit(false) post_process_stage(vk::context& ctx, const post_process_meta& meta)
 			: post_process_stage(ctx, post_process_meta{meta}){
+		}
+
+		void set_sampler_at(binding_info binding_info, VkSampler sampler){
+			samplers_.insert_or_assign(binding_info, sampler);
+		}
+
+
+		void set_sampler_at_binding(std::uint32_t binding_at_set_0, VkSampler sampler){
+			samplers_.insert_or_assign({binding_at_set_0, 0}, sampler);
+		}
+
+		[[nodiscard]] VkSampler get_sampler_at(binding_info binding_info) const {
+			return samplers_.at(binding_info);
+		}
+
+		vk::uniform_buffer& ubo(){
+			if(uniform_buffers_.size() != 1){
+				throw std::out_of_range("unspecified uniform buffer");
+			}
+
+			return uniform_buffers_.front();
+		}
+
+		vk::uniform_buffer& ubo_at(unsigned local_binding){
+			for (const auto & [idx, desc] : meta_.get_local_uniform_buffer() |  std::views::enumerate){
+				if(desc.binding == local_binding){
+					return uniform_buffers_[idx];
+				}
+			}
+
+			throw std::out_of_range("pass does not exist");
+		}
+
+	protected:
+		auto& meta(this auto& self) noexcept{
+			return self.meta_;
+		}
+
+		void init_pipeline(const vk::context& ctx) noexcept{
+			descriptor_layout_ = {ctx.get_device(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, meta_.descriptor_layout_builder_};
+			pipeline_layout_ = vk::pipeline_layout{ctx.get_device(), 0, {descriptor_layout_}};
+			pipeline_ = vk::pipeline{ctx.get_device(), pipeline_layout_, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, meta_.shader_->get_create_info()};
+		}
+
+		void reset_descriptor_buffer(vk::context& ctx, std::uint32_t chunk_count = 1){
+			descriptor_buffer_ = vk::descriptor_buffer{ctx.get_allocator(), descriptor_layout_, descriptor_layout_.binding_count(), chunk_count};
+		}
+
+		void init_uniform_buffer(vk::context& ctx){
+			for (const auto & desc : meta_.get_local_uniform_buffer()){
+				uniform_buffers_.push_back(vk::uniform_buffer{ctx.get_allocator(), desc.desc.size});
+			}
+		}
+
+		void default_bind_uniform_buffer(){
+			vk::descriptor_mapper mapper{descriptor_buffer_};
+
+			for (const auto & [desc, entity] : std::views::zip(meta_.get_local_uniform_buffer(), uniform_buffers_)){
+				(void)mapper.set_uniform_buffer(desc.binding, entity);
+			}
+		}
+
+		void default_bind_resources(const pass_resource_reference& resources){
+			vk::descriptor_mapper mapper{descriptor_buffer_};
+			auto bind = [&, this](const resource_map_entry& connection, const resource_desc::resource_entity* res){
+				std::visit(overload{
+						[&](const resource_desc::image_entity& entity){
+							auto& req = std::get<resource_desc::image_requirement>(res->overall_req.desc);
+							if(req.is_sampled_image()){
+								mapper.set_image(
+									connection.binding.binding,
+									entity.handle.get_image_view(),
+									0,
+									VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, get_sampler_at(connection.binding));
+							}else{
+								mapper.set_storage_image(connection.binding.binding, entity.handle.get_image_view(), VK_IMAGE_LAYOUT_GENERAL);
+							}
+						},
+						[&](const resource_desc::buffer_entity& entity){
+							(void)mapper.set_storage_buffer(connection.binding.binding, entity.buffer.begin(), entity.buffer.size);
+						},
+					}, res->resource);
+			};
+			for(const auto& connection : meta_.inout_map_.connection){
+				if(auto res = resources.get_in_if(connection.slot.in)){
+					bind(connection, res);
+					continue;
+				}
+
+				if(auto res = resources.get_out_if(connection.slot.out)){
+					bind(connection, res);
+					continue;
+				}
+
+				throw std::out_of_range("failed to find resource");
+			}
+
+		}
+
+	public:
+		void post_init(vk::context& ctx, const math::u32size2 extent) override{
+			init_pipeline(ctx);
+			init_uniform_buffer(ctx);
+			reset_descriptor_buffer(ctx);
+		}
+
+		void reset_resources(vk::context& context, const pass_resource_reference* resources, const math::u32size2 extent) override{
+			default_bind_uniform_buffer();
+			if(resources)default_bind_resources(*resources);
+		}
+
+		void record_command(
+			vk::context& context,
+
+			const pass_resource_reference* resources, math::u32size2 extent, VkCommandBuffer buffer) override{
+
+			pipeline_.bind(buffer, VK_PIPELINE_BIND_POINT_COMPUTE);
+			descriptor_buffer_.bind_to(buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0);
+
+			auto groups = get_work_group_size(extent);
+			vkCmdDispatch(buffer, groups.x, groups.y, 1);
 		}
 
 		inout_data& sockets() noexcept override{

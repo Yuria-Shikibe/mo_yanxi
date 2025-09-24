@@ -32,7 +32,7 @@ namespace mo_yanxi::vk{
 			return features;
 		}()};
 
-		constexpr VkPhysicalDeviceVulkan12Features PhysicalDeviceVulkan12Features{[]{
+		const VkPhysicalDeviceVulkan12Features PhysicalDeviceVulkan12Features{[]{
 			VkPhysicalDeviceVulkan12Features features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
 
 			features.bufferDeviceAddress = true;
@@ -42,6 +42,7 @@ namespace mo_yanxi::vk{
 
 			return features;
 		}()};
+
 		constexpr VkPhysicalDeviceVulkan11Features PhysicalDeviceVulkan11Features{[]{
 			VkPhysicalDeviceVulkan11Features features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES};
 
@@ -68,6 +69,14 @@ namespace mo_yanxi::vk{
 			.descriptorBufferCaptureReplay = false,
 			.descriptorBufferImageLayoutIgnored = false,
 			.descriptorBufferPushDescriptors = false
+		};
+
+		constexpr VkPhysicalDeviceRobustness2FeaturesEXT Robustness2{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT,
+			// .pNext = ,
+			// .robustBufferAccess2 = ,
+			// .robustImageAccess2 = ,
+			.nullDescriptor = true
 		};
 
 
@@ -156,6 +165,7 @@ namespace mo_yanxi::vk{
 			// PhysicalDeviceBufferDeviceAddressFeatures,
 			DescriptorBufferFeatures,
 			MeshShaderFeatures,
+			// Robustness2,
 		};
 	}
 
@@ -231,7 +241,7 @@ namespace mo_yanxi::vk{
 			createInfo.enabledExtensionCount = static_cast<std::uint32_t>(device_extensions.size());
 			createInfo.ppEnabledExtensionNames = device_extensions.data();
 
-			if constexpr(enable_validation_layers){
+			if (enable_validation_layers){
 				createInfo.enabledLayerCount = static_cast<std::uint32_t>(used_validation_layers.size());
 				createInfo.ppEnabledLayerNames = used_validation_layers.data();
 			} else{

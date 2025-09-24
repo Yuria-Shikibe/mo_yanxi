@@ -17,7 +17,7 @@ namespace mo_yanxi{
 
 		[[nodiscard]] constexpr referenced_ptr() = default;
 
-		[[nodiscard]] constexpr explicit referenced_ptr(T* object) : object{object}{
+		[[nodiscard]] constexpr explicit(false) referenced_ptr(T* object) : object{object}{
 			if(this->object)this->object->incr_ref();
 		}
 		[[nodiscard]] constexpr explicit(false) referenced_ptr(T& object) : referenced_ptr(std::addressof(object)){
@@ -190,4 +190,7 @@ namespace mo_yanxi{
 		template <typename T, bool b>
 		friend struct referenced_ptr;
 	};
+
+	export
+	using referenced_object_base = referenced_object<false>;
 }

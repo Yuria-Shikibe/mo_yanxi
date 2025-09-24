@@ -356,6 +356,7 @@ namespace mo_yanxi::vk{
 			const std::uint32_t chunkIndex = 0,
 			const VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) const{
 			auto [info, size] = buffer_obj->get_image_info(imageInfo, descriptorType);
+			assert(imageInfo.imageView != nullptr);
 
 			vk::getDescriptorEXT(
 				buffer_obj->get_device(),
