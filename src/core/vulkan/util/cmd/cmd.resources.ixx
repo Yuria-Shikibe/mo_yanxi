@@ -171,6 +171,12 @@ namespace mo_yanxi::vk::cmd{
 			image_memory_barriers.clear();
 		}
 
+		bool empty() const noexcept{
+			return memory_barriers.empty() &&
+			buffer_memory_barriers.empty() &&
+			image_memory_barriers.empty();
+		}
+
 		[[nodiscard]] VkDependencyInfo create() const noexcept{
 			return {
 					.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,

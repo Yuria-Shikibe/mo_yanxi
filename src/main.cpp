@@ -126,8 +126,181 @@ import mo_yanxi.graphic.post_processor.oit_blender;
 import test;
 import std;
 
+
+
+void graph_small_test(){
+
+
+	using namespace mo_yanxi;
+	using namespace mo_yanxi::game;
+	using namespace mo_yanxi::graphic;
+	using namespace resource_desc;
+	vk::storage_buffer oit_mock_buffer{core::global::graphic::context.get_allocator(),
+		get_oit_buffer_size(core::global::graphic::context.get_extent()),
+						VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+
+	};
+
+	graphic::post_process_graph graph{core::global::graphic::context};
+
+	auto& ui_base = graph.add_explicit_resource(explicit_resource{external_image{}});
+	auto& ui_light = graph.add_explicit_resource(explicit_resource{external_image{}});
+
+
+	auto& final_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::result_merge, {
+		{{0}, no_slot, 0},
+		{{1}, 0, no_slot},
+		{{2}, 1, no_slot},
+		{{3}, 2, no_slot},
+		{{4}, 3, no_slot},
+	}});
+
+	final_merge.sockets().at_out(0).get<image_requirement>().desc.format = VK_FORMAT_R8G8B8A8_UNORM;
+
+	{
+		const post_process_meta bloom_meta = []{
+			post_process_meta meta{
+				assets::graphic::shaders::comp::bloom,
+				{
+						{{0}, {0, no_slot}},
+						{{1}, {1, no_slot}},
+						{{2}, {no_slot, 0}},
+						{{3}, {no_slot, 0}},
+					}
+			};
+			{
+				auto& req = meta.sockets.at_out<resource_desc::image_requirement>(0);
+
+				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
+				req.mip_levels = 6;
+				req.scaled_times = 0;
+				req.desc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+			}
+
+			{
+				auto& req = meta.sockets.at_in<resource_desc::image_requirement>(1);
+
+				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
+				req.mip_levels = 6;
+				req.scaled_times = 0;
+				req.desc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+			}
+
+			return meta;
+		}();
+
+		auto& anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
+			{{1}, 0, no_slot},
+			{{2}, no_slot, 0},
+		}});
+		anti_alias.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+
+		auto& ui_bloom = graph.add_stage<bloom_pass>(bloom_meta);
+		ui_bloom.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
+
+		auto& world_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::world_merge, {
+			{{0}, no_slot, 0},
+			{{1}, 0, no_slot},
+			{{2}, 1, no_slot},
+			{{3}, 2, no_slot},
+			{{4}, 3, no_slot},
+		}});
+
+
+		graph.add_input(&world_merge, {
+			{{}, 0},
+			{{}, 1},
+			{{}, 2},
+			{{}, 3},
+		});
+
+		anti_alias.add_dep({
+			.id = &world_merge
+		});
+
+		graph.add_input(&final_merge, {
+			explicit_resource_usage{ui_base, 1},
+			explicit_resource_usage{ui_light, 2},
+		});
+
+		graph.add_output(&final_merge, {{{}, 0}});
+
+		final_merge.add_dep({pass_dependency{
+			.id = &ui_bloom,
+			.dst_idx = 3
+		},
+			{.id = &anti_alias,}
+		});
+
+
+		graph.add_input(&ui_bloom, {
+			{{}, 1},
+		});
+
+		graph.add_input(&ui_bloom, {
+			explicit_resource_usage{ui_light, 1},
+		});
+
+	}
+
+	graph.sort();
+	graph.check_sockets_connection();
+	graph.analysis_minimal_allocation();
+	graph.update_external_resources();
+	graph.print_resource_reference();
+	graph.post_init();
+	graph.resize();
+
+
+	graph.create_command();
+
+	core::global::graphic::context.register_post_resize("test", [&](window_instance::resize_event event){
+		graph.resize();
+		graph.create_command();
+
+	   core::global::graphic::context.set_staging_image(
+		   {
+			   .image = std::get<image_entity>(graph.out_at(&final_merge, 0).resource).image.image,
+			   .extent = core::global::graphic::context.get_extent(),
+			   .clear = false,
+			   .owner_queue_family = core::global::graphic::context.compute_family(),
+			   .src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			   .src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			   .dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			   .dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			   .src_layout = VK_IMAGE_LAYOUT_GENERAL,
+			   .dst_layout = VK_IMAGE_LAYOUT_GENERAL
+		   }, false);
+   });
+
+	core::global::graphic::context.set_staging_image({
+		.image = std::get<image_entity>(graph.out_at(&final_merge, 0).resource).image.image,
+		.extent = core::global::graphic::context.get_extent(),
+		.clear = false,
+		.owner_queue_family = core::global::graphic::context.compute_family(),
+		.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+		.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+		.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+		.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+	});
+
+	vk::fence fence{core::global::graphic::context.get_device(), false};
+	while(!core::global::graphic::context.window().should_close()){
+		core::global::graphic::context.window().poll_events();
+
+		vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {graph.get_main_command_buffer()}, fence);
+		fence.wait_and_reset();
+		core::global::graphic::context.flush();
+	}
+
+	core::global::graphic::context.wait_on_device();
+}
+
+
 #pragma region MAIN
-#if 0
+#if 1
 
 void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& atlas){
 	using namespace std::literals;
@@ -427,7 +600,7 @@ void main_loop(){
 				>("gfx");
 	wgfx_input.set_context(math::vec2{}, std::ref(world.graphic_context), std::ref(world.component_manager));
 
-	test::set_swapchain_flusher();
+	// test::set_swapchain_flusher();
 
 	graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.light.png)"}).first;
 	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
@@ -435,8 +608,6 @@ void main_loop(){
 
 
 	using grided_entity_desc = game::ecs::desc::grid_entity;
-
-	using projectile_entity_desc = game::ecs::desc::projectile;
 
 	game::meta::chamber::grid grid{};
 	game::meta::hitbox_transed hitbox_transed{};
@@ -556,8 +727,175 @@ void main_loop(){
 
 	world.component_manager.do_deferred();
 
-	std::size_t count{};
-	float dt{};
+
+	graphic::post_process_graph graph{core::global::graphic::context};
+	using namespace graphic;
+	using namespace resource_desc;
+	auto& ui_base = graph.add_explicit_resource(explicit_resource{external_image{}});
+	auto& ui_light = graph.add_explicit_resource(explicit_resource{external_image{}});
+
+	auto& final_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::result_merge, {
+		{{0}, no_slot, 0},
+		{{1}, 0, no_slot},
+		{{2}, 1, no_slot},
+		{{3}, 2, no_slot},
+		{{4}, 3, no_slot},
+	}});
+
+	final_merge.sockets().at_out(0).get<image_requirement>().desc.format = VK_FORMAT_R8G8B8A8_UNORM;
+
+	{
+		const post_process_meta bloom_meta = []{
+			post_process_meta meta{
+				assets::graphic::shaders::comp::bloom,
+				{
+						{{0}, {0, no_slot}},
+						{{1}, {1, no_slot}},
+						{{2}, {no_slot, 0}},
+						{{3}, {no_slot, 0}},
+					}
+			};
+			{
+				auto& req = meta.sockets.at_out<resource_desc::image_requirement>(0);
+
+				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
+				req.mip_levels = 6;
+				req.scaled_times = 0;
+				req.desc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+			}
+
+			{
+				auto& req = meta.sockets.at_in<resource_desc::image_requirement>(1);
+
+				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
+				req.mip_levels = 6;
+				req.scaled_times = 1;
+				req.desc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+			}
+
+			return meta;
+		}();
+
+		auto& anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
+			{{1}, 0, no_slot},
+			{{2}, no_slot, 0},
+		}});
+		anti_alias.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+
+		auto& ui_bloom = graph.add_stage<bloom_pass>(bloom_meta);
+		ui_bloom.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
+		ui_bloom.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+
+		auto& world_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::world_merge, {
+			{{0}, no_slot, 0},
+			{{1}, 0, no_slot},
+			{{2}, 1, no_slot},
+			{{3}, 2, no_slot},
+			{{4}, 3, no_slot},
+		}});
+
+
+		graph.add_input(&world_merge, {
+			{{}, 0},
+			{{}, 1},
+			{{}, 2},
+			{{}, 3},
+		});
+
+		anti_alias.add_dep({
+			.id = &world_merge
+		});
+
+		graph.add_input(&final_merge, {
+			explicit_resource_usage{ui_base, 1},
+			explicit_resource_usage{ui_light, 2},
+		});
+
+		graph.add_output(&final_merge, {{{}, 0}});
+
+		final_merge.add_dep({pass_dependency{
+			.id = &ui_bloom,
+			.dst_idx = 3
+		},
+			{.id = &anti_alias,}
+		});
+
+
+		graph.add_input(&ui_bloom, {
+			{{}, 1},
+		});
+
+		graph.add_input(&ui_bloom, {
+			explicit_resource_usage{ui_light, 0},
+		});
+
+	}
+
+	graph.sort();
+	graph.check_sockets_connection();
+	graph.analysis_minimal_allocation();
+	graph.print_resource_reference();
+	graph.post_init();
+
+	core::global::graphic::context.register_post_resize("test", [&](window_instance::resize_event event){
+		core::global::ui::root->resize_all(math::frect{math::vector2{event.size.width, event.size.height}.as<float>()});
+
+		renderer_world.resize(event.size);
+		renderer_ui.resize(event.size);
+		merger.resize(event.size);
+
+		std::get<external_image>(ui_base.desc).handle = renderer_ui.batch.blit_base;
+		std::get<external_image>(ui_base.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+
+		std::get<external_image>(ui_light.desc).handle = renderer_ui.batch.blit_light;
+		std::get<external_image>(ui_light.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+
+
+		graph.update_external_resources();
+		graph.resize();
+		graph.create_command();
+
+		core::global::graphic::context.set_staging_image(
+			{
+				.image = std::get<graphic::resource_desc::image_entity>(graph.out_at(&final_merge, 0).resource).image.
+				image,
+				.extent = core::global::graphic::context.get_extent(),
+				.clear = false,
+				.owner_queue_family = core::global::graphic::context.compute_family(),
+				.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+				.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+				.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+				.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+			}, false);
+	});
+
+	std::get<external_image>(ui_base.desc).handle = renderer_ui.batch.blit_base;
+	std::get<external_image>(ui_base.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+
+	std::get<external_image>(ui_light.desc).handle = renderer_ui.batch.blit_light;
+	std::get<external_image>(ui_light.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+
+
+	graph.update_external_resources();
+	graph.resize();
+	graph.create_command();
+
+	core::global::graphic::context.set_staging_image({
+		.image = std::get<graphic::resource_desc::image_entity>(graph.out_at(&final_merge, 0).resource).image.image,
+		.extent = core::global::graphic::context.get_extent(),
+		.clear = false,
+		.owner_queue_family = core::global::graphic::context.compute_family(),
+		.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+		.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+		.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+		.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+	});
+
+	vk::fence fence{core::global::graphic::context.get_device(), false};
 
 	core::global::timer.reset_time();
 	while(!context.window().should_close()){
@@ -775,11 +1113,12 @@ void main_loop(){
 		renderer_world.batch.batch.consume_all();
 		renderer_world.post_process();
 
-		renderer_ui.post_process();
+		// renderer_ui.post_process();
 
-		merger.submit();
-		renderer_ui.clear();
+		// merger.submit();
+		// renderer_ui.clear();
 
+		vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {graph.get_main_command_buffer()});
 		context.flush();
 	}
 	if(async_collide.valid())async_collide.get();
@@ -789,6 +1128,7 @@ void main_loop(){
 #endif
 #pragma endregion ;
 
+/*
 void graph_test(){
 
 	using namespace mo_yanxi;
@@ -991,157 +1331,7 @@ void graph_test(){
 	}
 
 }
-
-
-void graph_small_test(){
-
-
-	using namespace mo_yanxi;
-	using namespace mo_yanxi::game;
-	using namespace mo_yanxi::graphic;
-	using namespace resource_desc;
-	vk::storage_buffer oit_mock_buffer{core::global::graphic::context.get_allocator(),
-		get_oit_buffer_size(core::global::graphic::context.get_extent()),
-						VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-
-	};
-
-	graphic::post_process_graph graph{core::global::graphic::context};
-
-	// graph.add_explicit_resource(explicit_resource{false, external_image{}});
-
-
-	auto& final_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::result_merge, {
-		{{0}, no_slot, 0},
-		{{1}, 0, no_slot},
-		{{2}, 1, no_slot},
-		{{3}, 2, no_slot},
-		{{4}, 3, no_slot},
-	}});
-
-	final_merge.sockets().at_out(0).get<image_requirement>().desc.format = VK_FORMAT_R8G8B8A8_UNORM;
-
-	{
-		const post_process_meta bloom_meta = []{
-			post_process_meta meta{
-				assets::graphic::shaders::comp::bloom,
-				{
-						{{0}, {0, no_slot}},
-						{{1}, {1, no_slot}},
-						{{2}, {no_slot, 0}},
-						{{3}, {no_slot, 0}},
-					}
-			};
-			{
-				auto& req = meta.sockets.at_out<resource_desc::image_requirement>(0);
-
-				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
-				req.mip_levels = 6;
-				req.scaled_times = 0;
-				req.desc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-			}
-
-			{
-				auto& req = meta.sockets.at_in<resource_desc::image_requirement>(1);
-
-				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
-				req.mip_levels = 6;
-				req.scaled_times = 0;
-				req.desc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-			}
-
-			return meta;
-		}();
-
-		auto& anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
-			{{1}, 0, no_slot},
-			{{2}, no_slot, 0},
-		}});
-		anti_alias.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
-
-		auto& ui_bloom = graph.add_stage<bloom_pass>(bloom_meta);
-		ui_bloom.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
-		ui_bloom.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
-
-		graph.add_input(&final_merge, {
-			{{}, 1},
-			{{}, 2},
-		});
-
-		graph.add_output(&final_merge, {{{}, 0}});
-
-		final_merge.add_dep({pass_dependency{
-			.id = &ui_bloom,
-			.dst_idx = 3
-		},
-			{.id = &anti_alias,}
-		});
-
-
-		graph.add_input(&ui_bloom, {
-			{{}, 0},
-			{{}, 1},
-		});
-
-		graph.add_input(&anti_alias, {
-			{{}, 0}
-		});
-	}
-
-	graph.sort();
-	graph.check_sockets_connection();
-	graph.analysis_minimal_allocation();
-	graph.update_external_resources();
-	graph.print_resource_reference();
-	graph.post_init();
-	graph.resize();
-
-
-	graph.create_command();
-
-	core::global::graphic::context.register_post_resize("test", [&](window_instance::resize_event event){
-		graph.resize();
-		graph.create_command();
-
-	   core::global::graphic::context.set_staging_image(
-		   {
-			   .image = std::get<image_entity>(graph.out_at(&final_merge, 0).resource).image.image,
-			   .extent = core::global::graphic::context.get_extent(),
-			   .clear = false,
-			   .owner_queue_family = core::global::graphic::context.compute_family(),
-			   .src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-			   .src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-			   .dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-			   .dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-			   .src_layout = VK_IMAGE_LAYOUT_GENERAL,
-			   .dst_layout = VK_IMAGE_LAYOUT_GENERAL
-		   }, false);
-   });
-
-	core::global::graphic::context.set_staging_image({
-		.image = std::get<image_entity>(graph.out_at(&final_merge, 0).resource).image.image,
-		.extent = core::global::graphic::context.get_extent(),
-		.clear = false,
-		.owner_queue_family = core::global::graphic::context.compute_family(),
-		.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-		.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-		.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-		.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-		.src_layout = VK_IMAGE_LAYOUT_GENERAL,
-		.dst_layout = VK_IMAGE_LAYOUT_GENERAL
-	});
-
-	vk::fence fence{core::global::graphic::context.get_device(), false};
-	while(!core::global::graphic::context.window().should_close()){
-		core::global::graphic::context.window().poll_events();
-
-		vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {graph.get_main_command_buffer()}, fence);
-		fence.wait_and_reset();
-		core::global::graphic::context.flush();
-	}
-
-	core::global::graphic::context.wait_on_device();
-}
+*/
 
 
 int main(){
@@ -1168,19 +1358,18 @@ int main(){
 	// }
 	//
 	// core::global::graphic::context.wait_on_device();
-	graph_small_test();
+	// graph_small_test();
 	// graphic::shader_reflection reflection{assets::graphic::shaders::comp::bloom.get_binary()};
 	// reflection.foo();
-	// core::global::ui::init();
-	//
-	//
-	// game::content::load();
-	// test::load_content();
-	//
-	// main_loop();
-	//
-	// test::dispose_content();
-	// core::global::ui::dispose();
+
+	core::global::ui::init();
+	game::content::load();
+	test::load_content();
+
+	main_loop();
+
+	test::dispose_content();
+	core::global::ui::dispose();
 
 	assets::graphic::dispose();
 	core::global::assets::dispose();

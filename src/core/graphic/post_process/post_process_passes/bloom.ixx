@@ -4,11 +4,11 @@ module;
 
 export module mo_yanxi.graphic.post_process_graph.bloom;
 
+import std;
 export import mo_yanxi.graphic.post_process_graph.generic_post_process_pass;
 import mo_yanxi.vk.image_derives;
 import mo_yanxi.vk.ext;
 import mo_yanxi.math.vector2;
-import std;
 
 namespace mo_yanxi::graphic{
 	[[nodiscard]] constexpr std::uint32_t reverse_after(std::uint32_t value, std::uint32_t ceil) noexcept{
@@ -158,8 +158,7 @@ namespace mo_yanxi::graphic{
 				math::u32size2 current_ext{extent / div};
 
 				cmd::set_descriptor_offsets(buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0, {0}, {descriptor_buffer_.get_chunk_offset(i)});
-
-				auto groups = get_work_group_size(current_ext);
+				const auto groups = get_work_group_size(current_ext);
 				vkCmdDispatch(buffer, groups.x, groups.y, 1);
 			}
 		}

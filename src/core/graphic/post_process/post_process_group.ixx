@@ -271,7 +271,7 @@ namespace mo_yanxi::graphic{
 
 				mip_levels = get_optional_max(mip_levels, other.mip_levels, no_req_spec);
 				if(desc.format == VK_FORMAT_UNDEFINED)desc.format = other.desc.format;
-				assert(desc.format == other.desc.format);
+				assert(desc.format == other.desc.format || other.desc.format == VK_FORMAT_UNDEFINED);
 				// ownership = ownership_type{std::max(std::to_underlying(ownership), std::to_underlying(other.ownership))};
 				usage |= other.usage;
 			}
@@ -365,10 +365,14 @@ namespace mo_yanxi::graphic{
 					std::in_place_type<ret>,
 					[](const image_requirement& l, const image_requirement& r) -> ret {
 						if(
-							(l.scaled_times != r.scaled_times && (l.scaled_times != no_req_spec && r.scaled_times != no_req_spec) ||
-							(l.desc.format != r.desc.format && (l.desc.format != VK_FORMAT_UNDEFINED && r.desc.format != VK_FORMAT_UNDEFINED))
-						)){
+							l.scaled_times != r.scaled_times && (l.scaled_times != no_req_spec && r.scaled_times != no_req_spec)
+						){
 							return "Size Incompatible";
+						}
+
+						//TODO format compatibility check, consider sampler and other...
+						if(l.desc.format != r.desc.format){
+							return "Format Incompatible";
 						}
 
 						return std::nullopt;
@@ -380,10 +384,7 @@ namespace mo_yanxi::graphic{
 			}
 
 			void promote(const resource_requirement& other){
-				std::visit(overload{
-					[](auto& l, const auto& r){
-						throw std::runtime_error("Incompatible resource type");
-					},
+				std::visit(narrow_overload{
 					[](image_requirement& l, const image_requirement& r) {
 						l.promote(r);
 					},
@@ -1098,26 +1099,32 @@ namespace mo_yanxi::graphic{
 			 */
 			void unique(){
 				auto& range = bounds;
-				std::unordered_map<pass_identity, std::vector<record_pair>, pass_identity_hasher> checked_outs{};
+				struct full_eq{
+					static bool operator()(const pass_identity& l, const pass_identity& r) noexcept {
+						return l.where == r.where && l.external_target == r.external_target && l.slot_out == r.slot_out;
+					}
+				};
+				std::unordered_map<pass_identity, resource_lifebound*, pass_identity_hasher, full_eq> checked_outs{};
 				auto itr = std::ranges::begin(range);
 				auto end = std::ranges::end(range);
 				while(itr != end){
 					auto& indices = checked_outs[itr->get_head()];
 
-					if(
-						auto another = std::ranges::find(indices, itr->source_out(), &record_pair::index);
-						itr->source_out() != no_slot && another != indices.end()){
+					if(indices != nullptr){
 						const auto view = itr->passed_by;
 						const auto mismatch = std::ranges::mismatch(
-							another->life_bound->passed_by, view);
+							indices->passed_by, view);
 						for(auto& pass : std::ranges::subrange{mismatch.in2, view.end()}){
-							another->life_bound->passed_by.push_back(pass);
+							indices->passed_by.push_back(pass);
 						}
+
+						assert(!indices->requirement.get_incompatible_info(itr->requirement).has_value());
+						indices->requirement.promote(itr->requirement);
 
 						itr = range.erase(itr);
 						end = std::ranges::end(range);
-					} else{
-						if(itr->source_out() != no_slot) indices.push_back({itr->source_out(), &*itr});
+					}else{
+						if(itr->source_out() != no_slot) indices = &*itr;
 						++itr;
 					}
 				}
@@ -1265,7 +1272,7 @@ namespace mo_yanxi::graphic{
 		math::u32size2 extent_{};
 
 		vk::command_buffer main_command_buffer{};
-
+		post_graph::life_bounds life_bounds_{};
 	public:
 		[[nodiscard]] post_process_graph() = default;
 
@@ -1466,6 +1473,7 @@ namespace mo_yanxi::graphic{
 						auto& rst = result.bounds.emplace_back(inout.at_in(in));
 						auto& cur = rst.passed_by.emplace_back(pass.get());
 						cur.slot_in = in;
+						rst.requirement = inout.at_in(in);
 					}
 				}
 
@@ -1521,19 +1529,6 @@ namespace mo_yanxi::graphic{
 			for(auto& lifebound : result.bounds){
 				std::ranges::reverse(lifebound.passed_by);
 			}
-			//
-			// for(const auto& lifebound : result.bounds){
-			// 	std::print("Completed<{:5}>: {:6}  ",
-			// 		lifebound.passed_by.front().slot_in == no_slot,
-			// 		lifebound.requirement.type_name()
-			// 	);
-			//
-			// 	std::print("{:n:}", lifebound.passed_by | std::views::transform([](const pass_identity& value){
-			// 		return value.format("Tml");
-			// 	}));
-			//
-			// 	std::println();
-			// }
 
 			result.unique();
 
@@ -1551,6 +1546,10 @@ namespace mo_yanxi::graphic{
 			using namespace post_graph;
 			using namespace resource_desc;
 
+			static constexpr resource_requirement_partial_greater_comp comp{};
+			std::ranges::sort(life_bounds.bounds, comp, &resource_lifebound::requirement);
+			life_bounds_ = life_bounds;
+
 			struct lifebound_ref{
 				resource_lifebound* bound{};
 				unsigned* assigned_resource_index{nullptr};
@@ -1561,7 +1560,9 @@ namespace mo_yanxi::graphic{
 			};
 
 			std::vector<unsigned> lifebound_assignments(life_bounds.bounds.size(), no_slot);
-			std::unordered_map<pass_identity, std::vector<lifebound_ref>, pass_identity_hasher> req_per_stage{};
+			using StagesMap =
+			std::unordered_map<pass_identity, std::vector<lifebound_ref>, pass_identity_hasher>;
+			StagesMap req_per_stage{};
 
 			struct req_partial_eq{
 				static bool operator()(const resource_requirement& l, const resource_requirement& r) noexcept {
@@ -1580,8 +1581,7 @@ namespace mo_yanxi::graphic{
 
 			struct partition{
 				std::vector<resource_requirement> requirements{};
-				// std::unordered_set<resource_requirement, req_partial_hash, req_partial_eq> closure{};
-				std::vector<std::uint8_t> selection_mark{};
+				std::unordered_map<pass_identity, std::vector<std::uint8_t>, pass_identity_hasher> stage_captures{};
 				std::vector<unsigned> indices{};
 
 				unsigned prefix_sum{};
@@ -1590,14 +1590,21 @@ namespace mo_yanxi::graphic{
 					return requirements.front();
 				}
 
-				void add(const resource_requirement& requirement){
+				std::size_t add(const resource_requirement& requirement){
+					const auto idx = requirements.size();
+					indices.push_back(idx);
 					requirements.emplace_back(requirement);
-					// closure.insert(requirement);
+					for (auto& marks : stage_captures | std::views::values){
+						marks.resize(requirements.size(), 0);
+					}
+					return idx;
 				}
-
-				void reset_marks(){
-					selection_mark.assign(requirements.size(), 0);
-				}
+				//
+				// void reset_marks(const StagesMap& req_per_stage){
+				// 	for (const auto & pass_identity : req_per_stage | std::views::keys){
+				// 		stage_captures[pass_identity].assign(requirements.size(), 0);
+				// 	}
+				// }
 
 			};
 
@@ -1609,107 +1616,77 @@ namespace mo_yanxi::graphic{
 				});
 			};
 
-			auto reset_markers = [&]{
-				std::ranges::for_each(minimal_requirements_per_partition, &partition::reset_marks);
-			};
-
-			static constexpr resource_requirement_partial_greater_comp comp{};
 
 			{
 				//cal shared requirements
 				for (auto&& [idx, image] : life_bounds.bounds | std::views::enumerate){
 					if(image.ownership != ownership_type::shared)continue;
-					if(auto category = get_partition_itr(image.requirement); category == minimal_requirements_per_partition.end()){
-						auto& vec = minimal_requirements_per_partition.emplace_back();
-						vec.add(image.requirement);
-					}
-
 					for (const auto & passed_by : image.passed_by){
 						req_per_stage[passed_by].push_back({&image, &lifebound_assignments[idx]});
 					}
 				}
 
-				reset_markers();
-
-				for (const auto & [pass, reqs] : req_per_stage){
-					for (const auto& req : reqs){
-						auto partition_itr = get_partition_itr(req.bound->requirement);
-
-						for (auto && [candidate, selected] : std::views::zip(partition_itr->requirements, partition_itr->selection_mark)){
-							if(selected)continue;
-							selected = true;
-							goto skip0;
+				for (auto&& [idx, image] : life_bounds.bounds | std::views::enumerate){
+					if(image.ownership != ownership_type::shared)continue;
+					if(auto category = get_partition_itr(image.requirement); category == minimal_requirements_per_partition.end()){
+						auto& vec = minimal_requirements_per_partition.emplace_back();
+						for (const auto & pass : req_per_stage | std::views::keys){
+							vec.stage_captures.insert({pass, std::vector<std::uint8_t>{}});
 						}
 
-						partition_itr->add(req.bound->requirement);
-
-						skip0:
-						(void)0;
+						vec.add(image.requirement);
 					}
-
-					reset_markers();
 				}
 
-				for (auto && p : minimal_requirements_per_partition){
-					p.indices = {std::from_range, std::views::iota(0uz, p.requirements.size())};
-				}
+				for (auto&& [bound, assignment] : std::views::zip(life_bounds.bounds, lifebound_assignments)){
+					if(bound.ownership != ownership_type::shared)continue;
 
-				for (auto&& [pass, reqs] : req_per_stage){
-					std::ranges::sort(reqs, comp, &lifebound_ref::requirement);
-				}
+					if(assignment != no_slot)continue;
 
-				for (auto & [pass, reqs] : req_per_stage){
-					for (auto& reqs_inner : req_per_stage | std::views::values){
-						for (const auto& req : reqs_inner){
-							if(*req.assigned_resource_index != no_slot){
-								//lifebound already bound, capture it first
-								auto partition_itr = get_partition_itr(req.requirement());
-								partition_itr->selection_mark[*req.assigned_resource_index] = true;
-							}
-						}
-					}
-
-
-					for (auto& req : reqs){
-						if(*req.assigned_resource_index != no_slot)continue;
-
-						auto partition_itr = get_partition_itr(req.requirement());
-
-						std::ranges::sort(partition_itr->indices, [&](unsigned l, unsigned r){
-							return comp(partition_itr->requirements[l], partition_itr->requirements[r]);
-						});
-
-
-						for (auto& candidate : partition_itr->indices){
-							auto& selected = partition_itr->selection_mark[candidate];
-
-							if(selected)continue;
-							if(comp(req.requirement(), partition_itr->requirements[candidate])){
-								selected = true;
-								*req.assigned_resource_index = candidate;
-
-								goto skip;
-							}
+					auto partition_itr = get_partition_itr(bound.requirement);
+					assert(partition_itr != minimal_requirements_per_partition.end());
+					std::ranges::sort(partition_itr->indices, [&](unsigned l, unsigned r){
+						return comp(partition_itr->requirements[l], partition_itr->requirements[r]);
+					});
+					for (auto& candidate : partition_itr->indices){
+						if(std::ranges::any_of(bound.passed_by, [&](const pass_identity& passed_by){
+							return partition_itr->stage_captures.at(passed_by)[candidate];
+						})){
+							continue;
 						}
 
-						//No currently compatibled, promote the minimal found one to fit
-						for (unsigned candidate : partition_itr->indices | std::views::reverse){
-							auto& selected_2 = partition_itr->selection_mark[candidate];
-							if(selected_2)continue;
-							selected_2 = true;
-							*req.assigned_resource_index = candidate;
+						if(comp(bound.requirement, partition_itr->requirements[candidate])){
+							for (const auto & passed_by : bound.passed_by){
+								partition_itr->stage_captures.at(passed_by)[candidate] = true;
+							}
+							assignment = candidate;
 
-							partition_itr->requirements[candidate].promote(req.requirement());
 							goto skip;
 						}
-
-						throw std::runtime_error{"unmatched req"};
-
-						skip:
-						(void)0;
 					}
 
-					reset_markers();
+					//No currently compatibled, promote the minimal found one to fit
+					for (unsigned candidate : partition_itr->indices | std::views::reverse){
+						if(std::ranges::any_of(bound.passed_by, [&](const pass_identity& passed_by){
+							return partition_itr->stage_captures.at(passed_by)[candidate];
+						})){
+							continue;
+						}
+
+						for (const auto & passed_by : bound.passed_by){
+							partition_itr->stage_captures.at(passed_by)[candidate] = true;
+						}
+
+						assignment = candidate;
+						partition_itr->requirements[candidate].promote(bound.requirement);
+						goto skip;
+
+					}
+
+					assignment = partition_itr->add(bound.requirement);
+
+					skip:
+					(void)0;
 				}
 			}
 
@@ -1725,26 +1702,26 @@ namespace mo_yanxi::graphic{
 				}
 			}
 
-			for (auto& reqs : req_per_stage | std::views::values){
-				for (const auto& req : reqs){
-					if(req.bound->used_entity != nullptr)continue;
-					assert(*req.assigned_resource_index != no_slot);
-					auto& pt = *get_partition_itr(req.requirement());
-					req.bound->used_entity = &shared_resources[pt.prefix_sum + *req.assigned_resource_index];
+			for (auto&& [bound, assignment] : std::views::zip(life_bounds.bounds, lifebound_assignments)){
+				if(bound.ownership != ownership_type::shared)continue;
+				assert(assignment != no_slot);
 
-					for (const auto & passed_by : req.bound->passed_by){
-						if(!passed_by.where)continue;
-						auto& ref = resource_ref[const_cast<pass*>(passed_by.where)];
-						if(passed_by.slot_in != no_slot){
-							ref.set_in(passed_by.slot_in, req.bound->used_entity);
-						}
+				auto& pt = *get_partition_itr(bound.requirement);
+				bound.used_entity = &shared_resources[pt.prefix_sum + assignment];
 
-						if(passed_by.slot_out != no_slot){
-							ref.set_out(passed_by.slot_out, req.bound->used_entity);
-						}
+				for (const auto & passed_by : bound.passed_by){
+					if(!passed_by.where)continue;
+					auto& ref = resource_ref[const_cast<pass*>(passed_by.where)];
+					if(passed_by.slot_in != no_slot){
+						ref.set_in(passed_by.slot_in, bound.used_entity);
+					}
+
+					if(passed_by.slot_out != no_slot){
+						ref.set_out(passed_by.slot_out, bound.used_entity);
 					}
 				}
 			}
+
 
 			{
 				//assign exclusive resources
@@ -1775,17 +1752,37 @@ namespace mo_yanxi::graphic{
 			}
 
 			{
+
+				std::unordered_map<const explicit_resource*, resource_entity*> group;
+				std::unordered_map<pass_identity, resource_entity* *, pass_identity_hasher> pass_to_group;
+
+				for (const auto & [pass, res] : external_inputs){
+					for (const auto & re : res){
+						if(!re.resource->is_external_spec())continue;
+
+						pass_to_group[{nullptr, pass, no_slot, re.slot}] = &(group[re.resource.get()] = nullptr);
+					}
+				}
+
+				// std::vector<>pass_identity
+				std::size_t count{};
+
 				//assign borrowed resources
 				for (const auto & req : life_bounds.bounds){
 					if(req.ownership != ownership_type::external)continue;
-					borrowed_resources.push_back(resource_entity{req.requirement});
+					++count;
 				}
 
+				borrowed_resources.reserve(count);
 
 				for (const auto & [idx, req] : life_bounds.bounds
 					| std::views::filter([](const resource_lifebound& b){return b.ownership == ownership_type::external;})
 					| std::views::enumerate){
-					req.used_entity = &borrowed_resources[idx];
+					if(auto ptr = pass_to_group.at(req.get_head()); *ptr != nullptr){
+						req.used_entity = *ptr;
+					}else{
+						*ptr = req.used_entity = &borrowed_resources.emplace_back(resource_entity{req.requirement});
+					}
 
 					for (const auto & passed_by : req.passed_by){
 						if(!passed_by.where)continue;
@@ -1856,7 +1853,8 @@ namespace mo_yanxi::graphic{
 
 			static constexpr auto update = [](const resource_desc::explicit_resource& external_resource, resource_desc::resource_entity& entity){
 				using namespace resource_desc;
-				std::visit(narrow_overload{
+				std::visit(overload_def_noop{
+					std::in_place_type<void>,
 					[](const external_buffer& ext, buffer_entity& ent){
 						ent.buffer = ext.handle;
 					}, [](const external_image& ext, image_entity& ent){
@@ -1966,19 +1964,21 @@ namespace mo_yanxi::graphic{
 							if(auto to_this_itr = external_inputs.find(stage.get()); to_this_itr != external_inputs.end()){
 								for (const auto & res : to_this_itr->second){
 									if(res.slot == in_idx && !res.is_local()){
-										res_states.insert_or_assign(ref.inputs[res.slot], entity_state{*res.resource});
+										res_states.try_emplace(ref.inputs[res.slot], entity_state{*res.resource});
 									}
 								}
 							}
 
-							auto layout = cur_req.get<image_requirement>().get_expected_layout();
+							const auto layout = cur_req.get<image_requirement>().get_expected_layout();
+							const auto old_layout = try_get_layout(rentity);
+
 							dependency_gen.push(
 								entity.image.image,
 								VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
 								VK_ACCESS_2_NONE,
 								VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 								r.get_image_access(),
-								try_get_layout(rentity),
+								old_layout,
 								layout,
 								{
 									.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -2007,15 +2007,15 @@ namespace mo_yanxi::graphic{
 
 					std::visit(narrow_overload{
 						[&](const image_requirement& r, const image_entity& entity){
-							auto layout = cur_req.get<image_requirement>().get_expected_layout();
-
+							const auto layout = cur_req.get<image_requirement>().get_expected_layout();
+							const auto old_layout = try_get_layout(rentity);
 							dependency_gen.push(
 								entity.image.image,
 								VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
 								VK_ACCESS_2_NONE,
 								VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 								r.get_image_access(),
-								try_get_layout(rentity),
+								old_layout,
 								layout,
 								{
 									.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -2033,7 +2033,7 @@ namespace mo_yanxi::graphic{
 						}
 					}, rentity->overall_req.desc, rentity->resource);
 				}
-				dependency_gen.apply(scoped_recorder);
+				if(!dependency_gen.empty())dependency_gen.apply(scoped_recorder);
 
 				//TODO pass command record
 				stage->record_command(*context_, &ref, extent_, scoped_recorder);
@@ -2082,9 +2082,9 @@ namespace mo_yanxi::graphic{
 						}
 					}
 				}
-				dependency_gen.apply(scoped_recorder);
-
 			}
+
+			if(!dependency_gen.empty())dependency_gen.apply(scoped_recorder);
 		}
 
 		VkCommandBuffer get_main_command_buffer() const noexcept{

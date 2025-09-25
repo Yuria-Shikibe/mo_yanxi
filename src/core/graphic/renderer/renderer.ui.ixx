@@ -198,7 +198,7 @@ namespace mo_yanxi::graphic{
 
 	export
 	struct ui_batch_proxy : batch_proxy{
-	private:
+	public:
 		friend renderer_ui;
 		friend batch_proxy;
 

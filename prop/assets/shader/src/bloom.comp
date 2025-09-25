@@ -47,7 +47,7 @@ vec4 sample_input(const vec2 where, const uint raw_mip_index){
         }
     }else{
         if(raw_mip_index == 0){
-            return texture(input_image, where);
+            return textureLod(input_image, where, 0);
         }else{
             return textureLod(down_mipmap_sample, where, index - 1);
         }

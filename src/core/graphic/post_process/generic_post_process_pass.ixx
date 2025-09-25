@@ -2,7 +2,6 @@ module;
 
 #include <vulkan/vulkan.h>
 #include <spirv_cross/spirv_cross.hpp>
-#include <spirv_cross/spirv_reflect.hpp>
 #include <spirv_cross/spirv_glsl.hpp>
 #include <gch/small_vector.hpp>
 
@@ -18,8 +17,8 @@ export import mo_yanxi.vk.context;
 export import mo_yanxi.vk.uniform_buffer;
 export import mo_yanxi.vk.descriptor_buffer;
 
-import std;
 import mo_yanxi.basic_util;
+import std;
 
 namespace mo_yanxi::graphic{
 	export
@@ -255,11 +254,11 @@ namespace mo_yanxi::graphic{
 							if(req.is_sampled_image()){
 								mapper.set_image(
 									connection.binding.binding,
-									entity.handle.get_image_view(),
+									entity.image.image_view,
 									0,
 									VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, get_sampler_at(connection.binding));
 							}else{
-								mapper.set_storage_image(connection.binding.binding, entity.handle.get_image_view(), VK_IMAGE_LAYOUT_GENERAL);
+								mapper.set_storage_image(connection.binding.binding, entity.image.image_view, VK_IMAGE_LAYOUT_GENERAL);
 							}
 						},
 						[&](const resource_desc::buffer_entity& entity){
