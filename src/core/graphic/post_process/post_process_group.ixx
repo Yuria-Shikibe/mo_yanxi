@@ -1,20 +1,21 @@
 module;
 
 #include <vulkan/vulkan.h>
+#include "../src/ext/enum_operator_gen.hpp"
 
 #include <spirv_cross/spirv_cross.hpp>
-#include <gch/small_vector.hpp>
-
 #include <spirv_cross/spirv_glsl.hpp>
+#include <gch/small_vector.hpp>
+#include <plf_hive.h>
 
-
-#include "../src/ext/enum_operator_gen.hpp"
 
 export module mo_yanxi.graphic.post_process_graph;
 
+
+
+export import mo_yanxi.vk.context;
 import mo_yanxi.vk.shader;
 import mo_yanxi.vk.image_derives;
-import mo_yanxi.vk.context;
 import mo_yanxi.vk.command_buffer;
 import mo_yanxi.vk.resources;
 import mo_yanxi.graphic.shader_reflect;
@@ -24,9 +25,30 @@ import mo_yanxi.math.vector2;
 import mo_yanxi.referenced_ptr;
 
 import std;
-import <plf_hive.h>;
 
 namespace mo_yanxi::graphic{
+
+	 constexpr VkPipelineStageFlags2 deduce_stage(VkImageLayout layout) noexcept {
+		switch(layout){
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : return VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+		case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL : return VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : return VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : return VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+
+		default : return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+		}
+	}
+
+	constexpr VkAccessFlags2 deduce_external_image_access(VkPipelineStageFlags2 stage) noexcept {
+	 	//TODO use bit_or to merge, instead of individual test?
+	 	switch(stage){
+	 		case VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT : return VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+	 		case VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT : return VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	 		default: return VK_ACCESS_2_NONE;
+	 	}
+	}
+
+
 	export constexpr VkFormat convertImageFormatToVkFormat(spv::ImageFormat imageFormat) noexcept{
 		switch(imageFormat){
 		case spv::ImageFormatUnknown : return VK_FORMAT_UNDEFINED;
@@ -242,9 +264,9 @@ namespace mo_yanxi::graphic{
 		export
 		struct image_requirement{
 			image_desc desc{};
-			// ownership_type ownership{};
 			VkImageUsageFlags usage{};
 
+			VkImageAspectFlags aspect_flags{};
 			/**
 			 * @brief explicitly specfied expected initial layout of the image
 			 */
@@ -259,11 +281,9 @@ namespace mo_yanxi::graphic{
 			unsigned mip_levels{no_req_spec};
 			unsigned scaled_times{no_req_spec};
 
-			std::variant<
-				std::monostate,
-				std::array<float, 4>,
-				std::array<std::uint32_t, 4>
-			> clear_color{}; //transient
+			VkImageAspectFlags get_aspect() const noexcept{
+				return aspect_flags ? aspect_flags : VK_IMAGE_ASPECT_COLOR_BIT;
+			}
 
 			void promote(const image_requirement& other){
 				desc.dim = std::max(desc.dim, other.desc.dim);
@@ -274,6 +294,7 @@ namespace mo_yanxi::graphic{
 				assert(desc.format == other.desc.format || other.desc.format == VK_FORMAT_UNDEFINED);
 				// ownership = ownership_type{std::max(std::to_underlying(ownership), std::to_underlying(other.ownership))};
 				usage |= other.usage;
+				aspect_flags |= other.aspect_flags;
 			}
 
 			bool is_sampled_image() const noexcept{
@@ -293,15 +314,27 @@ namespace mo_yanxi::graphic{
 			}
 
 
-			[[nodiscard]] VkAccessFlags2 get_image_access() const noexcept{
-				switch(desc.decoration){
-				case image_decr::sampler : return VK_ACCESS_2_SHADER_READ_BIT;
-				case image_decr::read : return VK_ACCESS_2_SHADER_READ_BIT;
-				case image_decr::write : return VK_ACCESS_2_SHADER_WRITE_BIT;
-				case image_decr::read | image_decr::write : return VK_ACCESS_2_SHADER_READ_BIT |
-						VK_ACCESS_2_SHADER_WRITE_BIT;
-				default : return VK_ACCESS_2_NONE;
+			[[nodiscard]] VkAccessFlags2 get_image_access(VkPipelineStageFlags2 pipelineStageFlags2) const noexcept{
+				switch(pipelineStageFlags2){
+				case VK_PIPELINE_STAGE_2_TRANSFER_BIT : switch(desc.decoration){
+					case image_decr::read : return VK_ACCESS_2_TRANSFER_READ_BIT;
+					case image_decr::write : return VK_ACCESS_2_TRANSFER_WRITE_BIT;
+					case image_decr::read | image_decr::write : return VK_ACCESS_2_TRANSFER_READ_BIT |
+							VK_ACCESS_2_TRANSFER_WRITE_BIT;
+					default : return VK_ACCESS_2_NONE;
+					}
+
+
+				default : switch(desc.decoration){
+					case image_decr::sampler : return VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+					case image_decr::read : return VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+					case image_decr::write : return VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+					case image_decr::read | image_decr::write : return VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+							VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+					default : return VK_ACCESS_2_NONE;
+					}
 				}
+
 			}
 
 			[[nodiscard]] image_requirement max(const image_requirement& other_in_same_partition) const noexcept{
@@ -313,6 +346,7 @@ namespace mo_yanxi::graphic{
 			[[nodiscard]] std::strong_ordering compatibility_three_way_compare(const image_requirement& other_in_same_partition) const noexcept{
 				return graphic::connect_three_way_result(
 					compare_bitflags(usage, other_in_same_partition.usage),
+					compare_bitflags(aspect_flags, other_in_same_partition.aspect_flags),
 					mip_levels <=> other_in_same_partition.mip_levels,
 					desc.dim <=> other_in_same_partition.desc.dim
 				);
@@ -322,7 +356,7 @@ namespace mo_yanxi::graphic{
 		export
 		struct buffer_requirement{
 			VkDeviceSize size;
-
+			VkAccessFlagBits2 access{VK_ACCESS_2_NONE};
 
 			void promote(const buffer_requirement& other){
 				size = std::max(size, other.size);
@@ -364,6 +398,10 @@ namespace mo_yanxi::graphic{
 				return std::visit<ret>(overload_def_noop{
 					std::in_place_type<ret>,
 					[](const image_requirement& l, const image_requirement& r) -> ret {
+						if(l.aspect_flags != r.aspect_flags && (l.aspect_flags != 0 && r.aspect_flags != 0)){
+							return "Aspect Incompatible";
+						}
+
 						if(
 							l.scaled_times != r.scaled_times && (l.scaled_times != no_req_spec && r.scaled_times != no_req_spec)
 						){
@@ -629,15 +667,29 @@ namespace mo_yanxi::graphic{
 		};
 
 		export
+		struct external_resource_dependency{
+			VkPipelineStageFlags2    src_stage;
+			VkAccessFlags2           src_access;
+			VkPipelineStageFlags2    dst_stage;
+			VkAccessFlags2           dst_access;
+		};
+
+		export
 		struct explicit_resource : referenced_object_base{
 			using variant_t = std::variant<external_image, external_buffer, std::monostate>;
 
 			variant_t desc{std::monostate{}};
+			external_resource_dependency dependency{};
 
 			[[nodiscard]] explicit_resource() = default;
 
 			[[nodiscard]] explicit explicit_resource(const variant_t& desc)
 				: desc(desc){
+			}
+
+			[[nodiscard]] explicit_resource(const variant_t& desc, const external_resource_dependency& dependency)
+				: desc(desc),
+				  dependency(dependency){
 			}
 
 			[[nodiscard]] bool is_external_spec() const noexcept{
@@ -708,7 +760,9 @@ namespace mo_yanxi::graphic{
 			using variant_t = std::variant<image_entity_state, buffer_entity_state>;
 			variant_t desc{};
 
-			VkAccessFlags2 last_access{};
+			VkPipelineStageFlags2 last_stage{VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT};
+			VkAccessFlags2 last_access{VK_ACCESS_2_NONE};
+			bool external_init_required{};
 
 			[[nodiscard]] resource_type type() const noexcept{
 				return static_cast<resource_type>(desc.index());
@@ -949,7 +1003,8 @@ namespace mo_yanxi::graphic{
 				break;
 			case inout_type::out : output_slots.push_back(sz);
 				break;
-			case inout_type::inout : input_slots.push_back(sz);
+			case inout_type::inout :
+				input_slots.push_back(sz);
 				output_slots.push_back(sz);
 				break;
 			default : break;
@@ -1029,7 +1084,7 @@ namespace mo_yanxi::graphic{
 			bool operator==(const pass_identity& i) const noexcept{
 				if(where == i.where){
 					if(where == nullptr){
-						return slot_out == i.slot_out && slot_in == i.slot_in;
+						return external_target == i.external_target && slot_out == i.slot_out && slot_in == i.slot_in;
 					}else{
 						return true;
 					}
@@ -1209,7 +1264,8 @@ namespace mo_yanxi::graphic{
 		}
 
 	public:
-		gch::small_vector<pass_dependency> dependencies{};
+		gch::small_vector<pass_dependency> dependencies_resource_{};
+		gch::small_vector<pass*> dependencies_executions_{};
 
 		[[nodiscard]] explicit pass(vk::context& ctx){};
 
@@ -1249,6 +1305,23 @@ namespace mo_yanxi::graphic{
 
 		[[nodiscard]] std::string get_identity_name() const noexcept{
 			return std::format("({:#X}){}", static_cast<std::uint16_t>(std::bit_cast<std::uintptr_t>(this)), get_name());
+		}
+
+
+		void add_dep(pass_dependency dep){
+			dependencies_resource_.push_back(dep);
+		}
+
+		void add_dep(std::initializer_list<pass_dependency> dep){
+			dependencies_resource_.append(dep);
+		}
+
+		void add_exec_dep(pass* dep){
+			dependencies_executions_.push_back(dep);
+		}
+
+		void add_exec_dep(std::initializer_list<pass*> dep){
+			dependencies_executions_.append(dep);
 		}
 	};
 
@@ -1323,9 +1396,17 @@ namespace mo_yanxi::graphic{
 			};
 			std::unordered_map<pass*, node> nodes;
 
+
+
 			for(const auto& v : stages){
-				for(auto& dep : v->dependencies){
+				nodes.try_emplace(v.get());
+
+				for(auto& dep : v->dependencies_resource_){
 					++nodes[dep.id].in_degree;
+				}
+
+				for(auto& dep : v->dependencies_executions_){
+					++nodes[dep].in_degree;
 				}
 			}
 
@@ -1335,13 +1416,12 @@ namespace mo_yanxi::graphic{
 			sorted.reserve(stages.size());
 
 			std::size_t current_index{};
-			for(const auto& output : external_outputs | std::views::keys){
-				queue.push_back(output);
-			}
 
-			for(const auto& stage : stages){
-				for(const auto& dependency : stage->dependencies){
-					std::erase(queue, dependency.id);
+			{//Set Initial Nodes
+				for (const auto & [node, indeg] : nodes){
+					if(indeg.in_degree)continue;
+
+					queue.push_back(node);
 				}
 			}
 
@@ -1353,11 +1433,18 @@ namespace mo_yanxi::graphic{
 				auto current = queue[current_index++];
 				sorted.push_back(current);
 
-				for(const auto& dependency : current->dependencies){
+				for(const auto& dependency : current->dependencies_resource_){
 					auto& deg = nodes[dependency.id].in_degree;
 					--deg;
 					if(deg == 0){
 						queue.push_back(dependency.id);
+					}
+				}
+				for(const auto& dependency : current->dependencies_executions_){
+					auto& deg = nodes[dependency].in_degree;
+					--deg;
+					if(deg == 0){
+						queue.push_back(dependency);
 					}
 				}
 			}
@@ -1386,7 +1473,7 @@ namespace mo_yanxi::graphic{
 					resources.try_emplace(idx, std::addressof(inout.data[data_idx]));
 				}
 
-				for(const auto& dependency : stage->dependencies){
+				for(const auto& dependency : stage->dependencies_resource_){
 					if(auto itr = resources.find(dependency.dst_idx); itr != resources.end()){
 						auto& dep_out = dependency.id->sockets();
 						if(auto src_data = dep_out.get_out(dependency.src_idx)){
@@ -1483,7 +1570,7 @@ namespace mo_yanxi::graphic{
 
 					auto cur_head = res_bnd.passed_by.back();
 					while(true){
-						for(const auto& dependency : cur_head->dependencies){
+						for(const auto& dependency : cur_head->dependencies_resource_){
 							if(dependency.dst_idx == cur_head.slot_in){
 								auto& pass = *dependency.id;
 								auto& inout = pass.sockets();
@@ -1764,6 +1851,8 @@ namespace mo_yanxi::graphic{
 					}
 				}
 
+				auto initial = pass_to_group;
+
 				// std::vector<>pass_identity
 				std::size_t count{};
 
@@ -1778,7 +1867,7 @@ namespace mo_yanxi::graphic{
 				for (const auto & [idx, req] : life_bounds.bounds
 					| std::views::filter([](const resource_lifebound& b){return b.ownership == ownership_type::external;})
 					| std::views::enumerate){
-					if(auto ptr = pass_to_group.at(req.get_head()); *ptr != nullptr){
+					if(const auto ptr = pass_to_group.at(req.get_head()); *ptr != nullptr){
 						req.used_entity = *ptr;
 					}else{
 						*ptr = req.used_entity = &borrowed_resources.emplace_back(resource_entity{req.requirement});
@@ -1869,7 +1958,10 @@ namespace mo_yanxi::graphic{
 					const auto res = get_resource(borrowed_resources, entity);
 					if(!res)continue;
 
-					for (const auto & external : external_inputs.at(pass)){
+					const auto itr = external_inputs.find(pass);
+					if(itr == external_inputs.end())continue;
+
+					for (const auto & external : itr->second){
 						if(external.slot == slot){
 							update(*external.resource, *res);
 							break;
@@ -1882,7 +1974,10 @@ namespace mo_yanxi::graphic{
 					const auto res = get_resource(borrowed_resources, entity);
 					if(!res)continue;
 
-					for (const auto & external : external_outputs.at(pass)){
+					const auto itr = external_outputs.find(pass);
+					if(itr == external_outputs.end())continue;
+
+					for (const auto & external : itr->second){
 						if(external.slot == slot){
 							update(*external.resource, *res);
 							break;
@@ -1938,12 +2033,12 @@ namespace mo_yanxi::graphic{
 			using namespace resource_desc;
 			std::unordered_map<const resource_entity*, entity_state> res_states{};
 
-			auto try_get_layout = [&](const resource_entity* entity){
-				if(const auto itr = res_states.find(entity); itr != res_states.end()){
-					return itr->second.get_layout();
-				}
-				return VK_IMAGE_LAYOUT_UNDEFINED;
-			};
+			// auto try_get_layout = [&](const resource_entity* entity){
+			// 	if(const auto itr = res_states.find(entity); itr != res_states.end()){
+			// 		return itr->second.get_layout();
+			// 	}
+			// 	return VK_IMAGE_LAYOUT_UNDEFINED;
+			// };
 
 			vk::scoped_recorder scoped_recorder{main_command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
@@ -1964,24 +2059,45 @@ namespace mo_yanxi::graphic{
 							if(auto to_this_itr = external_inputs.find(stage.get()); to_this_itr != external_inputs.end()){
 								for (const auto & res : to_this_itr->second){
 									if(res.slot == in_idx && !res.is_local()){
-										res_states.try_emplace(ref.inputs[res.slot], entity_state{*res.resource});
+										auto [itr, suc] = res_states.try_emplace(ref.inputs[res.slot], entity_state{*res.resource});
+										if(!suc)continue;
+										auto& state = itr->second;
+										state.external_init_required = true;
+
+										if(auto layout = res.resource->get_layout(); layout != VK_IMAGE_LAYOUT_UNDEFINED){
+											state.last_stage = deduce_stage(layout);
+											state.last_access = deduce_external_image_access(state.last_stage);
+										}
+
 									}
 								}
 							}
 
-							const auto layout = cur_req.get<image_requirement>().get_expected_layout();
-							const auto old_layout = try_get_layout(rentity);
+							const auto& req = cur_req.get<image_requirement>();
+							VkImageLayout old_layout{};
+							VkPipelineStageFlags2 old_stage{VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT};
+							VkAccessFlags2 old_access{VK_ACCESS_2_NONE};
+							if(const auto itr = res_states.find(rentity); itr != res_states.end()){
+								old_layout = itr->second.get_layout();
+								old_stage = itr->second.last_stage;
+								old_access = itr->second.last_access;
+							}
+
+							const auto new_layout = req.get_expected_layout();
+							const auto next_stage = deduce_stage(new_layout);
+							const auto next_access = req.get_image_access(next_stage);
+							const auto aspect = r.get_aspect();
 
 							dependency_gen.push(
 								entity.image.image,
-								VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
-								VK_ACCESS_2_NONE,
-								VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-								r.get_image_access(),
+								old_stage,
+								old_access,
+								next_stage,
+								next_access,
 								old_layout,
-								layout,
+								new_layout,
 								{
-									.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+									.aspectMask = aspect,
 									.baseMipLevel = 0,
 									.levelCount = value_or(r.mip_levels, 1u),
 									.baseArrayLayer = 0,
@@ -1989,7 +2105,11 @@ namespace mo_yanxi::graphic{
 								}
 							);
 
-							std::get<image_entity_state>(res_states[rentity].desc).current_layout = layout;
+							auto& state = res_states[rentity];
+							std::get<image_entity_state>(state.desc).current_layout = new_layout;
+							state.last_stage = next_stage;
+							state.last_access = next_access;
+							state.external_init_required = false;
 
 						},
 						[&](const buffer_requirement& r, const buffer_entity& entity){
@@ -2007,18 +2127,32 @@ namespace mo_yanxi::graphic{
 
 					std::visit(narrow_overload{
 						[&](const image_requirement& r, const image_entity& entity){
-							const auto layout = cur_req.get<image_requirement>().get_expected_layout();
-							const auto old_layout = try_get_layout(rentity);
+
+							const auto& req = cur_req.get<image_requirement>();
+							VkImageLayout old_layout{};
+							VkPipelineStageFlags2 old_stage{VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT};
+							VkAccessFlags2 old_access{VK_ACCESS_2_NONE};
+							if(const auto itr = res_states.find(rentity); itr != res_states.end()){
+								old_layout = itr->second.get_layout();
+								old_stage = itr->second.last_stage;
+								old_access = itr->second.last_access;
+							}
+
+							const auto new_layout = req.get_expected_layout();
+							const auto next_stage = deduce_stage(new_layout);
+							const auto next_access = req.get_image_access(next_stage);
+							const auto aspect = r.get_aspect();
+
 							dependency_gen.push(
 								entity.image.image,
-								VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
-								VK_ACCESS_2_NONE,
-								VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-								r.get_image_access(),
+								old_stage,
+								old_access,
+								next_stage,
+								next_access,
 								old_layout,
-								layout,
+								new_layout,
 								{
-									.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+									.aspectMask = aspect,
 									.baseMipLevel = 0,
 									.levelCount = value_or(r.mip_levels, 1u),
 									.baseArrayLayer = 0,
@@ -2026,7 +2160,7 @@ namespace mo_yanxi::graphic{
 								}
 							);
 
-							std::get<image_entity_state>(res_states[rentity].desc).current_layout = layout;
+							std::get<image_entity_state>(res_states[rentity].desc).current_layout = new_layout;
 						},
 						[&](const buffer_requirement& r, const buffer_entity& entity){
 
@@ -2035,11 +2169,9 @@ namespace mo_yanxi::graphic{
 				}
 				if(!dependency_gen.empty())dependency_gen.apply(scoped_recorder);
 
-				//TODO pass command record
 				stage->record_command(*context_, &ref, extent_, scoped_recorder);
 
 				//restore output final format, transition if any should be done within the pass
-
 				for (const auto& [out_idx, data_idx] : inout.get_valid_in()){
 					auto rentity = ref.inputs[out_idx];
 					auto& cur_req = inout.data[data_idx];
@@ -2075,10 +2207,47 @@ namespace mo_yanxi::graphic{
 
 					if(auto to_this_itr = external_outputs.find(stage.get()); to_this_itr != external_outputs.end()){
 						for (const auto & res : to_this_itr->second){
-							if(res.resource->get_layout() == VK_IMAGE_LAYOUT_UNDEFINED)continue;
-							if(res.slot == out_idx){
-								//TODO layout transition to output expected
-							}
+							if(res.resource->get_layout() == VK_IMAGE_LAYOUT_UNDEFINED || !res.resource->is_external_spec())continue;
+							if(res.slot != out_idx)continue;
+
+							std::visit(
+								narrow_overload{
+									[&](const image_requirement& r, const image_entity& entity){
+										VkImageLayout old_layout{};
+										VkPipelineStageFlags2 old_stage{VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT};
+										VkAccessFlags2 old_access{VK_ACCESS_2_NONE};
+										if(const auto itr = res_states.find(rentity); itr != res_states.end()){
+											old_layout = itr->second.get_layout();
+											old_stage = itr->second.last_stage;
+											old_access = itr->second.last_access;
+										}
+
+										const auto new_layout = res.resource->get_layout();
+										const auto next_stage = deduce_stage(new_layout);
+
+										const auto& req = cur_req.get<image_requirement>();
+										const auto aspect = r.get_aspect();
+
+										dependency_gen.push(
+											entity.image.image,
+											old_stage,
+											old_access,
+											next_stage,
+											deduce_external_image_access(next_stage),
+											old_layout,
+											new_layout,
+											{
+												.aspectMask = aspect,
+												.baseMipLevel = 0,
+												.levelCount = value_or(r.mip_levels, 1u),
+												.baseArrayLayer = 0,
+												.layerCount = 1
+											}
+										);
+									},
+									[&](const buffer_requirement& r, const buffer_entity& entity){
+									}
+								}, rentity->overall_req.desc, rentity->resource);
 						}
 					}
 				}

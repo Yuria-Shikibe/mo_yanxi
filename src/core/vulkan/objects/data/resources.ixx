@@ -63,8 +63,13 @@ namespace mo_yanxi::vk{
 			assert(off + size <= this->size);
 			return buffer_borrow{buffer, address + offset + off, size};
 		}
+
 		[[nodiscard]] constexpr VkDeviceAddress begin() const noexcept{
 			return address + offset;
+		}
+
+		[[nodiscard]] constexpr VkDeviceAddress end() const noexcept{
+			return address + offset + size;
 		}
 	};
 
@@ -118,7 +123,7 @@ namespace mo_yanxi::vk{
 			return buffer_borrow{*this, get_address(), off, size};
 		}
 
-		buffer_borrow borrow(VkDeviceSize off) const noexcept{
+		buffer_borrow borrow_after(VkDeviceSize off) const noexcept{
 			assert(off < get_size());
 			return buffer_borrow{*this, get_address(), off, get_size() - off};
 		}

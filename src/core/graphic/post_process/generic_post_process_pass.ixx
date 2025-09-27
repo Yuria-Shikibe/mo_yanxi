@@ -247,10 +247,10 @@ namespace mo_yanxi::graphic{
 
 		void default_bind_resources(const pass_resource_reference& resources){
 			vk::descriptor_mapper mapper{descriptor_buffer_};
-			auto bind = [&, this](const resource_map_entry& connection, const resource_desc::resource_entity* res){
+			auto bind = [&, this](const resource_map_entry& connection, const resource_desc::resource_entity* res, const resource_desc::resource_requirement& requirement){
 				std::visit(overload{
 						[&](const resource_desc::image_entity& entity){
-							auto& req = std::get<resource_desc::image_requirement>(res->overall_req.desc);
+							auto& req = std::get<resource_desc::image_requirement>(requirement.desc);
 							if(req.is_sampled_image()){
 								mapper.set_image(
 									connection.binding.binding,
@@ -268,12 +268,12 @@ namespace mo_yanxi::graphic{
 			};
 			for(const auto& connection : meta_.inout_map_.connection){
 				if(auto res = resources.get_in_if(connection.slot.in)){
-					bind(connection, res);
+					bind(connection, res, meta_.sockets.at_in(connection.slot.in));
 					continue;
 				}
 
 				if(auto res = resources.get_out_if(connection.slot.out)){
-					bind(connection, res);
+					bind(connection, res, meta_.sockets.at_out(connection.slot.out));
 					continue;
 				}
 
@@ -319,13 +319,6 @@ namespace mo_yanxi::graphic{
 		}
 
 
-		void add_dep(pass_dependency dep){
-			dependencies.push_back(dep);
-		}
-
-		void add_dep(std::initializer_list<pass_dependency> dep){
-			dependencies.append(dep);
-		}
 	};
 
 

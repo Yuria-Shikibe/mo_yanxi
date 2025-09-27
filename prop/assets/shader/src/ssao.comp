@@ -14,6 +14,8 @@ layout(binding = 2) uniform UBO {
     vec4 kernal[MaxKernalSize];
     int kernalSize;
     float scale;
+    int cap1;
+    int cap2;
 } ubo;
 
 const float radius = 2.5f;
@@ -39,7 +41,7 @@ void main() {
     }
 
     for (int i = 0; i < ubo.kernalSize; ++i){
-        const vec2 smp = uv + ubo.kernal[i].xy * radius * ubo.scale;
+        const vec2 smp = uv + ubo.kernal[i].xy * radius * (ubo.scale);
 
         const float sampleDepth = texture(depthTex, smp).r;
 
@@ -49,10 +51,7 @@ void main() {
         occlusion += rangeCheck;
     }
 
-    const float factor = max(occlusion, 0) / ubo.kernalSize;
-    const float drakness = 1.0 - factor;
+    const float avg_occlusion = max(occlusion, 0) / ubo.kernalSize;
 
-    const vec4 outColor = vec4(vec3(smoothstep(0.25f, 0.95f, drakness)), factor);
-
-    imageStore(outTex, pos, vec4(1 - factor));
+    imageStore(outTex, pos, vec4(1 - avg_occlusion));
 }

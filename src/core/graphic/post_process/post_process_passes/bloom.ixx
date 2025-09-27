@@ -152,10 +152,62 @@ namespace mo_yanxi::graphic{
 			pipeline_.bind(buffer, VK_PIPELINE_BIND_POINT_COMPUTE);
 			cmd::bind_descriptors(buffer, {descriptor_buffer_});
 
+			const auto& down_sample_image = std::get<resource_desc::image_entity>(resources->at_in(1).resource);
+			const auto& up_sample_image = std::get<resource_desc::image_entity>(resources->at_out(0).resource);
+
 			for(std::uint32_t i = 0; i < mipLevel * 2; ++i){
 				const auto current_mipmap_index = reverse_after(i, mipLevel);
 				const auto div = 1 << (current_mipmap_index + 1 - (i >= mipLevel));
 				math::u32size2 current_ext{extent / div};
+
+				if(i > 0){
+					if(i <= mipLevel){
+						//mipmap access barrier
+						// cmd::memory_barrier(
+						// 	buffer,
+						// 	down_sample_image.image.image,
+						// 	VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+						// 	VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+						// 	VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+						// 	VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+						// 	VK_IMAGE_LAYOUT_GENERAL,
+						// 	VK_IMAGE_LAYOUT_GENERAL,
+						//
+						// 	VkImageSubresourceRange{
+						// 		VK_IMAGE_ASPECT_COLOR_BIT, reverse_after(i - 1, mipLevel), 1, 0, 1
+						// 	}
+						// );
+					}else{
+						cmd::memory_barrier(
+							buffer,
+							down_sample_image.image.image,
+							VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+							VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+							VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+							VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+							VK_IMAGE_LAYOUT_GENERAL,
+							VK_IMAGE_LAYOUT_GENERAL,
+
+							VkImageSubresourceRange{
+								VK_IMAGE_ASPECT_COLOR_BIT, reverse_after(i, mipLevel) + 1, 1, 0, 1
+							}
+						);
+					}
+				}
+
+				// if(current_mipmap_index == 0 && i != 0){
+				// 	//Final, set output image layout to general
+				// 	cmd::memory_barrier(
+				// 		buffer,
+				// 		up_sample_image.image.image,
+				// 		VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				// 		VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
+				// 		VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				// 		VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+				// 		VK_IMAGE_LAYOUT_GENERAL,
+				// 		VK_IMAGE_LAYOUT_GENERAL
+				// 	);
+				// }
 
 				cmd::set_descriptor_offsets(buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0, {0}, {descriptor_buffer_.get_chunk_offset(i)});
 				const auto groups = get_work_group_size(current_ext);

@@ -185,7 +185,7 @@ namespace mo_yanxi::graphic{
 
 	export
 	struct world_batch_proxy : batch_proxy{
-	private:
+	public:
 		friend renderer_world;
 
 		world_batch_attachments draw_attachments{};
@@ -608,10 +608,10 @@ namespace mo_yanxi::graphic{
 				context().compute_queue(),
 				std::array{
 					batch.oit_blender.get_main_command_buffer(),
-					ssao.get_main_command_buffer(),
-					bloom.get_main_command_buffer(),
-					merge_command.get(),
-					anti_alias.get_main_command_buffer()
+					// ssao.get_main_command_buffer(),
+					// bloom.get_main_command_buffer(),
+					// merge_command.get(),
+					// anti_alias.get_main_command_buffer()
 				});
 		}
 

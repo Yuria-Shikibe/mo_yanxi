@@ -119,6 +119,8 @@ import mo_yanxi.graphic.shader_reflect;
 import mo_yanxi.graphic.post_process_graph;
 import mo_yanxi.graphic.post_process_graph.generic_post_process_pass;
 import mo_yanxi.graphic.post_process_graph.bloom;
+import mo_yanxi.graphic.post_process_graph.ssao;
+import mo_yanxi.graphic.post_process_graph.fill;
 import mo_yanxi.graphic.post_processor.oit_blender;
 
 
@@ -302,6 +304,7 @@ void graph_small_test(){
 #pragma region MAIN
 #if 1
 
+#pragma region UI_INIT
 void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& atlas){
 	using namespace std::literals;
 	using namespace mo_yanxi;
@@ -541,6 +544,7 @@ void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& at
 
 	}*/
 }
+#pragma endregion
 
 void main_loop(){
 	using namespace mo_yanxi;
@@ -734,6 +738,16 @@ void main_loop(){
 	auto& ui_base = graph.add_explicit_resource(explicit_resource{external_image{}});
 	auto& ui_light = graph.add_explicit_resource(explicit_resource{external_image{}});
 
+	auto& world_base = graph.add_explicit_resource(explicit_resource{external_image{}});
+	auto& world_light = graph.add_explicit_resource(explicit_resource{external_image{}});
+	auto& world_depth = graph.add_explicit_resource(explicit_resource{external_image{VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL}});
+
+	auto& world_draw_base = graph.add_explicit_resource(explicit_resource{external_image{VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}});
+	auto& world_draw_light = graph.add_explicit_resource(explicit_resource{external_image{VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}});
+	auto& world_draw_oit_head = graph.add_explicit_resource(explicit_resource{external_image{}});
+	auto& world_draw_oit_buffer = graph.add_explicit_resource(explicit_resource{external_buffer{}});
+	auto& world_draw_oit_buffer_stat = graph.add_explicit_resource(explicit_resource{external_buffer{}});
+
 	auto& final_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::result_merge, {
 		{{0}, no_slot, 0},
 		{{1}, 0, no_slot},
@@ -776,15 +790,21 @@ void main_loop(){
 			return meta;
 		}();
 
-		auto& anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
-			{{1}, 0, no_slot},
-			{{2}, no_slot, 0},
-		}});
-		anti_alias.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+		// auto& anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
+		// 	{{1}, 0, no_slot},
+		// 	{{2}, no_slot, 0},
+		// }});
+		// anti_alias.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
 
 		auto& ui_bloom = graph.add_stage<bloom_pass>(bloom_meta);
 		ui_bloom.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
 		ui_bloom.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+		graph.add_input(&ui_bloom, {
+			{{}, 1},
+		});
+		graph.add_input(&ui_bloom, {
+			explicit_resource_usage{ui_light, 0},
+		});
 
 		auto& world_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::world_merge, {
 			{{0}, no_slot, 0},
@@ -794,17 +814,42 @@ void main_loop(){
 			{{4}, 3, no_slot},
 		}});
 
-
-		graph.add_input(&world_merge, {
-			{{}, 0},
+		auto& world_bloom = graph.add_stage<bloom_pass>(bloom_meta);
+		world_bloom.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
+		world_bloom.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+		graph.add_input(&world_bloom, {
 			{{}, 1},
-			{{}, 2},
-			{{}, 3},
+		});
+		graph.add_input(&world_bloom, {
+			explicit_resource_usage{world_light, 0},
 		});
 
-		anti_alias.add_dep({
-			.id = &world_merge
-		});
+		auto& ssao = graph.add_stage<ssao_pass>(post_process_meta{assets::graphic::shaders::comp::ssao, {
+			{{0}, 0, no_slot},
+			{{1}, no_slot, 0}
+		}});
+		ssao.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
+
+		auto& req = ssao.sockets().at_in<resource_desc::image_requirement>(0).aspect_flags = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+		{
+			auto& ui_clear = graph.add_stage<image_clear>(2);
+
+			ui_clear.add_exec_dep(&final_merge);
+			graph.add_input(&ui_clear, {
+				explicit_resource_usage{ui_base, 0},
+				explicit_resource_usage{ui_light, 1},
+			});
+
+			graph.add_output(&ui_clear, {
+				explicit_resource_usage{ui_base, 0},
+				explicit_resource_usage{ui_light, 1},
+			});
+		}
+		//
+		// anti_alias.add_dep({
+		// 	.id = &world_merge
+		// });
 
 		graph.add_input(&final_merge, {
 			explicit_resource_usage{ui_base, 1},
@@ -817,18 +862,120 @@ void main_loop(){
 			.id = &ui_bloom,
 			.dst_idx = 3
 		},
-			{.id = &anti_alias,}
+			// {.id = &anti_alias,}
+			{.id = &world_merge,}
+		});
+
+		world_merge.add_dep({
+			{
+				.id = &ssao,
+				.dst_idx = 3
+			}, {
+				.id = &world_bloom,
+				.dst_idx = 2
+			}});
+
+		graph.add_input(&ssao, {
+			explicit_resource_usage{world_depth, 0}
 		});
 
 
-		graph.add_input(&ui_bloom, {
-			{{}, 1},
+		auto& oit = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::oit_blend, post_process_stage_inout_map{
+			{{0}, 0, no_slot},
+			{{1}, 1, no_slot},
+			{{2}, 2, no_slot},
+			{{3}, 3, no_slot},
+			{{4}, 4, no_slot},
+			{{5}, 5, 0},
+			{{6}, 6, 1},
+		}});
+		oit.set_sampler_at_binding(2, assets::graphic::samplers::blit_sampler);
+
+
+		graph.add_input(&oit, {
+			explicit_resource_usage{world_draw_oit_buffer, 0},
+			explicit_resource_usage{world_draw_oit_head, 1},
+			explicit_resource_usage{world_depth, 2},
+			explicit_resource_usage{world_draw_base, 3},
+			explicit_resource_usage{world_draw_light, 4},
+			explicit_resource_usage{world_base, 5},
+			explicit_resource_usage{world_light, 6},
 		});
 
-		graph.add_input(&ui_bloom, {
-			explicit_resource_usage{ui_light, 0},
+		world_merge.add_dep({
+			pass_dependency{&oit, 0, 0},
+			pass_dependency{&oit, 1, 1}
 		});
 
+		{
+			auto& world_clear = graph.add_stage<image_clear>(2);
+
+			world_clear.add_exec_dep(&world_merge);
+			graph.add_input(&world_clear, {
+				explicit_resource_usage{world_base, 0},
+				explicit_resource_usage{world_light, 1},
+			});
+
+			graph.add_output(&world_clear, {
+				explicit_resource_usage{world_base, 0},
+				explicit_resource_usage{world_light, 1},
+			});
+
+			auto& world_depth_clear = graph.add_stage<depth_stencil_image_clear>(std::initializer_list<depth_stencil_image_clear::clear_info>{{{1}}});
+
+			world_depth_clear.add_exec_dep(&ssao);
+			world_depth_clear.add_exec_dep(&oit);
+			graph.add_input(&world_depth_clear, {
+				explicit_resource_usage{world_depth, 0},
+			});
+
+			graph.add_output(&world_depth_clear, {
+				explicit_resource_usage{world_depth, 0},
+			});
+		}
+
+
+		{
+			auto& world_clear = graph.add_stage<image_clear>(2);
+
+			world_clear.add_exec_dep(&oit);
+			graph.add_input(&world_clear, {
+				explicit_resource_usage{world_draw_base, 0},
+				explicit_resource_usage{world_draw_light, 1},
+			});
+
+			graph.add_output(&world_clear, {
+				explicit_resource_usage{world_draw_base, 0},
+				explicit_resource_usage{world_draw_light, 1},
+			});
+		}
+		{
+			VkClearColorValue color{.uint32 = {~0u}};
+			auto& oit_clear = graph.add_stage<image_clear>(std::initializer_list<image_clear::clear_info>{{color}});
+
+			oit_clear.add_exec_dep(&oit);
+			graph.add_input(&oit_clear, {
+				explicit_resource_usage{world_draw_oit_head, 0},
+			});
+
+			graph.add_output(&oit_clear, {
+				explicit_resource_usage{world_draw_oit_head, 0},
+			});
+
+			auto off = std::bit_cast<std::uint32_t>(&oit_statistic::size);
+			auto& oit_buf_clear = graph.add_stage<buffer_fill>(std::initializer_list<buffer_fill::clear_info>{
+				{0, std::bit_cast<std::uint32_t>(&oit_statistic::size), sizeof(oit_statistic) - off},
+			});
+
+			oit_buf_clear.add_exec_dep(&oit);
+			graph.add_input(&oit_buf_clear, {
+				explicit_resource_usage{world_draw_oit_buffer_stat, 0},
+			});
+
+			graph.add_output(&oit_buf_clear, {
+				explicit_resource_usage{world_draw_oit_buffer_stat, 0},
+			});
+		}
 	}
 
 	graph.sort();
@@ -837,6 +984,38 @@ void main_loop(){
 	graph.print_resource_reference();
 	graph.post_init();
 
+	auto update_external_resource = [&](){
+		std::get<external_image>(ui_base.desc).handle = renderer_ui.batch.blit_base;
+		std::get<external_image>(ui_base.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+
+		std::get<external_image>(ui_light.desc).handle = renderer_ui.batch.blit_light;
+		std::get<external_image>(ui_light.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+
+		std::get<external_image>(world_base.desc).handle = renderer_world.batch.mid_attachments.color_base;
+		std::get<external_image>(world_base.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+
+		std::get<external_image>(world_light.desc).handle = renderer_world.batch.mid_attachments.color_light;
+		std::get<external_image>(world_light.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+
+		std::get<external_image>(world_depth.desc).handle = {renderer_world.batch.depth, renderer_world.batch.depth_view_d32f};
+		std::get<external_image>(world_depth.desc).expected_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		std::get<external_image>(world_draw_base.desc).handle = renderer_world.batch.draw_attachments.color_base;
+		std::get<external_image>(world_draw_base.desc).expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		std::get<external_image>(world_draw_light.desc).handle = renderer_world.batch.draw_attachments.color_light;
+		std::get<external_image>(world_draw_light.desc).expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		std::get<external_image>(world_draw_oit_head.desc).handle = renderer_world.batch.oit_image_head;
+		std::get<external_image>(world_draw_oit_head.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+
+		std::get<external_buffer>(world_draw_oit_buffer.desc).handle = renderer_world.batch.oit_buffer.borrow_after(sizeof(oit_statistic));
+		std::get<external_buffer>(world_draw_oit_buffer_stat.desc).handle = renderer_world.batch.oit_buffer.borrow(0, sizeof(oit_statistic));
+		graph.update_external_resources();
+		graph.resize();
+		graph.create_command();
+	};
+
 	core::global::graphic::context.register_post_resize("test", [&](window_instance::resize_event event){
 		core::global::ui::root->resize_all(math::frect{math::vector2{event.size.width, event.size.height}.as<float>()});
 
@@ -844,17 +1023,7 @@ void main_loop(){
 		renderer_ui.resize(event.size);
 		merger.resize(event.size);
 
-		std::get<external_image>(ui_base.desc).handle = renderer_ui.batch.blit_base;
-		std::get<external_image>(ui_base.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
-
-		std::get<external_image>(ui_light.desc).handle = renderer_ui.batch.blit_light;
-		std::get<external_image>(ui_light.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
-
-
-		graph.update_external_resources();
-		graph.resize();
-		graph.create_command();
-
+		update_external_resource();
 		core::global::graphic::context.set_staging_image(
 			{
 				.image = std::get<graphic::resource_desc::image_entity>(graph.out_at(&final_merge, 0).resource).image.
@@ -871,16 +1040,7 @@ void main_loop(){
 			}, false);
 	});
 
-	std::get<external_image>(ui_base.desc).handle = renderer_ui.batch.blit_base;
-	std::get<external_image>(ui_base.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
-
-	std::get<external_image>(ui_light.desc).handle = renderer_ui.batch.blit_light;
-	std::get<external_image>(ui_light.desc).expected_layout = VK_IMAGE_LAYOUT_GENERAL;
-
-
-	graph.update_external_resources();
-	graph.resize();
-	graph.create_command();
+	update_external_resource();
 
 	core::global::graphic::context.set_staging_image({
 		.image = std::get<graphic::resource_desc::image_entity>(graph.out_at(&final_merge, 0).resource).image.image,
@@ -939,7 +1099,7 @@ void main_loop(){
 
 		{
 
-			acquirer.proj.depth = 0.35f;
+			acquirer.proj.depth = 1.f;
 
 			acquirer << graphic::draw::white_region;
 			graphic::draw::fill::rect_ortho(
@@ -948,13 +1108,16 @@ void main_loop(){
 					graphic::colors::black
 				);
 
+			acquirer.proj.depth = 0.25f;
+
 			graphic::draw::line::quad(
 					acquirer,
 					rect2.view_as_quad(),
 					2.f,
-					graphic::colors::white
+					graphic::colors::white.copy().set_a(.3f)
 				);
 
+			acquirer.proj.depth = 0.35f;
 			acquirer.proj.slightly_decr_depth();
 
 			graphic::draw::line::line(acquirer.get(), cursor_in_world, renderer_world.camera.get_viewport_center(),
@@ -1111,12 +1274,13 @@ void main_loop(){
 		world.graphic_context.render_efx();
 
 		renderer_world.batch.batch.consume_all();
-		renderer_world.post_process();
+		// renderer_world.post_process();
 
 		// renderer_ui.post_process();
 
 		// merger.submit();
 		// renderer_ui.clear();
+		// context.wait_on_device();
 
 		vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {graph.get_main_command_buffer()});
 		context.flush();
