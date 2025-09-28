@@ -90,15 +90,6 @@ namespace mo_yanxi::game::fx{
 					return meta;
 				}();
 
-				// auto& anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
-				// 	{{1}, 0, no_slot},
-				// 	{{2}, no_slot, 0},
-				// }});
-				// anti_alias.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
-				//
-				// anti_alias.add_dep({
-				// 	.id = &world_merge
-				// });
 
 				auto ui_bloom = graph.add_stage<bloom_pass>(bloom_meta);
 				ui_bloom.meta.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
@@ -148,15 +139,6 @@ namespace mo_yanxi::game::fx{
 					{0, false},
 				});
 
-				final_merge.pass.add_dep({
-						pass_dependency{
-							.id = &ui_bloom.pass,
-							.dst_idx = 3
-						},
-						// {.id = &anti_alias,}
-						{.id = &world_merge.pass,}
-					});
-
 				ssao.pass.add_input({{world_depth, 0}});
 
 				auto oit = graph.add_stage<post_process_stage>(post_process_meta{
@@ -187,6 +169,26 @@ namespace mo_yanxi::game::fx{
 						{&oit.pass, 1, 1},
 						{&ssao.pass, 0, 3},
 						{&world_bloom.pass, 0, 2}
+					});
+
+
+				auto anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
+					{{1}, 0, no_slot},
+					{{2}, no_slot, 0},
+				}});
+				anti_alias.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+
+				anti_alias.pass.add_dep({
+					.id = &world_merge.pass
+				});
+
+				final_merge.pass.add_dep({
+						pass_dependency{
+							.id = ui_bloom.id(),
+							.dst_idx = 3
+						},
+						{.id = anti_alias.id(),}
+						// {.id = &world_merge.pass,}
 					});
 
 				{

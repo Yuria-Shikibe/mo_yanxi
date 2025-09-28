@@ -451,6 +451,10 @@ namespace mo_yanxi::graphic::render_graph{
 	struct add_result{
 		pass_data& pass;
 		T& meta;
+
+		[[nodiscard]] pass_data* id() const noexcept{
+			return std::addressof(pass);
+		}
 	};
 
 	struct post_process_graph{
@@ -961,6 +965,7 @@ namespace mo_yanxi::graphic::render_graph{
 
 		void resize(math::u32size2 size){
 			// if(extent_ != size){
+			//TODO no force reallocat on reopen the window after minimizing causes device lost
 				extent_ = size;
 				allocate();
 			// }
