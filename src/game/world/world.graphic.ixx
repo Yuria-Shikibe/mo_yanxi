@@ -37,9 +37,9 @@ namespace mo_yanxi::game::world{
 			return *renderer_;
 		}
 
-		void update(const float delta_in_tick, bool paused){
-			renderer().update(delta_in_tick);
+		bool update(const float delta_in_tick, bool paused){
 			fx_manager.update(delta_in_tick * !paused);
+			return renderer().update(delta_in_tick);
 		}
 
 		void render_efx() const noexcept{

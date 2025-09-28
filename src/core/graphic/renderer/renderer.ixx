@@ -12,6 +12,16 @@ export import mo_yanxi.graphic.batch_proxy;
 import std;
 
 namespace mo_yanxi::graphic{
+	export constexpr math::u32size2 compute_group_unit_size2{16, 16};
+
+	export constexpr math::u32size2 get_work_group_size(math::u32size2 image_size) noexcept{
+		return image_size.add(compute_group_unit_size2.copy().sub(1u, 1u)).div(compute_group_unit_size2);
+	}
+
+	export constexpr VkExtent2D size_to_extent_2d(math::u32size2 sz) noexcept{
+		return std::bit_cast<VkExtent2D>(sz);
+	}
+
 	export
 	struct renderer_export{
 

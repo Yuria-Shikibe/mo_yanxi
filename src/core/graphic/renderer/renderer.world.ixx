@@ -15,11 +15,7 @@ import mo_yanxi.vk.util.cmd.render;
 import mo_yanxi.vk.ext;
 import mo_yanxi.vk.util.uniform;
 
-import mo_yanxi.graphic.post_processor.bloom;
-import mo_yanxi.graphic.post_processor.ssao;
 import mo_yanxi.graphic.post_processor.oit_blender;
-import mo_yanxi.graphic.post_processor.anti_aliasing;
-
 import std;
 
 namespace mo_yanxi::graphic{
@@ -450,13 +446,16 @@ namespace mo_yanxi::graphic{
 			camera.resize_screen(context.get_extent().width, context.get_extent().height);
 		}
 
-		void update(float delta_in_tick){
+		bool update(float delta_in_tick){
 			camera.update(delta_in_tick);
+			batch.frag_data.current.camera_scale = camera.get_scale();
+
 			if(camera.check_changed()){
 				batch.vert_data.current.view = {camera.get_world_to_uniformed()};
+				return true;
 			}
 
-			batch.frag_data.current.camera_scale = camera.get_scale();
+			return false;
 		}
 
 		void resize(const VkExtent2D extent){

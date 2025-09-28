@@ -38,11 +38,36 @@ namespace mo_yanxi::graphic::render_graph{
 	};
 
 	export
-	struct bloom_pass : post_process_stage{
+	struct bloom_pass final : post_process_stage{
 		using post_process_stage::post_process_stage;
 
-	private:
+		void set_scale(const float scale){
+			vk::buffer_mapper ubo_mapper{ubo()};
+			for(std::uint32_t i = 0; i < current_mip_level_ * 2; ++i){
+				(void)ubo_mapper.load(scale, sizeof(bloom_uniform_block) * i + std::bit_cast<std::uint32_t>(&bloom_uniform_block::scale));
+			}
 
+			this->scale = scale;
+		}
+
+		void set_strength(const float strengthSrc = 1.f, const float strengthDst = 1.f){
+			vk::buffer_mapper ubo_mapper{ubo()};
+			for(std::uint32_t i = 0; i < current_mip_level_ * 2; ++i){
+				(void)ubo_mapper.load(strengthSrc, &bloom_uniform_block::strength_src, i);
+				(void)ubo_mapper.load(strengthDst, &bloom_uniform_block::strength_dst, i);
+			}
+
+			strength_src = strengthSrc;
+			strength_dst = strengthDst;
+		}
+
+
+
+	private:
+		float scale{1};
+		float strength_src{1};
+		float strength_dst{1};
+		std::uint32_t current_mip_level_{0};
 		std::vector<vk::image_view> down_mipmap_image_views{};
 		std::vector<vk::image_view> up_mipmap_image_views{};
 
@@ -54,40 +79,40 @@ namespace mo_yanxi::graphic::render_graph{
 			return get_real_mip_level(get_required_mipmap_level(), extent);
 		}
 
-	public:
+	private:
 		void post_init(vk::context& ctx, const math::u32size2 extent) override{
 			init_pipeline(ctx);
 		}
 
 		void reset_resources(vk::context& context, const pass_resource_reference& resources, const math::u32size2 extent) override{
-			uniform_buffer_ = {context.get_allocator(), sizeof(bloom_uniform_block) * get_real_mipmap_level(extent) * 2};
-			reset_descriptor_buffer(context, get_real_mipmap_level(extent) * 2);
+			current_mip_level_ = get_real_mipmap_level(extent);
+			uniform_buffer_ = {context.get_allocator(), sizeof(bloom_uniform_block) * current_mip_level_ * 2};
+			reset_descriptor_buffer(context, current_mip_level_ * 2);
 
-			const auto mipLevel = get_real_mipmap_level(extent);
 			{
 				vk::descriptor_mapper info{descriptor_buffer_};
 				vk::buffer_mapper ubo_mapper{uniform_buffer_};
-				for(std::uint32_t i = 0; i < mipLevel * 2; ++i){
+				for(std::uint32_t i = 0; i < current_mip_level_ * 2; ++i){
 					(void)info.set_uniform_buffer(
 						4,
 						uniform_buffer_.get_address() + i * sizeof(bloom_uniform_block),
 						sizeof(bloom_uniform_block), i);
 
 					(void)ubo_mapper.load(bloom_uniform_block{
-						.current_layer = reverse_after_bit(i, mipLevel),
-						.up_scaling = i >= mipLevel,
-						.total_layer = mipLevel,
-						.scale = 1,
-						.strength_src = 1,
-						.strength_dst = 1,
+						.current_layer = reverse_after_bit(i, current_mip_level_),
+						.up_scaling = i >= current_mip_level_,
+						.total_layer = current_mip_level_,
+						.scale = scale,
+						.strength_src = strength_src,
+						.strength_dst = strength_dst,
 					}, sizeof(bloom_uniform_block) * i);
 				}
 			}
 
 			auto& down_sample_image = std::get<resource_desc::image_entity>(resources.at_in(1).resource);
 			auto& up_sample_image = std::get<resource_desc::image_entity>(resources.at_out(0).resource);
-			down_mipmap_image_views.resize(mipLevel);
-			up_mipmap_image_views.resize(mipLevel);
+			down_mipmap_image_views.resize(current_mip_level_);
+			up_mipmap_image_views.resize(current_mip_level_);
 
 			for (auto&& [idx, view] : down_mipmap_image_views | std::views::enumerate){
 				view = vk::image_view(
@@ -127,15 +152,15 @@ namespace mo_yanxi::graphic::render_graph{
 
 			vk::descriptor_mapper mapper{descriptor_buffer_};
 
-			for(std::uint32_t i = 0; i < mipLevel * 2; ++i){
+			for(std::uint32_t i = 0; i < current_mip_level_ * 2; ++i){
 				mapper.set_image(0, std::get<resource_desc::image_entity>(resources.at_in(0).resource).image.image_view, i, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
 				mapper.set_image(1, down_sample_image.image.image_view, i, VK_IMAGE_LAYOUT_GENERAL, sampler);
 				mapper.set_image(2, up_sample_image.image.image_view, i, VK_IMAGE_LAYOUT_GENERAL, sampler);
 
-				if(i < mipLevel){
+				if(i < current_mip_level_){
 					mapper.set_storage_image(3, down_mipmap_image_views[i], VK_IMAGE_LAYOUT_GENERAL, i);
 				}else{
-					mapper.set_storage_image(3, up_mipmap_image_views[reverse_after(i, mipLevel)], VK_IMAGE_LAYOUT_GENERAL, i);
+					mapper.set_storage_image(3, up_mipmap_image_views[reverse_after(i, current_mip_level_)], VK_IMAGE_LAYOUT_GENERAL, i);
 				}
 			}
 		}
@@ -145,21 +170,19 @@ namespace mo_yanxi::graphic::render_graph{
 
 			using namespace vk;
 
-			const auto mipLevel = get_real_mipmap_level(extent);
-
 			pipeline_.bind(buffer, VK_PIPELINE_BIND_POINT_COMPUTE);
 			cmd::bind_descriptors(buffer, {descriptor_buffer_});
 
 			const auto& down_sample_image = std::get<resource_desc::image_entity>(resources.at_in(1).resource);
 			const auto& up_sample_image = std::get<resource_desc::image_entity>(resources.at_out(0).resource);
 
-			for(std::uint32_t i = 0; i < mipLevel * 2; ++i){
-				const auto current_mipmap_index = reverse_after(i, mipLevel);
-				const auto div = 1 << (current_mipmap_index + 1 - (i >= mipLevel));
+			for(std::uint32_t i = 0; i < current_mip_level_ * 2; ++i){
+				const auto current_mipmap_index = reverse_after(i, current_mip_level_);
+				const auto div = 1 << (current_mipmap_index + 1 - (i >= current_mip_level_));
 				math::u32size2 current_ext{extent / div};
 
 				if(i > 0){
-					if(i <= mipLevel){
+					if(i <= current_mip_level_){
 						// mipmap access barrier
 						 cmd::memory_barrier(
 						 	buffer,
@@ -172,7 +195,7 @@ namespace mo_yanxi::graphic::render_graph{
 						 	VK_IMAGE_LAYOUT_GENERAL,
 
 						 	VkImageSubresourceRange{
-						 		VK_IMAGE_ASPECT_COLOR_BIT, reverse_after(i - 1, mipLevel), 1, 0, 1
+						 		VK_IMAGE_ASPECT_COLOR_BIT, reverse_after(i - 1, current_mip_level_), 1, 0, 1
 						 	}
 						 );
 					}else{
@@ -187,7 +210,7 @@ namespace mo_yanxi::graphic::render_graph{
 							VK_IMAGE_LAYOUT_GENERAL,
 
 							VkImageSubresourceRange{
-								VK_IMAGE_ASPECT_COLOR_BIT, reverse_after(i, mipLevel) + 1, 1, 0, 1
+								VK_IMAGE_ASPECT_COLOR_BIT, reverse_after(i, current_mip_level_) + 1, 1, 0, 1
 							}
 						);
 					}

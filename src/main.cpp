@@ -115,8 +115,6 @@ import mo_yanxi.game.meta.grid.srl;
 
 
 import mo_yanxi.graphic.shader_reflect;
-import mo_yanxi.graphic.post_process_graph;
-import mo_yanxi.graphic.post_process_graph.generic_post_process_pass;
 import mo_yanxi.graphic.post_processor.oit_blender;
 
 
@@ -879,6 +877,10 @@ void main_loop(){
 		.dst_layout = VK_IMAGE_LAYOUT_GENERAL
 	});
 
+
+	graph.world_bloom().set_strength(1.05f, 0.95f);
+	graph.ui_bloom().set_strength(.8f, .8f);
+
 	core::global::timer.reset_time();
 	while(!context.window().should_close()){
 		context.window().poll_events();
@@ -895,7 +897,10 @@ void main_loop(){
 		core::global::input.update(core::global::timer.global_delta_tick());
 
 		world.component_manager.update_update_delta(core::global::timer.update_delta_tick());
-		world.graphic_context.update(core::global::timer.global_delta_tick(), core::global::timer.is_paused());
+		if(world.graphic_context.update(core::global::timer.global_delta_tick(), core::global::timer.is_paused())){
+			graph.ssao_pass().set_scale(world.graphic_context.renderer().camera.map_scale(0.15f, 2.5f) * 1.5f);
+			graph.world_bloom().set_scale(world.graphic_context.renderer().camera.map_scale(0.9f, 1.5f));
+		}
 		renderer_ui.set_time(core::global::timer.global_time());
 
 		wgfx_input.set_context(core::global::ui::root->get_current_focus().get_cursor_pos());

@@ -114,14 +114,14 @@ namespace mo_yanxi::graphic::render_graph{
 
 
 	export
-	struct post_process_graph;
+	struct render_graph_manager;
 
 	export
 	struct pass_data;
 
 	export
 	struct pass_resource_reference{
-		friend post_process_graph;
+		friend render_graph_manager;
 
 	private:
 		gch::small_vector<const resource_desc::resource_entity*, 4> inputs{};
@@ -194,7 +194,7 @@ namespace mo_yanxi::graphic::render_graph{
 	export
 	struct pass_meta{
 		friend pass_data;
-		friend post_process_graph;
+		friend render_graph_manager;
 
 		static constexpr math::u32size2 compute_group_unit_size2{16, 16};
 
@@ -457,7 +457,7 @@ namespace mo_yanxi::graphic::render_graph{
 		}
 	};
 
-	struct post_process_graph{
+	struct render_graph_manager{
 	private:
 		vk::context* context_{};
 
@@ -468,7 +468,6 @@ namespace mo_yanxi::graphic::render_graph{
 		std::vector<resource_desc::resource_entity> exclusive_resources{};
 		std::vector<resource_desc::resource_entity> borrowed_resources{};
 
-		//TODO use named map?
 		plf::hive<resource_desc::explicit_resource> explicit_resources{};
 
 		math::u32size2 extent_{};
@@ -477,9 +476,9 @@ namespace mo_yanxi::graphic::render_graph{
 		life_trace_group life_bounds_{};
 
 	public:
-		[[nodiscard]] post_process_graph() = default;
+		[[nodiscard]] render_graph_manager() = default;
 
-		[[nodiscard]] explicit post_process_graph(vk::context& context)
+		[[nodiscard]] explicit render_graph_manager(vk::context& context)
 			: context_(&context), main_command_buffer{context_->get_compute_command_pool().obtain()}{
 		}
 
@@ -621,33 +620,16 @@ namespace mo_yanxi::graphic::render_graph{
 
 	public:
 		void analysis_minimal_allocation(){
-			life_trace_group life_bounds{execute_sequence_ | std::views::reverse | ranges::views::deref};
+			life_bounds_ = life_trace_group{execute_sequence_ | std::views::reverse | ranges::views::deref};
 
 			using namespace post_graph;
 			using namespace resource_desc;
 
+			auto& life_bounds = life_bounds_;
 			static constexpr resource_requirement_partial_greater_comp comp{};
 			std::ranges::sort(life_bounds, comp, &resource_trace::requirement);
-			life_bounds_ = life_bounds;
 
 			std::vector<unsigned> lifebound_assignments(life_bounds.size(), no_slot);
-			using StagesMap = std::unordered_set<const pass_data*>;
-			StagesMap req_per_stage{};
-
-			struct req_partial_eq{
-				static bool operator()(const resource_requirement& l, const resource_requirement& r) noexcept {
-					return l.is_compatibility_part_equal_to(r);
-				}
-			};
-
-			struct req_partial_hash{
-				static std::size_t operator()(const resource_requirement& l) noexcept {
-					static constexpr std::hash<std::string_view> hasher{};
-					//TODO better hash
-					const std::string_view hash{reinterpret_cast<const char*>(&l), sizeof(l)};
-					return hasher(hash);
-				}
-			};
 
 			struct partition{
 				std::vector<resource_requirement> requirements{};
@@ -681,23 +663,12 @@ namespace mo_yanxi::graphic::render_graph{
 
 
 			{
-				//cal shared requirements
 				for (auto&& [idx, image] : life_bounds | std::views::enumerate){
 					if(image.ownership != ownership_type::shared)continue;
 
-					for (const auto & passed_by : image.passed_by){
-						if(passed_by.where){
-							req_per_stage.insert(passed_by.where);
-						}
-					}
-
-				}
-
-				for (auto&& [idx, image] : life_bounds | std::views::enumerate){
-					if(image.ownership != ownership_type::shared)continue;
 					if(auto category = get_partition_itr(image.requirement); category == minimal_requirements_per_partition.end()){
 						auto& vec = minimal_requirements_per_partition.emplace_back();
-						for (const auto & pass : req_per_stage){
+						for (const auto& pass : execute_sequence_){
 							vec.stage_captures.try_emplace(pass);
 						}
 

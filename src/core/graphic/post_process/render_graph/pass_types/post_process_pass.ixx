@@ -1,6 +1,8 @@
 module;
 
 #include <vulkan/vulkan.h>
+#include <spirv_cross/spirv_cross.hpp>
+#include <spirv_cross/spirv_glsl.hpp>
 
 export module mo_yanxi.graphic.render_graph.post_process_pass;
 export import mo_yanxi.graphic.render_graph.manager;
@@ -18,6 +20,104 @@ import mo_yanxi.basic_util;
 import std;
 
 namespace mo_yanxi::graphic::render_graph{
+	namespace resource_desc{
+		constexpr VkFormat convertImageFormatToVkFormat(spv::ImageFormat imageFormat) noexcept{
+			switch(imageFormat){
+			case spv::ImageFormatUnknown : return VK_FORMAT_UNDEFINED;
+			case spv::ImageFormatRgba8 : return VK_FORMAT_R8G8B8A8_UNORM;
+			case spv::ImageFormatRgba8Snorm : return VK_FORMAT_R8G8B8A8_SNORM;
+			case spv::ImageFormatRgba8ui : return VK_FORMAT_R8G8B8A8_UINT;
+			case spv::ImageFormatRgba8i : return VK_FORMAT_R8G8B8A8_SINT;
+			case spv::ImageFormatR32ui : return VK_FORMAT_R32_UINT;
+			case spv::ImageFormatR32i : return VK_FORMAT_R32_SINT;
+			case spv::ImageFormatRgba16 : return VK_FORMAT_R16G16B16A16_UNORM;
+			case spv::ImageFormatRgba16Snorm : return VK_FORMAT_R16G16B16A16_SNORM;
+			case spv::ImageFormatRgba16ui : return VK_FORMAT_R16G16B16A16_UINT;
+			case spv::ImageFormatRgba16i : return VK_FORMAT_R16G16B16A16_SINT;
+			case spv::ImageFormatRgba16f : return VK_FORMAT_R16G16B16A16_SFLOAT;
+			case spv::ImageFormatR32f : return VK_FORMAT_R32_SFLOAT;
+			case spv::ImageFormatRgba32ui : return VK_FORMAT_R32G32B32A32_UINT;
+			case spv::ImageFormatRgba32i : return VK_FORMAT_R32G32B32A32_SINT;
+			case spv::ImageFormatRgba32f : return VK_FORMAT_R32G32B32A32_SFLOAT;
+			case spv::ImageFormatR8 : return VK_FORMAT_R8_UNORM;
+			case spv::ImageFormatR8Snorm : return VK_FORMAT_R8_SNORM;
+			case spv::ImageFormatR8ui : return VK_FORMAT_R8_UINT;
+			case spv::ImageFormatR8i : return VK_FORMAT_R8_SINT;
+			case spv::ImageFormatRg8 : return VK_FORMAT_R8G8_UNORM;
+			case spv::ImageFormatRg8Snorm : return VK_FORMAT_R8G8_SNORM;
+			case spv::ImageFormatRg8ui : return VK_FORMAT_R8G8_UINT;
+			case spv::ImageFormatRg8i : return VK_FORMAT_R8G8_SINT;
+			case spv::ImageFormatR16 : return VK_FORMAT_R16_UNORM;
+			case spv::ImageFormatR16Snorm : return VK_FORMAT_R16_SNORM;
+			case spv::ImageFormatR16ui : return VK_FORMAT_R16_UINT;
+			case spv::ImageFormatR16i : return VK_FORMAT_R16_SINT;
+			case spv::ImageFormatR16f : return VK_FORMAT_R16_SFLOAT;
+			case spv::ImageFormatRg16 : return VK_FORMAT_R16G16_UNORM;
+			case spv::ImageFormatRg16Snorm : return VK_FORMAT_R16G16_SNORM;
+			case spv::ImageFormatRg16ui : return VK_FORMAT_R16G16_UINT;
+			case spv::ImageFormatRg16i : return VK_FORMAT_R16G16_SINT;
+			case spv::ImageFormatRg16f : return VK_FORMAT_R16G16_SFLOAT;
+			case spv::ImageFormatR64ui : return VK_FORMAT_R64_UINT;
+			case spv::ImageFormatR64i : return VK_FORMAT_R64_SINT;
+			default : return VK_FORMAT_UNDEFINED;
+			}
+		}
+
+		std::size_t get_buffer_size(
+			const spirv_cross::Compiler& compiler,
+			const spirv_cross::Resource& resource){
+			const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
+
+			std::size_t size = compiler.get_declared_struct_size(type);
+
+			if(!type.array.empty()){
+				for(uint32_t array_size : type.array){
+					if(array_size == 0){
+						break;
+					}
+					size *= array_size;
+				}
+			}
+
+			return size;
+		}
+
+		image_requirement extract_image_state(
+				const spirv_cross::CompilerGLSL& complier,
+				const spirv_cross::Resource& resource)
+		{
+			decoration decr{};
+			auto& type = complier.get_type(resource.type_id);
+
+			bool no_read = complier.get_decoration(resource.id, spv::DecorationNonReadable);
+			bool no_write = complier.get_decoration(resource.id, spv::DecorationNonWritable);
+
+			if(type.image.sampled != 1){
+				if(!no_read && !no_write){
+					decr = decoration::read | decoration::write;
+				} else if(no_read){
+					decr = decoration::write;
+				} else{
+					decr = decoration::read;
+				}
+			} else{
+				decr = decoration::sampled;
+			}
+
+			return image_requirement{
+				.decr = decr,
+				// .format = convertImageFormatToVkFormat(type.image.format),
+				.dim = static_cast<unsigned>(type.image.dim == spv::Dim1D
+												 ? 1
+												 : type.image.dim == spv::Dim2D
+												 ? 2
+												 : type.image.dim == spv::Dim3D
+												 ? 3
+												 : 0),
+			};
+		}
+	}
+
 	template <typename T>
 	constexpr T ceil_div(T x, T div) noexcept{
 		return (x + div - 1) / div;
@@ -75,14 +175,14 @@ namespace mo_yanxi::graphic::render_graph{
 
 			for(const auto& input : refl.resources().uniform_buffers){
 				auto binding = refl.binding_info_of(input);
-				uniform_buffers_.push_back({binding, get_buffer_size(refl.compiler(), input)});
+				uniform_buffers_.push_back({binding, resource_desc::get_buffer_size(refl.compiler(), input)});
 				if(binding.set != 0)continue;
 				descriptor_layout_builder_.push(binding.binding, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 			}
 
 			for(const auto& input : refl.resources().storage_buffers){
 				auto binding = refl.binding_info_of(input);
-				resources_.push_back({binding, resource_desc::buffer_requirement{get_buffer_size(refl.compiler(), input)}});
+				resources_.push_back({binding, resource_desc::buffer_requirement{resource_desc::get_buffer_size(refl.compiler(), input)}});
 				if(binding.set != 0)continue;
 				descriptor_layout_builder_.push(binding.binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 			}
@@ -173,7 +273,7 @@ namespace mo_yanxi::graphic::render_graph{
 
 	export
 	struct post_process_stage : pass_meta{
-		friend post_process_graph;
+		friend render_graph_manager;
 
 	protected:
 		post_process_meta meta_{};
@@ -213,6 +313,10 @@ namespace mo_yanxi::graphic::render_graph{
 		}
 
 		vk::uniform_buffer& ubo(){
+			return uniform_buffer_;
+		}
+
+		[[nodiscard]] const vk::uniform_buffer& ubo() const {
 			return uniform_buffer_;
 		}
 

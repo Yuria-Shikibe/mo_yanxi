@@ -65,14 +65,23 @@ namespace mo_yanxi::graphic::render_graph{
 	};
 
 	export
-	struct ssao_pass : post_process_stage{
+	struct ssao_pass final : post_process_stage{
 		using post_process_stage::post_process_stage;
+
+
+		void set_scale(const float scale){
+			vk::buffer_mapper{ubo()}.load(scale, std::bit_cast<std::uint32_t>(&ssao_kernal_block::scale));
+			this->scale = scale;
+		}
+
+	private:
+		float scale{4};
 
 		void reset_resources(vk::context& context, const pass_resource_reference& resources,
 			const math::u32size2 extent) override{
 			post_process_stage::reset_resources(context, resources, extent);
 
-			vk::buffer_mapper{ubo()}.load(ssao_kernal_block{extent.as<math::isize2>()});
+			vk::buffer_mapper{ubo()}.load(ssao_kernal_block{extent.as<math::isize2>(), scale});
 		}
 	};
 }

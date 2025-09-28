@@ -14,10 +14,6 @@ export import mo_yanxi.vk.util.cmd.render;
 export import mo_yanxi.vk.ext;
 export import mo_yanxi.vk.util.uniform;
 
-export import mo_yanxi.graphic.post_processor.resolve;
-export import mo_yanxi.graphic.post_processor.bloom;
-export import mo_yanxi.graphic.post_processor.ssao;
-
 export import mo_yanxi.graphic.renderer.predecl;
 
 import mo_yanxi.math.matrix3;
@@ -164,7 +160,7 @@ namespace mo_yanxi::graphic{
 			})
 		{}
 
-		void set(math::u32size2 extent, math::u32size2 group_extent = post_processor::compute_group_unit_size2) noexcept{
+		void set(math::u32size2 extent, math::u32size2 group_extent = compute_group_unit_size2) noexcept{
 			extent.add(group_extent.copy().sub(1u, 1u)).div(group_extent);
 
 			current = value_type{
