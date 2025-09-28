@@ -2,15 +2,15 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.graphic.post_process_graph.bloom;
+export module mo_yanxi.graphic.render_graph.bloom;
 
 import std;
-export import mo_yanxi.graphic.post_process_graph.generic_post_process_pass;
+export import mo_yanxi.graphic.render_graph.post_process_pass;
 import mo_yanxi.vk.image_derives;
 import mo_yanxi.vk.ext;
 import mo_yanxi.math.vector2;
 
-namespace mo_yanxi::graphic{
+namespace mo_yanxi::graphic::render_graph{
 	[[nodiscard]] constexpr std::uint32_t reverse_after(std::uint32_t value, std::uint32_t ceil) noexcept{
 		if(value < ceil)return value;
 		return (ceil * 2 - value - 1);
@@ -47,32 +47,30 @@ namespace mo_yanxi::graphic{
 		std::vector<vk::image_view> up_mipmap_image_views{};
 
 		[[nodiscard]] std::uint32_t get_required_mipmap_level() const noexcept{
-			return meta().sockets.at_out<resource_desc::image_requirement>(0).mip_levels;
+			return sockets().at_out<resource_desc::image_requirement>(0).mip_levels;
 		}
+
 		[[nodiscard]] std::uint32_t get_real_mipmap_level(const math::u32size2 extent) const noexcept{
 			return get_real_mip_level(get_required_mipmap_level(), extent);
 		}
 
 	public:
-
 		void post_init(vk::context& ctx, const math::u32size2 extent) override{
 			init_pipeline(ctx);
-
 		}
 
-		void reset_resources(vk::context& context, const pass_resource_reference* resources, const math::u32size2 extent) override{
-			uniform_buffers_.resize(1);
-			uniform_buffers_.front() = {context.get_allocator(), sizeof(bloom_uniform_block) * get_real_mipmap_level(extent) * 2};
+		void reset_resources(vk::context& context, const pass_resource_reference& resources, const math::u32size2 extent) override{
+			uniform_buffer_ = {context.get_allocator(), sizeof(bloom_uniform_block) * get_real_mipmap_level(extent) * 2};
 			reset_descriptor_buffer(context, get_real_mipmap_level(extent) * 2);
 
 			const auto mipLevel = get_real_mipmap_level(extent);
 			{
 				vk::descriptor_mapper info{descriptor_buffer_};
-				vk::buffer_mapper ubo_mapper{uniform_buffers_.front()};
+				vk::buffer_mapper ubo_mapper{uniform_buffer_};
 				for(std::uint32_t i = 0; i < mipLevel * 2; ++i){
 					(void)info.set_uniform_buffer(
 						4,
-						uniform_buffers_.front().get_address() + i * sizeof(bloom_uniform_block),
+						uniform_buffer_.get_address() + i * sizeof(bloom_uniform_block),
 						sizeof(bloom_uniform_block), i);
 
 					(void)ubo_mapper.load(bloom_uniform_block{
@@ -86,8 +84,8 @@ namespace mo_yanxi::graphic{
 				}
 			}
 
-			auto& down_sample_image = std::get<resource_desc::image_entity>(resources->at_in(1).resource);
-			auto& up_sample_image = std::get<resource_desc::image_entity>(resources->at_out(0).resource);
+			auto& down_sample_image = std::get<resource_desc::image_entity>(resources.at_in(1).resource);
+			auto& up_sample_image = std::get<resource_desc::image_entity>(resources.at_out(0).resource);
 			down_mipmap_image_views.resize(mipLevel);
 			up_mipmap_image_views.resize(mipLevel);
 
@@ -130,7 +128,7 @@ namespace mo_yanxi::graphic{
 			vk::descriptor_mapper mapper{descriptor_buffer_};
 
 			for(std::uint32_t i = 0; i < mipLevel * 2; ++i){
-				mapper.set_image(0, std::get<resource_desc::image_entity>(resources->at_in(0).resource).image.image_view, i, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
+				mapper.set_image(0, std::get<resource_desc::image_entity>(resources.at_in(0).resource).image.image_view, i, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
 				mapper.set_image(1, down_sample_image.image.image_view, i, VK_IMAGE_LAYOUT_GENERAL, sampler);
 				mapper.set_image(2, up_sample_image.image.image_view, i, VK_IMAGE_LAYOUT_GENERAL, sampler);
 
@@ -142,7 +140,7 @@ namespace mo_yanxi::graphic{
 			}
 		}
 
-		void record_command(vk::context& context, const pass_resource_reference* resources, math::u32size2 extent,
+		void record_command(vk::context& context, const pass_resource_reference& resources, math::u32size2 extent,
 			VkCommandBuffer buffer) override{
 
 			using namespace vk;
@@ -152,8 +150,8 @@ namespace mo_yanxi::graphic{
 			pipeline_.bind(buffer, VK_PIPELINE_BIND_POINT_COMPUTE);
 			cmd::bind_descriptors(buffer, {descriptor_buffer_});
 
-			const auto& down_sample_image = std::get<resource_desc::image_entity>(resources->at_in(1).resource);
-			const auto& up_sample_image = std::get<resource_desc::image_entity>(resources->at_out(0).resource);
+			const auto& down_sample_image = std::get<resource_desc::image_entity>(resources.at_in(1).resource);
+			const auto& up_sample_image = std::get<resource_desc::image_entity>(resources.at_out(0).resource);
 
 			for(std::uint32_t i = 0; i < mipLevel * 2; ++i){
 				const auto current_mipmap_index = reverse_after(i, mipLevel);
@@ -162,21 +160,21 @@ namespace mo_yanxi::graphic{
 
 				if(i > 0){
 					if(i <= mipLevel){
-						//mipmap access barrier
-						// cmd::memory_barrier(
-						// 	buffer,
-						// 	down_sample_image.image.image,
-						// 	VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-						// 	VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-						// 	VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-						// 	VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-						// 	VK_IMAGE_LAYOUT_GENERAL,
-						// 	VK_IMAGE_LAYOUT_GENERAL,
-						//
-						// 	VkImageSubresourceRange{
-						// 		VK_IMAGE_ASPECT_COLOR_BIT, reverse_after(i - 1, mipLevel), 1, 0, 1
-						// 	}
-						// );
+						// mipmap access barrier
+						 cmd::memory_barrier(
+						 	buffer,
+						 	down_sample_image.image.image,
+						 	VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+						 	VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+						 	VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+						 	VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+						 	VK_IMAGE_LAYOUT_GENERAL,
+						 	VK_IMAGE_LAYOUT_GENERAL,
+
+						 	VkImageSubresourceRange{
+						 		VK_IMAGE_ASPECT_COLOR_BIT, reverse_after(i - 1, mipLevel), 1, 0, 1
+						 	}
+						 );
 					}else{
 						cmd::memory_barrier(
 							buffer,
@@ -195,24 +193,29 @@ namespace mo_yanxi::graphic{
 					}
 				}
 
-				// if(current_mipmap_index == 0 && i != 0){
-				// 	//Final, set output image layout to general
-				// 	cmd::memory_barrier(
-				// 		buffer,
-				// 		up_sample_image.image.image,
-				// 		VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				// 		VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
-				// 		VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				// 		VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-				// 		VK_IMAGE_LAYOUT_GENERAL,
-				// 		VK_IMAGE_LAYOUT_GENERAL
-				// 	);
-				// }
+				if(current_mipmap_index == 0 && i != 0){
+					//Final, set output image layout to general
+					cmd::memory_barrier(
+						buffer,
+						up_sample_image.image.image,
+						VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+						VK_ACCESS_2_NONE,
+						VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+						VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+						VK_IMAGE_LAYOUT_GENERAL,
+						VK_IMAGE_LAYOUT_GENERAL
+					);
+				}
 
 				cmd::set_descriptor_offsets(buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0, {0}, {descriptor_buffer_.get_chunk_offset(i)});
 				const auto groups = get_work_group_size(current_ext);
 				vkCmdDispatch(buffer, groups.x, groups.y, 1);
 			}
+		}
+
+		[[nodiscard]] std::span<const inout_index> get_required_internal_buffer_slots() const noexcept override{
+			static constexpr inout_index idx = 1;
+			return {&idx, 1};
 		}
 	};
 }

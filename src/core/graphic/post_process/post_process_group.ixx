@@ -1,13 +1,15 @@
 module;
 
 #include <vulkan/vulkan.h>
-#include "../src/ext/enum_operator_gen.hpp"
 
 #include <spirv_cross/spirv_cross.hpp>
 #include <spirv_cross/spirv_glsl.hpp>
-#include <gch/small_vector.hpp>
-#include <plf_hive.h>
+#include "plf_hive.h"
 
+// #include
+// #include <gch/small_vector.hpp>
+
+#include "../src/ext/enum_operator_gen.hpp"
 
 export module mo_yanxi.graphic.post_process_graph;
 
@@ -21,6 +23,7 @@ import mo_yanxi.vk.resources;
 import mo_yanxi.graphic.shader_reflect;
 import mo_yanxi.meta_programming;
 import mo_yanxi.basic_util;
+
 import mo_yanxi.math.vector2;
 import mo_yanxi.referenced_ptr;
 
@@ -108,33 +111,6 @@ namespace mo_yanxi::graphic{
 		}
 
 		return size;
-	}
-
-
-	template <typename T>
-	std::strong_ordering compare_bitflags(T lhs, T rhs) noexcept{
-		if constexpr (std::is_scoped_enum_v<T>){
-			return graphic::compare_bitflags(std::to_underlying(lhs), std::to_underlying(rhs));
-		}else{
-			if(lhs == rhs)return std::strong_ordering::equal;
-			if((lhs & rhs) == rhs)return std::strong_ordering::greater;
-			return std::strong_ordering::less;
-		}
-	}
-
-
-	template <typename C>
-	constexpr std::strong_ordering connect_three_way_result(C cur) noexcept{
-		return cur;
-	}
-
-	template <typename C, typename ...T>
-	constexpr std::strong_ordering connect_three_way_result(C cur, T... rst) noexcept{
-		if(std::is_eq(cur)){
-			return graphic::connect_three_way_result(rst...);
-		}else{
-			return cur;
-		}
 	}
 
 
@@ -344,7 +320,7 @@ namespace mo_yanxi::graphic{
 			}
 
 			[[nodiscard]] std::strong_ordering compatibility_three_way_compare(const image_requirement& other_in_same_partition) const noexcept{
-				return graphic::connect_three_way_result(
+				return connect_three_way_result(
 					compare_bitflags(usage, other_in_same_partition.usage),
 					compare_bitflags(aspect_flags, other_in_same_partition.aspect_flags),
 					mip_levels <=> other_in_same_partition.mip_levels,
@@ -422,7 +398,7 @@ namespace mo_yanxi::graphic{
 			}
 
 			void promote(const resource_requirement& other){
-				std::visit(narrow_overload{
+				std::visit(overload_narrow{
 					[](image_requirement& l, const image_requirement& r) {
 						l.promote(r);
 					},
@@ -771,7 +747,7 @@ namespace mo_yanxi::graphic{
 			[[nodiscard]] entity_state() = default;
 
 			[[nodiscard]] explicit(false) entity_state(const explicit_resource& ext){
-				std::visit(narrow_overload{
+				std::visit(overload_narrow{
 					[this](const external_image& image){
 						auto& s = desc.emplace<image_entity_state>();
 						s.current_layout = image.expected_layout;
@@ -832,7 +808,7 @@ namespace mo_yanxi::graphic{
 	export
 	struct post_process_stage_inout_map{
 		// private:
-		gch::small_vector<resource_map_entry> connection{};
+		std::vector<resource_map_entry> connection{};
 
 	public:
 		[[nodiscard]] post_process_stage_inout_map() = default;
@@ -902,19 +878,19 @@ namespace mo_yanxi::graphic{
 			unsigned out;
 		};
 
-		gch::small_vector<inout_pair> in_out{};
-		gch::small_vector<unsigned> in{};
-		gch::small_vector<unsigned> out{};
+		std::vector<inout_pair> in_out{};
+		std::vector<unsigned> in{};
+		std::vector<unsigned> out{};
 	};
 
 	export
 	struct inout_data{
 		static constexpr std::size_t sso = 4;
-		using index_slot_type = gch::small_vector<inout_index, sso>;
+		using index_slot_type = std::vector<inout_index>;
 
-		gch::small_vector<resource_desc::ubo_desc> uniform_buffers{};
+		std::vector<resource_desc::ubo_desc> uniform_buffers{};
 
-		gch::small_vector<resource_desc::resource_requirement, sso> data{};
+		std::vector<resource_desc::resource_requirement> data{};
 		index_slot_type input_slots{};
 		index_slot_type output_slots{};
 
@@ -1264,8 +1240,8 @@ namespace mo_yanxi::graphic{
 		}
 
 	public:
-		gch::small_vector<pass_dependency> dependencies_resource_{};
-		gch::small_vector<pass*> dependencies_executions_{};
+		std::vector<pass_dependency> dependencies_resource_{};
+		std::vector<pass*> dependencies_executions_{};
 
 		[[nodiscard]] explicit pass(vk::context& ctx){};
 
@@ -1313,7 +1289,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		void add_dep(std::initializer_list<pass_dependency> dep){
-			dependencies_resource_.append(dep);
+			dependencies_resource_.append_range(dep);
 		}
 
 		void add_exec_dep(pass* dep){
@@ -1321,7 +1297,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		void add_exec_dep(std::initializer_list<pass*> dep){
-			dependencies_executions_.append(dep);
+			dependencies_executions_.append_range(dep);
 		}
 	};
 
@@ -2054,7 +2030,7 @@ namespace mo_yanxi::graphic{
 
 					assert(rentity != nullptr);
 
-					std::visit(narrow_overload{
+					std::visit(overload_narrow{
 						[&](const image_requirement& r, const image_entity& entity){
 							if(auto to_this_itr = external_inputs.find(stage.get()); to_this_itr != external_inputs.end()){
 								for (const auto & res : to_this_itr->second){
@@ -2125,7 +2101,7 @@ namespace mo_yanxi::graphic{
 
 					assert(rentity != nullptr);
 
-					std::visit(narrow_overload{
+					std::visit(overload_narrow{
 						[&](const image_requirement& r, const image_entity& entity){
 
 							const auto& req = cur_req.get<image_requirement>();
@@ -2178,7 +2154,7 @@ namespace mo_yanxi::graphic{
 
 					assert(rentity != nullptr);
 
-					std::visit(narrow_overload{
+					std::visit(overload_narrow{
 						[&](const image_requirement& r, const image_entity& entity){
 							auto layout = cur_req.get<image_requirement>().get_expected_layout_on_output();
 							std::get<image_entity_state>(res_states[rentity].desc).current_layout = layout;
@@ -2195,7 +2171,7 @@ namespace mo_yanxi::graphic{
 
 					assert(rentity != nullptr);
 
-					std::visit(narrow_overload{
+					std::visit(overload_narrow{
 						[&](const image_requirement& r, const image_entity& entity){
 							auto layout = cur_req.get<image_requirement>().get_expected_layout_on_output();
 							std::get<image_entity_state>(res_states[rentity].desc).current_layout = layout;
@@ -2211,7 +2187,7 @@ namespace mo_yanxi::graphic{
 							if(res.slot != out_idx)continue;
 
 							std::visit(
-								narrow_overload{
+								overload_narrow{
 									[&](const image_requirement& r, const image_entity& entity){
 										VkImageLayout old_layout{};
 										VkPipelineStageFlags2 old_stage{VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT};

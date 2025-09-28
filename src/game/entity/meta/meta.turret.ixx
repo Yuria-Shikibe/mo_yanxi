@@ -1,7 +1,7 @@
 module;
 
 #include "../src/ext/adapted_attributes.hpp"
-#include <plf_hive.h>
+#include "plf_hive.h"
 
 export module mo_yanxi.game.meta.turret;
 

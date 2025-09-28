@@ -65,9 +65,9 @@ namespace mo_yanxi{
 
 	export
 	template<typename... Fs>
-	struct narrow_overload : private Fs... {
+	struct overload_narrow : private Fs... {
 		template <typename ...Args>
-		constexpr explicit(false) narrow_overload(Args&&... fs) : Fs{std::forward<Args>(fs)}... {}
+		constexpr explicit(false) overload_narrow(Args&&... fs) : Fs{std::forward<Args>(fs)}... {}
 
 		using Fs::operator()...;
 
@@ -80,7 +80,7 @@ namespace mo_yanxi{
 
 	export
 	template<typename... Fs>
-	narrow_overload(Fs&&...) -> narrow_overload<std::decay_t<Fs>...>;
+	overload_narrow(Fs&&...) -> overload_narrow<std::decay_t<Fs>...>;
 
 	export
 	template<typename Ret, typename... Fs>
@@ -154,13 +154,43 @@ namespace mo_yanxi{
 		}
 	}
 
+
+	CONST_FN FORCE_INLINE constexpr std::strong_ordering connect_three_way_result(const std::strong_ordering cur) noexcept{
+		return cur;
+	}
+
+	export
+	template <typename ...T>
+		requires (std::convertible_to<T, std::strong_ordering> && ...)
+	CONST_FN FORCE_INLINE constexpr std::strong_ordering connect_three_way_result(const std::strong_ordering cur, const T&... rst) noexcept{
+		if(std::is_eq(cur)){
+			return mo_yanxi::connect_three_way_result(rst...);
+		}else{
+			return cur;
+		}
+	}
+
+
+	export
+	template <typename T>
+		requires (std::integral<T> || std::is_enum_v<T>)
+	CONST_FN FORCE_INLINE constexpr std::strong_ordering compare_bitflags(const T lhs, const T rhs) noexcept{
+		if constexpr (std::is_scoped_enum_v<T>){
+			return mo_yanxi::compare_bitflags(std::to_underlying(lhs), std::to_underlying(rhs));
+		}else{
+			if(lhs == rhs)return std::strong_ordering::equal;
+			if((lhs & rhs) == rhs)return std::strong_ordering::greater;
+			return std::strong_ordering::less;
+		}
+	}
+
+
+
 	export
 	struct dereference{
 		template <std::indirectly_readable T>
 		constexpr decltype(auto) operator()(T&& val) const noexcept{
-			if constexpr (std::is_pointer_v<std::decay_t<T>>){
-				assert(val != nullptr);
-			}else if constexpr (std::equality_comparable_with<T, std::nullptr_t>){
+			if constexpr (std::equality_comparable_with<T, std::nullptr_t>){
 				assert(val != nullptr);
 			}
 

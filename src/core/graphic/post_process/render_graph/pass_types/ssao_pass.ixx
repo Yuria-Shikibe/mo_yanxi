@@ -1,13 +1,13 @@
 
-export module mo_yanxi.graphic.post_process_graph.ssao;
+export module mo_yanxi.graphic.render_graph.ssao;
 
-import std;
-export import mo_yanxi.graphic.post_process_graph.generic_post_process_pass;
+export import mo_yanxi.graphic.render_graph.post_process_pass;
 import mo_yanxi.vk.image_derives;
 import mo_yanxi.vk.ext;
 import mo_yanxi.math.vector2;
+import std;
 
-namespace mo_yanxi::graphic{
+namespace mo_yanxi::graphic::render_graph{
 
 	struct ssao_kernal_block {
 		struct unit{
@@ -68,13 +68,11 @@ namespace mo_yanxi::graphic{
 	struct ssao_pass : post_process_stage{
 		using post_process_stage::post_process_stage;
 
-		void reset_resources(vk::context& context, const pass_resource_reference* resources,
+		void reset_resources(vk::context& context, const pass_resource_reference& resources,
 			const math::u32size2 extent) override{
 			post_process_stage::reset_resources(context, resources, extent);
 
-			vk::buffer_mapper{ubo()}
-				.load(ssao_kernal_block{extent.as<math::isize2>()});
-				// .load(1, std::bit_cast<std::uint32_t>(&ssao_kernal_block::scale));
+			vk::buffer_mapper{ubo()}.load(ssao_kernal_block{extent.as<math::isize2>()});
 		}
 	};
 }

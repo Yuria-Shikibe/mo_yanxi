@@ -618,9 +618,7 @@ namespace mo_yanxi::graphic{
 	struct renderer_ui : renderer{
 	public:
 		ui_batch_proxy batch{};
-		vk::storage_image merge_result{};
 
-		bloom_post_processor bloom{};
 
 		[[nodiscard]] renderer_ui() = default;
 
@@ -628,140 +626,15 @@ namespace mo_yanxi::graphic{
 			vk::context& context,
 			renderer_export& export_target) :
 			renderer(context, export_target, "renderer.ui"),
-			batch(context),
-			merge_result{
-			context.get_allocator(), context.get_extent(), 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT
-			},
-
-			bloom{
-				context, std::bit_cast<math::usize2>(context.get_extent()),
-				assets::graphic::shaders::comp::bloom,
-				assets::graphic::samplers::blit_sampler,
-				6, 1.f
-			},
-			merge_descriptor_layout(context.get_device(), [](vk::descriptor_layout_builder& builder){
-				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
-				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
-				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
-				builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
-			}),
-
-			merge_descriptor_buffer{
-				context.get_allocator(), merge_descriptor_layout, merge_descriptor_layout.binding_count()
-			},
-			merge_pipeline_layout(context.get_device(), 0, {merge_descriptor_layout}),
-			merge_pipeline(
-				context.get_device(), merge_pipeline_layout,
-				VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
-				assets::graphic::shaders::comp::ui_merge.get_create_info()),
-			clean_command(context.get_compute_command_pool().obtain()){
-
-			bloom.set_strength(.8f, .8f);
-
-			init_layout(context.get_transient_compute_command_buffer());
-			create_clear_commands();
-			set_merger_state();
-			set_bloom_state();
-
-
-			set_export(batch.blit_base);
-			set_export(batch.blit_light, "light");
-			set_export(bloom.get_output(), "bloom");
+			batch(context){
 		}
 
 		void resize(const VkExtent2D extent){
 			batch.resize(extent);
-
-			merge_result.resize(extent);
-
-			{
-				const auto cmd = context().get_transient_compute_command_buffer();
-				bloom.resize(
-					cmd,
-					{extent.width, extent.height},
-					false);
-
-				init_layout(cmd);
-			}
-
-			create_clear_commands();
-			set_merger_state();
-			set_bloom_state();
-
-			set_export(batch.blit_base);
-			set_export(batch.blit_light, "light");
-			set_export(bloom.get_output(), "bloom");
-		}
-
-		void post_process() const{
-			vk::cmd::submit_command(
-				context().compute_queue(),
-				std::array{
-					bloom.get_main_command_buffer(),
-					// clean_command.get()
-				});
-		}
-
-		void clear(){
-			vk::cmd::submit_command(
-				context().compute_queue(),
-				std::array{
-					clean_command.get(),
-					// clean_command.get()
-				});
 		}
 
 		void set_time(float time_in_sec){
 			batch.frag_data.current.global_time = std::fmod(time_in_sec, 1 << 16);
-		}
-
-	private:
-		vk::descriptor_layout merge_descriptor_layout{};
-		vk::descriptor_buffer merge_descriptor_buffer{};
-		vk::pipeline_layout merge_pipeline_layout{};
-		vk::pipeline merge_pipeline{};
-		vk::command_buffer clean_command{};
-
-		void set_bloom_state(){
-			bloom.set_input({
-				graphic::post_process_socket{
-					.image = batch.blit_light.get_image(),
-					.view = batch.blit_light.get_image_view(),
-					.src_layout = VK_IMAGE_LAYOUT_GENERAL,
-					.queue_family_index = context().compute_family(),
-				}
-			});
-		}
-
-		void set_merger_state(){
-			vk::descriptor_mapper{merge_descriptor_buffer}
-				.set_storage_image(0, merge_result.get_image_view())
-				.set_storage_image(1, batch.blit_base.get_image_view())
-				.set_storage_image(2, batch.blit_light.get_image_view())
-				.set_storage_image(3, bloom.get_output().view);
-		}
-
-		void create_clear_commands(){
-			std::array attachments{&batch.blit_base, &batch.blit_light};
-
-			vk::scoped_recorder scoped_recorder{clean_command, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
-
-			for (const auto & attachment : attachments){
-				vk::cmd::clear_color(
-					scoped_recorder, attachment->get_image(), {},
-
-					vk::image::default_image_subrange,
-					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-					VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
-					VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-					VK_IMAGE_LAYOUT_GENERAL
-				);
-			}
-		}
-
-		void init_layout(VkCommandBuffer compute_command_buffer) const{
-			merge_result.init_layout_general(compute_command_buffer);
 		}
 
 	public:

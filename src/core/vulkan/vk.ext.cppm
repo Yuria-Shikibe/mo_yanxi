@@ -9,10 +9,11 @@ import std;
 namespace mo_yanxi::vk{
 	export std::add_pointer_t<decltype(vkGetPhysicalDeviceProperties2KHR)> getPhysicalDeviceProperties2KHR = nullptr;
 	export std::add_pointer_t<decltype(vkGetDescriptorSetLayoutSizeEXT)> getDescriptorSetLayoutSizeEXT = nullptr;
-	export std::add_pointer_t<decltype(vkGetDescriptorSetLayoutBindingOffsetEXT)> getDescriptorSetLayoutBindingOffsetEXT
-		= nullptr;
-	export std::add_pointer_t<decltype(vkGetDescriptorEXT)> getDescriptorEXT_ = nullptr;
+	export std::add_pointer_t<decltype(vkGetDescriptorSetLayoutBindingOffsetEXT)> getDescriptorSetLayoutBindingOffsetEXT = nullptr;
+	std::add_pointer_t<decltype(vkGetDescriptorEXT)> getDescriptorEXT_ = nullptr;
 	export std::add_pointer_t<decltype(vkCmdDrawMeshTasksEXT)> drawMeshTasksEXT = nullptr;
+
+	std::add_pointer_t<decltype(vkGetDeviceFaultInfoEXT)> vkGetDeviceFaultInfoEXT = nullptr;
 
 	std::add_pointer_t<decltype(vkCmdBindDescriptorBuffersEXT)> PFN_cmdBindDescriptorBuffersEXT = nullptr;
 	std::add_pointer_t<decltype(vkCmdSetDescriptorBufferOffsetsEXT)> PFN_cmdSetDescriptorBufferOffsetsEXT = nullptr;
@@ -25,6 +26,30 @@ namespace mo_yanxi::vk{
 		assert(pDescriptorInfo != nullptr);
 		assert(pDescriptor != nullptr);
 		getDescriptorEXT_(device, pDescriptorInfo, dataSize, pDescriptor);
+	}
+
+	export void getDeviceFaultInfo(
+		VkDevice                                    device){
+		VkDeviceFaultCountsEXT faultCounts{
+			.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT,
+			.pNext = nullptr,
+		};
+		VkResult result = vkGetDeviceFaultInfoEXT(device, &faultCounts, nullptr);
+		if (result == VK_SUCCESS || result == VK_INCOMPLETE) {
+			std::cout << "Device fault count: " << faultCounts.vendorInfoCount << std::endl;
+		}
+
+		std::vector<VkDeviceFaultAddressInfoEXT> addressInfos(faultCounts.addressInfoCount);
+		std::vector<VkDeviceFaultVendorInfoEXT> vendorInfos(faultCounts.vendorInfoCount);
+
+		VkDeviceFaultInfoEXT faultInfo{
+			.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_INFO_EXT,
+			.pAddressInfos = addressInfos.data(),
+			.pVendorInfos = vendorInfos.data(),
+		};
+
+		vkGetDeviceFaultInfoEXT(device, &faultCounts, &faultInfo);
+		std::println(std::cerr, "[VULKAN] DEVICE FAULT: {}", faultInfo.description);
 	}
 
 	namespace cmd{
@@ -179,6 +204,11 @@ namespace mo_yanxi::vk{
 		drawMeshTasksEXT = LoadFuncPtr(instance, vkCmdDrawMeshTasksEXT);
 		PFN_cmdBindDescriptorBuffersEXT = LoadFuncPtr(instance, vkCmdBindDescriptorBuffersEXT);
 		PFN_cmdSetDescriptorBufferOffsetsEXT = LoadFuncPtr(instance, vkCmdSetDescriptorBufferOffsetsEXT);
+
+
+		vkGetDeviceFaultInfoEXT = LoadFuncPtr(instance, vkGetDeviceFaultInfoEXT);
+
+
 	}
 }
 

@@ -1,6 +1,7 @@
 module;
 
-#include <plf_hive.h>
+#include "plf_hive.h"
+#include <cassert>
 
 export module mo_yanxi.game.ui.grid_editor:sub_panels;
 

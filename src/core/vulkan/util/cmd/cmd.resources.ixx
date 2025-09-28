@@ -192,6 +192,27 @@ namespace mo_yanxi::vk::cmd{
 					.pImageMemoryBarriers = image_memory_barriers.empty() ? nullptr : image_memory_barriers.data()
 				};
 		}
+		//
+		// void merge(){
+		// 	auto itr = image_memory_barriers.begin();
+		// 	auto end = image_memory_barriers.end();
+		//
+		// 	while(itr != end){
+		// 		auto next = std::ranges::next(itr);
+		// 		while(next != end){
+		// 			if(next->image != itr->image)continue;
+		// 			assert(next->newLayout == itr->newLayout);
+		// 			assert(next->oldLayout == itr->oldLayout);
+		//
+		//
+		// 			itr->srcStageMask |= next->srcStageMask;
+		// 			itr->srcAccessMask |= next->srcAccessMask;
+		//
+		// 			itr->dstStageMask |= next->dstStageMask;
+		// 			itr->dstAccessMask |= next->dstAccessMask;
+		// 		}
+		// 	}
+		// }
 
 		void apply(VkCommandBuffer command_buffer, bool reserve = false) noexcept{
 			const auto d = create();
