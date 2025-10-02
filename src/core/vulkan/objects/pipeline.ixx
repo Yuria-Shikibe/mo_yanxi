@@ -136,6 +136,7 @@ namespace mo_yanxi::vk{
 			multisampleState.rasterizationSamples = bits;
 			multisampleState.sampleShadingEnable = perPixel;
 			multisampleState.minSampleShading = minShading;
+			// multisampleState.alphaToCoverageEnable = true;
 			return *this;
 		}
 

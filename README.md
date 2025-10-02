@@ -1,6 +1,6 @@
 # TODO List
 
-* [ ] Render Graph / Render Resource Reuse
+* [x] Render Graph / Render Resource Reuse
 --- 
 * [X] 字体渲染 (Partial) (是否引入ICU?)
 * [ ] 带引用计数的各项资产管理 (Partial Done)

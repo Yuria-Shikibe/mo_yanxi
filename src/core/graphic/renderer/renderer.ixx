@@ -23,33 +23,11 @@ namespace mo_yanxi::graphic{
 	}
 
 	export
-	struct renderer_export{
-
-		string_open_addr_hash_map<vk::image_handle> results{};
-
-		[[nodiscard]] vk::image_handle find(std::string_view name) const noexcept{
-			if(auto rst = results.try_find(name)){
-				return *rst;
-			}
-			return {};
-		}
-	};
-
-	export
 	struct renderer{
 	protected:
-		renderer_export* export_{};
 		std::string name{};
 
 		math::irect region{};
-
-		void set_export(vk::image_handle handle) const{
-			export_->results.insert_or_assign(name, handle);
-		}
-
-		void set_export(vk::image_handle handle, std::string_view suffix) const{
-			export_->results.insert_or_assign(std::format("{}.{}", name, suffix), handle);
-		}
 
 	public:
 
@@ -57,10 +35,8 @@ namespace mo_yanxi::graphic{
 
 		[[nodiscard]] explicit renderer(
 			vk::context& context,
-			renderer_export& export_target,
 			const std::string_view name
-		)
-			: export_(&export_target), name(name){
+		) : name(name){
 		}
 
 		template <std::derived_from<renderer> T>

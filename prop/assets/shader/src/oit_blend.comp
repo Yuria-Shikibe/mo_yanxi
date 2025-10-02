@@ -38,7 +38,7 @@ layout(set = 0, binding = 0, std430) restrict buffer oit_list_s{
 } oit_list;
 
 layout (set = 0, binding = 1, r32ui) restrict uniform readonly uimage2D oit_head_indices;
-layout (set = 0, binding = 2) uniform sampler2D input_depth;
+layout (set = 0, binding = 2, r32f) restrict uniform readonly image2D input_depth;
 
 layout (set = 0, binding = 3, rgba32f) restrict uniform readonly image2D input_color_base;
 layout (set = 0, binding = 4, rgba32f) restrict uniform readonly image2D input_color_light;
@@ -62,8 +62,12 @@ const uint INVALID_IDX = ~0u;
 void main() {
     const ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
 
-    float src_depth = texelFetch(input_depth, pos, 0).r;
-    vec4 src_color_base = imageLoad(input_color_base, pos);
+    float src_depth = imageLoad(input_depth, pos).r;
+
+
+    vec4 color_base_raw = imageLoad(input_color_base, pos);
+    vec4 src_color_base = vec4(mix(vec3(0), color_base_raw.rgb, color_base_raw.a), 1.f);
+
     vec4 src_color_light = imageLoad(input_color_light, pos);
     uint node_idx = imageLoad(oit_head_indices, pos).r;
 

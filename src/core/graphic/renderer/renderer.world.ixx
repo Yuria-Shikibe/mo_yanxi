@@ -19,24 +19,26 @@ import mo_yanxi.graphic.post_processor.oit_blender;
 import std;
 
 namespace mo_yanxi::graphic{
-	// static constexpr std::uint32_t MultiSampleTimes = 0;
-	// static constexpr VkSampleCountFlagBits SampleCount = []{
-	// 	switch(MultiSampleTimes){
-	// 		case 0: return VK_SAMPLE_COUNT_1_BIT;
-	// 		case 1: return VK_SAMPLE_COUNT_2_BIT;
-	// 		case 2: return VK_SAMPLE_COUNT_4_BIT;
-	// 		case 3: return VK_SAMPLE_COUNT_8_BIT;
-	// 		case 4: return VK_SAMPLE_COUNT_16_BIT;
-	// 		case 5: return VK_SAMPLE_COUNT_32_BIT;
-	// 		case 6: return VK_SAMPLE_COUNT_64_BIT;
-	// 		default: return VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM;
-	// 	}
-	// }();
+	constexpr inline std::uint32_t MultiSampleTimes = 2;
+	constexpr inline VkSampleCountFlagBits SampleCount = []{
+		switch(MultiSampleTimes){
+			case 0: return VK_SAMPLE_COUNT_1_BIT;
+			case 1: return VK_SAMPLE_COUNT_2_BIT;
+			case 2: return VK_SAMPLE_COUNT_4_BIT;
+			case 3: return VK_SAMPLE_COUNT_8_BIT;
+			case 4: return VK_SAMPLE_COUNT_16_BIT;
+			case 5: return VK_SAMPLE_COUNT_32_BIT;
+			case 6: return VK_SAMPLE_COUNT_64_BIT;
+			default: return VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM;
+		}
+	}();
 
 
 	struct world_vertex_uniform{
 		vk::padded_mat3 view{math::mat3_idt};
 		vk::padded_mat3 proj{math::mat3_idt};
+
+		constexpr friend bool operator==(const world_vertex_uniform& lhs, const world_vertex_uniform& rhs) noexcept = default;
 	};
 
 	struct world_fragment_uniform{
@@ -71,7 +73,8 @@ namespace mo_yanxi::graphic{
 			);
 			pipeline_template.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::overwrite);
 			pipeline_template.push_color_attachment_format(VK_FORMAT_R16G16B16A16_SFLOAT, vk::blending::overwrite);
-			// if(MultiSampleTimes > 0)pipeline_template.set_multisample(SampleCount, 1.f, true);
+			if(MultiSampleTimes > 0)pipeline_template.set_multisample(SampleCount, 1.f, true);
+
 			pipeline_template.set_depth_format(VK_FORMAT_D32_SFLOAT);
 			pipeline_template.set_depth_state(true, enable_depth_write);
 
@@ -105,12 +108,12 @@ namespace mo_yanxi::graphic{
 		static constexpr std::size_t size = 3;
 	private:
 		static constexpr VkImageUsageFlags get_usage(VkSampleCountFlagBits samples){
-			auto usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-			// if(samples == VK_SAMPLE_COUNT_1_BIT){
+			auto usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+			if(samples == VK_SAMPLE_COUNT_1_BIT){
 				return usage | VK_IMAGE_USAGE_STORAGE_BIT;
-			// }else{
-			// 	return usage;
-			// }
+			}else{
+				return usage;
+			}
 		}
 
 	public:
@@ -185,10 +188,13 @@ namespace mo_yanxi::graphic{
 		friend renderer_world;
 
 		world_batch_attachments draw_attachments{};
+		world_batch_attachments draw_resolved_attachments{};
 		world_batch_attachments mid_attachments{};
 
 		vk::image depth{};
-		vk::image_view depth_view_d32f{};
+		vk::image_view depth_view{};
+		vk::image depth_resolved{};
+		vk::image_view depth_resolved_view{};
 
 		vk::storage_buffer oit_buffer{};
 		vk::storage_image oit_image_head{};
@@ -216,7 +222,8 @@ namespace mo_yanxi::graphic{
 					context, assets::graphic::buffers::indices_buffer, assets::graphic::samplers::texture_sampler, 4,
 					sizeof(vk::vertices::vertex_world), 2048
 				}),
-			draw_attachments{context, VK_SAMPLE_COUNT_1_BIT},
+			draw_attachments{context, SampleCount},
+			draw_resolved_attachments{context, VK_SAMPLE_COUNT_1_BIT},
 			mid_attachments{context, VK_SAMPLE_COUNT_1_BIT},
 
 			oit_buffer{context.get_allocator(), get_oit_buffer_size(context.get_extent()),
@@ -257,10 +264,11 @@ namespace mo_yanxi::graphic{
 		}
 
 		void resize(const VkExtent2D extent){
-			oit_buffer.resize(get_oit_buffer_size(extent));
-			oit_image_head.resize(extent);
-			mid_attachments.resize(extent);
 			draw_attachments.resize(extent);
+			draw_resolved_attachments.resize(extent);
+			mid_attachments.resize(extent);
+			oit_image_head.resize(extent);
+			oit_buffer.resize(get_oit_buffer_size(extent));
 			on_resize(extent);
 		}
 
@@ -296,14 +304,12 @@ namespace mo_yanxi::graphic{
 		void on_resize(const VkExtent2D extent){
 			region.extent = extent;
 
-
 			for(std::size_t i = 0; i < batch.get_chunk_count(); ++i){
 				(void)vk::descriptor_mapper{descriptor_buffer}
 					.set_storage_buffer(2, oit_buffer.get_address(), sizeof(oit_statistic), i)
 					.set_storage_buffer(3, oit_buffer.get_address() + sizeof(oit_statistic), oit_buffer.get_size() - sizeof(oit_statistic), i)
 					.set_storage_image(4, oit_image_head.get_image_view(), VK_IMAGE_LAYOUT_GENERAL, i);
 			}
-
 
 			create_attachments(extent);
 
@@ -319,9 +325,41 @@ namespace mo_yanxi::graphic{
 
 		void update_layer_commands(batch_layer& batch_layer){
 			vk::dynamic_rendering dynamic_rendering{
-					{draw_attachments.color_base.get_image_view(), draw_attachments.color_light.get_image_view()},
-				depth_view_d32f
+					// {draw_attachments.color_base.get_image_view(), draw_attachments.color_light.get_image_view()},
+				// depth_view_d32f
 				};
+
+
+
+			dynamic_rendering.set_depth_attachment(
+				depth_view,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VK_ATTACHMENT_LOAD_OP_LOAD,
+				VK_ATTACHMENT_STORE_OP_STORE,
+				depth_resolved_view,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VK_RESOLVE_MODE_MAX_BIT
+			);
+
+			dynamic_rendering.push_color_attachment(
+				draw_attachments.color_base.get_image_view(),
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_ATTACHMENT_LOAD_OP_LOAD,
+				VK_ATTACHMENT_STORE_OP_STORE,
+				draw_resolved_attachments.color_base.get_image_view(),
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_RESOLVE_MODE_AVERAGE_BIT
+			);
+
+			dynamic_rendering.push_color_attachment(
+				draw_attachments.color_light.get_image_view(),
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_ATTACHMENT_LOAD_OP_LOAD,
+				VK_ATTACHMENT_STORE_OP_STORE,
+				draw_resolved_attachments.color_light.get_image_view(),
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_RESOLVE_MODE_AVERAGE_BIT
+			);
 
 			const auto h = batch_layer.create_command(dynamic_rendering, batch, region);
 			for(std::size_t i = 0; i < batch.get_chunk_count(); ++i){
@@ -342,11 +380,22 @@ namespace mo_yanxi::graphic{
 		void init_image_layout(VkCommandBuffer graphic_command_buffer, VkCommandBuffer compute_command_buffer){
 			mid_attachments.init_layout(compute_command_buffer, VK_IMAGE_LAYOUT_GENERAL);
 			draw_attachments.init_layout(graphic_command_buffer);
-
+			draw_resolved_attachments.init_layout(graphic_command_buffer);
 			oit_image_head.init_layout_general(graphic_command_buffer);
 
 			vk::cmd::memory_barrier(
 				graphic_command_buffer, depth,
+				VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+				VK_ACCESS_2_NONE,
+				VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
+				VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				VK_IMAGE_LAYOUT_UNDEFINED,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				vk::image::depth_image_subrange
+			);
+
+			vk::cmd::memory_barrier(
+				graphic_command_buffer, depth_resolved,
 				VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
 				VK_ACCESS_2_NONE,
 				VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
@@ -366,17 +415,16 @@ namespace mo_yanxi::graphic{
 						.extent = {extent.width, extent.height, 1},
 						.mipLevels = 1,
 						.arrayLayers = 1,
-						.samples = VK_SAMPLE_COUNT_1_BIT,
+						.samples = SampleCount,
 						.tiling = VK_IMAGE_TILING_OPTIMAL,
-						.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-						VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+						.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 					},
 					VmaAllocationCreateInfo{
 						.usage = VMA_MEMORY_USAGE_GPU_ONLY
 					}
 				};
 
-			depth_view_d32f = {
+			depth_view = {
 					context().get_device(), VkImageViewCreateInfo{
 						.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 						.image = depth,
@@ -386,47 +434,43 @@ namespace mo_yanxi::graphic{
 						.subresourceRange = vk::image::depth_image_subrange
 					}
 				};
+
+			depth_resolved = {
+					context().get_allocator(), VkImageCreateInfo{
+						.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+						.imageType = VK_IMAGE_TYPE_2D,
+						.format = VK_FORMAT_D32_SFLOAT,
+						.extent = {extent.width, extent.height, 1},
+						.mipLevels = 1,
+						.arrayLayers = 1,
+						.samples = VK_SAMPLE_COUNT_1_BIT,
+						.tiling = VK_IMAGE_TILING_OPTIMAL,
+						.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+					},
+					VmaAllocationCreateInfo{
+						.usage = VMA_MEMORY_USAGE_GPU_ONLY
+					}
+				};
+
+			depth_resolved_view = {
+					context().get_device(), VkImageViewCreateInfo{
+						.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+						.image = depth_resolved,
+						.viewType = VK_IMAGE_VIEW_TYPE_2D,
+						.format = VK_FORMAT_D32_SFLOAT,
+						.components = {},
+						.subresourceRange = vk::image::depth_image_subrange
+					}
+				};
 		}
 
 		VkCommandBuffer submit(std::size_t index){
-
-			frag_data.update<true>(index);
-			vert_data.update<true>(index);
+			frag_data.update<false>(index);
+			vert_data.update<false>(index);
 
 			return main_layer.submit(context(), index);
 		}
 
-		void append_clean_command(VkCommandBuffer scoped_recorder) const{
-			vk::cmd::clear_color(
-					scoped_recorder, mid_attachments.color_base.get_image(), {},
-					vk::image::default_image_subrange,
-					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-					VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-					VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-					VK_IMAGE_LAYOUT_GENERAL
-				);
-
-			vk::cmd::clear_color(
-				scoped_recorder, mid_attachments.color_light.get_image(), {},
-				 vk::image::default_image_subrange,
-				 VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				 VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				 VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-				 VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-				 VK_IMAGE_LAYOUT_GENERAL
-			);
-
-			vk::cmd::clear_depth_stencil(
-				scoped_recorder, depth, {1}, vk::image::depth_image_subrange,
-				VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-				VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
-				VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-				VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-			);
-
-		}
 	};
 
 	struct renderer_world : renderer{
@@ -437,12 +481,10 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] renderer_world() = default;
 
 		[[nodiscard]] renderer_world(
-			vk::context& context,
-			renderer_export& export_target) :
-			renderer(context, export_target, "renderer.world"),
+			vk::context& context) :
+			renderer(context, "renderer.world"),
 			batch(context){
 
-			//bloom.set_strength(1.05f, 0.95f);
 			camera.resize_screen(context.get_extent().width, context.get_extent().height);
 		}
 

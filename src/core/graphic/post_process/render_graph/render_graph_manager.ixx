@@ -493,6 +493,15 @@ namespace mo_yanxi::graphic::render_graph{
 			return *explicit_resources.insert(std::move(res));
 		}
 
+		void init_after_pass_initialized(){
+			auto_create_buffer();
+			sort();
+			check_sockets_connection();
+			analysis_minimal_allocation();
+			post_init();
+		}
+
+	private:
 		void sort(){
 			if(passes_.empty()){
 				throw std::runtime_error("No outputs found");
@@ -618,7 +627,6 @@ namespace mo_yanxi::graphic::render_graph{
 			}
 		}
 
-	public:
 		void analysis_minimal_allocation(){
 			life_bounds_ = life_trace_group{execute_sequence_ | std::views::reverse | ranges::views::deref};
 
@@ -661,6 +669,25 @@ namespace mo_yanxi::graphic::render_graph{
 				});
 			};
 
+			auto get_maximum_region = [&, this](const std::vector<pass_identity>& seq){
+				using Itr = decltype(execute_sequence_)::iterator;
+				Itr max = execute_sequence_.begin();
+				Itr min = execute_sequence_.end();
+
+				for (const auto & p : seq){
+					if(!p.where)continue;
+
+					auto itr = std::ranges::find(execute_sequence_, p.where);
+					max = std::ranges::max(max, itr);
+					min = std::ranges::min(min, itr);
+				}
+
+				// auto d1 = min - execute_sequence_.begin();
+				// auto d2 = max - execute_sequence_.begin();
+
+				return std::span{min, std::ranges::next(max)};
+			};
+
 
 			{
 				for (auto&& [idx, image] : life_bounds | std::views::enumerate){
@@ -686,17 +713,18 @@ namespace mo_yanxi::graphic::render_graph{
 					std::ranges::sort(partition_itr->indices, [&](unsigned l, unsigned r){
 						return comp(partition_itr->requirements[l], partition_itr->requirements[r]);
 					});
+
+					const auto subrange = get_maximum_region(bound.passed_by);
 					for (auto& candidate : partition_itr->indices){
-						if(std::ranges::any_of(bound.passed_by, [&](const pass_identity& passed_by){
-							return passed_by.where != nullptr && partition_itr->stage_captures.at(passed_by.where)[candidate];
+						if(std::ranges::any_of(subrange, [&](const pass_data* passed_by){
+							return partition_itr->stage_captures.at(passed_by)[candidate];
 						})){
 							continue;
 						}
 
 						if(comp(bound.requirement, partition_itr->requirements[candidate])){
-							for (const auto & passed_by : bound.passed_by){
-								if(passed_by.where == nullptr)continue;
-								partition_itr->stage_captures.at(passed_by.where)[candidate] = true;
+							for (auto passed_by : subrange){
+								partition_itr->stage_captures.at(passed_by)[candidate] = true;
 							}
 							assignment = candidate;
 
@@ -706,15 +734,14 @@ namespace mo_yanxi::graphic::render_graph{
 
 					//No currently compatibled, promote the minimal found one to fit
 					for (unsigned candidate : partition_itr->indices | std::views::reverse){
-						if(std::ranges::any_of(bound.passed_by, [&](const pass_identity& passed_by){
-							return passed_by.where != nullptr && partition_itr->stage_captures.at(passed_by.where)[candidate];
+						if(std::ranges::any_of(subrange, [&](const pass_data* passed_by){
+							return partition_itr->stage_captures.at(passed_by)[candidate];
 						})){
 							continue;
 						}
 
-						for (const auto & passed_by : bound.passed_by){
-							if(passed_by.where == nullptr)continue;
-							partition_itr->stage_captures.at(passed_by.where)[candidate] = true;
+						for (auto passed_by : subrange){
+							partition_itr->stage_captures.at(passed_by)[candidate] = true;
 						}
 
 						assignment = candidate;
@@ -724,6 +751,9 @@ namespace mo_yanxi::graphic::render_graph{
 					}
 
 					assignment = partition_itr->add(bound.requirement);
+					for (auto passed_by : subrange){
+						partition_itr->stage_captures.at(passed_by)[assignment] = true;
+					}
 
 					skip:
 					(void)0;
@@ -830,40 +860,24 @@ namespace mo_yanxi::graphic::render_graph{
 
 				(void)0;
 			}
+
+#if DEBUG_CHECK
+			for (const auto & data : passes_){
+				auto& s = data.sockets();
+				auto inouts = s.get_inout_indices();
+				for (const auto & [idx, in_data_idx] : data.sockets().get_valid_in()){
+					if(std::ranges::contains(inouts, static_cast<inout_index>(idx), &slot_pair::in))continue;
+
+					for (const auto & [out_idx, out_data_idx] : data.sockets().get_valid_out()){
+						if(std::ranges::contains(inouts, static_cast<inout_index>(out_idx), &slot_pair::out))continue;
+
+						assert(&data.used_resources_.at_in(idx) != &data.used_resources_.at_out(out_idx));
+					}
+				}
+			}
+#endif
+
 		}
-
-		/*void print_resource_reference() const {
-			std::println();
-			std::println("Resource Requirements: {}", shared_resources.size());
-
-			std::map<const resource_desc::resource_entity*, std::vector<post_graph::pass_identity>> inouts{};
-			for (const auto & [pass, ref] : resource_ref){
-				for (const auto & [idx, res] : ref.inputs | std::views::enumerate){
-					if(res){
-						inouts[res].push_back(post_graph::pass_identity{pass, nullptr, static_cast<inout_index>(idx)});
-					}
-				}
-				for (const auto & [idx, res] : ref.outputs | std::views::enumerate){
-					if(res){
-						auto& vec = inouts[res];
-						if(auto itr = std::ranges::find(vec, pass, &post_graph::pass_identity::where); itr != vec.end()){
-							itr->slot_out = idx;
-						}else{
-							vec.push_back(post_graph::pass_identity{pass, nullptr, no_slot, static_cast<inout_index>(idx)});
-						}
-
-					}
-				}
-			}
-
-			for (const auto & [res, user] : inouts){
-				std::println("Res[{:0>2}]<{}>: ", res - shared_resources.data(), res->overall_req.type_name());
-				std::println("{:n:}", user | std::views::transform([](const post_graph::pass_identity& value){
-					return value.format("None");
-				}));
-				std::println();
-			}
-		}*/
 
 		void auto_create_buffer(){
 			for (auto & stage : passes_){
@@ -873,11 +887,15 @@ namespace mo_yanxi::graphic::render_graph{
 			}
 		}
 
-
 		void post_init(){
 			for (auto & stage : passes_){
 				stage.meta->post_init(*context_, extent_);
 			}
+		}
+
+	public:
+		auto get_exec_seq() const noexcept{
+			return execute_sequence_ | ranges::views::deref;
 		}
 
 		void update_external_resources() noexcept{
@@ -935,16 +953,16 @@ namespace mo_yanxi::graphic::render_graph{
 		}
 
 		void resize(math::u32size2 size){
-			// if(extent_ != size){
-			//TODO no force reallocat on reopen the window after minimizing causes device lost
+			if(extent_ != size){
 				extent_ = size;
 				allocate();
-			// }
+			}
 		}
 
 		void resize(VkExtent2D size){
 			resize(std::bit_cast<math::u32size2>(size));
 		}
+
 		void resize(){
 			resize(context_->get_extent());
 		}
@@ -957,18 +975,19 @@ namespace mo_yanxi::graphic::render_graph{
 			for (auto & local_resource : exclusive_resources){
 				local_resource.allocate_image(context_->get_allocator(), std::bit_cast<VkExtent2D>(extent_));
 			}
+		}
 
+		void reset_resources(){
 			for (const auto & stage : passes_){
 				stage.meta->reset_resources(*context_, stage.used_resources_, extent_);
 			}
 		}
 
-		void create_command(){
+		void create_command(VkCommandBuffer buffer){
 			using namespace resource_desc;
 			std::unordered_map<const resource_entity*, entity_state> res_states{};
 			std::unordered_map<const resource_entity*, bool> already_modified_mark{};
 
-			vk::scoped_recorder scoped_recorder{main_command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
 			vk::cmd::dependency_gen dependency_gen{};
 
@@ -1108,9 +1127,9 @@ namespace mo_yanxi::graphic::render_graph{
 						}
 					}, rentity.overall_req.desc, rentity.resource);
 				}
-				if(!dependency_gen.empty())dependency_gen.apply(scoped_recorder);
+				if(!dependency_gen.empty())dependency_gen.apply(buffer);
 
-				stage.meta->record_command(*context_, ref, extent_, scoped_recorder);
+				stage.meta->record_command(*context_, ref, extent_, buffer);
 
 				//restore output final format, transition if any should be done within the pass
 				for (const auto& [out_idx, data_idx] : inout.get_valid_in()){
@@ -1194,13 +1213,31 @@ namespace mo_yanxi::graphic::render_graph{
 				}
 			}
 
-			if(!dependency_gen.empty())dependency_gen.apply(scoped_recorder);
+			if(!dependency_gen.empty())dependency_gen.apply(buffer);
+		}
+
+		void create_command(){
+			vk::scoped_recorder scoped_recorder{main_command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
+			create_command(scoped_recorder);
 		}
 
 		VkCommandBuffer get_main_command_buffer() const noexcept{
 			return main_command_buffer;
 		}
+	};
 
+	struct nested_render_graph : render_graph_manager, pass_meta{
+		using render_graph_manager::render_graph_manager;
+
+	protected:
+		[[nodiscard]] const pass_inout_connection& sockets() const noexcept override;
+		void post_init(vk::context& context, const math::u32size2 extent) override;
+		void record_command(vk::context& context, const pass_resource_reference& resources, math::u32size2 extent,
+			VkCommandBuffer buffer) override;
+		void reset_resources(vk::context& context, const pass_resource_reference& resources,
+			const math::u32size2 extent) override;
+		[[nodiscard]] std::span<const inout_index> get_required_internal_buffer_slots() const noexcept override;
+		[[nodiscard]] std::string_view get_name() const noexcept override;
 	};
 }
 

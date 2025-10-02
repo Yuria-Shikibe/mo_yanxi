@@ -92,20 +92,21 @@ namespace mo_yanxi::graphic::render_graph{
 			bool no_read = complier.get_decoration(resource.id, spv::DecorationNonReadable);
 			bool no_write = complier.get_decoration(resource.id, spv::DecorationNonWritable);
 
-			if(type.image.sampled != 1){
-				if(!no_read && !no_write){
-					decr = decoration::read | decoration::write;
-				} else if(no_read){
-					decr = decoration::write;
-				} else{
-					decr = decoration::read;
-				}
+			// if(type.image.sampled == 1){
+			// 	(void)0;
+			// }
+
+			if(!no_read && !no_write){
+				decr = decoration::read | decoration::write;
+			} else if(no_read){
+				decr = decoration::write;
 			} else{
-				decr = decoration::sampled;
+				decr = decoration::read;
 			}
 
 			return image_requirement{
 				.decr = decr,
+				.sample_count = type.image.sampled == 1,
 				// .format = convertImageFormatToVkFormat(type.image.format),
 				.dim = static_cast<unsigned>(type.image.dim == spv::Dim1D
 												 ? 1

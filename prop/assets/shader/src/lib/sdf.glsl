@@ -7,11 +7,14 @@ float median(vec3 v) {
 }
 
 float msdf(sampler2D samp, vec2 uv, float scale) {
-    vec2 msdfUnit = 1. / vec2(textureSize(samp, 0)) * scale;
-    vec3 col = texture(samp, uv).rgb;
+    vec2 fw = fwidth(uv);
+    float lod = min(fw.x, fw.y);
+
+    vec2 msdfUnit = 1. / vec2(textureSize(samp, int(lod))) * scale;
+    vec3 col = textureLod(samp, uv, lod).rgb;
     float sigDist = median(col) - 0.5;
 
-    /**if(uniformed)*/sigDist *= dot(msdfUnit, 0.7 / fwidth(uv));
+    /**if(uniformed)*/sigDist *= dot(msdfUnit, 0.7 / fw);
 
     return sigDist;
 }

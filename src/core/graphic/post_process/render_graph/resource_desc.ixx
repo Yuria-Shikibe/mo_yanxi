@@ -62,10 +62,12 @@ namespace mo_yanxi::graphic::render_graph{
 			}
 		}
 
+
+
 		export
 		enum struct decoration{
 			unknown,
-			sampled = 1,
+			// sampled = 1,
 			read = 1 << 1,
 			write = 1 << 2,
 		};
@@ -119,6 +121,8 @@ namespace mo_yanxi::graphic::render_graph{
 		struct image_requirement{
 			THOROUGH TRANSIENT decoration decr{};
 
+			THOROUGH std::uint32_t sample_count{};
+
 			THOROUGH VkFormat format{VK_FORMAT_UNDEFINED};
 
 			THOROUGH VkImageUsageFlags usage{/*No Spec*/};
@@ -141,7 +145,7 @@ namespace mo_yanxi::graphic::render_graph{
 
 			[[nodiscard]] VkImageUsageFlags get_required_usage() const noexcept{
 				VkImageUsageFlags rst{};
-				if(decr == decoration::sampled){
+				if(sample_count){
 					rst |= VK_IMAGE_USAGE_SAMPLED_BIT;
 				} else{
 					rst |= VK_IMAGE_USAGE_STORAGE_BIT;
@@ -157,6 +161,7 @@ namespace mo_yanxi::graphic::render_graph{
 			void promote(const image_requirement& other) noexcept{
 				dim = std::max(dim, other.dim);
 
+				sample_count = std::max(sample_count, other.sample_count);
 				decr |= other.decr;
 
 				mip_levels = get_optional_max(mip_levels, other.mip_levels, no_req_spec);
@@ -170,12 +175,12 @@ namespace mo_yanxi::graphic::render_graph{
 			}
 
 			[[nodiscard]] bool is_sampled_image() const noexcept{
-				return decr == decoration::sampled;
+				return sample_count > 0 ;
 			}
 
 			[[nodiscard]] VkImageLayout get_expected_layout() const noexcept{
 				if(override_layout)return override_layout;
-				return decr == decoration::sampled
+				return is_sampled_image()
 						   ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 						   : VK_IMAGE_LAYOUT_GENERAL;
 			}
@@ -197,8 +202,9 @@ namespace mo_yanxi::graphic::render_graph{
 					}
 
 
-				default : switch(decr){
-					case decoration::sampled : return VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+				default :
+					if(is_sampled_image())return VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+					switch(decr){
 					case decoration::read : return VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
 					case decoration::write : return VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
 					case decoration::read | decoration::write : return VK_ACCESS_2_SHADER_STORAGE_READ_BIT |

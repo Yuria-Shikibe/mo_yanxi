@@ -90,6 +90,7 @@ namespace mo_yanxi::vk{
 	private:
 		std::uint32_t mipLevel{};
 		std::uint32_t layers{};
+		VkFormat format_{};
 
 		// image image;
 		// image_view image_view;
@@ -99,17 +100,18 @@ namespace mo_yanxi::vk{
 		[[nodiscard]] texture(
 			allocator& allocator,
 			const VkExtent2D extent,
+			const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM,
 			const std::uint32_t layers = 1) :
 			combined_image({
 				               allocator,
 				               {extent.width, extent.height, 1},
 				               VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				               VK_FORMAT_R8G8B8A8_UNORM,
+				               format,
 				               get_recommended_mip_level(extent, 5), layers, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TYPE_2D
 			               }, {
 					               .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 					               .viewType = layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D,
-					               .format = VK_FORMAT_R8G8B8A8_UNORM,
+					               .format = format,
 					               .components = {},
 					               .subresourceRange = VkImageSubresourceRange{
 						               .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -120,7 +122,9 @@ namespace mo_yanxi::vk{
 					               }
 				               }),
 			mipLevel(get_recommended_mip_level(extent, 5)),
-			layers(layers){
+			layers(layers),
+			format_(format)
+		{
 		}
 
 		[[nodiscard]] std::uint32_t get_mip_level() const noexcept{

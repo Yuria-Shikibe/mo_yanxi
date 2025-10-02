@@ -51,6 +51,10 @@ void mo_yanxi::assets::graphic::load(vk::context& context){
 	shaders::comp::oit_blend = {context.get_device(), dir::shader_spv / "oit_blend.comp.spv"};
 	shaders::comp::anti_aliasing = {context.get_device(), dir::shader_spv / "nfaa.comp.spv"};
 
+	shaders::comp::smaa::edge_detection = {context.get_device(), dir::shader_spv / "smaa.edge_detection.comp.spv"};
+	shaders::comp::smaa::weight_calculate = {context.get_device(), dir::shader_spv / "smaa.weight_calculate.comp.spv"};
+	shaders::comp::smaa::neighborhood_blending = {context.get_device(), dir::shader_spv / "smaa.neighborhood_blending.comp.spv"};
+
 	samplers::texture_sampler = {context.get_device(), vk::preset::default_texture_sampler};
 	samplers::ui_sampler = {context.get_device(), vk::preset::ui_texture_sampler};
 	samplers::blit_sampler = {context.get_device(), vk::preset::default_blit_sampler};
@@ -76,6 +80,10 @@ void mo_yanxi::assets::graphic::dispose(){
 	shaders::comp::result_merge = {};
 	shaders::comp::oit_blend = {};
 	shaders::comp::anti_aliasing = {};
+
+	shaders::comp::smaa::edge_detection = {};
+	shaders::comp::smaa::weight_calculate = {};
+	shaders::comp::smaa::neighborhood_blending = {};
 
 	samplers::texture_sampler = {};
 	samplers::blit_sampler = {};

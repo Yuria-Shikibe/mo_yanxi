@@ -13,7 +13,7 @@ namespace mo_yanxi::core::global::graphic{
 	void init_renderers(){
 		std::destroy_at(&world);
 		std::destroy_at(&ui);
-		std::construct_at(&world, context, result_exports);
-		std::construct_at(&ui, context, result_exports);
+		std::construct_at(&world, context);
+		std::construct_at(&ui, context);
 	}
 }

@@ -1,0 +1,95 @@
+#pragma shader_stage(compute)
+
+#include "smaa.preset.glsl"
+
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+
+layout (set = 0, binding = 0) restrict uniform writeonly image2D target;
+layout (set = 0, binding = 1) uniform sampler2D colorTex;
+
+/**
+ * Color Edge Detection
+ *
+ * IMPORTANT NOTICE: color edge detection requires gamma-corrected colors, and
+ * thus 'colorTex' should be a non-sRGB texture.
+ */
+vec2 SMAAColorEdgeDetectionPS(
+    vec2 texcoord,
+    vec4 offset[3],
+    sampler2D colorTex
+//#if SMAA_PREDICATION
+//                                , sampler2D(predicationTex)
+//#endif
+) {
+    // Calculate the threshold:
+//    #if SMAA_PREDICATION
+//        vec2 threshold = SMAACalculatePredicatedThreshold(texcoord, offset, predicationTex);
+//    #else
+    vec2 threshold = vec2(SMAA_THRESHOLD, SMAA_THRESHOLD);
+//    #endif
+
+    // Calculate color deltas:
+    vec4 delta;
+    vec3 C = texture(colorTex, texcoord).rgb;
+
+    vec3 Cleft = texture(colorTex, offset[0].xy).rgb;
+    vec3 t = abs(C - Cleft);
+    delta.x = max(max(t.r, t.g), t.b);
+
+    vec3 Ctop = texture(colorTex, offset[0].zw).rgb;
+    t = abs(C - Ctop);
+    delta.y = max(max(t.r, t.g), t.b);
+
+    // We do the usual threshold:
+    vec2 edges = step(threshold, delta.xy);
+
+    // Then discard if there is no edge:
+    if (dot(edges, vec2(1.0, 1.0)) == 0.0)
+    return vec2(0);
+
+    // Calculate right and bottom deltas:
+    vec3 Cright = texture(colorTex, offset[1].xy).rgb;
+    t = abs(C - Cright);
+    delta.z = max(max(t.r, t.g), t.b);
+
+    vec3 Cbottom = texture(colorTex, offset[1].zw).rgb;
+    t = abs(C - Cbottom);
+    delta.w = max(max(t.r, t.g), t.b);
+
+    // Calculate the maximum delta in the direct neighborhood:
+    vec2 maxDelta = max(delta.xy, delta.zw);
+
+    // Calculate left-left and top-top deltas:
+    vec3 Cleftleft = texture(colorTex, offset[2].xy).rgb;
+    t = abs(C - Cleftleft);
+    delta.z = max(max(t.r, t.g), t.b);
+
+    vec3 Ctoptop = texture(colorTex, offset[2].zw).rgb;
+    t = abs(C - Ctoptop);
+    delta.w = max(max(t.r, t.g), t.b);
+
+    // Calculate the final maximum delta:
+    maxDelta = max(maxDelta.xy, delta.zw);
+    float finalDelta = max(maxDelta.x, maxDelta.y);
+
+    // Local contrast adaptation:
+    edges.xy *= step(finalDelta, SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR * delta.xy);
+
+    return edges;
+}
+
+void main(){
+    const ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    const vec2 inv = vec2(1) / vec2(imageSize(target));
+    const vec2 uv = (vec2(pos) + vec2(0.5f, 0.5f)) * inv;
+
+    vec4 offset[3];
+    offset[0] = fma(inv.xyxy, vec4(-1.0, 0.0, 0.0, -1.0), uv.xyxy);
+    offset[1] = fma(inv.xyxy, vec4( 1.0, 0.0, 0.0,  1.0), uv.xyxy);
+    offset[2] = fma(inv.xyxy, vec4(-2.0, 0.0, 0.0, -2.0), uv.xyxy);
+
+    vec2 result = SMAAColorEdgeDetectionPS(uv, offset, colorTex);
+    imageStore(target, pos, vec4(result, 0, 0));
+}

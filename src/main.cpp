@@ -126,8 +126,8 @@ import test;
 import std;
 
 #pragma region MAIN
-#if 1
 
+#if 1
 #pragma region UI_INIT
 void init_ui(mo_yanxi::ui::loose_group& root, mo_yanxi::graphic::image_atlas& atlas){
 	using namespace std::literals;
@@ -556,259 +556,6 @@ void main_loop(){
 
 	game::fx::post_process_graph graph{core::global::graphic::context};
 
-	/*
-	graphic::post_process_graph graph{core::global::graphic::context};
-	using namespace graphic;
-	using namespace resource_desc;
-	auto& ui_base = graph.add_explicit_resource(explicit_resource{external_image{}});
-	auto& ui_light = graph.add_explicit_resource(explicit_resource{external_image{}});
-
-	auto& world_base = graph.add_explicit_resource(explicit_resource{external_image{}});
-	auto& world_light = graph.add_explicit_resource(explicit_resource{external_image{}});
-	auto& world_depth = graph.add_explicit_resource(explicit_resource{external_image{VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL}});
-
-	auto& world_draw_base = graph.add_explicit_resource(explicit_resource{external_image{VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}});
-	auto& world_draw_light = graph.add_explicit_resource(explicit_resource{external_image{VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}});
-	auto& world_draw_oit_head = graph.add_explicit_resource(explicit_resource{external_image{}});
-	auto& world_draw_oit_buffer = graph.add_explicit_resource(explicit_resource{external_buffer{}});
-	auto& world_draw_oit_buffer_stat = graph.add_explicit_resource(explicit_resource{external_buffer{}});
-
-	auto& final_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::result_merge, {
-		{{0}, no_slot, 0},
-		{{1}, 0, no_slot},
-		{{2}, 1, no_slot},
-		{{3}, 2, no_slot},
-		{{4}, 3, no_slot},
-	}});
-
-	final_merge.sockets().at_out(0).get<image_requirement>().desc.format = VK_FORMAT_R8G8B8A8_UNORM;
-
-	{
-		const post_process_meta bloom_meta = []{
-			post_process_meta meta{
-				assets::graphic::shaders::comp::bloom,
-				{
-						{{0}, {0, no_slot}},
-						{{1}, {1, no_slot}},
-						{{2}, {no_slot, 0}},
-						{{3}, {no_slot, 0}},
-					}
-			};
-			{
-				auto& req = meta.sockets.at_out<resource_desc::image_requirement>(0);
-
-				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
-				req.mip_levels = 6;
-				req.scaled_times = 0;
-				req.desc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-			}
-
-			{
-				auto& req = meta.sockets.at_in<resource_desc::image_requirement>(1);
-
-				req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
-				req.mip_levels = 6;
-				req.scaled_times = 1;
-				req.desc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-			}
-
-			return meta;
-		}();
-
-		// auto& anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
-		// 	{{1}, 0, no_slot},
-		// 	{{2}, no_slot, 0},
-		// }});
-		// anti_alias.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
-
-		auto& ui_bloom = graph.add_stage<bloom_pass>(bloom_meta);
-		ui_bloom.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
-		ui_bloom.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
-		graph.add_input(&ui_bloom, {
-			{{}, 1},
-		});
-		graph.add_input(&ui_bloom, {
-			explicit_resource_usage{ui_light, 0},
-		});
-
-		auto& world_merge = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::world_merge, {
-			{{0}, no_slot, 0},
-			{{1}, 0, no_slot},
-			{{2}, 1, no_slot},
-			{{3}, 2, no_slot},
-			{{4}, 3, no_slot},
-		}});
-
-		auto& world_bloom = graph.add_stage<bloom_pass>(bloom_meta);
-		world_bloom.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
-		world_bloom.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
-		graph.add_input(&world_bloom, {
-			{{}, 1},
-		});
-		graph.add_input(&world_bloom, {
-			explicit_resource_usage{world_light, 0},
-		});
-
-		auto& ssao = graph.add_stage<ssao_pass>(post_process_meta{assets::graphic::shaders::comp::ssao, {
-			{{0}, 0, no_slot},
-			{{1}, no_slot, 0}
-		}});
-		ssao.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
-
-		auto& req = ssao.sockets().at_in<resource_desc::image_requirement>(0).aspect_flags = VK_IMAGE_ASPECT_DEPTH_BIT;
-
-		{
-			auto& ui_clear = graph.add_stage<image_clear>(2);
-
-			ui_clear.add_exec_dep(&final_merge);
-			graph.add_input(&ui_clear, {
-				explicit_resource_usage{ui_base, 0},
-				explicit_resource_usage{ui_light, 1},
-			});
-
-			graph.add_output(&ui_clear, {
-				explicit_resource_usage{ui_base, 0},
-				explicit_resource_usage{ui_light, 1},
-			});
-		}
-		//
-		// anti_alias.add_dep({
-		// 	.id = &world_merge
-		// });
-
-		graph.add_input(&final_merge, {
-			explicit_resource_usage{ui_base, 1},
-			explicit_resource_usage{ui_light, 2},
-		});
-
-		graph.add_output(&final_merge, {{{}, 0}});
-
-		final_merge.add_dep({pass_dependency{
-			.id = &ui_bloom,
-			.dst_idx = 3
-		},
-			// {.id = &anti_alias,}
-			{.id = &world_merge,}
-		});
-
-		world_merge.add_dep({
-			{
-				.id = &ssao,
-				.dst_idx = 3
-			}, {
-				.id = &world_bloom,
-				.dst_idx = 2
-			}});
-
-		graph.add_input(&ssao, {
-			explicit_resource_usage{world_depth, 0}
-		});
-
-
-		auto& oit = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::oit_blend, post_process_stage_inout_map{
-			{{0}, 0, no_slot},
-			{{1}, 1, no_slot},
-			{{2}, 2, no_slot},
-			{{3}, 3, no_slot},
-			{{4}, 4, no_slot},
-			{{5}, 5, 0},
-			{{6}, 6, 1},
-		}});
-		oit.set_sampler_at_binding(2, assets::graphic::samplers::blit_sampler);
-
-
-		graph.add_input(&oit, {
-			explicit_resource_usage{world_draw_oit_buffer, 0},
-			explicit_resource_usage{world_draw_oit_head, 1},
-			explicit_resource_usage{world_depth, 2},
-			explicit_resource_usage{world_draw_base, 3},
-			explicit_resource_usage{world_draw_light, 4},
-			explicit_resource_usage{world_base, 5},
-			explicit_resource_usage{world_light, 6},
-		});
-
-		world_merge.add_dep({
-			pass_dependency{&oit, 0, 0},
-			pass_dependency{&oit, 1, 1}
-		});
-
-		{
-			auto& world_clear = graph.add_stage<image_clear>(2);
-
-			world_clear.add_exec_dep(&world_merge);
-			graph.add_input(&world_clear, {
-				explicit_resource_usage{world_base, 0},
-				explicit_resource_usage{world_light, 1},
-			});
-
-			graph.add_output(&world_clear, {
-				explicit_resource_usage{world_base, 0},
-				explicit_resource_usage{world_light, 1},
-			});
-
-			auto& world_depth_clear = graph.add_stage<depth_stencil_image_clear>(std::initializer_list<depth_stencil_image_clear::clear_info>{{{1}}});
-
-			world_depth_clear.add_exec_dep(&ssao);
-			world_depth_clear.add_exec_dep(&oit);
-			graph.add_input(&world_depth_clear, {
-				explicit_resource_usage{world_depth, 0},
-			});
-
-			graph.add_output(&world_depth_clear, {
-				explicit_resource_usage{world_depth, 0},
-			});
-		}
-
-
-		{
-			auto& world_clear = graph.add_stage<image_clear>(2);
-
-			world_clear.add_exec_dep(&oit);
-			graph.add_input(&world_clear, {
-				explicit_resource_usage{world_draw_base, 0},
-				explicit_resource_usage{world_draw_light, 1},
-			});
-
-			graph.add_output(&world_clear, {
-				explicit_resource_usage{world_draw_base, 0},
-				explicit_resource_usage{world_draw_light, 1},
-			});
-		}
-		{
-			VkClearColorValue color{.uint32 = {~0u}};
-			auto& oit_clear = graph.add_stage<image_clear>(std::initializer_list<image_clear::clear_info>{{color}});
-
-			oit_clear.add_exec_dep(&oit);
-			graph.add_input(&oit_clear, {
-				explicit_resource_usage{world_draw_oit_head, 0},
-			});
-
-			graph.add_output(&oit_clear, {
-				explicit_resource_usage{world_draw_oit_head, 0},
-			});
-
-			auto off = std::bit_cast<std::uint32_t>(&oit_statistic::size);
-			auto& oit_buf_clear = graph.add_stage<buffer_fill>(std::initializer_list<buffer_fill::clear_info>{
-				{0, std::bit_cast<std::uint32_t>(&oit_statistic::size), sizeof(oit_statistic) - off},
-			});
-
-			oit_buf_clear.add_exec_dep(&oit);
-			graph.add_input(&oit_buf_clear, {
-				explicit_resource_usage{world_draw_oit_buffer_stat, 0},
-			});
-
-			graph.add_output(&oit_buf_clear, {
-				explicit_resource_usage{world_draw_oit_buffer_stat, 0},
-			});
-		}
-	}
-
-	graph.sort();
-	graph.check_sockets_connection();
-	graph.analysis_minimal_allocation();
-	graph.print_resource_reference();
-	graph.post_init();*/
-
 	graph.set_updator([&](game::fx::post_process_graph& graph){
 		graph.ui_base.as_image().handle = renderer_ui.batch.blit_base;
 		graph.ui_base.as_image().expected_layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -816,20 +563,34 @@ void main_loop(){
 		graph.ui_light.as_image().handle = renderer_ui.batch.blit_light;
 		graph.ui_light.as_image().expected_layout = VK_IMAGE_LAYOUT_GENERAL;
 
-		graph.world_base.as_image().handle = renderer_world.batch.mid_attachments.color_base;
-		graph.world_base.as_image().expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+		graph.world_blit_base.as_image().handle = renderer_world.batch.mid_attachments.color_base;
+		graph.world_blit_base.as_image().expected_layout = VK_IMAGE_LAYOUT_GENERAL;
 
-		graph.world_light.as_image().handle = renderer_world.batch.mid_attachments.color_light;
-		graph.world_light.as_image().expected_layout = VK_IMAGE_LAYOUT_GENERAL;
+		graph.world_blit_light.as_image().handle = renderer_world.batch.mid_attachments.color_light;
+		graph.world_blit_light.as_image().expected_layout = VK_IMAGE_LAYOUT_GENERAL;
 
-		graph.world_depth.as_image().handle = {renderer_world.batch.depth, renderer_world.batch.depth_view_d32f};
-		graph.world_depth.as_image().expected_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		graph.world_draw_resolved_depth.as_image().handle = {renderer_world.batch.depth_resolved, renderer_world.batch.depth_resolved_view};
+		graph.world_draw_resolved_depth.as_image().expected_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		graph.world_draw_resolved_base.as_image().handle = renderer_world.batch.draw_resolved_attachments.color_base;
+		graph.world_draw_resolved_base.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		graph.world_draw_resolved_light.as_image().handle = renderer_world.batch.draw_resolved_attachments.color_light;
+		graph.world_draw_resolved_light.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+
+
+		graph.world_draw_depth.as_image().handle = {renderer_world.batch.depth, renderer_world.batch.depth_view};
+		graph.world_draw_depth.as_image().expected_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 		graph.world_draw_base.as_image().handle = renderer_world.batch.draw_attachments.color_base;
 		graph.world_draw_base.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		graph.world_draw_light.as_image().handle = renderer_world.batch.draw_attachments.color_light;
 		graph.world_draw_light.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+
+
 
 		graph.world_draw_oit_head.as_image().handle = renderer_world.batch.oit_image_head;
 		graph.world_draw_oit_head.as_image().expected_layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -926,14 +687,14 @@ void main_loop(){
 
 		{
 
-			acquirer.proj.depth = 1.f;
+			// acquirer.proj.depth = 1.f;
 
 			acquirer << graphic::draw::white_region;
-			graphic::draw::fill::rect_ortho(
-					acquirer.get(),
-					math::frect{math::vec2{}, 40000},
-					graphic::colors::black
-				);
+			// graphic::draw::fill::rect_ortho(
+			// 		acquirer.get(),
+			// 		math::frect{math::vec2{}, 40000},
+			// 		graphic::colors::black
+			// 	);
 
 			acquirer.proj.depth = 0.25f;
 
@@ -998,9 +759,13 @@ void main_loop(){
 							if(!tile.building) return;
 
 							draw::line::rect_ortho(acquirer, tile.get_bound(), 1, colors::dark_gray.to_light());
-							draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-												   (colors::red_dusted.create_lerp(tile.building.data().get_meta()->get_meta_info().is_structural() ? colors::pale_yellow : colors::pale_green, tile.building.data().hit_point.get_capability_factor())).to_light(1.5f).set_a(
-													   tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
+							draw::fill::rect_ortho(
+								acquirer.get(),
+								tile.get_bound(),
+
+								(colors::red_dusted.create_lerp(tile.building.data().get_meta()->get_meta_info().is_structural() ? colors::pale_yellow : colors::pale_green, tile.building.data().hit_point.get_capability_factor()))
+									.to_light(1.5f)
+									.set_a(tile.get_status().valid_hit_point / tile.building.data().get_tile_individual_max_hitpoint()));
 						});
 
 						grid.manager.sliced_each([&](const chamber::building_data& building_data){
@@ -1020,8 +785,10 @@ void main_loop(){
 						if(true){
 							auto rst = grid.get_dst_sorted_tiles(rect2, (rect2[0] + rect2[3]) / 2, dst.normalize());
 							for (const auto& [idx, tile] : rst | std::views::enumerate){
-								draw::fill::rect_ortho(acquirer.get(), tile.get_bound(),
-													   colors::aqua.create_lerp(colors::red_dusted, idx / static_cast<float>(rst.size())));
+								draw::fill::rect_ortho(
+									acquirer.get(),
+									tile.get_bound(),
+									colors::aqua.create_lerp(colors::red_dusted, idx / static_cast<float>(rst.size())));
 							}
 						}
 
@@ -1095,20 +862,10 @@ void main_loop(){
 
 			ecs_renderer.filter_screen_space(world.component_manager, renderer_world.camera.get_viewport());
 			ecs_renderer.draw(world.graphic_context);
-
 		}
 
 		world.graphic_context.render_efx();
-
 		renderer_world.batch.batch.consume_all();
-		// renderer_world.post_process();
-
-		// renderer_ui.post_process();
-
-		// merger.submit();
-		// renderer_ui.clear();
-		// context.wait_on_device();
-
 		vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {graph.get_main_command_buffer()});
 		context.flush();
 	}
@@ -1117,10 +874,13 @@ void main_loop(){
 	context.wait_on_device();
 }
 #endif
-#pragma endregion ;
+
+#pragma endregion
 
 int main(){
-	if(auto ptr = std::getenv("NSIGHT"); ptr != nullptr && std::strcmp(ptr, "1") == 0){
+	if(!DEBUG_CHECK){
+		mo_yanxi::vk::enable_validation_layers = false;
+	}else if(auto ptr = std::getenv("NSIGHT"); ptr != nullptr && std::strcmp(ptr, "1") == 0){
 		mo_yanxi::vk::enable_validation_layers = false;
 	}
 

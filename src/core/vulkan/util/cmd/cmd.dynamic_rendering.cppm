@@ -33,7 +33,7 @@ namespace mo_yanxi::vk{
 			const VkAttachmentStoreOp storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 
 			VkImageView resolveImageView = nullptr,
-			const VkImageLayout resolveImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			const VkImageLayout resolveImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			const VkResolveModeFlagBits resolveMode = VK_RESOLVE_MODE_MAX_BIT
 		){
 			depthInfo = VkRenderingAttachmentInfo{
@@ -63,7 +63,7 @@ namespace mo_yanxi::vk{
 			const VkAttachmentStoreOp storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 
 			VkImageView resolveImageView = nullptr,
-			const VkImageLayout resolveImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			const VkImageLayout resolveImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			const VkResolveModeFlagBits resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT
 			){
 			colorAttachmentsInfo.push_back(VkRenderingAttachmentInfo{

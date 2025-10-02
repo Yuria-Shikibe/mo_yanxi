@@ -99,7 +99,7 @@ namespace mo_yanxi::graphic::render_graph{
 						sizeof(bloom_uniform_block), i);
 
 					(void)ubo_mapper.load(bloom_uniform_block{
-						.current_layer = reverse_after_bit(i, current_mip_level_),
+						.current_layer = reverse_after(i, current_mip_level_),
 						.up_scaling = i >= current_mip_level_,
 						.total_layer = current_mip_level_,
 						.scale = scale,

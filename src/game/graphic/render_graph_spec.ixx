@@ -9,11 +9,13 @@ export import mo_yanxi.graphic.render_graph.fill;
 export import mo_yanxi.graphic.render_graph.ssao;
 
 import mo_yanxi.vk.context;
+import mo_yanxi.vk.image_derives;
 import mo_yanxi.assets.graphic;
 import std;
 
 //TODO to clean up
 import mo_yanxi.graphic.post_processor.oit_blender;
+import mo_yanxi.graphic.render_graph.smaa_asserts;
 
 namespace mo_yanxi::game::fx{
 	using namespace graphic::render_graph;
@@ -26,12 +28,16 @@ namespace mo_yanxi::game::fx{
 		explicit_resource& ui_base{graph.add_explicit_resource(explicit_resource{external_image{}})};
 		explicit_resource& ui_light{graph.add_explicit_resource(explicit_resource{external_image{}})};
 
-		explicit_resource& world_base{graph.add_explicit_resource(explicit_resource{external_image{}})};
-		explicit_resource& world_light{graph.add_explicit_resource(explicit_resource{external_image{}})};
+		explicit_resource& world_blit_base{graph.add_explicit_resource(explicit_resource{external_image{}})};
+		explicit_resource& world_blit_light{graph.add_explicit_resource(explicit_resource{external_image{}})};
 
-		explicit_resource& world_depth{graph.add_explicit_resource(explicit_resource{external_image{}})};
+		explicit_resource& world_draw_depth{graph.add_explicit_resource(explicit_resource{external_image{}})};
 		explicit_resource& world_draw_base{graph.add_explicit_resource(explicit_resource{external_image{}})};
 		explicit_resource& world_draw_light{graph.add_explicit_resource(explicit_resource{external_image{}})};
+
+		explicit_resource& world_draw_resolved_depth{graph.add_explicit_resource(explicit_resource{external_image{}})};
+		explicit_resource& world_draw_resolved_base{graph.add_explicit_resource(explicit_resource{external_image{}})};
+		explicit_resource& world_draw_resolved_light{graph.add_explicit_resource(explicit_resource{external_image{}})};
 
 		explicit_resource& world_draw_oit_head{graph.add_explicit_resource(explicit_resource{external_image{}})};
 		explicit_resource& world_draw_oit_buffer{graph.add_explicit_resource(explicit_resource{external_buffer{}})};
@@ -77,11 +83,11 @@ namespace mo_yanxi::game::fx{
 			oit.pass.add_input({
 				explicit_resource_usage{world_draw_oit_buffer, 0},
 				explicit_resource_usage{world_draw_oit_head, 1},
-				explicit_resource_usage{world_depth, 2},
-				explicit_resource_usage{world_draw_base, 3},
-				explicit_resource_usage{world_draw_light, 4},
-				explicit_resource_usage{world_base, 5},
-				explicit_resource_usage{world_light, 6},
+				explicit_resource_usage{world_draw_resolved_depth, 2},
+				explicit_resource_usage{world_draw_resolved_base, 3},
+				explicit_resource_usage{world_draw_resolved_light, 4},
+				explicit_resource_usage{world_blit_base, 5},
+				explicit_resource_usage{world_blit_light, 6},
 			});
 
 
@@ -119,18 +125,20 @@ namespace mo_yanxi::game::fx{
 
 			const auto world_bloom = graph.add_stage<bloom_pass>(bloom_meta);
 			world_bloom.meta.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
-			world_bloom.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
 			world_bloom.pass.add_dep({&oit.pass, 1});
 
 			const auto ssao = graph.add_stage<graphic::render_graph::ssao_pass>(post_process_meta{
 					assets::graphic::shaders::comp::ssao, {
-						{{0}, 0, no_slot},
-						{{1}, no_slot, 0}
+						{{0}, no_slot, 0},
+						{{1}, 0, no_slot},
+						{{2}, 1, no_slot},
 					}
 				});
-			ssao.meta.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
+			ssao.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+			ssao.meta.set_sampler_at_binding(2, assets::graphic::samplers::blit_sampler);
 			ssao.meta.sockets().at_in<image_requirement>(0).aspect_flags = VK_IMAGE_ASPECT_DEPTH_BIT;
-			ssao.pass.add_input({{world_depth, 0}});
+			ssao.pass.add_input({{world_draw_resolved_depth, 0}});
+			ssao.pass.add_input({{world_draw_light, 1}});
 
 
 			auto world_merge = graph.add_stage<post_process_stage>(post_process_meta{
@@ -143,18 +151,55 @@ namespace mo_yanxi::game::fx{
 					}
 				});
 			world_merge.pass.add_dep({
-					{&oit.pass, 0, 0},
-					{&oit.pass, 1, 1},
-					{&ssao.pass, 0, 3},
-					{&world_bloom.pass, 0, 2}
+					{oit.id(), 0, 0},
+					{oit.id(), 1, 1},
+					{ssao.id(), 0, 3},
+					{world_bloom.id(), 0, 2}
 				});
 
-			auto anti_alias = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::anti_aliasing, {
-					{{1}, 0, no_slot},
-					{{2}, no_slot, 0},
+				auto smaa_edge_pass = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::smaa::edge_detection, {
+					   {{0}, no_slot, 0},
+					   {{1}, 0, no_slot},
+				   }});
+
+				smaa_edge_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+				smaa_edge_pass.pass.add_dep({.id = world_merge.id()});
+
+				auto smaa_weight_pass = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::smaa::weight_calculate, {
+					   {{0}, no_slot, 0},
+					   {{1}, 0, no_slot},
+					   {{2}, 1, no_slot},
+					   {{3}, 2, no_slot},
+				   }});
+
+				auto& areaTex = graph.add_explicit_resource(explicit_resource{external_image{}});
+				auto& searchTex = graph.add_explicit_resource(explicit_resource{external_image{}});
+
+				smaa_weight_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+				smaa_weight_pass.meta.set_sampler_at_binding(2, assets::graphic::samplers::texture_sampler);
+				smaa_weight_pass.meta.set_sampler_at_binding(3, assets::graphic::samplers::texture_sampler);
+				smaa_weight_pass.pass.add_dep({.id = smaa_edge_pass.id()});
+				smaa_weight_pass.pass.add_input({{areaTex, 1}});
+				smaa_weight_pass.pass.add_input({{searchTex, 2}});
+
+				const auto smaaTex = assets::graphic::get_smaa_tex();
+				areaTex.as_image().handle = smaaTex.area_tex;
+				areaTex.as_image().expected_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+				searchTex.as_image().handle = smaaTex.search_tex;
+				searchTex.as_image().expected_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+				auto smaa_final_pass = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::smaa::neighborhood_blending, {
+					   {{0}, no_slot, 0},
+					   {{1}, 0, no_slot},
+					   {{2}, 1, no_slot},
 				}});
-			anti_alias.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
-			anti_alias.pass.add_dep({.id = world_merge.id()});
+				smaa_final_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+				smaa_final_pass.meta.set_sampler_at_binding(2, assets::graphic::samplers::blit_sampler);
+				smaa_final_pass.pass.add_dep({world_merge.id(), 0, 0});
+				smaa_final_pass.pass.add_dep({smaa_weight_pass.id(), 0, 1});
+				// smaa_final_pass.pass.add_output({{0, true}});
+
 
 			const auto ui_bloom = graph.add_stage<bloom_pass>(bloom_meta);
 			ui_bloom.meta.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
@@ -176,8 +221,8 @@ namespace mo_yanxi::game::fx{
 						.id = ui_bloom.id(),
 						.dst_idx = 3
 					},
-					{.id = anti_alias.id(),}
-					// {.id = &world_merge.pass,}
+					{.id = smaa_final_pass.id(),}
+					// {.id = world_merge.id(),}
 				});
 
 
@@ -196,8 +241,18 @@ namespace mo_yanxi::game::fx{
 
 				world_clear.pass.add_exec_dep(&world_merge.pass);
 				world_clear.pass.add_inout({
-						{world_base, 0},
-						{world_light, 1},
+						{world_blit_base, 0},
+						{world_blit_light, 1},
+					});
+			}
+
+			{
+				auto world_clear = graph.add_stage<image_clear>(2);
+
+				world_clear.pass.add_exec_dep(&oit.pass);
+				world_clear.pass.add_inout({
+						explicit_resource_usage{world_draw_resolved_base, 0},
+						explicit_resource_usage{world_draw_resolved_light, 1},
 					});
 
 
@@ -206,18 +261,22 @@ namespace mo_yanxi::game::fx{
 
 				world_depth_clear.pass.add_exec_dep(&ssao.pass);
 				world_depth_clear.pass.add_exec_dep(&oit.pass);
-				world_depth_clear.pass.add_inout({{world_depth, 0}});
-
+				world_depth_clear.pass.add_inout({{world_draw_resolved_depth, 0}});
 			}
 
 			{
 				auto world_clear = graph.add_stage<image_clear>(2);
 
-				world_clear.pass.add_exec_dep(&oit.pass);
 				world_clear.pass.add_inout({
 						explicit_resource_usage{world_draw_base, 0},
 						explicit_resource_usage{world_draw_light, 1},
 					});
+
+
+				auto world_depth_clear =
+					graph.add_stage<depth_stencil_image_clear>(std::initializer_list<depth_stencil_image_clear::clear_info>{{{1}}});
+
+				world_depth_clear.pass.add_inout({{world_draw_depth, 0}});
 			}
 
 			{
@@ -241,11 +300,10 @@ namespace mo_yanxi::game::fx{
 					});
 			}
 
-			graph.auto_create_buffer();
-			graph.sort();
-			graph.check_sockets_connection();
-			graph.analysis_minimal_allocation();
-			graph.post_init();
+			graph.init_after_pass_initialized();
+			std::println("{}", graph.get_exec_seq() | std::views::transform([](const pass_data& pass){
+				return pass.get_identity_name();
+			}));
 
 			world_bloom_ = &world_bloom.meta;
 			ui_bloom_ = &ui_bloom.meta;
@@ -265,6 +323,7 @@ namespace mo_yanxi::game::fx{
 			updater(*this);
 			graph.update_external_resources();
 			graph.resize();
+			graph.reset_resources();
 			graph.create_command();
 		}
 

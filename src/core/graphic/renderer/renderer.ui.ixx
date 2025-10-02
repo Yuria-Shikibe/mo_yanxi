@@ -619,9 +619,8 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] renderer_ui() = default;
 
 		[[nodiscard]] renderer_ui(
-			vk::context& context,
-			renderer_export& export_target) :
-			renderer(context, export_target, "renderer.ui"),
+			vk::context& context) :
+			renderer(context, "renderer.ui"),
 			batch(context){
 		}
 

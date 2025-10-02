@@ -10,10 +10,10 @@ export import mo_yanxi.graphic.renderer;
 export import mo_yanxi.graphic.renderer.world;
 export import mo_yanxi.graphic.renderer.ui;
 
+import std;
+
 namespace mo_yanxi::core::global::graphic{
 	export inline vk::context context{};
-
-	mo_yanxi::graphic::renderer_export result_exports{};
 
 	export mo_yanxi::graphic::renderer_world world;
 	export mo_yanxi::graphic::renderer_ui ui;
@@ -25,6 +25,7 @@ namespace mo_yanxi::core::global::graphic{
 	export void dispose(){
 		ui = {};
 		world = {};
-		context = {};
+		std::destroy_at(&context);
+		std::construct_at(&context);
 	}
 }

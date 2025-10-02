@@ -1,3 +1,6 @@
+#ifndef LIB_BLEND
+#define LIB_BLEND
+
 vec4 mulAlpha(vec4 color) {
     return vec4(color.rgb * color.a, color.a);
 }
@@ -17,3 +20,5 @@ vec4 blend2(vec4 src, vec4 dst) {
     vec4 result = vec4(src.rgb + dst.rgb * (1 - src.a), src.a + dst.a * (1 - src.a));
     return result;
 }
+
+#endif

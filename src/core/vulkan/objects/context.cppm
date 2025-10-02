@@ -101,6 +101,8 @@ namespace mo_yanxi::vk{
 
 		events::named_event_manager<std::move_only_function<void() const>, window_instance::resize_event> eventManager{};
 
+		std::vector<void(*)() noexcept> append_disposers{};
+
 	public:
 
 		[[nodiscard]] context() = default;
@@ -225,6 +227,9 @@ namespace mo_yanxi::vk{
 
 		~context(){
 			if(device){
+				for (auto append_disposer : append_disposers){
+					std::invoke(append_disposer);
+				}
 				vkDestroySwapchainKHR(device, swap_chain, nullptr);
 				if(last_swap_chain)vkDestroySwapchainKHR(device, last_swap_chain, nullptr);
 			}
@@ -239,6 +244,10 @@ namespace mo_yanxi::vk{
 
 		void register_post_resize(const std::string_view name, std::move_only_function<void(const window_instance::resize_event&) const>&& callback) {
 			eventManager.on<window_instance::resize_event>(name, std::move(callback));
+		}
+
+		void add_dispose(std::convertible_to<void(*)() noexcept> auto fn){
+			append_disposers.push_back(fn);
 		}
 
 	private:
