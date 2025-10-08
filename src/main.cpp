@@ -612,6 +612,7 @@ void main_loop(){
 	while(!context.window().should_close()){
 		context.window().poll_events();
 		core::global::timer.fetch_time();
+		core::global::input.update(core::global::timer.global_delta_tick());
 
 		// count++;
 		// dt += core::global::timer.global_delta();
@@ -621,7 +622,6 @@ void main_loop(){
 		// 	count = 0;
 		// }
 
-		core::global::input.update(core::global::timer.global_delta_tick());
 
 		world.component_manager.update_update_delta(core::global::timer.update_delta_tick());
 		if(world.graphic_context.update(core::global::timer.global_delta_tick(), core::global::timer.is_paused())){
@@ -898,6 +898,8 @@ int main(){
 	core::global::assets::init(&core::global::graphic::context);
 	assets::graphic::load(core::global::graphic::context);
 
+	camera2 camera;
+	assets::ctrl::spec_camera = &camera;
 	//
 	// while(!core::global::graphic::context.window().should_close()){
 	// 	core::global::graphic::context.window().poll_events();
@@ -912,15 +914,34 @@ int main(){
 	game::content::load();
 	test::load_content();
 
+	struct VertexUBO{
+		vk::padded_mat3 proj{};
+		vk::padded_mat3 view{};
+	};
+
 	{
 		auto& ctx = core::global::graphic::context;
 		instruction_batch batch{ctx};
-		batch_external_data batch_external_data{ctx};
+
+		vk::uniform_buffer usr_ubo{ctx.get_allocator(), sizeof(VertexUBO) * batch.batch_work_group_count};
+		constexpr std::size_t debugSize = 4096 * 8;
+		vk::buffer b = vk::templates::create_storage_buffer(ctx.get_allocator(), debugSize * batch.batch_work_group_count, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+
+		batch_external_data batch_external_data{ctx, [](vk::descriptor_layout_builder& b){
+			b.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
+			// b.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
+		}};
+
+		batch_external_data.bind([&](std::uint32_t idx, const vk::descriptor_mapper& mapper){
+			(void)mapper.set_uniform_buffer(0, usr_ubo.get_address() + idx * sizeof(VertexUBO), sizeof(VertexUBO), idx);
+			// (void)mapper.set_storage_buffer(1, b.get_address() + idx * debugSize, debugSize, idx);
+		});
 
 		vk::shader_module msh{ctx.get_device(), assets::dir::shader_spv / "test.mesh_mesh.spv"};
 		msh.set_no_deduced_stage();
 
-		vk::pipeline_layout pipeline_layout{ctx.get_device(), 0, {batch.get_batch_descriptor_layout(), /*draw_descriptor_layout*/}};
+		vk::pipeline_layout pipeline_layout{ctx.get_device(), 0,
+			{batch.get_batch_descriptor_layout(), batch_external_data.descriptor_set_layout()}};
 
 		vk::graphic_pipeline_template gtp{};
 		gtp.set_shaders({
@@ -930,100 +951,6 @@ int main(){
 		gtp.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::alpha_blend);
 
 		vk::pipeline p{ctx.get_device(), pipeline_layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, gtp};
-
-
-		{
-			/*auto where = batch.instruction_buffer_.begin();
-			where = draw::place_instruction_at(
-				where,
-				instructions.end(),
-				draw::triangle_draw{
-				.generic = {.depth = 0},
-				.p0 = {-.5f -.35f, -.5f},
-				.p1 = {.5f -.35f, -.5f},
-				.p2 = {0 -.35f, .5f},
-				.c0 = {1, 0, 0, 1},
-				.c1 = {0, 1, 0, 1},
-				.c2 = {0, 0, 1, 1}
-			});
-			//
-			where = draw::place_instruction_at(
-				where,
-				instructions.end(),
-				draw::triangle_draw{
-				.generic = {.depth = 0},
-				.p0 = {-.5f +.35f, -.5f},
-				.p1 = {.5f +.35f, -.5f},
-				.p2 = {0 +.35f, .5f},
-				.c0 = {1, 0, 0, 1},
-				.c1 = {0, 1, 0, 1},
-				.c2 = {0, 0, 1, 1}
-			});
-
-			where = draw::place_instruction_at(
-				where,
-				instructions.end(),
-				draw::poly_fill_draw{
-					.pos = {.5f, -.5f},
-					.segments = 6,
-					.initial_angle = 30 * math::deg_to_rad,
-
-					.radius = {.1f, .2f},
-
-					.inner = {0, 0, 0, 1},
-					.outer = {1, 1, 1, 1}
-			});
-
-			for(int i = 0; i < 50; ++i){
-				where = draw::place_instruction_at(
-				where,
-				instructions.end(),
-				draw::poly_fill_draw{
-					.pos = {-.35f + float(i) * 0.005f, .25f},
-					.segments = 2500,
-					.initial_angle = 30 * math::deg_to_rad,
-
-					.radius = {.01f, .2f},
-
-					.inner = {0, 1, 0, 0},
-					.outer = {1, 0, 1, .4f}
-			});
-			}
-
-
-			where = draw::place_instruction_at(
-				where,
-				instructions.end(),
-				draw::rectangle_draw{
-				.pos = {.5f, 0},
-				.angle = 30 * math::deg_to_rad,
-				.scale = 1,
-				.c0 = {0, 0, 0, 1},
-				.c1 = {1, 0, 0, 1},
-				.c2 = {0, 1, 0, 1},
-				.c3 = {1, 1, 0, 1},
-				.extent = {.15f, .15f},
-			});*/
-			//
-			// for(int i = 0; i < 5; ++i){
-			// 	where = draw::place_instruction_at(where, instructions.end(), draw::circle_fill_draw{
-			// 		.radius = {0, 500},
-			// 	});
-			// }
-
-			// for(int i = 0; i < 11; ++i){
-			// 	where = draw::place_instruction_at(where, instructions.end(), draw::triangle_draw{});
-			// }
-			//
-			// for(int i = 0; i < 64; ++i){
-			// 	where = draw::place_instruction_at(where, instructions.end(), draw::rectangle_draw{});
-			// }
-			//
-			// for(int i = 0; i < 16; ++i){
-			// 	where = draw::place_instruction_at(where, instructions.end(), draw::line_draw{});
-			// }
-
-		}
 
 		vk::color_attachment attachment{ctx.get_allocator(), ctx.get_extent(),
 			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
@@ -1053,7 +980,7 @@ int main(){
 		core::global::graphic::context.set_staging_image({
 			.image = attachment.get_image(),
 			.extent = core::global::graphic::context.get_extent(),
-			.clear = false,
+			.clear = true,
 			.owner_queue_family = core::global::graphic::context.graphic_family(),
 			.src_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
 			.src_access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -1063,50 +990,73 @@ int main(){
 			.dst_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 		});
 
+		camera.resize_screen(core::global::graphic::context.get_extent().width, core::global::graphic::context.get_extent().height);
+
 		vk::dynamic_rendering dynamic_rendering{
 			{attachment.get_image_view()}, nullptr
 		};
 
-		batch.record_command(pipeline_layout, [&] -> std::generator<VkCommandBuffer&&> {
-			for (const auto & group : batch_external_data.groups){
-				vk::scoped_recorder recorder{group.command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
+		{
+			batch.record_command(pipeline_layout, [&] -> std::generator<VkCommandBuffer&&> {
+				for (const auto & [idx, group] : batch_external_data.groups | std::views::enumerate){
+					vk::scoped_recorder recorder{group.command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
-				dynamic_rendering.begin_rendering(recorder, ctx.get_screen_area());
-				p.bind(recorder, VK_PIPELINE_BIND_POINT_GRAPHICS);
+					dynamic_rendering.begin_rendering(recorder, ctx.get_screen_area());
+					p.bind(recorder, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
-				vk::cmd::set_viewport(recorder, ctx.get_screen_area());
-				vk::cmd::set_scissor(recorder, ctx.get_screen_area());
+					batch_external_data.user_descriptor_buffer_.bind_chunk_to(recorder, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, idx);
+					vk::cmd::set_viewport(recorder, ctx.get_screen_area());
+					vk::cmd::set_scissor(recorder, ctx.get_screen_area());
 
-				co_yield group.command_buffer.get();
+					co_yield group.command_buffer.get();
 
-				vkCmdEndRendering(recorder);
-			}
-		}());
+					vkCmdEndRendering(recorder);
+				}
+			}());
 
-		batch.on_submit = [&](std::uint32_t idx) -> VkCommandBuffer {
-			return batch_external_data.groups[idx].command_buffer;
-		};
+			batch.on_submit = [&](std::uint32_t idx, std::span<const std::byte> spn) -> VkCommandBuffer {
+				if(!spn.empty() && spn.size_bytes() == sizeof(VertexUBO)){
+					vk::buffer_mapper{usr_ubo}.load_range(spn, sizeof(VertexUBO) * idx);
+				}
+				return batch_external_data.groups[idx].command_buffer;
+			};
+		}
+
+		camera.set_scale_range({0.2f, 4.f});
+		batch.update_ubo(VertexUBO{
+			.proj = math::mat3_idt,
+			.view = camera.get_world_to_uniformed()
+		});
 
 		vk::fence fence{ctx.get_device(), false};
 		core::global::timer.reset_time();
 		while(!ctx.window().should_close()){
 			ctx.window().poll_events();
 			core::global::timer.fetch_time();
+			core::global::input.update(core::global::timer.global_delta_tick());
+			camera.update(core::global::timer.global_delta_tick());
+
+			if(camera.check_changed()){
+				batch.update_ubo(VertexUBO{
+					.proj = math::mat3_idt,
+					.view = camera.get_world_to_uniformed()
+				});
+			}
+
+			for(unsigned i = 0; i < 10; ++i){
+				batch.push_instruction(
+					draw::poly_fill_draw{
+						.pos = {.35f + i * 270.1f, .25f},
+						.segments = 600,
+						.initial_angle = 0,
+
+						.radius = {10.01f, 100.2f},
+
+						.inner = {0, 1, 0, 0},
+						.outer = {1, 0, 1, .4f},
+				});
+			}
 			//
-			// for(unsigned i = 0; i < 10; ++i){
-			// 	math::vec2 off{i * .1f};
-			// 	batch.push_instruction(draw::triangle_draw{
-			// 		.generic = {.depth = 0},
-			// 		.p0 = off + math::vec2{-.1f -.35f, -.5f},
-			// 		.p1 = off + math::vec2{.1f -.35f, -.5f},
-			// 		.p2 = off + math::vec2{0 -.35f, -.3f},
-			// 		.c0 = {1, 0, 0, 1},
-			// 		.c1 = {0, 1, 0, 1},
-			// 		.c2 = {0, 0, 1, 1}
-			// 	});
-			//
-			//
-			// }
 			// batch.push_instruction(draw::rectangle_draw{
 			// 	.pos = {.5f, 0},
 			// 	.angle = 30 * math::deg_to_rad,
@@ -1118,34 +1068,22 @@ int main(){
 			// 	.extent = {.15f, .15f},
 			// });
 
-			batch.push_instruction(
-				draw::poly_fill_draw{
-					.pos = {-.35f, .25f},
-					.segments = 4000,
-					.initial_angle = 30 * math::deg_to_rad,
 
-					.radius = {.01f, .2f},
-
-					.inner = {0, 1, 0, 0},
-					.outer = {1, 0, 1, .4f},
-			});
+			// batch.push_instruction(
+			// 	draw::poly_fill_draw{
+			// 		.pos = {-.35f, .25f},
+			// 		.segments = 600,
+			// 		.initial_angle = 0,
+			//
+			// 		.radius = {.01f, .2f},
+			//
+			// 		.inner = {0, 1, 0, 0},
+			// 		.outer = {1, 1, 1, .4f},
+			// });
 
 			batch.consume_all();
 			batch.wait_all();
 			assert(batch.is_all_done());
-
-			//
-			// vk::cmd::submit_command(core::global::graphic::context.graphic_queue(), {draw_buf}, fence);
-			// fence.wait_and_reset();
-			//
-			// vk::cmd::submit_command(core::global::graphic::context.graphic_queue(), {draw_buf}, fence);
-			// fence.wait_and_reset();
-			//
-			// vk::cmd::submit_command(core::global::graphic::context.graphic_queue(), {draw_buf}, fence);
-			// fence.wait_and_reset();
-			//
-			// vk::cmd::submit_command(core::global::graphic::context.graphic_queue(), {draw_buf}, fence);
-			// fence.wait_and_reset();
 
 			ctx.flush();
 			vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {manager.get_main_command_buffer()});

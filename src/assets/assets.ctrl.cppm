@@ -21,7 +21,10 @@ namespace mo_yanxi::assets::ctrl{
 	bool disableMove = false;
 	float cameraMoveSpeed = baseCameraMoveSpeed;
 
-	mo_yanxi::graphic::camera2& get_camera(){
+	export inline mo_yanxi::graphic::camera2* spec_camera;
+
+	mo_yanxi::graphic::camera2& get_camera() noexcept {
+		if(spec_camera)return *spec_camera;
 		if(core::global::ui::root->get_current_focus().has_camera_focus()){
 			return *core::global::ui::root->get_current_focus().focused_camera;
 		}else{
@@ -73,7 +76,8 @@ namespace mo_yanxi::assets::ctrl{
 			if(!core::global::ui::root->is_scroll_idle()){
 				core::global::ui::root->input_scroll(x, y);
 			}else{
-				core::global::graphic::world.camera.set_target_scale(core::global::graphic::world.camera.get_target_scale() + y * 0.05f);
+				auto& cmr = get_camera();
+				cmr.set_target_scale(cmr.get_target_scale() + y * 0.05f);
 			}
 		 });
 		//

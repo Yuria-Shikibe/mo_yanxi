@@ -88,15 +88,21 @@ namespace mo_yanxi::graphic{
 }
 
 namespace mo_yanxi::graphic::draw{
+	using float2 = math::vec2;
+	struct alignas(16) float4 : color{};
+
+
 	export enum struct draw_instruction_type : std::uint32_t{
 		noop,
+		uniform_update,
+
 		triangle,
 		rectangle,
 		line,
 		circle,
 		partial_circle,
 
-		uniform_update,
+
 		SIZE,
 	};
 
@@ -107,7 +113,6 @@ namespace mo_yanxi::graphic::draw{
 		return math::clamp<std::uint32_t>(static_cast<std::uint32_t>(radius * math::pi / CircleVertPrecision), 10U, 256U);
 	}
 
-
 	export union image_view{
 		VkImageView view;
 		std::uint64_t index;
@@ -117,11 +122,6 @@ namespace mo_yanxi::graphic::draw{
 		std::uint32_t cap;
 	};
 
-	// struct primitive_generic{
-	// 	draw_mode mode;
-	// 	float depth;
-	// };
-	//
 	export struct alignas(16) primitive_generic{
 		image_view image;
 		draw_mode mode;
@@ -130,9 +130,9 @@ namespace mo_yanxi::graphic::draw{
 
 	export struct alignas(16) triangle_draw{
 		primitive_generic generic;
-		math::vec2 p0, p1, p2;
-		math::vec2 uv0, uv1, uv2;
-		alignas(16) color c0, c1, c2;
+		float2 p0, p1, p2;
+		float2 uv0, uv1, uv2;
+		float4 c0, c1, c2;
 
 
 		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const triangle_draw& instruction) noexcept{return 3;}
@@ -143,13 +143,26 @@ namespace mo_yanxi::graphic::draw{
 
 	export struct alignas(16) rectangle_draw{
 		primitive_generic generic;
-		math::vec2 pos;
+		float2 pos;
 		float angle;
-		float scale;
-		color c0, c1, c2, c3;
-		math::vec2 extent;
-		math::vec2 uv00, uv11;
+		float scale; //TODO uses other?
 
+		float4 c0, c1, c2, c3;
+		float2 extent;
+		float2 uv00, uv11;
+
+
+		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const rectangle_draw& instruction) noexcept{return 4;}
+
+		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(this const rectangle_draw& instruction) noexcept{return 2;}
+
+	};
+
+	export struct alignas(16) rectangle_ortho_draw{
+		primitive_generic generic;
+		float2 v00, v11;
+		float4 c0, c1, c2, c3;
+		float2 uv00, uv11;
 
 
 		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const rectangle_draw& instruction) noexcept{return 4;}
@@ -160,12 +173,11 @@ namespace mo_yanxi::graphic::draw{
 
 	export struct alignas(16) line_draw{
 		primitive_generic generic;
-		math::vec2 src, dst;
-		math::vec2 uv00, uv11;
+		float2 src, dst;
+		float2 uv00, uv11;
 		float stroke;
 		std::uint32_t cap; //TODO
-		color csrc, cdst;
-
+		float4 csrc, cdst;
 
 
 		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const line_draw& instruction) noexcept{return 4;}
@@ -176,7 +188,7 @@ namespace mo_yanxi::graphic::draw{
 
 	export struct alignas(16) poly_fill_draw{
 		primitive_generic generic;
-		math::vec2 pos;
+		float2 pos;
 		std::uint32_t segments;
 		float initial_angle;
 
@@ -185,8 +197,8 @@ namespace mo_yanxi::graphic::draw{
 		std::uint32_t cap2;
 
 		math::range radius;
-		math::vec2 uv00, uv11;
-		alignas(16) color inner, outer;
+		float2 uv00, uv11;
+		float4 inner, outer;
 
 
 		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const poly_fill_draw& instruction) noexcept{
@@ -200,14 +212,14 @@ namespace mo_yanxi::graphic::draw{
 
 	export struct partial_poly_fill_draw{
 		primitive_generic generic;
-		math::vec2 pos;
+		float2 pos;
 		std::uint32_t segments;
 		std::uint32_t cap;
 
 		math::range radius;
 		math::based_section<float> range;
-		math::vec2 uv00, uv11;
-		alignas(16) color inner, outer;
+		float2 uv00, uv11;
+		float4 inner, outer;
 
 		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const partial_poly_fill_draw& instruction) noexcept{
 			return instruction.radius.from == 0 ? instruction.segments + 1 : instruction.segments * 2;
@@ -262,19 +274,35 @@ namespace mo_yanxi::graphic::draw{
 	concept known_instruction = instruction_type_of<T> != draw_instruction_type::uniform_update;
 
 
+	union dispatch_info_payload{
+		struct {
+			std::uint32_t vertex_count;
+			std::uint32_t primitive_count;
+		} draw;
+
+		struct {
+			std::uint32_t offset;
+			std::uint32_t cap;
+		} ubo;
+	};
+
+
 	export
 	struct alignas(16) instruction_head{
 		draw_instruction_type type;
-		std::uint32_t size;
-
-		//TODO union for ubo update span?
-		std::uint32_t vertex_count;
-		std::uint32_t primitive_count;
+		std::uint32_t size; //size include head
+		dispatch_info_payload payload;
 
 		[[nodiscard]] constexpr std::ptrdiff_t get_instr_byte_size() const noexcept{
 			return size << 4u;
 		}
+
+		[[nodiscard]] constexpr std::ptrdiff_t get_payload_byte_size() const noexcept{
+			return (size - 1 /*head*/) << 4u;
+		}
 	};
+
+	static_assert(std::is_standard_layout_v<instruction_head>);
 
 	template <typename T>
 	constexpr instruction_head make_instruction_head(const T& instr) noexcept{
@@ -298,10 +326,11 @@ namespace mo_yanxi::graphic::draw{
 			}
 		}();
 
+
 		return instruction_head{
-			instruction_type_of<T>,
-			required / 16,
-			vtx, pmt
+			.type = instruction_type_of<T>,
+			.size = required / 16,
+			.payload = {.draw = {.vertex_count = vtx, .primitive_count = pmt}}
 		};
 	}
 
@@ -314,7 +343,6 @@ namespace mo_yanxi::graphic::draw{
 		return ptr;
 	}
 
-	// template <typename T>
 	FORCE_INLINE CONST_FN constexpr std::uint32_t get_completed_primitives_at(std::uint32_t vtx) noexcept{
 		return vtx < 3 ? 0 : vtx - 2;
 	}
@@ -426,13 +454,14 @@ namespace mo_yanxi::graphic::draw{
 	}
 
 	export
-	template <typename T>
+	template <known_instruction T>
 		requires (std::is_trivially_copyable_v<T>)
 	[[nodiscard]] FORCE_INLINE std::byte* place_instruction_at(
 		std::byte* const where,
 		const std::byte* const sentinel,
-		const draw_instruction_type type, const T& payload) noexcept{
+		const T& payload) noexcept{
 		CHECKED_ASSUME(where != nullptr);
+		CHECKED_ASSUME(where <= sentinel);
 		CHECKED_ASSUME(std::bit_cast<std::uintptr_t>(where) % 16 == 0);
 
 		if(sentinel - where < get_instr_size<T>() + sizeof(instruction_head))return nullptr;
@@ -441,16 +470,33 @@ namespace mo_yanxi::graphic::draw{
 
 		std::construct_at(reinterpret_cast<instruction_head*>(where), draw::make_instruction_head(payload));
 		std::construct_at(reinterpret_cast<T*>(where + sizeof(instruction_head)), payload);
-
-		return pwhere + get_instr_size<T>();
+		return std::assume_aligned<16>(pwhere + get_instr_size<T>());
 	}
-
 
 	export
 	template <typename T>
-		requires (std::is_trivially_copyable_v<T> && known_instruction<T>)
-	[[nodiscard]] FORCE_INLINE std::byte* place_instruction_at(std::byte* const where, const std::byte* const sentinel, const T& payload) noexcept{
-		return draw::place_instruction_at(where, sentinel, instruction_type_of<T>, payload);
+		requires (std::is_trivially_copyable_v<T>)
+	[[nodiscard]] FORCE_INLINE std::byte* place_ubo_update_at(
+		std::byte* const where,
+		const std::byte* const sentinel,
+		const T& payload,
+		const std::uint32_t offset = 0
+		) noexcept{
+		CHECKED_ASSUME(where != nullptr);
+		CHECKED_ASSUME(where <= sentinel);
+		CHECKED_ASSUME(std::bit_cast<std::uintptr_t>(where) % 16 == 0);
+
+		if(sentinel - where < get_instr_size<T>() + sizeof(instruction_head))return nullptr;
+
+		const auto pwhere = std::assume_aligned<16>(where);
+
+		std::construct_at(reinterpret_cast<instruction_head*>(where), instruction_head{
+			.type = draw_instruction_type::uniform_update,
+			.size = get_instr_size<T>() / 16,
+			.payload = {.ubo = {.offset = offset}}
+		});
+		std::construct_at(reinterpret_cast<T*>(where + sizeof(instruction_head)), payload);
+		return std::assume_aligned<16>(pwhere + get_instr_size<T>());
 	}
 
 	constexpr inline std::ptrdiff_t GPU_BUF_UNIT_SIZE = 16;
@@ -462,6 +508,10 @@ namespace mo_yanxi::graphic::draw{
 		std::uint32_t next_vertex_offset;
 		bool ubo_requires_update;
 		bool img_requires_update;
+
+		[[nodiscard]] bool contains_next() const noexcept{
+			return next_primit_offset != 0;
+		}
 
 		bool host_process_required() const noexcept{
 			return next == nullptr || ubo_requires_update || img_requires_update;
@@ -480,7 +530,7 @@ namespace mo_yanxi::graphic::draw{
 	export
 	[[nodiscard]] std::span<const std::byte> get_ubo_data(const std::byte* p) noexcept{
 		const auto head = get_instr_head(p);
-		const auto ubo_size = head.size * GPU_BUF_UNIT_SIZE - sizeof(instruction_head);
+		const std::size_t ubo_size = head.get_payload_byte_size();
 		return std::span{p + sizeof(instruction_head), ubo_size};
 	}
 
@@ -499,22 +549,6 @@ namespace mo_yanxi::graphic::draw{
 		return true;
 	}
 
-	union dispatch_info_payload{
-		struct {
-			std::uint32_t primitive_offset;
-			std::uint32_t primitive_count;
-		};
-
-		struct {
-			std::uint32_t ubo_offset;
-			std::uint32_t ubo_size;
-		};
-	};
-
-	struct T{
-		dispatch_info_payload payload;
-	};
-
 	export
 	struct alignas(16) dispatch_group_info{
 		std::uint32_t instruction_offset; //offset in 16 Byte
@@ -523,6 +557,10 @@ namespace mo_yanxi::graphic::draw{
 		std::uint32_t primitive_count;
 	};
 
+	/**
+	 *
+	 * @brief parse given instructions between [begin, sentinel), store mesh dispatch info to storage
+	 */
 	export
 	FORCE_INLINE dispatch_result get_dispatch_info(
 		std::byte* const instr_begin,
@@ -540,7 +578,7 @@ namespace mo_yanxi::graphic::draw{
 
 		std::uint32_t verticesBreakpoint{initial_vertex_offset};
 		std::uint32_t nextPrimitiveOffset{initial_primitive_offset};
-		storage[currentMeshCount].primitive_offset = nextPrimitiveOffset;
+		storage[0].primitive_offset = nextPrimitiveOffset;
 
 		auto ptr_to_head = std::assume_aligned<16>(instr_begin);
 
@@ -607,8 +645,8 @@ namespace mo_yanxi::graphic::draw{
 				if(pushedVertices + nextVertices <= MaxVerticesPerMesh){
 					verticesBreakpoint = 0;
 					pushedVertices += nextVertices;
-					nextPrimitiveOffset = 0;
 					pushedPrimitives += get_primitive_count(head.type, ptr_to_head + sizeof(instruction_head), nextVertices);
+					nextPrimitiveOffset = 0;
 
 					ptr_to_head = std::assume_aligned<16>(ptr_to_head + head.get_instr_byte_size());
 
