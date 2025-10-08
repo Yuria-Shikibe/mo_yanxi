@@ -58,6 +58,7 @@ namespace mo_yanxi::vk{
 			features.independentBlend = true;
 			features.sampleRateShading = true;
 			features.fragmentStoresAndAtomics = true;
+			features.shaderInt64 = true;
 
 			return features;
 		}()};

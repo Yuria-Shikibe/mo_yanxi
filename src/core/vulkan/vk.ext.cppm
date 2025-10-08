@@ -11,7 +11,8 @@ namespace mo_yanxi::vk{
 	export std::add_pointer_t<decltype(vkGetDescriptorSetLayoutSizeEXT)> getDescriptorSetLayoutSizeEXT = nullptr;
 	export std::add_pointer_t<decltype(vkGetDescriptorSetLayoutBindingOffsetEXT)> getDescriptorSetLayoutBindingOffsetEXT = nullptr;
 	std::add_pointer_t<decltype(vkGetDescriptorEXT)> getDescriptorEXT_ = nullptr;
-	export std::add_pointer_t<decltype(vkCmdDrawMeshTasksEXT)> drawMeshTasksEXT = nullptr;
+	std::add_pointer_t<decltype(vkCmdDrawMeshTasksEXT)> drawMeshTasksEXT = nullptr;
+	std::add_pointer_t<decltype(vkCmdDrawMeshTasksIndirectEXT)> drawMeshTasksIndirectEXT = nullptr;
 
 	std::add_pointer_t<decltype(vkGetDeviceFaultInfoEXT)> vkGetDeviceFaultInfoEXT = nullptr;
 
@@ -58,6 +59,23 @@ namespace mo_yanxi::vk{
 			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 		};
 		constexpr VkDeviceSize OffsetDesignator[MaxStackBufferSize]{};
+
+		export void drawMeshTasks(
+			   VkCommandBuffer                             commandBuffer,
+			   uint32_t                                    groupCountX,
+			   uint32_t                                    groupCountY,
+			   uint32_t                                    groupCountZ){
+			drawMeshTasksEXT(commandBuffer, groupCountX, groupCountY, groupCountZ);
+		}
+
+		export void drawMeshTasksIndirect(
+		VkCommandBuffer                             commandBuffer,
+		VkBuffer                                    buffer,
+		VkDeviceSize                                offset = 0,
+		uint32_t                                    drawCount = 1,
+		uint32_t                                    stride = sizeof(VkDrawMeshTasksIndirectCommandEXT)){
+			drawMeshTasksIndirectEXT(commandBuffer, buffer, offset, drawCount, stride);
+		}
 
 		export void bindDescriptorBuffersEXT(
 			VkCommandBuffer commandBuffer,
@@ -201,7 +219,10 @@ namespace mo_yanxi::vk{
 		getDescriptorSetLayoutSizeEXT = LoadFuncPtr(instance, vkGetDescriptorSetLayoutSizeEXT);
 		getDescriptorSetLayoutBindingOffsetEXT = LoadFuncPtr(instance, vkGetDescriptorSetLayoutBindingOffsetEXT);
 		getDescriptorEXT_ = LoadFuncPtr(instance, vkGetDescriptorEXT);
+
 		drawMeshTasksEXT = LoadFuncPtr(instance, vkCmdDrawMeshTasksEXT);
+		drawMeshTasksIndirectEXT = LoadFuncPtr(instance, vkCmdDrawMeshTasksIndirectEXT);
+
 		PFN_cmdBindDescriptorBuffersEXT = LoadFuncPtr(instance, vkCmdBindDescriptorBuffersEXT);
 		PFN_cmdSetDescriptorBufferOffsetsEXT = LoadFuncPtr(instance, vkCmdSetDescriptorBufferOffsetsEXT);
 

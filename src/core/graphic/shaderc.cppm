@@ -58,16 +58,16 @@ namespace mo_yanxi::graphic {
         shaderc::CompileOptions options;
 
     public:
-        shader_runtime_compiler() {
-            options.SetSourceLanguage(shaderc_source_language_glsl);
+        shader_runtime_compiler(shaderc_source_language language = shaderc_source_language_glsl) {
+            options.SetSourceLanguage(language);
             options.SetWarningsAsErrors();
             options.SetGenerateDebugInfo();
-            options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
+            options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_4);
             options.SetTargetSpirv(shaderc_spirv_version_1_6);
             options.SetOptimizationLevel(shaderc_optimization_level_performance);
             // options.SetPreserveBindings(true);
             // options.SetWarningsAsErrors();
-            options.SetForcedVersionProfile(460, shaderc_profile_core);
+            if(language == shaderc_source_language_glsl)options.SetForcedVersionProfile(460, shaderc_profile_core);
 
             options.SetIncluder(std::make_unique<Includer>());
         }
@@ -80,10 +80,7 @@ namespace mo_yanxi::graphic {
             options.AddMacroDefinition(name, val);
         }
 
-        //C:\VulkanSDK\1.3.290.0\Bin\spirv-val.exe D:\projects\vulkan_framework\properties\shader\spv\fxaa.frag.spv
         auto compile(const std::span<const char> code, const char *filepath, const char *entry = "main") const {
-
-
             const shaderc::SpvCompilationResult result =
                 compiler.CompileGlslToSpv(
                     code.data(), code.size(),

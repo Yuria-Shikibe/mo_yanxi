@@ -657,6 +657,12 @@ namespace mo_yanxi::math {
 		return rst;
 	}
 
+	export
+	template <std::integral T>
+	MATH_ATTR constexpr T div_ceil(const T val, const T div) noexcept {
+		return (val + div - 1) / div;
+	}
+
 	/** Returns the next power of two. Returns the specified value if the value is already a power of two. */
 	export MATH_ATTR constexpr int next_bit_ceil(std::unsigned_integral auto value) noexcept {
 		return std::bit_ceil(value) + 1;

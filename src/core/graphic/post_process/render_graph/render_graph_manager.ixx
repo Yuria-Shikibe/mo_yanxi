@@ -447,7 +447,7 @@ namespace mo_yanxi::graphic::render_graph{
 	};
 
 	export
-	template <std::derived_from<pass_meta> T>
+	template </*std::derived_from<pass_meta>*/ typename  T>
 	struct add_result{
 		pass_data& pass;
 		T& meta;
@@ -482,9 +482,10 @@ namespace mo_yanxi::graphic::render_graph{
 			: context_(&context), main_command_buffer{context_->get_compute_command_pool().obtain()}{
 		}
 
-		template <std::derived_from<pass_meta> T, typename ...Args>
-			requires (std::constructible_from<T, vk::context&, Args&& ...>)
+		template </*std::derived_from<pass_meta>*/ typename  T, typename ...Args>
+			// requires (std::constructible_from<T, vk::context&, Args&& ...>)
 		add_result<T> add_stage(Args&& ...args){
+			// static_assert(std::derived_from<T, pass_meta>);
 			pass_data& pass = *passes_.insert(pass_data{std::make_unique<T>(*context_, std::forward<Args>(args) ...)});
 			return {pass, static_cast<T&>(*pass.meta)};
 		}

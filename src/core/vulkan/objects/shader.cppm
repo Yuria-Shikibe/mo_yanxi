@@ -53,8 +53,8 @@ export namespace mo_yanxi::vk{
 
 		VkPipelineShaderStageCreateInfo get_create_info(
 			VkShaderStageFlagBits stage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM,
-			const VkSpecializationInfo* specializationInfo = nullptr
-			/*const std::string_view entry = "main"*/) const{
+			const VkSpecializationInfo* specializationInfo = nullptr,
+			const std::string_view entry = "main") const{
 
 			if(declStage){
 				if(stage == VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM){
@@ -74,7 +74,7 @@ export namespace mo_yanxi::vk{
 				.flags = 0,
 				.stage = stage,
 				.module = handle,
-				.pName = "main",
+				.pName = entry.data(),
 				.pSpecializationInfo = specializationInfo
 			};
 
@@ -136,6 +136,10 @@ export namespace mo_yanxi::vk{
 	public:
 		[[nodiscard]] std::span<const std::uint32_t> get_binary() const noexcept{
 			return binary;
+		}
+
+		void set_no_deduced_stage() noexcept{
+			declStage = {};
 		}
 	};
 

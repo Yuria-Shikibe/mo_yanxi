@@ -172,3 +172,11 @@ task("gen_proto_buf")
 
     set_menu{usage = "create protobuf cpp codes"}
 task_end()
+
+task("gen_slang")
+    on_run(function ()
+        os.exec("py ./build_scripts/slang_builder.py -c ./prop/util/bin/slangc.exe ./prop/assets/shader/slangs ./prop/assets/shader/spv")
+    end)
+
+    set_menu{usage = "compile slang to spirv"}
+task_end()

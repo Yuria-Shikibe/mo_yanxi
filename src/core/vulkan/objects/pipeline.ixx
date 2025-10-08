@@ -60,11 +60,11 @@ namespace mo_yanxi::vk{
 		shader_chain shaderChain{};
 		std::vector<VkDynamicState> dynamicStates{};
 
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo{
+		std::optional<VkPipelineVertexInputStateCreateInfo> vertexInputInfo{VkPipelineVertexInputStateCreateInfo{
 				.sType =  VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
 				.pNext = nullptr,
 				.flags = 0,
-			};
+			}};
 
 		VkPipelineDepthStencilStateCreateInfo depthStencilState{
 				.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
@@ -149,10 +149,11 @@ namespace mo_yanxi::vk{
 			const BindDescTy& binding_desc,
 			const AttrDescTy& attribute_desc
 		){
-			vertexInputInfo.vertexBindingDescriptionCount = static_cast<std::uint32_t>(std::ranges::size(binding_desc)),
-			vertexInputInfo.pVertexBindingDescriptions = std::ranges::data(binding_desc),
-			vertexInputInfo.vertexAttributeDescriptionCount = static_cast<std::uint32_t>(std::ranges::size(attribute_desc)),
-			vertexInputInfo.pVertexAttributeDescriptions = std::ranges::data(attribute_desc);
+			vertexInputInfo.emplace();
+			vertexInputInfo->vertexBindingDescriptionCount = static_cast<std::uint32_t>(std::ranges::size(binding_desc)),
+			vertexInputInfo->pVertexBindingDescriptions = std::ranges::data(binding_desc),
+			vertexInputInfo->vertexAttributeDescriptionCount = static_cast<std::uint32_t>(std::ranges::size(attribute_desc)),
+			vertexInputInfo->pVertexAttributeDescriptions = std::ranges::data(attribute_desc);
 
 			return *this;
 		}
@@ -289,7 +290,7 @@ namespace mo_yanxi::vk{
 					.flags = flags,
 					.stageCount = shaderChain.size(),
 					.pStages = shaderChain.data(),
-					.pVertexInputState = &vertexInputInfo,
+					.pVertexInputState = vertexInputInfo ? &*vertexInputInfo : nullptr,
 					.pInputAssemblyState = &assemblyInfo,
 					.pTessellationState = &tessellation_state_create_info,
 					.pViewportState = &viewportInfo,

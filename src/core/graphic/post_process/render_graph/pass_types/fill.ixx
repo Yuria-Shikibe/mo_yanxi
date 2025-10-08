@@ -29,6 +29,7 @@ namespace mo_yanxi::graphic::render_graph{
 		VkDeviceSize size{std::numeric_limits<VkDeviceSize>::max()};
 	};
 
+	//FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUCK MSVC BUG
 	export
 	template <typename Impl, typename ClearType>
 	struct generic_resource_fill : pass_meta{
@@ -59,18 +60,18 @@ namespace mo_yanxi::graphic::render_graph{
 
 		void add_impl(const clear_info& info) = delete;
 
-		[[nodiscard]] explicit generic_resource_fill(vk::context& context)
+		[[nodiscard]] explicit inline generic_resource_fill(vk::context& context)
 			: pass_meta(context){
 		}
 
-		[[nodiscard]] generic_resource_fill(vk::context& ctx, std::initializer_list<clear_info> clear_infos)
+		[[nodiscard]] inline generic_resource_fill(vk::context& ctx, std::initializer_list<clear_info> clear_infos)
 			: pass_meta(ctx){
 			for (const auto & clear_info : clear_infos){
 				this->add(clear_info);
 			}
 		}
 
-		[[nodiscard]] generic_resource_fill(vk::context& ctx, std::size_t count)
+		[[nodiscard]] inline generic_resource_fill(vk::context& ctx, std::size_t count)
 			: pass_meta(ctx){
 			for(std::size_t i = 0; i < count; ++i){
 				this->add({});
@@ -81,8 +82,18 @@ namespace mo_yanxi::graphic::render_graph{
 	export
 	struct image_clear : generic_resource_fill<image_clear, image_clear_info<VkClearColorValue>>{
 		friend generic_resource_fill;
-		using generic_resource_fill::generic_resource_fill;
 
+		[[nodiscard]] explicit image_clear(vk::context& context)
+			: generic_resource_fill<image_clear, image_clear_info<VkClearColorValue>>(context){
+		}
+
+		[[nodiscard]] image_clear(vk::context& ctx, const std::initializer_list<clear_info>& clear_infos)
+			: generic_resource_fill<image_clear, image_clear_info<VkClearColorValue>>(ctx, clear_infos){
+		}
+
+		[[nodiscard]] image_clear(vk::context& ctx, std::size_t count)
+			: generic_resource_fill<image_clear, image_clear_info<VkClearColorValue>>(ctx, count){
+		}
 
 	private:
 		void add_impl(const clear_info& info){
@@ -115,7 +126,19 @@ namespace mo_yanxi::graphic::render_graph{
 	export
 	struct depth_stencil_image_clear : generic_resource_fill<depth_stencil_image_clear, image_clear_info<VkClearDepthStencilValue>>{
 		friend generic_resource_fill;
-		using generic_resource_fill::generic_resource_fill;
+
+		[[nodiscard]] explicit depth_stencil_image_clear(vk::context& context)
+			: generic_resource_fill<depth_stencil_image_clear, image_clear_info<VkClearDepthStencilValue>>(context){
+		}
+
+		[[nodiscard]] depth_stencil_image_clear(vk::context& ctx, const std::initializer_list<clear_info>& clear_infos)
+			: generic_resource_fill<depth_stencil_image_clear, image_clear_info<VkClearDepthStencilValue>>(
+				ctx, clear_infos){
+		}
+
+		[[nodiscard]] depth_stencil_image_clear(vk::context& ctx, std::size_t count)
+			: generic_resource_fill<depth_stencil_image_clear, image_clear_info<VkClearDepthStencilValue>>(ctx, count){
+		}
 
 	private:
 
@@ -155,7 +178,18 @@ namespace mo_yanxi::graphic::render_graph{
 	export
 	struct buffer_fill : generic_resource_fill<buffer_fill, buffer_fill_info>{
 		friend generic_resource_fill;
-		using generic_resource_fill::generic_resource_fill;
+
+		[[nodiscard]] explicit buffer_fill(vk::context& context)
+			: generic_resource_fill<buffer_fill, buffer_fill_info>(context){
+		}
+
+		[[nodiscard]] buffer_fill(vk::context& ctx, const std::initializer_list<clear_info>& clear_infos)
+			: generic_resource_fill<buffer_fill, buffer_fill_info>(ctx, clear_infos){
+		}
+
+		[[nodiscard]] buffer_fill(vk::context& ctx, std::size_t count)
+			: generic_resource_fill<buffer_fill, buffer_fill_info>(ctx, count){
+		}
 
 	private:
 		void add_impl(const clear_info& info){

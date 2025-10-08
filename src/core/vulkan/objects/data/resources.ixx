@@ -447,13 +447,13 @@ namespace mo_yanxi::vk::templates{
 	}
 
 	export
-	[[nodiscard]] buffer create_storage_buffer(allocator& allocator, const std::size_t size_in_bytes){
+	[[nodiscard]] buffer create_storage_buffer(allocator& allocator, const std::size_t size_in_bytes, VkBufferUsageFlags append_usage = 0){
 		return buffer{
 			allocator,
 			{
 				.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 				.size = size_in_bytes,
-				.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+				.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | append_usage
 			}, {
 				.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 				.preferredFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT

@@ -190,8 +190,8 @@ namespace mo_yanxi::vk{
 			}
 
 			[[nodiscard]] FORCE_INLINE /*constexpr*/ std::uint32_t try_push(VkImageView image) noexcept {
-				if(!image)return std::numeric_limits<std::uint8_t>::max();
-				if(image == latest)return latest_index;
+				if(!image) return std::numeric_limits<std::uint8_t>::max();
+				if(image == latest) return latest_index;
 
 				// for(std::size_t i = 0; i < maximum_images; ++i){
 				// 	auto& cur = images[i];
@@ -209,52 +209,29 @@ namespace mo_yanxi::vk{
 				// 	}
 				// }
 
-				// 将目标指针广播到整个AVX寄存器
+
 				const __m256i target = _mm256_set1_epi64x(std::bit_cast<int64_t>(image));
 				const __m256i zero = _mm256_setzero_si256();
 
-				for (std::uint32_t i = 0; i != maximum_images; i += 4) {
-					// 对齐加载4个指针
-					const auto vec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&images[i]));
+				for(std::uint32_t group_idx = 0; group_idx != maximum_images; group_idx += 4){
+					const auto group = _mm256_load_si256(reinterpret_cast<const __m256i*>(images.data() + group_idx));
 
-					// 检查是否与目标指针相等
-					const auto eq_mask = _mm256_cmpeq_epi64(vec, target);
-					const auto eq_bits = _mm256_movemask_epi8(eq_mask);
-
-					// 高效生成元素掩码（无分支）
-					const std::uint32_t eq_element_mask =
-						((eq_bits & 0x000000FF) == 0x000000FF) |
-						(((eq_bits & 0x0000FF00) == 0x0000FF00) << 1) |
-						(((eq_bits & 0x00FF0000) == 0x00FF0000) << 2) |
-						(((eq_bits & 0xFF000000) == 0xFF000000) << 3);
-
-					if (eq_element_mask) {
-						// 使用 C++20 位操作找到第一个匹配位置
-						const auto j = std::countr_zero(eq_element_mask);
+					const auto eq_mask = _mm256_cmpeq_epi64(group, target);
+					if(const auto eq_bits = std::bit_cast<std::uint32_t>(_mm256_movemask_epi8(eq_mask))){
+						const auto idx = group_idx + /*local offset*/std::countr_zero(eq_bits) / 8;
 						latest = image;
-						latest_index = i + j;
-						return i + j;
+						latest_index = idx;
+						return idx;
 					}
 
-					// 检查空槽（nullptr）
-					const auto null_mask = _mm256_cmpeq_epi64(vec, zero);
-					const auto null_bits = _mm256_movemask_epi8(null_mask);
-
-					// 高效生成空槽掩码（无分支）
-					const std::uint32_t null_element_mask =
-						((null_bits & 0x000000FF) == 0x000000FF) |
-						(((null_bits & 0x0000FF00) == 0x0000FF00) << 1) |
-						(((null_bits & 0x00FF0000) == 0x00FF0000) << 2) |
-						(((null_bits & 0xFF000000) == 0xFF000000) << 3);
-
-					if (null_element_mask) {
-						// 使用 C++20 位操作找到第一个空槽位置
-						const auto j = std::countr_zero(null_element_mask);
-						images[i + j] = image;
+					const auto null_mask = _mm256_cmpeq_epi64(group, zero);
+					if(const auto null_bits = std::bit_cast<std::uint32_t>(_mm256_movemask_epi8(null_mask))){
+						const auto idx = group_idx + /*local offset*/std::countr_zero(null_bits) / 8;
+						images[idx] = image;
 						latest = image;
-						latest_index = i + j;
-						count = i + j + 1;
-						return i + j;
+						latest_index = idx;
+						++count;
+						return idx;
 					}
 				}
 

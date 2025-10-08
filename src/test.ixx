@@ -7,6 +7,7 @@ export module test;
 import mo_yanxi.assets.directories;
 import mo_yanxi.assets.ctrl;
 
+import mo_yanxi.vk.validation;
 import mo_yanxi.vk.context;
 import mo_yanxi.core.window;
 
@@ -50,6 +51,14 @@ namespace test{
 }
 
 namespace test{
+	export void check_validation_layer_activation(){
+		if(!DEBUG_CHECK){
+			vk::enable_validation_layers = false;
+		}else if(auto ptr = std::getenv("NSIGHT"); ptr != nullptr && std::strcmp(ptr, "1") == 0){
+			vk::enable_validation_layers = false;
+		}
+	}
+
 	export void foot(){
 		// using namespace mo_yanxi;
 		// math::vec2 v{114, 514};
@@ -81,6 +90,45 @@ namespace test{
 		});
 	}
 
+	export
+	void set_up_flush_setter(auto append, auto prov){
+
+		core::global::graphic::context.register_post_resize("test", [=](window_instance::resize_event event){
+			core::global::ui::root->resize_all(math::frect{math::vector2{event.size.width, event.size.height}.as<float>()});
+
+			core::global::graphic::world.resize(event.size);
+			core::global::graphic::ui.resize(event.size);
+
+			append();
+			core::global::graphic::context.set_staging_image(
+				{
+					.image = prov(),
+					.extent = core::global::graphic::context.get_extent(),
+					.clear = false,
+					.owner_queue_family = core::global::graphic::context.compute_family(),
+					.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+					.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+					.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+					.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+					.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+					.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+				}, false);
+		});
+
+		append();
+		core::global::graphic::context.set_staging_image({
+			.image = prov(),
+			.extent = core::global::graphic::context.get_extent(),
+			.clear = false,
+			.owner_queue_family = core::global::graphic::context.compute_family(),
+			.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+			.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+			.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+		});
+	}
 
 	export
 	void load_content(){

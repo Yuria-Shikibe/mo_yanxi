@@ -6,7 +6,7 @@
 // #include <cassert>
 
 // #define VMA_IMPLEMENTATION
-// #include <vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 // #include <freetype/freetype.h>
 
 #include "../src/srl/srl.hpp"
@@ -113,13 +113,12 @@ import mo_yanxi.game.ui.grid_editor;
 import mo_yanxi.game.content;
 import mo_yanxi.game.meta.grid.srl;
 
-
-import mo_yanxi.graphic.shader_reflect;
+import mo_yanxi.graphic.render_graph.manager;
+import mo_yanxi.graphic.render_graph.fill;
 import mo_yanxi.graphic.post_processor.oit_blender;
-
-
 import mo_yanxi.game.graphic.render_graph_spec;
-
+import draw_instruction;
+import draw_batch;
 
 
 import test;
@@ -599,43 +598,10 @@ void main_loop(){
 		graph.world_draw_oit_buffer_stat.as_buffer().handle = renderer_world.batch.oit_buffer.borrow(0, sizeof(graphic::oit_statistic));
 	});
 
-
-	core::global::graphic::context.register_post_resize("test", [&](window_instance::resize_event event){
-		core::global::ui::root->resize_all(math::frect{math::vector2{event.size.width, event.size.height}.as<float>()});
-
-		context.wait_on_device();
-		renderer_world.resize(event.size);
-		renderer_ui.resize(event.size);
-
+	test::set_up_flush_setter([&]{
 		graph.update_resources();
-		core::global::graphic::context.set_staging_image(
-			{
-				.image = graph.get_output_image().image,
-				.extent = core::global::graphic::context.get_extent(),
-				.clear = false,
-				.owner_queue_family = core::global::graphic::context.compute_family(),
-				.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-				.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-				.src_layout = VK_IMAGE_LAYOUT_GENERAL,
-				.dst_layout = VK_IMAGE_LAYOUT_GENERAL
-			}, false);
-	});
-
-	graph.update_resources();
-
-	core::global::graphic::context.set_staging_image({
-		.image = graph.get_output_image().image,
-		.extent = core::global::graphic::context.get_extent(),
-		.clear = false,
-		.owner_queue_family = core::global::graphic::context.compute_family(),
-		.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-		.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-		.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-		.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-		.src_layout = VK_IMAGE_LAYOUT_GENERAL,
-		.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+	}, [&]{
+		return graph.get_output_image().image;
 	});
 
 
@@ -877,12 +843,8 @@ void main_loop(){
 
 #pragma endregion
 
-int main(){
-	if(!DEBUG_CHECK){
-		mo_yanxi::vk::enable_validation_layers = false;
-	}else if(auto ptr = std::getenv("NSIGHT"); ptr != nullptr && std::strcmp(ptr, "1") == 0){
-		mo_yanxi::vk::enable_validation_layers = false;
-	}
+void draw_main(){
+	test::check_validation_layer_activation();
 
 
 	using namespace mo_yanxi;
@@ -920,4 +882,289 @@ int main(){
 	core::global::assets::dispose();
 	core::global::graphic::dispose();
 	core::glfw::terminate();
+}
+
+int main(){
+	using namespace mo_yanxi;
+	using namespace mo_yanxi::game;
+	using namespace mo_yanxi::graphic;
+	test::check_validation_layer_activation();
+
+	test::init_assets();
+	test::compile_shaders();
+	//
+	core::glfw::init();
+	core::global::graphic::init_vk();
+	core::global::assets::init(&core::global::graphic::context);
+	assets::graphic::load(core::global::graphic::context);
+
+	//
+	// while(!core::global::graphic::context.window().should_close()){
+	// 	core::global::graphic::context.window().poll_events();
+	// }
+	//
+	// core::global::graphic::context.wait_on_device();
+	// graph_small_test();
+	// graphic::shader_reflection reflection{assets::graphic::shaders::comp::bloom.get_binary()};
+	// reflection.foo();
+
+	core::global::ui::init();
+	game::content::load();
+	test::load_content();
+
+	{
+		auto& ctx = core::global::graphic::context;
+		instruction_batch batch{ctx};
+		batch_external_data batch_external_data{ctx};
+
+		vk::shader_module msh{ctx.get_device(), assets::dir::shader_spv / "test.mesh_mesh.spv"};
+		msh.set_no_deduced_stage();
+
+		vk::pipeline_layout pipeline_layout{ctx.get_device(), 0, {batch.get_batch_descriptor_layout(), /*draw_descriptor_layout*/}};
+
+		vk::graphic_pipeline_template gtp{};
+		gtp.set_shaders({
+			msh.get_create_info(VK_SHADER_STAGE_MESH_BIT_EXT, nullptr, "main_mesh"),
+			msh.get_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, nullptr, "main_frag")
+		});
+		gtp.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::alpha_blend);
+
+		vk::pipeline p{ctx.get_device(), pipeline_layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, gtp};
+
+
+		{
+			/*auto where = batch.instruction_buffer_.begin();
+			where = draw::place_instruction_at(
+				where,
+				instructions.end(),
+				draw::triangle_draw{
+				.generic = {.depth = 0},
+				.p0 = {-.5f -.35f, -.5f},
+				.p1 = {.5f -.35f, -.5f},
+				.p2 = {0 -.35f, .5f},
+				.c0 = {1, 0, 0, 1},
+				.c1 = {0, 1, 0, 1},
+				.c2 = {0, 0, 1, 1}
+			});
+			//
+			where = draw::place_instruction_at(
+				where,
+				instructions.end(),
+				draw::triangle_draw{
+				.generic = {.depth = 0},
+				.p0 = {-.5f +.35f, -.5f},
+				.p1 = {.5f +.35f, -.5f},
+				.p2 = {0 +.35f, .5f},
+				.c0 = {1, 0, 0, 1},
+				.c1 = {0, 1, 0, 1},
+				.c2 = {0, 0, 1, 1}
+			});
+
+			where = draw::place_instruction_at(
+				where,
+				instructions.end(),
+				draw::poly_fill_draw{
+					.pos = {.5f, -.5f},
+					.segments = 6,
+					.initial_angle = 30 * math::deg_to_rad,
+
+					.radius = {.1f, .2f},
+
+					.inner = {0, 0, 0, 1},
+					.outer = {1, 1, 1, 1}
+			});
+
+			for(int i = 0; i < 50; ++i){
+				where = draw::place_instruction_at(
+				where,
+				instructions.end(),
+				draw::poly_fill_draw{
+					.pos = {-.35f + float(i) * 0.005f, .25f},
+					.segments = 2500,
+					.initial_angle = 30 * math::deg_to_rad,
+
+					.radius = {.01f, .2f},
+
+					.inner = {0, 1, 0, 0},
+					.outer = {1, 0, 1, .4f}
+			});
+			}
+
+
+			where = draw::place_instruction_at(
+				where,
+				instructions.end(),
+				draw::rectangle_draw{
+				.pos = {.5f, 0},
+				.angle = 30 * math::deg_to_rad,
+				.scale = 1,
+				.c0 = {0, 0, 0, 1},
+				.c1 = {1, 0, 0, 1},
+				.c2 = {0, 1, 0, 1},
+				.c3 = {1, 1, 0, 1},
+				.extent = {.15f, .15f},
+			});*/
+			//
+			// for(int i = 0; i < 5; ++i){
+			// 	where = draw::place_instruction_at(where, instructions.end(), draw::circle_fill_draw{
+			// 		.radius = {0, 500},
+			// 	});
+			// }
+
+			// for(int i = 0; i < 11; ++i){
+			// 	where = draw::place_instruction_at(where, instructions.end(), draw::triangle_draw{});
+			// }
+			//
+			// for(int i = 0; i < 64; ++i){
+			// 	where = draw::place_instruction_at(where, instructions.end(), draw::rectangle_draw{});
+			// }
+			//
+			// for(int i = 0; i < 16; ++i){
+			// 	where = draw::place_instruction_at(where, instructions.end(), draw::line_draw{});
+			// }
+
+		}
+
+		vk::color_attachment attachment{ctx.get_allocator(), ctx.get_extent(),
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+		};
+
+		attachment.init_layout(ctx.get_transient_graphic_command_buffer());
+
+		render_graph::render_graph_manager manager{ctx};
+		{
+			auto& res = manager.add_explicit_resource(render_graph::resource_desc::explicit_resource{render_graph::resource_desc::external_image{}});
+			res.as_image().handle = attachment;
+			res.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			auto world_clear = manager.add_stage<render_graph::image_clear>(1);
+
+			world_clear.pass.add_inout({
+				render_graph::resource_desc::explicit_resource_usage{res, 0},
+			});
+
+			manager.update_external_resources();
+			manager.resize();
+			manager.reset_resources();
+			manager.create_command();
+		}
+
+
+
+		core::global::graphic::context.set_staging_image({
+			.image = attachment.get_image(),
+			.extent = core::global::graphic::context.get_extent(),
+			.clear = false,
+			.owner_queue_family = core::global::graphic::context.graphic_family(),
+			.src_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.src_access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			.dst_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dst_access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			.src_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			.dst_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		});
+
+		vk::dynamic_rendering dynamic_rendering{
+			{attachment.get_image_view()}, nullptr
+		};
+
+		batch.record_command(pipeline_layout, [&] -> std::generator<VkCommandBuffer&&> {
+			for (const auto & group : batch_external_data.groups){
+				vk::scoped_recorder recorder{group.command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
+
+				dynamic_rendering.begin_rendering(recorder, ctx.get_screen_area());
+				p.bind(recorder, VK_PIPELINE_BIND_POINT_GRAPHICS);
+
+				vk::cmd::set_viewport(recorder, ctx.get_screen_area());
+				vk::cmd::set_scissor(recorder, ctx.get_screen_area());
+
+				co_yield group.command_buffer.get();
+
+				vkCmdEndRendering(recorder);
+			}
+		}());
+
+		batch.on_submit = [&](std::uint32_t idx) -> VkCommandBuffer {
+			return batch_external_data.groups[idx].command_buffer;
+		};
+
+		vk::fence fence{ctx.get_device(), false};
+		core::global::timer.reset_time();
+		while(!ctx.window().should_close()){
+			ctx.window().poll_events();
+			core::global::timer.fetch_time();
+			//
+			// for(unsigned i = 0; i < 10; ++i){
+			// 	math::vec2 off{i * .1f};
+			// 	batch.push_instruction(draw::triangle_draw{
+			// 		.generic = {.depth = 0},
+			// 		.p0 = off + math::vec2{-.1f -.35f, -.5f},
+			// 		.p1 = off + math::vec2{.1f -.35f, -.5f},
+			// 		.p2 = off + math::vec2{0 -.35f, -.3f},
+			// 		.c0 = {1, 0, 0, 1},
+			// 		.c1 = {0, 1, 0, 1},
+			// 		.c2 = {0, 0, 1, 1}
+			// 	});
+			//
+			//
+			// }
+			// batch.push_instruction(draw::rectangle_draw{
+			// 	.pos = {.5f, 0},
+			// 	.angle = 30 * math::deg_to_rad,
+			// 	.scale = 1,
+			// 	.c0 = {0, 0, 0, 1},
+			// 	.c1 = {1, 0, 0, 1},
+			// 	.c2 = {0, 1, 0, 1},
+			// 	.c3 = {1, 1, 0, 1},
+			// 	.extent = {.15f, .15f},
+			// });
+
+			batch.push_instruction(
+				draw::poly_fill_draw{
+					.pos = {-.35f, .25f},
+					.segments = 4000,
+					.initial_angle = 30 * math::deg_to_rad,
+
+					.radius = {.01f, .2f},
+
+					.inner = {0, 1, 0, 0},
+					.outer = {1, 0, 1, .4f},
+			});
+
+			batch.consume_all();
+			batch.wait_all();
+			assert(batch.is_all_done());
+
+			//
+			// vk::cmd::submit_command(core::global::graphic::context.graphic_queue(), {draw_buf}, fence);
+			// fence.wait_and_reset();
+			//
+			// vk::cmd::submit_command(core::global::graphic::context.graphic_queue(), {draw_buf}, fence);
+			// fence.wait_and_reset();
+			//
+			// vk::cmd::submit_command(core::global::graphic::context.graphic_queue(), {draw_buf}, fence);
+			// fence.wait_and_reset();
+			//
+			// vk::cmd::submit_command(core::global::graphic::context.graphic_queue(), {draw_buf}, fence);
+			// fence.wait_and_reset();
+
+			ctx.flush();
+			vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {manager.get_main_command_buffer()});
+
+			// std::this_thread::sleep_for(std::chrono::seconds(2));
+		}
+
+		ctx.wait_on_device();
+	}
+	// main_loop();
+
+	test::dispose_content();
+	core::global::ui::dispose();
+
+	assets::graphic::dispose();
+	core::global::assets::dispose();
+	core::global::graphic::dispose();
+	core::glfw::terminate();
+	// draw_main();
+
+	(void)0;
 }
