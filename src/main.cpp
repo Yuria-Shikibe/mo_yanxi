@@ -1023,10 +1023,10 @@ int main(){
 		}
 
 		camera.set_scale_range({0.2f, 4.f});
-		batch.update_ubo(VertexUBO{
-			.proj = math::mat3_idt,
-			.view = camera.get_world_to_uniformed()
-		});
+		// batch.update_ubo(VertexUBO{
+		// 	.proj = math::mat3_idt,
+		// 	.view = camera.get_world_to_uniformed()
+		// });
 
 		vk::fence fence{ctx.get_device(), false};
 		core::global::timer.reset_time();
@@ -1055,34 +1055,26 @@ int main(){
 						.inner = {0, 1, 0, 0},
 						.outer = {1, 0, 1, .4f},
 				});
+
+				batch.push_instruction(draw::rectangle_draw{
+					.pos = {.5f, -300 + i * 270.1f},
+					.angle = 30 * math::deg_to_rad,
+					.scale = 1,
+					.c0 = {0, 0, 0, 1},
+					.c1 = {1, 0, 0, 1},
+					.c2 = {0, 1, 0, 1},
+					.c3 = {1, 1, 0, 1},
+					.extent = {100.15f, 100.15f},
+				});
+
 			}
-			//
-			// batch.push_instruction(draw::rectangle_draw{
-			// 	.pos = {.5f, 0},
-			// 	.angle = 30 * math::deg_to_rad,
-			// 	.scale = 1,
-			// 	.c0 = {0, 0, 0, 1},
-			// 	.c1 = {1, 0, 0, 1},
-			// 	.c2 = {0, 1, 0, 1},
-			// 	.c3 = {1, 1, 0, 1},
-			// 	.extent = {.15f, .15f},
-			// });
 
 
-			// batch.push_instruction(
-			// 	draw::poly_fill_draw{
-			// 		.pos = {-.35f, .25f},
-			// 		.segments = 600,
-			// 		.initial_angle = 0,
-			//
-			// 		.radius = {.01f, .2f},
-			//
-			// 		.inner = {0, 1, 0, 0},
-			// 		.outer = {1, 1, 1, .4f},
-			// });
 
 			batch.consume_all();
 			batch.wait_all();
+			// std::uint8_t cleared = std::ranges::fold_left(batch.instruction_buffer_ | std::views::transform(std::to_integer<std::uint8_t>), 0, std::plus<>{});
+			// std::ptrdiff_t where = std::ranges::find_if(batch.instruction_buffer_, std::to_integer<bool>) - batch.instruction_buffer_.begin();
 			assert(batch.is_all_done());
 
 			ctx.flush();

@@ -349,22 +349,22 @@ namespace mo_yanxi::graphic::draw{
 
 	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_vertex_count(draw_instruction_type type, const void* instruction) noexcept{
 		switch(type){
-			case draw_instruction_type::triangle: return 3U;
-			case draw_instruction_type::rectangle: return 4U;
-			case draw_instruction_type::line: return 4U;
-			case draw_instruction_type::circle: return static_cast<const poly_fill_draw*>(instruction)->get_vertex_count();
-			case draw_instruction_type::partial_circle: return static_cast<const partial_poly_fill_draw*>(instruction)->get_vertex_count();
+		case draw_instruction_type::triangle: return 3U;
+		case draw_instruction_type::rectangle: return 4U;
+		case draw_instruction_type::line: return 4U;
+		case draw_instruction_type::circle: return static_cast<const poly_fill_draw*>(instruction)->get_vertex_count();
+		case draw_instruction_type::partial_circle: return static_cast<const partial_poly_fill_draw*>(instruction)->get_vertex_count();
 		default: std::unreachable();
 		}
 	}
 
 	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_primitive_count(draw_instruction_type type, const void* instruction) noexcept{
 		switch(type){
-			case draw_instruction_type::triangle: return 1U;
-			case draw_instruction_type::rectangle: return 2U;
-			case draw_instruction_type::line: return 2U;
-			case draw_instruction_type::circle: return static_cast<const poly_fill_draw*>(instruction)->get_primitive_count();
-			case draw_instruction_type::partial_circle: return static_cast<const partial_poly_fill_draw*>(instruction)->get_primitive_count();
+		case draw_instruction_type::triangle: return 1U;
+		case draw_instruction_type::rectangle: return 2U;
+		case draw_instruction_type::line: return 2U;
+		case draw_instruction_type::circle: return static_cast<const poly_fill_draw*>(instruction)->get_primitive_count();
+		case draw_instruction_type::partial_circle: return static_cast<const partial_poly_fill_draw*>(instruction)->get_primitive_count();
 		default: std::unreachable();
 		}
 	}
@@ -453,6 +453,27 @@ namespace mo_yanxi::graphic::draw{
 		return ret;
 	}
 
+
+	template <typename T>
+		requires (std::is_trivially_copyable_v<T>)
+	[[nodiscard]] FORCE_INLINE std::byte* place_instr_at_impl(
+		std::byte* const where,
+		const std::byte* const sentinel,
+		const instruction_head& head,
+		const T& payload
+	){
+		if(sentinel - where < get_instr_size<T>() + sizeof(instruction_head))return nullptr;
+
+		const auto pwhere = std::assume_aligned<16>(where);
+
+		// assert(std::ranges::none_of(pwhere, pwhere + draw::get_instr_size<T>() + sizeof(instruction_head), std::to_integer<bool>));
+
+		std::construct_at(reinterpret_cast<instruction_head*>(pwhere), head);
+		std::construct_at(reinterpret_cast<T*>(pwhere + sizeof(instruction_head)), payload);
+		std::memset(pwhere + get_instr_size<T>(), 0, sizeof(instruction_head));
+		return std::assume_aligned<16>(pwhere + get_instr_size<T>());
+	}
+
 	export
 	template <known_instruction T>
 		requires (std::is_trivially_copyable_v<T>)
@@ -460,17 +481,7 @@ namespace mo_yanxi::graphic::draw{
 		std::byte* const where,
 		const std::byte* const sentinel,
 		const T& payload) noexcept{
-		CHECKED_ASSUME(where != nullptr);
-		CHECKED_ASSUME(where <= sentinel);
-		CHECKED_ASSUME(std::bit_cast<std::uintptr_t>(where) % 16 == 0);
-
-		if(sentinel - where < get_instr_size<T>() + sizeof(instruction_head))return nullptr;
-
-		const auto pwhere = std::assume_aligned<16>(where);
-
-		std::construct_at(reinterpret_cast<instruction_head*>(where), draw::make_instruction_head(payload));
-		std::construct_at(reinterpret_cast<T*>(where + sizeof(instruction_head)), payload);
-		return std::assume_aligned<16>(pwhere + get_instr_size<T>());
+		return draw::place_instr_at_impl(where, sentinel, draw::make_instruction_head(payload), payload);
 	}
 
 	export
@@ -482,21 +493,11 @@ namespace mo_yanxi::graphic::draw{
 		const T& payload,
 		const std::uint32_t offset = 0
 		) noexcept{
-		CHECKED_ASSUME(where != nullptr);
-		CHECKED_ASSUME(where <= sentinel);
-		CHECKED_ASSUME(std::bit_cast<std::uintptr_t>(where) % 16 == 0);
-
-		if(sentinel - where < get_instr_size<T>() + sizeof(instruction_head))return nullptr;
-
-		const auto pwhere = std::assume_aligned<16>(where);
-
-		std::construct_at(reinterpret_cast<instruction_head*>(where), instruction_head{
+		return draw::place_instr_at_impl(where, sentinel, instruction_head{
 			.type = draw_instruction_type::uniform_update,
 			.size = get_instr_size<T>() / 16,
 			.payload = {.ubo = {.offset = offset}}
-		});
-		std::construct_at(reinterpret_cast<T*>(where + sizeof(instruction_head)), payload);
-		return std::assume_aligned<16>(pwhere + get_instr_size<T>());
+		}, payload);
 	}
 
 	constexpr inline std::ptrdiff_t GPU_BUF_UNIT_SIZE = 16;
@@ -578,18 +579,12 @@ namespace mo_yanxi::graphic::draw{
 
 		std::uint32_t verticesBreakpoint{initial_vertex_offset};
 		std::uint32_t nextPrimitiveOffset{initial_primitive_offset};
-		storage[0].primitive_offset = nextPrimitiveOffset;
 
 		auto ptr_to_head = std::assume_aligned<16>(instr_begin);
 
 		while(currentMeshCount < storage.size()){
-			if(verticesBreakpoint >= 3){
-				//need patch 2 previous vertex to complete the primitive
-				storage[currentMeshCount].vertex_offset = verticesBreakpoint - 2;
-			}else{
-				//breakpoint at least larger than 3, or equivalent to redraw from 0
-				verticesBreakpoint = 0;
-			}
+			storage[currentMeshCount].primitive_offset = nextPrimitiveOffset;
+			storage[currentMeshCount].vertex_offset = verticesBreakpoint > 2 ? verticesBreakpoint - 2 : 0;
 
 			std::uint32_t pushedVertices{};
 			std::uint32_t pushedPrimitives{};
@@ -606,14 +601,12 @@ namespace mo_yanxi::graphic::draw{
 				storage[currentMeshCount].instruction_offset = (ptr_to_chunk_head - ptr_to_src) / GPU_BUF_UNIT_SIZE;
 				storage[currentMeshCount].primitive_count = pushedPrimitives;
 				++currentMeshCount;
-				if(currentMeshCount != storage.size()){
-					storage[currentMeshCount].primitive_offset = nextPrimitiveOffset;
-				}
+
 			};
 
 			while(true){
 				const auto& head = *start_lifetime_as<instruction_head>(ptr_to_head);
-
+				assert(std::to_underlying(head.type) < std::to_underlying(draw::draw_instruction_type::SIZE));
 				if(ptr_to_head + head.get_instr_byte_size() > instr_sentinel){
 					save_chunk_head_and_incr();
 					return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, false};

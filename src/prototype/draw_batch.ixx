@@ -31,7 +31,6 @@ namespace mo_yanxi::graphic{
 	struct working_group{
 		image_view_history image_view_history{};
 		//TODO UBO data
-		dspt_info_buffer dispatch_info{};
 		VkDrawMeshTasksIndirectCommandEXT indirect{};
 
 		std::byte* span_begin;
@@ -101,6 +100,7 @@ namespace mo_yanxi::graphic{
 		vk::descriptor_layout descriptor_layout_{};
 		vk::descriptor_buffer descriptor_buffer_{};
 
+		dspt_info_buffer temp_dispatch_info_{};
 		std::array<working_group, working_group_count> groups_{};
 		std::uint32_t current_idle_group_index_{};
 		std::uint32_t current_dspt_group_index_ = groups_.size();
@@ -164,49 +164,58 @@ namespace mo_yanxi::graphic{
 
 		template <draw::known_instruction T>
 		void push_instruction(const T& instr){
-			{
-				const auto head = get_instruction_placement_ptr();
-				if(check_need_block<T>(head)){
-					wait_last_group_and_pop();
-				}
-				instruction_idle_ptr_ = draw::place_instruction_at(head, instruction_buffer_.end(), instr);
-			}
-			if(instruction_idle_ptr_ == nullptr){
-				instruction_idle_ptr_ = instruction_buffer_.begin();
 
-				const auto head = get_instruction_placement_ptr();
-				if(check_need_block<T>(head)){
+
+			std::byte* rst{nullptr};
+			{
+				while(check_need_block<T>(instruction_idle_ptr_)){
+					if(is_all_idle())consume_one();
 					wait_last_group_and_pop();
 				}
-				instruction_idle_ptr_ = draw::place_instruction_at(head, instruction_buffer_.end(), instr);
-				assert(instruction_idle_ptr_ != nullptr);
+
+				rst = draw::place_instruction_at(instruction_idle_ptr_, instruction_buffer_.end(), instr);
 			}
+
+			if(rst == nullptr){
+				while(check_need_block<T>(instruction_buffer_.begin())){
+					if(is_all_idle())consume_one();
+					wait_last_group_and_pop();
+				}
+
+				rst = draw::place_instruction_at(instruction_buffer_.begin(), instruction_buffer_.end(), instr);
+			}
+			assert(instruction_idle_ptr_ != nullptr);
+			instruction_idle_ptr_ = rst;
 		}
 
 		template <typename T>
 		void update_ubo(const T& instr){
+			std::byte* rst{nullptr};
 			{
-				const auto head = get_instruction_placement_ptr();
-				if(check_need_block<T>(head)){
+				while(check_need_block<T>(instruction_idle_ptr_)){
+					if(is_all_idle())consume_one();
 					wait_last_group_and_pop();
 				}
-				instruction_idle_ptr_ = draw::place_ubo_update_at(head, instruction_buffer_.end(), instr);
-			}
-			if(instruction_idle_ptr_ == nullptr){
-				instruction_idle_ptr_ = instruction_buffer_.begin();
 
-				const auto head = get_instruction_placement_ptr();
-				if(check_need_block<T>(head)){
+				rst = draw::place_ubo_update_at(instruction_idle_ptr_, instruction_buffer_.end(), instr);
+			}
+
+			if(rst == nullptr){
+				while(check_need_block<T>(instruction_buffer_.begin())){
+					if(is_all_idle())consume_one();
 					wait_last_group_and_pop();
 				}
-				instruction_idle_ptr_ = draw::place_ubo_update_at(head, instruction_buffer_.end(), instr);
-				assert(instruction_idle_ptr_ != nullptr);
+
+				rst = draw::place_ubo_update_at(instruction_buffer_.begin(), instruction_buffer_.end(), instr);
 			}
+			assert(instruction_idle_ptr_ != nullptr);
+			instruction_idle_ptr_ = rst;
+
 		}
 
 
 		[[nodiscard]] bool is_all_done() const noexcept{
-			return instruction_idle_ptr_ == instruction_dspt_ptr_ && instruction_idle_ptr_ == instruction_pend_ptr_;
+			return /*std::ranges::none_of(instruction_buffer_, std::to_integer<bool>) &&*/ instruction_idle_ptr_ == instruction_dspt_ptr_ && instruction_idle_ptr_ == instruction_pend_ptr_;
 		}
 
 		void consume_all(){
@@ -214,14 +223,14 @@ namespace mo_yanxi::graphic{
 		}
 
 		bool consume_one(){
-			if(is_all_pending()){
-				wait_last_group_and_pop();
-			}
 
 			auto& group = groups_[current_idle_group_index_];
 			const auto begin = instruction_pend_ptr_;
 			const auto sentinel = instruction_idle_ptr_ >= instruction_pend_ptr_ ? instruction_idle_ptr_ : instruction_buffer_.end();
-			const auto dspcinfo = draw::get_dispatch_info(instruction_pend_ptr_, sentinel, group.dispatch_info, group.image_view_history, last_primit_offset_, last_vertex_offset_);
+			const auto dspcinfo = draw::get_dispatch_info(instruction_pend_ptr_, sentinel, temp_dispatch_info_, group.image_view_history, last_primit_offset_, last_vertex_offset_);
+			const auto next_instr_type = draw::get_instr_head(dspcinfo.next).type;
+
+			if(dspcinfo.count)std::memset(temp_dispatch_info_.data() + dspcinfo.count, 0, (temp_dispatch_info_.size() - dspcinfo.count) * sizeof(dspt_info_buffer::value_type));
 
 			last_primit_offset_ = dspcinfo.next_primit_offset;
 			last_vertex_offset_ = dspcinfo.next_vertex_offset;
@@ -231,14 +240,18 @@ namespace mo_yanxi::graphic{
 			}
 
 			if(dspcinfo.ubo_requires_update){
-				//TODO skip contiguous ubo update til last one ?
 				const auto data = draw::get_ubo_data(dspcinfo.next);
+
+				if(is_all_pending()){
+					wait_last_group_and_pop();
+				}
+
 				std::memcpy(latest_user_ubo_data_.data(), data.data(), data.size_bytes());
 				user_ubo_data_size_ = data.size_bytes();
 				++current_ubo_index_;
 
 				instruction_pend_ptr_ = dspcinfo.next + data.size_bytes() + sizeof(draw::instruction_head);
-				if(!dspcinfo.count){
+				if(!dspcinfo.count && is_all_idle()){
 					instruction_dspt_ptr_ = instruction_pend_ptr_;
 				}
 			}else{
@@ -246,25 +259,28 @@ namespace mo_yanxi::graphic{
 			}
 
 			if(dspcinfo.count){
-				const auto off = begin - instruction_buffer_.begin();
 				assert(dspcinfo.next >= begin);
 
-				const auto shared_instr_size = (dspcinfo.contains_next() ? draw::get_instr_head(dspcinfo.next).get_instr_byte_size() : 0);
-				const auto instr_size = dspcinfo.next - begin + shared_instr_size;
+				const auto instr_byte_off = begin - instruction_buffer_.begin();
+				const auto instr_shared_size = (dspcinfo.contains_next() ? draw::get_instr_head(dspcinfo.next).get_instr_byte_size() : 0);
+				const auto instr_size = dspcinfo.next - begin + instr_shared_size;
+
+				if(is_all_pending()){
+					wait_last_group_and_pop();
+				}
 
 				(void)vk::buffer_mapper{instruction_gpu_buffer}
 					.load_range(
-						std::span{begin + last_shared_instr_size_, dspcinfo.next + shared_instr_size},
-						off + last_shared_instr_size_);
+						std::span{begin + last_shared_instr_size_, dspcinfo.next + instr_shared_size},
+						instr_byte_off + last_shared_instr_size_);
 
 				(void)vk::buffer_mapper{dispatch_info_buffer}
-					.load_range(std::span{group.dispatch_info}, sizeof(dspt_info_buffer) * current_idle_group_index_);
+					.load_range(std::span{temp_dispatch_info_}, sizeof(dspt_info_buffer) * current_idle_group_index_);
 
 				(void)vk::descriptor_mapper{descriptor_buffer_}
 					.set_storage_buffer(0,
-						instruction_gpu_buffer.get_address() + off,
+						instruction_gpu_buffer.get_address() + instr_byte_off,
 						instr_size,
-
 						current_idle_group_index_);
 
 
@@ -275,7 +291,7 @@ namespace mo_yanxi::graphic{
 				(void)vk::buffer_mapper{indirect_buffer}
 					.load(group.indirect, sizeof(VkDrawMeshTasksIndirectCommandEXT) * current_idle_group_index_);
 
-				last_shared_instr_size_ = shared_instr_size;
+				last_shared_instr_size_ = instr_shared_size;
 
 				//usr update
 				assert(on_submit);
@@ -320,12 +336,11 @@ namespace mo_yanxi::graphic{
 				};
 
 				vkQueueSubmit2(context_->graphic_queue(), 1, &submitInfo2, nullptr);
-				// vk::cmd::q
 
 				push_current_group();
 			}
 
-			if(draw::get_instr_head(dspcinfo.next).type == draw::draw_instruction_type::noop && instruction_pend_ptr_ > instruction_idle_ptr_){
+			if(next_instr_type == draw::draw_instruction_type::noop && instruction_pend_ptr_ > instruction_idle_ptr_){
 				instruction_pend_ptr_ = instruction_buffer_.begin();
 				return true;
 			}
@@ -341,14 +356,7 @@ namespace mo_yanxi::graphic{
 					group->mesh_semaphore.wait(group->current_signal_index);
 				}
 
-				auto idx_1 = group->span_begin - instruction_buffer_.begin();
-				auto idx_2 = group->span_end - instruction_buffer_.begin();
-
-				instruction_dspt_ptr_ = group->span_end;
-
-				std::memset(group->dispatch_info.data(), 0, sizeof(dspt_info_buffer));
-				std::memset(group->span_begin, 0, group->span_end - group->span_begin);
-
+				// std::memset(group->dispatch_info.data(), 0, sizeof(dspt_info_buffer) );
 				instruction_dspt_ptr_ = group->span_end;
 				pop_front_group();
 			}
@@ -378,15 +386,17 @@ namespace mo_yanxi::graphic{
 
 		template <typename InstrT>
 		bool check_need_block(const std::byte* where) const noexcept{
-			const auto end = where + draw::get_instr_size<InstrT>();
+			const bool directly_done = draw::get_instr_head(where).type == draw::draw_instruction_type::noop;
+			// return std::any_of(where, where + draw::get_instr_size<InstrT>(), std::to_integer<bool>);
+			//
+			// if(is_all_idle()){
+			// 	return directly_done;
+			// }
+			//
+			const auto end = where + draw::get_instr_size<InstrT>() + sizeof(draw::instruction_head);
+			if(instruction_dspt_ptr_ == where)return !directly_done;
 
-			if(is_all_idle()){
-				return false;
-			}
-
-			if(instruction_dspt_ptr_ == instruction_idle_ptr_)return true;
-
-			if(instruction_dspt_ptr_ > instruction_idle_ptr_){
+			if(instruction_dspt_ptr_ > where){
 				return end > instruction_dspt_ptr_;
 			}else{
 				//reversed, where next instruction will never directly collide with dispatched instructions;
@@ -416,10 +426,5 @@ namespace mo_yanxi::graphic{
 			current_idle_group_index_ = (current_idle_group_index_ + 1) % groups_.size();
 		}
 
-		[[nodiscard]] std::byte* get_instruction_placement_ptr() const noexcept{
-			const auto ret = std::assume_aligned<16>(instruction_idle_ptr_ ? instruction_idle_ptr_ : instruction_buffer_.begin());
-			CHECKED_ASSUME(ret != nullptr);
-			return ret;
-		}
 	};
 }
