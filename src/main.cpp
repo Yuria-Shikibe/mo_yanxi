@@ -899,6 +899,7 @@ int main(){
 	assets::graphic::load(core::global::graphic::context);
 
 	camera2 camera;
+	math::vec2 cursor;
 	assets::ctrl::spec_camera = &camera;
 	//
 	// while(!core::global::graphic::context.window().should_close()){
@@ -914,6 +915,7 @@ int main(){
 	game::content::load();
 	test::load_content();
 
+
 	struct VertexUBO{
 		vk::padded_mat3 proj{};
 		vk::padded_mat3 view{};
@@ -921,7 +923,7 @@ int main(){
 
 	{
 		auto& ctx = core::global::graphic::context;
-		instruction_batch batch{ctx};
+		instruction_batch batch{ctx, assets::graphic::samplers::texture_sampler};
 
 		vk::uniform_buffer usr_ubo{ctx.get_allocator(), sizeof(VertexUBO) * batch.batch_work_group_count};
 		constexpr std::size_t debugSize = 4096 * 8;
@@ -997,7 +999,7 @@ int main(){
 		};
 
 		{
-			batch.record_command(pipeline_layout, [&] -> std::generator<VkCommandBuffer&&> {
+			batch.record_command(pipeline_layout, [&] -> std::generator<const vk::command_buffer&> {
 				for (const auto & [idx, group] : batch_external_data.groups | std::views::enumerate){
 					vk::scoped_recorder recorder{group.command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
@@ -1008,7 +1010,7 @@ int main(){
 					vk::cmd::set_viewport(recorder, ctx.get_screen_area());
 					vk::cmd::set_scissor(recorder, ctx.get_screen_area());
 
-					co_yield group.command_buffer.get();
+					co_yield group.command_buffer;
 
 					vkCmdEndRendering(recorder);
 				}
@@ -1029,6 +1031,18 @@ int main(){
 		// });
 
 		vk::fence fence{ctx.get_device(), false};
+
+
+		graphic::image_atlas& atlas{core::global::assets::atlas};
+		graphic::image_page& main_page = atlas.create_image_page("main");
+
+		graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
+		graphic::borrowed_image_region r1 = atlas.create_image_page("1").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
+		graphic::borrowed_image_region r2 = atlas.create_image_page("2").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
+		graphic::borrowed_image_region r3 = atlas.create_image_page("3").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
+		graphic::borrowed_image_region r4 = atlas.create_image_page("4").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
+
+
 		core::global::timer.reset_time();
 		while(!ctx.window().should_close()){
 			ctx.window().poll_events();
@@ -1042,12 +1056,13 @@ int main(){
 					.view = camera.get_world_to_uniformed()
 				});
 			}
+			batch.consume_all();
 
 			for(unsigned i = 0; i < 10; ++i){
 				batch.push_instruction(
 					draw::poly_fill_draw{
 						.pos = {.35f + i * 270.1f, .25f},
-						.segments = 600,
+						.segments = 6000,
 						.initial_angle = 0,
 
 						.radius = {10.01f, 100.2f},
@@ -1056,7 +1071,32 @@ int main(){
 						.outer = {1, 0, 1, .4f},
 				});
 
+				batch.push_instruction(
+					draw::poly_fill_draw{
+						.pos = {.35f + i * 270.1f, .25f},
+						.segments = 6000,
+						.initial_angle = 0,
+
+						.radius = {10.01f, 100.2f},
+
+						.inner = {0, 1, 0, 0},
+						.outer = {1, 0, 1, .4f},
+				});
+
+				batch.push_instruction(
+					draw::poly_fill_draw_partial{
+						.pos = {.35f + i * 270.1f, -200.25f},
+						.segments = 64,
+
+						.radius = {.from = 30, .to = 120},
+						.range = {0.1f, 0.8f},
+
+						.inner = {0, 1, 0, 0},
+						.outer = {1, 1, 1, .7f}
+				});
+
 				batch.push_instruction(draw::rectangle_draw{
+					.generic = {.image = light_region->view},
 					.pos = {.5f, -300 + i * 270.1f},
 					.angle = 30 * math::deg_to_rad,
 					.scale = 1,
@@ -1065,7 +1105,91 @@ int main(){
 					.c2 = {0, 1, 0, 1},
 					.c3 = {1, 1, 0, 1},
 					.extent = {100.15f, 100.15f},
+					.uv00 = light_region->uv.v00(),
+					.uv11 = light_region->uv.v11(),
 				});
+
+				batch.push_instruction(draw::rectangle_draw{
+					.generic = {.image = r1->view},
+					.pos = {200.5f, -300 + i * 270.1f},
+					.angle = 30 * math::deg_to_rad,
+					.scale = 1,
+					.c0 = {0, 0, 1, 1},
+					.c1 = {1, 0, 1, 1},
+					.c2 = {0, 1, 1, 1},
+					.c3 = {1, 1, 1, 1},
+					.extent = {100.15f, 100.15f},
+					.uv00 = r1->uv.v00(),
+					.uv11 = r1->uv.v11(),
+				});
+
+				batch.push_instruction(draw::rectangle_draw{
+					.generic = {.image = r2->view},
+					.pos = {400.5f, -300 + i * 270.1f},
+					.angle = 30 * math::deg_to_rad,
+					.scale = 1,
+					.c0 = {0, 0, 1, 1},
+					.c1 = {1, 0, 1, 1},
+					.c2 = {0, 1, 1, 1},
+					.c3 = {1, 1, 1, 1},
+					.extent = {100.15f, 100.15f},
+					.uv00 = r2->uv.v00(),
+					.uv11 = r2->uv.v11(),
+				});
+
+				auto cursor_world = camera.get_screen_to_world(core::global::input.get_cursor_pos(), {}, true);
+
+
+
+				batch.push_instruction(draw::constrained_curve{
+					.param = draw::curve_trait_mat::bezier * draw::curve_ctrl_handle{{
+						{0, 0}, {0, 50}, cursor_world.copy().add_y(-50), cursor_world
+					}},
+
+					.factor_range = {0, 1},
+					.segments = 32,
+					.stroke = 16,
+					.src_color = colors::white,
+					.dst_color = colors::aqua
+				});
+
+				batch.push_instruction(draw::constrained_curve{
+					.param = draw::curve_trait_mat::hermite * draw::curve_ctrl_handle{{
+						{0 - 100, 0}, {0 - 100, 50}, cursor_world.copy().add_x(-100), cursor_world.copy().add( - 100, -50)
+					}},
+
+					.factor_range = {0, 1},
+					.segments = 32,
+					.stroke = 16,
+					.src_color = colors::white,
+					.dst_color = colors::aqua
+				});
+
+				batch.push_instruction(draw::constrained_curve{
+					.param = draw::curve_trait_mat::catmull_rom<> * draw::curve_ctrl_handle{{
+						{0 + 100, 0}, {0 + 100, 50}, cursor_world.copy().add( + 100, -50), cursor_world.copy().add_x(+100)
+					}},
+
+					.factor_range = {0, 1},
+					.segments = 32,
+					.stroke = 16,
+					.src_color = colors::white,
+					.dst_color = colors::aqua
+				});
+
+
+				batch.push_instruction(draw::constrained_curve{
+					.param = draw::curve_trait_mat::b_spline * draw::curve_ctrl_handle{{
+						{0 + 200, 0}, {0 + 200, 50}, cursor_world.copy().add( + 200, -50), cursor_world.copy().add_x(+200)
+					}},
+
+					.factor_range = {0, 1},
+					.segments = 32,
+					.stroke = 16,
+					.src_color = colors::white,
+					.dst_color = colors::aqua
+				});
+
 
 			}
 
@@ -1079,8 +1203,6 @@ int main(){
 
 			ctx.flush();
 			vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {manager.get_main_command_buffer()});
-
-			// std::this_thread::sleep_for(std::chrono::seconds(2));
 		}
 
 		ctx.wait_on_device();

@@ -205,9 +205,14 @@ namespace mo_yanxi::vk{
 		}
 
 		template <typename T>
-			requires (std::is_pointer_v<T>)
+			requires (std::is_trivially_copyable_v<T>)
 		const buffer_mapper& load(const T* data, const std::size_t count, const std::ptrdiff_t dst_byte_offset = 0) const noexcept{
 			std::memcpy(mapped + dst_byte_offset, data, sizeof(T) * count);
+			return *this;
+		}
+
+		const buffer_mapper& load(const void* data, const std::size_t size, const std::ptrdiff_t dst_byte_offset = 0) const noexcept{
+			std::memcpy(mapped + dst_byte_offset, data, size);
 			return *this;
 		}
 

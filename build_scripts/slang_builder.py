@@ -46,6 +46,7 @@ def compile_slang_to_spv(input_dir, output_dir, slangc_path="slangc"):
                 slangc_path,
                 "-O",  # 启用优化
                 "-fvk-use-gl-layout",
+                "-matrix-layout-column-major",
                 "-o", str(output_path),
                 str(slang_file)
             ]

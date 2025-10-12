@@ -273,4 +273,22 @@ namespace mo_yanxi::vk{
 
 		event& operator=(event&& other) noexcept = default;
 	};
+
+	export
+	void wait_multiple(
+		VkDevice device,
+		const std::span<VkSemaphore> semaphores,
+		const std::span<const std::uint64_t> value,
+		const std::uint64_t timeout = std::numeric_limits<std::uint64_t>::max()) {
+		const VkSemaphoreWaitInfo info{
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.semaphoreCount = static_cast<std::uint32_t>(value.size()),
+			.pSemaphores = semaphores.data(),
+			.pValues = value.data()
+		};
+
+		vkWaitSemaphores(device, &info, timeout);
+	}
 }

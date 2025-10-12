@@ -59,6 +59,7 @@ namespace mo_yanxi::vk{
 			features.sampleRateShading = true;
 			features.fragmentStoresAndAtomics = true;
 			features.shaderInt64 = true;
+			// features.shaderInt16 = true;
 
 			return features;
 		}()};

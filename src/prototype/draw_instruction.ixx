@@ -6,6 +6,8 @@ module;
 
 export module draw_instruction;
 export import mo_yanxi.math.vector2;
+export import mo_yanxi.math.vector4;
+export import mo_yanxi.math.matrix4;
 export import mo_yanxi.graphic.color;
 
 import mo_yanxi.math;
@@ -19,6 +21,7 @@ namespace mo_yanxi::graphic{
 	struct image_view_history{
 		static constexpr std::size_t max_cache_count = 4;
 		static_assert(max_cache_count % 4 == 0);
+		static_assert(sizeof(void*) == sizeof(std::uint64_t));
 		using handle_t = VkImageView;
 
 	private:
@@ -26,8 +29,13 @@ namespace mo_yanxi::graphic{
 		std::uint32_t latest_index{};
 		alignas(32) std::array<handle_t, max_cache_count> images{};
 		std::uint32_t count{};
+		bool changed{};
 
 	public:
+		bool check_changed() noexcept{
+			return std::exchange(changed, false);
+		}
+
 		FORCE_INLINE void clear(this image_view_history& self) noexcept{
 			self = {};
 		}
@@ -37,9 +45,9 @@ namespace mo_yanxi::graphic{
 		}
 
 		[[nodiscard]] FORCE_INLINE /*constexpr*/ std::uint32_t try_push(handle_t image) noexcept{
-			if(!image) return std::numeric_limits<std::uint8_t>::max(); //directly vec4(1)
+			if(!image) return std::numeric_limits<std::uint32_t>::max(); //directly vec4(1)
 			if(image == latest) return latest_index;
-
+			//
 			// for(std::size_t i = 0; i < maximum_images; ++i){
 			// 	auto& cur = images[i];
 			// 	if(image == cur){
@@ -52,11 +60,12 @@ namespace mo_yanxi::graphic{
 			// 		latest = cur = image;
 			// 		latest_index = i;
 			// 		count = i + 1;
+			// 		changed = true;
 			// 		return i;
 			// 	}
 			// }
 
-			const __m256i target = _mm256_set1_epi64x(std::bit_cast<int64_t>(image));
+			const __m256i target = _mm256_set1_epi64x(std::bit_cast<std::int64_t>(image));
 			const __m256i zero = _mm256_setzero_si256();
 
 			for(std::uint32_t group_idx = 0; group_idx != max_cache_count; group_idx += 4){
@@ -76,7 +85,8 @@ namespace mo_yanxi::graphic{
 					images[idx] = image;
 					latest = image;
 					latest_index = idx;
-					++count;
+					count = idx + 1;
+					changed = true;
 					return idx;
 				}
 			}
@@ -98,9 +108,16 @@ namespace mo_yanxi::graphic::draw{
 
 		triangle,
 		rectangle,
-		line,
-		circle,
-		partial_circle,
+		line, //TODO
+		poly,
+		poly_partial, //TODO
+
+		constrained_curve,
+
+		//TODO closed line
+		//TODO nine patch
+		//TODO ortho rect
+		//TODO ortho rect bound
 
 
 		SIZE,
@@ -116,6 +133,18 @@ namespace mo_yanxi::graphic::draw{
 	export union image_view{
 		VkImageView view;
 		std::uint64_t index;
+
+		void set_view(VkImageView view) noexcept{
+			new (&this->view) VkImageView(view);
+		}
+
+		void set_index(std::uint32_t idx) noexcept{
+			new (&this->index) std::uint64_t(idx);
+		}
+
+		[[nodiscard]] VkImageView get_image_view() const noexcept{
+			return view;// std::bit_cast<VkImageView>(std::bit_cast<std::uintptr_t>(*this) & (~0b111));
+		}
 	};
 
 	export struct draw_mode{
@@ -173,17 +202,19 @@ namespace mo_yanxi::graphic::draw{
 
 	export struct alignas(16) line_draw{
 		primitive_generic generic;
-		float2 src, dst;
-		float2 uv00, uv11;
-		float stroke;
-		std::uint32_t cap; //TODO
-		float4 csrc, cdst;
-
 
 		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const line_draw& instruction) noexcept{return 4;}
 
 		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(this const line_draw& instruction) noexcept{return 2;}
+	};
 
+	export struct alignas(16) line_draw_segement{
+		float2 pos;
+		float stroke;
+		float offset; //TODO ?
+		float4 color;
+
+		//TODO uv?
 	};
 
 	export struct alignas(16) poly_fill_draw{
@@ -210,7 +241,7 @@ namespace mo_yanxi::graphic::draw{
 		}
 	};
 
-	export struct partial_poly_fill_draw{
+	export struct alignas(16) poly_fill_draw_partial{
 		primitive_generic generic;
 		float2 pos;
 		std::uint32_t segments;
@@ -221,14 +252,88 @@ namespace mo_yanxi::graphic::draw{
 		float2 uv00, uv11;
 		float4 inner, outer;
 
-		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const partial_poly_fill_draw& instruction) noexcept{
-			return instruction.radius.from == 0 ? instruction.segments + 1 : instruction.segments * 2;
+		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const poly_fill_draw_partial& instruction) noexcept{
+			return instruction.radius.from == 0 ? instruction.segments + 2 : (instruction.segments + 1) * 2;
 		}
 
-		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(this const partial_poly_fill_draw& instruction) noexcept{
+		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(this const poly_fill_draw_partial& instruction) noexcept{
 			return instruction.segments << unsigned(instruction.radius.from != 0);
 		}
 	};
+
+	export struct curve_parameter{
+		std::array<math::vec4, 2> constrain_vector;
+		// std::array<math::vec4, 2> constrain_vector_derivative;
+	};
+
+	export struct alignas(16) constrained_curve{
+		primitive_generic generic;
+		curve_parameter param;
+
+		math::based_section<float> factor_range;
+		std::uint32_t segments;
+		float stroke;
+
+		float2 uv00, uv11;
+		float4 src_color, dst_color;
+
+		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const constrained_curve& instruction) noexcept{
+			return instruction.segments * 2 + 2;
+		}
+
+		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(this const constrained_curve& instruction) noexcept{
+			return instruction.segments * 2;
+		}
+	};
+
+	export
+	using curve_ctrl_handle = std::array<math::vec2, 4>;
+
+	export
+	struct curve_trait_matrix{
+		static constexpr math::matrix4 dt{
+			{}, {0, 1}, {0, 0, 2}, {0, 0, 0, 3}
+		};
+
+
+		math::matrix4 trait;
+
+		[[nodiscard]] curve_trait_matrix() = default;
+
+		[[nodiscard]] explicit(false) constexpr curve_trait_matrix(const math::matrix4& trait)
+			: trait(trait){
+		}
+
+		FORCE_INLINE constexpr friend curve_parameter operator*(const curve_trait_matrix& lhs, const curve_ctrl_handle& rhs) noexcept {
+			std::array<math::vec4, 2> rst_0;
+			rst_0[0] = lhs.trait.c0 * rhs[0].x + lhs.trait.c1 * rhs[1].x + lhs.trait.c2 * rhs[2].x + lhs.trait.c3 * rhs[3].x;
+			rst_0[1] = lhs.trait.c0 * rhs[0].y + lhs.trait.c1 * rhs[1].y + lhs.trait.c2 * rhs[2].y + lhs.trait.c3 * rhs[3].y;
+
+			return {rst_0};
+		}
+	};
+
+	namespace curve_trait_mat{
+		export constexpr inline curve_trait_matrix bezier{
+			{{1.f, -3.f, 3.f, -1.f}, {0, 3, -6, 3}, {0, 0, 3, -3}, {0, 0, 0, 1}}
+		};
+
+		export constexpr inline curve_trait_matrix hermite{
+				{{1, 0, -3, 2}, {0, 1, -2, 1}, {0, 0, 3, -2}, {0, 0, -1, 1}}
+		};
+
+		export
+		template <float tau = .5f>
+		constexpr inline curve_trait_matrix catmull_rom{
+			math::matrix4{{0, -tau, 2 * tau, -tau}, {1, 0, tau - 3, 2 - tau}, {0, tau, 3 - 2 * tau, tau - 2}, {0, 0, -tau, tau}}
+		};
+
+		export
+		constexpr inline curve_trait_matrix b_spline{
+			(1.f / 6.f) * math::matrix4{{1, -3, 3, -1}, {4, 0, -6, 3}, {1, 3, 3, -3}, {0, 0, 0, 1}}
+		};
+	}
+
 
 
 	export union draw_instruction_payload{
@@ -236,21 +341,22 @@ namespace mo_yanxi::graphic::draw{
 		rectangle_draw rect;
 		line_draw line;
 		poly_fill_draw circle;
-		partial_poly_fill_draw partial_circle_draw;
+		poly_fill_draw_partial partial_circle_draw;
 	};
 
 	static_assert(std::is_standard_layout_v<draw_instruction_payload>);
 	static_assert(std::is_aggregate_v<draw_instruction_payload>);
 	static_assert(std::is_trivially_copyable_v<draw_instruction_payload>);
-	static_assert(std::is_trivially_constructible_v<draw_instruction_payload>);
+	// static_assert(std::is_trivially_constructible_v<draw_instruction_payload>);
 	static_assert(std::is_trivially_destructible_v<draw_instruction_payload>);
 
 	static_assert(std::is_pointer_interconvertible_with_class(&triangle_draw::generic));
 	static_assert(std::is_pointer_interconvertible_with_class(&rectangle_draw::generic));
 	static_assert(std::is_pointer_interconvertible_with_class(&line_draw::generic));
 	static_assert(std::is_pointer_interconvertible_with_class(&poly_fill_draw::generic));
-	static_assert(std::is_pointer_interconvertible_with_class(&partial_poly_fill_draw::generic));
+	static_assert(std::is_pointer_interconvertible_with_class(&poly_fill_draw_partial::generic));
 
+	export
 	template <typename T>
 	constexpr inline draw_instruction_type instruction_type_of = draw_instruction_type::uniform_update;
 
@@ -264,10 +370,13 @@ namespace mo_yanxi::graphic::draw{
 	constexpr inline draw_instruction_type instruction_type_of<line_draw> = draw_instruction_type::line;
 
 	template <>
-	constexpr inline draw_instruction_type instruction_type_of<poly_fill_draw> = draw_instruction_type::circle;
+	constexpr inline draw_instruction_type instruction_type_of<poly_fill_draw> = draw_instruction_type::poly;
 
 	template <>
-	constexpr inline draw_instruction_type instruction_type_of<partial_poly_fill_draw> = draw_instruction_type::partial_circle;
+	constexpr inline draw_instruction_type instruction_type_of<poly_fill_draw_partial> = draw_instruction_type::poly_partial;
+
+	template <>
+	constexpr inline draw_instruction_type instruction_type_of<constrained_curve> = draw_instruction_type::constrained_curve;
 
 	export
 	template <typename T>
@@ -335,7 +444,7 @@ namespace mo_yanxi::graphic::draw{
 	}
 
 	template <typename T>
-	const T* start_lifetime_as(const void* p) noexcept{
+	[[nodiscard]] const T* start_lifetime_as(const void* p) noexcept{
 		const auto mp = const_cast<void*>(p);
 		const auto bytes = new(mp) std::byte[sizeof(T)];
 		const auto ptr = reinterpret_cast<const T*>(bytes);
@@ -343,34 +452,36 @@ namespace mo_yanxi::graphic::draw{
 		return ptr;
 	}
 
-	FORCE_INLINE CONST_FN constexpr std::uint32_t get_completed_primitives_at(std::uint32_t vtx) noexcept{
+	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_completed_primitives_at(std::uint32_t vtx) noexcept{
 		return vtx < 3 ? 0 : vtx - 2;
 	}
 
-	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_vertex_count(draw_instruction_type type, const void* instruction) noexcept{
+	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_vertex_count(draw_instruction_type type, const void* ptr_to_payload) noexcept{
 		switch(type){
 		case draw_instruction_type::triangle: return 3U;
 		case draw_instruction_type::rectangle: return 4U;
 		case draw_instruction_type::line: return 4U;
-		case draw_instruction_type::circle: return static_cast<const poly_fill_draw*>(instruction)->get_vertex_count();
-		case draw_instruction_type::partial_circle: return static_cast<const partial_poly_fill_draw*>(instruction)->get_vertex_count();
+		case draw_instruction_type::poly: return static_cast<const poly_fill_draw*>(ptr_to_payload)->get_vertex_count();
+		case draw_instruction_type::poly_partial: return static_cast<const poly_fill_draw_partial*>(ptr_to_payload)->get_vertex_count();
+		case draw_instruction_type::constrained_curve: return static_cast<const constrained_curve*>(ptr_to_payload)->get_vertex_count();
 		default: std::unreachable();
 		}
 	}
 
-	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_primitive_count(draw_instruction_type type, const void* instruction) noexcept{
+	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_primitive_count(draw_instruction_type type, const void* ptr_to_payload) noexcept{
 		switch(type){
 		case draw_instruction_type::triangle: return 1U;
 		case draw_instruction_type::rectangle: return 2U;
 		case draw_instruction_type::line: return 2U;
-		case draw_instruction_type::circle: return static_cast<const poly_fill_draw*>(instruction)->get_primitive_count();
-		case draw_instruction_type::partial_circle: return static_cast<const partial_poly_fill_draw*>(instruction)->get_primitive_count();
+		case draw_instruction_type::poly: return static_cast<const poly_fill_draw*>(ptr_to_payload)->get_primitive_count();
+		case draw_instruction_type::poly_partial: return static_cast<const poly_fill_draw_partial*>(ptr_to_payload)->get_primitive_count();
+		case draw_instruction_type::constrained_curve: return static_cast<const constrained_curve*>(ptr_to_payload)->get_primitive_count();
 		default: std::unreachable();
 		}
 	}
 
-	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_primitive_count(draw_instruction_type type, const void* instruction, std::uint32_t pushed_vertex) noexcept{
-		assert(get_vertex_count(type, instruction) >= pushed_vertex);
+	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_primitive_count(draw_instruction_type type, const void* ptr_to_payload, std::uint32_t pushed_vertex) noexcept{
+		assert(get_vertex_count(type, ptr_to_payload) >= pushed_vertex);
 		return get_completed_primitives_at(pushed_vertex);
 	}
 
@@ -453,6 +564,13 @@ namespace mo_yanxi::graphic::draw{
 		return ret;
 	}
 
+	export
+	template <typename T>
+		requires (std::is_trivially_copyable_v<T>)
+	consteval std::size_t get_instr_placement_size_requirement() noexcept{
+		return get_instr_size<T>() + sizeof(instruction_head);
+	}
+
 
 	template <typename T>
 		requires (std::is_trivially_copyable_v<T>)
@@ -465,8 +583,6 @@ namespace mo_yanxi::graphic::draw{
 		if(sentinel - where < get_instr_size<T>() + sizeof(instruction_head))return nullptr;
 
 		const auto pwhere = std::assume_aligned<16>(where);
-
-		// assert(std::ranges::none_of(pwhere, pwhere + draw::get_instr_size<T>() + sizeof(instruction_head), std::to_integer<bool>));
 
 		std::construct_at(reinterpret_cast<instruction_head*>(pwhere), head);
 		std::construct_at(reinterpret_cast<T*>(pwhere + sizeof(instruction_head)), payload);
@@ -502,6 +618,7 @@ namespace mo_yanxi::graphic::draw{
 
 	constexpr inline std::ptrdiff_t GPU_BUF_UNIT_SIZE = 16;
 
+	export
 	struct dispatch_result{
 		std::byte* next;
 		std::uint32_t count;
@@ -509,6 +626,8 @@ namespace mo_yanxi::graphic::draw{
 		std::uint32_t next_vertex_offset;
 		bool ubo_requires_update;
 		bool img_requires_update;
+
+		VkImageView current_img{};
 
 		[[nodiscard]] bool contains_next() const noexcept{
 			return next_primit_offset != 0;
@@ -524,35 +643,45 @@ namespace mo_yanxi::graphic::draw{
 	};
 
 	export
-	const instruction_head& get_instr_head(const std::byte* p) noexcept{
+	[[nodiscard]] FORCE_INLINE const instruction_head& get_instr_head(const std::byte* p) noexcept{
 		return *start_lifetime_as<instruction_head>(std::assume_aligned<16>(p));
 	}
 
 	export
-	[[nodiscard]] std::span<const std::byte> get_ubo_data(const std::byte* p) noexcept{
+	[[nodiscard]] FORCE_INLINE std::span<const std::byte> get_ubo_data(const std::byte* p) noexcept{
 		const auto head = get_instr_head(p);
 		const std::size_t ubo_size = head.get_payload_byte_size();
 		return std::span{p + sizeof(instruction_head), ubo_size};
 	}
 
+	// constexpr inline std::uint32_t MaxMeshDispatchPerTask = 16;
 	constexpr inline std::uint32_t MaxTaskDispatchPerTime = 32;
-	constexpr inline std::uint32_t MaxMeshDispatchPerTask = 16;
 	constexpr inline std::uint32_t MaxVerticesPerMesh = 64;
-	constexpr inline std::uint32_t MaxVerticesPerTask = MaxVerticesPerMesh * MaxMeshDispatchPerTask;
-	constexpr inline std::uint32_t MaxVertices = MaxVerticesPerTask * MaxTaskDispatchPerTime;
+	// constexpr inline std::uint32_t MaxVerticesPerTask = MaxVerticesPerMesh * MaxMeshDispatchPerTask;
+	// constexpr inline std::uint32_t MaxVertices = MaxVerticesPerTask * MaxTaskDispatchPerTime;
 
-	bool set_image_index(void* instruction, image_view_history& cache) noexcept{
+	struct image_set_result{
+		VkImageView image;
+		bool succeed;
+
+		constexpr explicit operator bool() const noexcept{
+			return succeed;
+		}
+	};
+
+	FORCE_INLINE image_set_result set_image_index(void* instruction, image_view_history& cache) noexcept{
 		auto& generic = *static_cast<primitive_generic*>(instruction);
-		auto idx = cache.try_push(generic.image.view);
-		if(idx == image_view_history::max_cache_count)return false;
-		std::destroy_at(&generic.image.view);
-		std::construct_at(&generic.image.index, idx);
-		return true;
+
+		const auto view = generic.image.get_image_view();
+		const auto idx = cache.try_push(view);
+		if(idx == image_view_history::max_cache_count)return image_set_result{view, false};
+		generic.image.set_index(idx);
+		return image_set_result{view, true};
 	}
 
 	export
 	struct alignas(16) dispatch_group_info{
-		std::uint32_t instruction_offset; //offset in 16 Byte
+		std::uint32_t instruction_offset; //offset in 16 Byte TODO remove the scaling?
 		std::uint32_t vertex_offset;
 		std::uint32_t primitive_offset;
 		std::uint32_t primitive_count;
@@ -579,12 +708,14 @@ namespace mo_yanxi::graphic::draw{
 
 		std::uint32_t verticesBreakpoint{initial_vertex_offset};
 		std::uint32_t nextPrimitiveOffset{initial_primitive_offset};
+		VkImageView current_img{};
 
 		auto ptr_to_head = std::assume_aligned<16>(instr_begin);
+		bool requires_image_try_push{true};
 
 		while(currentMeshCount < storage.size()){
 			storage[currentMeshCount].primitive_offset = nextPrimitiveOffset;
-			storage[currentMeshCount].vertex_offset = verticesBreakpoint > 2 ? verticesBreakpoint - 2 : 0;
+			storage[currentMeshCount].vertex_offset = verticesBreakpoint > 2 ? (verticesBreakpoint - 2) : (verticesBreakpoint = 0);
 
 			std::uint32_t pushedVertices{};
 			std::uint32_t pushedPrimitives{};
@@ -609,7 +740,7 @@ namespace mo_yanxi::graphic::draw{
 				assert(std::to_underlying(head.type) < std::to_underlying(draw::draw_instruction_type::SIZE));
 				if(ptr_to_head + head.get_instr_byte_size() > instr_sentinel){
 					save_chunk_head_and_incr();
-					return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, false};
+					return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, false, current_img};
 				}
 
 				switch(head.type){
@@ -622,10 +753,17 @@ namespace mo_yanxi::graphic::draw{
 				default: break;
 				}
 
-				if(!set_image_index(ptr_to_head + sizeof(instruction_head), image_cache)){
-					save_chunk_head_and_incr();
-					return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, true};
+
+				if(requires_image_try_push){
+					requires_image_try_push = false;
+					if(auto rst = set_image_index(ptr_to_head + sizeof(instruction_head), image_cache); !rst){
+						save_chunk_head_and_incr();
+						return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, true, rst.image};
+					}else{
+						current_img = rst.image;
+					}
 				}
+
 
 				auto nextVertices = get_vertex_count(head.type, ptr_to_head + sizeof(instruction_head));
 
@@ -642,6 +780,7 @@ namespace mo_yanxi::graphic::draw{
 					nextPrimitiveOffset = 0;
 
 					ptr_to_head = std::assume_aligned<16>(ptr_to_head + head.get_instr_byte_size());
+					requires_image_try_push = true;
 
 					if(pushedVertices == MaxVerticesPerMesh)break;
 				}else{
@@ -658,7 +797,7 @@ namespace mo_yanxi::graphic::draw{
 			save_chunk_head_and_incr();
 		}
 
-		return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, false};
+		return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, false, current_img};
 	}
 
 }
