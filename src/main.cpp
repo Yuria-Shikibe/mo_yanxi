@@ -1042,7 +1042,6 @@ int main(){
 		graphic::borrowed_image_region r3 = atlas.create_image_page("3").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
 		graphic::borrowed_image_region r4 = atlas.create_image_page("4").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
 
-
 		core::global::timer.reset_time();
 		while(!ctx.window().should_close()){
 			ctx.window().poll_events();
@@ -1056,140 +1055,162 @@ int main(){
 					.view = camera.get_world_to_uniformed()
 				});
 			}
-			batch.consume_all();
 
-			for(unsigned i = 0; i < 10; ++i){
-				batch.push_instruction(
-					draw::poly_fill_draw{
-						.pos = {.35f + i * 270.1f, .25f},
-						.segments = 6000,
-						.initial_angle = 0,
+			for(unsigned i = 0; i < 2; ++i){
+				// batch.push_instruction(
+				// 	draw::poly_fill_draw{
+				// 		.pos = {.35f + i * 270.1f, .25f},
+				// 		.segments = 6000,
+				// 		.initial_angle = 0,
+				//
+				// 		.radius = {10.01f, 100.2f},
+				//
+				// 		.inner = {0, 1, 0, 0},
+				// 		.outer = {1, 0, 1, .4f},
+				// });
+				//
+				// batch.push_instruction(
+				// 	draw::poly_fill_draw{
+				// 		.pos = {.35f + i * 270.1f, .25f},
+				// 		.segments = 6000,
+				// 		.initial_angle = 0,
+				//
+				// 		.radius = {10.01f, 100.2f},
+				//
+				// 		.inner = {0, 1, 0, 0},
+				// 		.outer = {1, 0, 1, .4f},
+				// });
+				//
+				// batch.push_instruction(
+				// 	draw::poly_fill_draw_partial{
+				// 		.pos = {.35f + i * 270.1f, -200.25f},
+				// 		.segments = 64,
+				//
+				// 		.radius = {.from = 30, .to = 120},
+				// 		.range = {0.1f, 0.8f},
+				//
+				// 		.inner = {0, 1, 0, 0},
+				// 		.outer = {1, 1, 1, .7f}
+				// });
+				//
+				// batch.push_instruction(draw::rectangle_draw{
+				// 	.generic = {.image = light_region->view},
+				// 	.pos = {.5f, -300 + i * 270.1f},
+				// 	.angle = 30 * math::deg_to_rad,
+				// 	.scale = 1,
+				// 	.c0 = {0, 0, 0, 1},
+				// 	.c1 = {1, 0, 0, 1},
+				// 	.c2 = {0, 1, 0, 1},
+				// 	.c3 = {1, 1, 0, 1},
+				// 	.extent = {100.15f, 100.15f},
+				// 	.uv00 = light_region->uv.v00(),
+				// 	.uv11 = light_region->uv.v11(),
+				// });
+				//
+				// batch.push_instruction(draw::rectangle_draw{
+				// 	.generic = {.image = r1->view},
+				// 	.pos = {200.5f, -300 + i * 270.1f},
+				// 	.angle = 30 * math::deg_to_rad,
+				// 	.scale = 1,
+				// 	.c0 = {0, 0, 1, 1},
+				// 	.c1 = {1, 0, 1, 1},
+				// 	.c2 = {0, 1, 1, 1},
+				// 	.c3 = {1, 1, 1, 1},
+				// 	.extent = {100.15f, 100.15f},
+				// 	.uv00 = r1->uv.v00(),
+				// 	.uv11 = r1->uv.v11(),
+				// });
+				//
+				// batch.push_instruction(draw::rectangle_draw{
+				// 	.generic = {.image = r2->view},
+				// 	.pos = {400.5f, -300 + i * 270.1f},
+				// 	.angle = 30 * math::deg_to_rad,
+				// 	.scale = 1,
+				// 	.c0 = {0, 0, 1, 1},
+				// 	.c1 = {1, 0, 1, 1},
+				// 	.c2 = {0, 1, 1, 1},
+				// 	.c3 = {1, 1, 1, 1},
+				// 	.extent = {100.15f, 100.15f},
+				// 	.uv00 = r2->uv.v00(),
+				// 	.uv11 = r2->uv.v11(),
+				// });
+				//
+				// auto cursor_world = camera.get_screen_to_world(core::global::input.get_cursor_pos(), {}, true);
 
-						.radius = {10.01f, 100.2f},
+				// batch.push_instruction(draw::constrained_curve{
+				// 	.param = draw::curve_trait_mat::bezier * draw::curve_ctrl_handle{{
+				// 		{0, 0}, {0, 50}, cursor_world.copy().add_y(-50), cursor_world
+				// 	}},
+				//
+				// 	.factor_range = {0, 1},
+				// 	.segments = 32,
+				// 	.stroke = 16,
+				// 	.src_color = colors::white,
+				// 	.dst_color = colors::aqua
+				// });
+				//
+				// batch.push_instruction(draw::constrained_curve{
+				// 	.param = draw::curve_trait_mat::hermite * draw::curve_ctrl_handle{{
+				// 		{0 - 100, 0}, {0 - 100, 50}, cursor_world.copy().add_x(-100), cursor_world.copy().add( - 100, -50)
+				// 	}},
+				//
+				// 	.factor_range = {0, 1},
+				// 	.segments = 32,
+				// 	.stroke = 16,
+				// 	.src_color = colors::white,
+				// 	.dst_color = colors::aqua
+				// });
+				//
+				// batch.push_instruction(draw::constrained_curve{
+				// 	.param = draw::curve_trait_mat::catmull_rom<> * draw::curve_ctrl_handle{{
+				// 		{0 + 100, 0}, {0 + 100, 50}, cursor_world.copy().add( + 100, -50), cursor_world.copy().add_x(+100)
+				// 	}},
+				//
+				// 	.factor_range = {0, 1},
+				// 	.segments = 32,
+				// 	.stroke = 16,
+				// 	.src_color = colors::white,
+				// 	.dst_color = colors::aqua
+				// });
+				//
+				//
+				// batch.push_instruction(draw::constrained_curve{
+				// 	.param = draw::curve_trait_mat::b_spline * draw::curve_ctrl_handle{{
+				// 		{0 + 200, 0}, {0 + 200, 50}, cursor_world.copy().add( + 200, -50), cursor_world.copy().add_x(+200)
+				// 	}},
+				//
+				// 	.factor_range = {0, 1},
+				// 	.segments = 32,
+				// 	.stroke = 16,
+				// 	.src_color = colors::white,
+				// 	.dst_color = colors::aqua
+				// });
 
-						.inner = {0, 1, 0, 0},
-						.outer = {1, 0, 1, .4f},
-				});
+				float off = i == 0 ? core::global::timer.global_time() * 5.f : 0.f;
 
-				batch.push_instruction(
-					draw::poly_fill_draw{
-						.pos = {.35f + i * 270.1f, .25f},
-						.segments = 6000,
-						.initial_angle = 0,
+				batch.push_instruction(draw::line_segments_draw{
 
-						.radius = {10.01f, 100.2f},
-
-						.inner = {0, 1, 0, 0},
-						.outer = {1, 0, 1, .4f},
-				});
-
-				batch.push_instruction(
-					draw::poly_fill_draw_partial{
-						.pos = {.35f + i * 270.1f, -200.25f},
-						.segments = 64,
-
-						.radius = {.from = 30, .to = 120},
-						.range = {0.1f, 0.8f},
-
-						.inner = {0, 1, 0, 0},
-						.outer = {1, 1, 1, .7f}
-				});
-
-				batch.push_instruction(draw::rectangle_draw{
-					.generic = {.image = light_region->view},
-					.pos = {.5f, -300 + i * 270.1f},
-					.angle = 30 * math::deg_to_rad,
-					.scale = 1,
-					.c0 = {0, 0, 0, 1},
-					.c1 = {1, 0, 0, 1},
-					.c2 = {0, 1, 0, 1},
-					.c3 = {1, 1, 0, 1},
-					.extent = {100.15f, 100.15f},
-					.uv00 = light_region->uv.v00(),
-					.uv11 = light_region->uv.v11(),
-				});
-
-				batch.push_instruction(draw::rectangle_draw{
-					.generic = {.image = r1->view},
-					.pos = {200.5f, -300 + i * 270.1f},
-					.angle = 30 * math::deg_to_rad,
-					.scale = 1,
-					.c0 = {0, 0, 1, 1},
-					.c1 = {1, 0, 1, 1},
-					.c2 = {0, 1, 1, 1},
-					.c3 = {1, 1, 1, 1},
-					.extent = {100.15f, 100.15f},
-					.uv00 = r1->uv.v00(),
-					.uv11 = r1->uv.v11(),
-				});
-
-				batch.push_instruction(draw::rectangle_draw{
-					.generic = {.image = r2->view},
-					.pos = {400.5f, -300 + i * 270.1f},
-					.angle = 30 * math::deg_to_rad,
-					.scale = 1,
-					.c0 = {0, 0, 1, 1},
-					.c1 = {1, 0, 1, 1},
-					.c2 = {0, 1, 1, 1},
-					.c3 = {1, 1, 1, 1},
-					.extent = {100.15f, 100.15f},
-					.uv00 = r2->uv.v00(),
-					.uv11 = r2->uv.v11(),
-				});
-
-				auto cursor_world = camera.get_screen_to_world(core::global::input.get_cursor_pos(), {}, true);
-
-
-
-				batch.push_instruction(draw::constrained_curve{
-					.param = draw::curve_trait_mat::bezier * draw::curve_ctrl_handle{{
-						{0, 0}, {0, 50}, cursor_world.copy().add_y(-50), cursor_world
-					}},
-
-					.factor_range = {0, 1},
-					.segments = 32,
+				}, draw::line_node{
+					.pos = {30, 70},
+					.stroke = 4,
+					.offset = off,
+					.color = colors::red_dusted,
+				}, draw::line_node{
+					.pos = {305, 170},
+					.stroke = 12,
+					.offset = off,
+					.color = colors::pale_yellow,
+				}, draw::line_node{
+					.pos = {630, -370},
 					.stroke = 16,
-					.src_color = colors::white,
-					.dst_color = colors::aqua
+					.offset = off,
+					.color = colors::pale_green,
+				}, draw::line_node{
+					.pos = {30, 200},
+					.stroke = 8,
+					.offset = off,
+					.color = colors::aqua,
 				});
-
-				batch.push_instruction(draw::constrained_curve{
-					.param = draw::curve_trait_mat::hermite * draw::curve_ctrl_handle{{
-						{0 - 100, 0}, {0 - 100, 50}, cursor_world.copy().add_x(-100), cursor_world.copy().add( - 100, -50)
-					}},
-
-					.factor_range = {0, 1},
-					.segments = 32,
-					.stroke = 16,
-					.src_color = colors::white,
-					.dst_color = colors::aqua
-				});
-
-				batch.push_instruction(draw::constrained_curve{
-					.param = draw::curve_trait_mat::catmull_rom<> * draw::curve_ctrl_handle{{
-						{0 + 100, 0}, {0 + 100, 50}, cursor_world.copy().add( + 100, -50), cursor_world.copy().add_x(+100)
-					}},
-
-					.factor_range = {0, 1},
-					.segments = 32,
-					.stroke = 16,
-					.src_color = colors::white,
-					.dst_color = colors::aqua
-				});
-
-
-				batch.push_instruction(draw::constrained_curve{
-					.param = draw::curve_trait_mat::b_spline * draw::curve_ctrl_handle{{
-						{0 + 200, 0}, {0 + 200, 50}, cursor_world.copy().add( + 200, -50), cursor_world.copy().add_x(+200)
-					}},
-
-					.factor_range = {0, 1},
-					.segments = 32,
-					.stroke = 16,
-					.src_color = colors::white,
-					.dst_color = colors::aqua
-				});
-
 
 			}
 
@@ -1201,6 +1222,7 @@ int main(){
 			// std::ptrdiff_t where = std::ranges::find_if(batch.instruction_buffer_, std::to_integer<bool>) - batch.instruction_buffer_.begin();
 			assert(batch.is_all_done());
 
+			// batch.reset();
 			ctx.flush();
 			vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {manager.get_main_command_buffer()});
 		}

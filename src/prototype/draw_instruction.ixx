@@ -108,13 +108,17 @@ namespace mo_yanxi::graphic::draw{
 
 		triangle,
 		rectangle,
-		line, //TODO
+
+		//TODO trivial line
+		line_segments, //TODO
+		//TODO line_segments_closed,
+
 		poly,
 		poly_partial, //TODO
 
 		constrained_curve,
 
-		//TODO closed line
+
 		//TODO nine patch
 		//TODO ortho rect
 		//TODO ortho rect bound
@@ -200,15 +204,41 @@ namespace mo_yanxi::graphic::draw{
 
 	};
 
-	export struct alignas(16) line_draw{
+	export struct alignas(16) line_segments_draw{
 		primitive_generic generic;
 
-		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(this const line_draw& instruction) noexcept{return 4;}
+		[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
+			std::size_t node_payload_size
+		) noexcept{
+			assert(node_payload_size >= 2);
+			return node_payload_size * 2;
+		}
 
-		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(this const line_draw& instruction) noexcept{return 2;}
+		template <typename ...Args>
+		[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
+			const Args&...
+		) noexcept{
+			return line_segments_draw::get_vertex_count(sizeof...(Args));
+		}
+
+		[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count(
+			std::size_t node_payload_size
+			) noexcept{
+			assert(node_payload_size >= 2);
+			return (node_payload_size - 1) * 2;
+		}
+
+
+		template <typename ...Args>
+		[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count(
+			const Args&...
+		) noexcept{
+			return line_segments_draw::get_primitive_count(sizeof...(Args));
+		}
+
 	};
 
-	export struct alignas(16) line_draw_segement{
+	export struct alignas(16) line_node{
 		float2 pos;
 		float stroke;
 		float offset; //TODO ?
@@ -319,7 +349,7 @@ namespace mo_yanxi::graphic::draw{
 		};
 
 		export constexpr inline curve_trait_matrix hermite{
-				{{1, 0, -3, 2}, {0, 1, -2, 1}, {0, 0, 3, -2}, {0, 0, -1, 1}}
+			{{1, 0, -3, 2}, {0, 1, -2, 1}, {0, 0, 3, -2}, {0, 0, -1, 1}}
 		};
 
 		export
@@ -339,22 +369,20 @@ namespace mo_yanxi::graphic::draw{
 	export union draw_instruction_payload{
 		triangle_draw tri;
 		rectangle_draw rect;
-		line_draw line;
+		line_segments_draw line;
 		poly_fill_draw circle;
 		poly_fill_draw_partial partial_circle_draw;
 	};
 
-	static_assert(std::is_standard_layout_v<draw_instruction_payload>);
-	static_assert(std::is_aggregate_v<draw_instruction_payload>);
-	static_assert(std::is_trivially_copyable_v<draw_instruction_payload>);
-	// static_assert(std::is_trivially_constructible_v<draw_instruction_payload>);
-	static_assert(std::is_trivially_destructible_v<draw_instruction_payload>);
+	template <typename Instr, typename Arg>
+	constexpr inline bool is_valid_consequent_argument = false;
 
-	static_assert(std::is_pointer_interconvertible_with_class(&triangle_draw::generic));
-	static_assert(std::is_pointer_interconvertible_with_class(&rectangle_draw::generic));
-	static_assert(std::is_pointer_interconvertible_with_class(&line_draw::generic));
-	static_assert(std::is_pointer_interconvertible_with_class(&poly_fill_draw::generic));
-	static_assert(std::is_pointer_interconvertible_with_class(&poly_fill_draw_partial::generic));
+	template <>
+	constexpr inline bool is_valid_consequent_argument<line_segments_draw, line_node> = true;
+
+	export
+	template <typename Instr, typename... Args>
+	concept valid_consequent_argument = (is_valid_consequent_argument<Instr, Args> && ...);
 
 	export
 	template <typename T>
@@ -367,7 +395,7 @@ namespace mo_yanxi::graphic::draw{
 	constexpr inline draw_instruction_type instruction_type_of<rectangle_draw> = draw_instruction_type::rectangle;
 
 	template <>
-	constexpr inline draw_instruction_type instruction_type_of<line_draw> = draw_instruction_type::line;
+	constexpr inline draw_instruction_type instruction_type_of<line_segments_draw> = draw_instruction_type::line_segments;
 
 	template <>
 	constexpr inline draw_instruction_type instruction_type_of<poly_fill_draw> = draw_instruction_type::poly;
@@ -403,25 +431,38 @@ namespace mo_yanxi::graphic::draw{
 		dispatch_info_payload payload;
 
 		[[nodiscard]] constexpr std::ptrdiff_t get_instr_byte_size() const noexcept{
-			return size << 4u;
+			return size;
 		}
 
 		[[nodiscard]] constexpr std::ptrdiff_t get_payload_byte_size() const noexcept{
-			return (size - 1 /*head*/) << 4u;
+			return size - sizeof(instruction_head);
 		}
 	};
 
 	static_assert(std::is_standard_layout_v<instruction_head>);
 
-	template <typename T>
-	constexpr instruction_head make_instruction_head(const T& instr) noexcept{
-		static constexpr std::uint32_t payload_size = static_cast<std::uint32_t>(sizeof(instr));
-		static constexpr std::ptrdiff_t required = sizeof(instruction_head) + payload_size;
+	export
+	template <typename T, typename ...Args>
+		requires (std::is_trivially_copyable_v<T> && valid_consequent_argument<T, Args...>)
+	consteval std::size_t get_instr_size() noexcept{
+		const auto ret = sizeof(instruction_head) + sizeof(T);
+		return ret + []{
+			if constexpr (sizeof...(Args) > 0){
+				return (sizeof(Args) + ...);
+			}else{
+				return 0;
+			}
+		}();
+	}
+
+	template <typename T, typename ...Args>
+	constexpr instruction_head make_instruction_head(const T& instr, const Args&... args) noexcept{
+		static constexpr std::ptrdiff_t required = get_instr_size<T, Args...>();
 		static_assert(required % 16 == 0);
 
 		const auto vtx = [&] -> std::uint32_t{
 			if constexpr (known_instruction<T>){
-				return instr.get_vertex_count();
+				return instr.get_vertex_count(args...);
 			}else{
 				return 0;
 			}
@@ -429,7 +470,7 @@ namespace mo_yanxi::graphic::draw{
 
 		const auto pmt = [&] -> std::uint32_t{
 			if constexpr (known_instruction<T>){
-				return instr.get_primitive_count();
+				return instr.get_primitive_count(args...);
 			}else{
 				return 0;
 			}
@@ -438,10 +479,11 @@ namespace mo_yanxi::graphic::draw{
 
 		return instruction_head{
 			.type = instruction_type_of<T>,
-			.size = required / 16,
+			.size = required,
 			.payload = {.draw = {.vertex_count = vtx, .primitive_count = pmt}}
 		};
 	}
+
 
 	template <typename T>
 	[[nodiscard]] const T* start_lifetime_as(const void* p) noexcept{
@@ -452,37 +494,31 @@ namespace mo_yanxi::graphic::draw{
 		return ptr;
 	}
 
-	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_completed_primitives_at(std::uint32_t vtx) noexcept{
-		return vtx < 3 ? 0 : vtx - 2;
+	export
+	[[nodiscard]] FORCE_INLINE const instruction_head& get_instr_head(const void* p) noexcept{
+		return *start_lifetime_as<instruction_head>(std::assume_aligned<16>(p));
 	}
 
-	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_vertex_count(draw_instruction_type type, const void* ptr_to_payload) noexcept{
+	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_vertex_count(draw_instruction_type type, const std::byte* ptr_to_instr) noexcept{
 		switch(type){
 		case draw_instruction_type::triangle: return 3U;
 		case draw_instruction_type::rectangle: return 4U;
-		case draw_instruction_type::line: return 4U;
-		case draw_instruction_type::poly: return static_cast<const poly_fill_draw*>(ptr_to_payload)->get_vertex_count();
-		case draw_instruction_type::poly_partial: return static_cast<const poly_fill_draw_partial*>(ptr_to_payload)->get_vertex_count();
-		case draw_instruction_type::constrained_curve: return static_cast<const constrained_curve*>(ptr_to_payload)->get_vertex_count();
+		case draw_instruction_type::line_segments:{
+			const auto size = get_instr_head(ptr_to_instr).get_instr_byte_size();
+			const auto payloadByteSize = (size - get_instr_size<line_segments_draw>());
+			assert(payloadByteSize % sizeof(line_node) == 0);
+			const auto payloadCount = payloadByteSize / sizeof(line_node);
+			return line_segments_draw::get_vertex_count(payloadCount);
+		}
+		case draw_instruction_type::poly: return reinterpret_cast<const poly_fill_draw*>(ptr_to_instr + sizeof(instruction_head))->get_vertex_count();
+		case draw_instruction_type::poly_partial: return reinterpret_cast<const poly_fill_draw_partial*>(ptr_to_instr + sizeof(instruction_head))->get_vertex_count();
+		case draw_instruction_type::constrained_curve: return reinterpret_cast<const constrained_curve*>(ptr_to_instr + sizeof(instruction_head))->get_vertex_count();
 		default: std::unreachable();
 		}
 	}
 
-	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_primitive_count(draw_instruction_type type, const void* ptr_to_payload) noexcept{
-		switch(type){
-		case draw_instruction_type::triangle: return 1U;
-		case draw_instruction_type::rectangle: return 2U;
-		case draw_instruction_type::line: return 2U;
-		case draw_instruction_type::poly: return static_cast<const poly_fill_draw*>(ptr_to_payload)->get_primitive_count();
-		case draw_instruction_type::poly_partial: return static_cast<const poly_fill_draw_partial*>(ptr_to_payload)->get_primitive_count();
-		case draw_instruction_type::constrained_curve: return static_cast<const constrained_curve*>(ptr_to_payload)->get_primitive_count();
-		default: std::unreachable();
-		}
-	}
-
-	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_primitive_count(draw_instruction_type type, const void* ptr_to_payload, std::uint32_t pushed_vertex) noexcept{
-		assert(get_vertex_count(type, ptr_to_payload) >= pushed_vertex);
-		return get_completed_primitives_at(pushed_vertex);
+	[[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_primitive_count(std::uint32_t vtx) noexcept{
+		return vtx < 3 ? 0 : vtx - 2;
 	}
 
 	export struct instruction_buffer{
@@ -512,6 +548,10 @@ namespace mo_yanxi::graphic::draw{
 
 		[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::byte* begin() const noexcept{
 			return std::assume_aligned<align>(src);
+		}
+
+		void clear() const noexcept{
+			std::memset(src, 0, size());
 		}
 		//
 		// [[nodiscard]] FORCE_INLINE CONST_FN constexpr std::byte* begin() noexcept{
@@ -553,51 +593,59 @@ namespace mo_yanxi::graphic::draw{
 		}
 	};
 
-	export
-	template <typename T>
-		requires (std::is_trivially_copyable_v<T>)
-	consteval std::size_t get_instr_size() noexcept{
-		const auto ret = sizeof(instruction_head) + sizeof(T);
-		if(ret % 16 != 0){
-			throw std::invalid_argument{"bad alignment"};
-		}
-		return ret;
-	}
-
-	export
-	template <typename T>
-		requires (std::is_trivially_copyable_v<T>)
-	consteval std::size_t get_instr_placement_size_requirement() noexcept{
-		return get_instr_size<T>() + sizeof(instruction_head);
-	}
+	// export
+	// template <typename T>
+	// 	requires (std::is_trivially_copyable_v<T>)
+	// consteval std::size_t get_instr_placement_size_requirement() noexcept{
+	// 	return get_trivial_instr_size<T>() + sizeof(instruction_head);
+	// }
 
 
-	template <typename T>
-		requires (std::is_trivially_copyable_v<T>)
+	template <typename T, typename ...Args>
+		requires (std::is_trivially_copyable_v<T> && valid_consequent_argument<T, Args...>)
 	[[nodiscard]] FORCE_INLINE std::byte* place_instr_at_impl(
 		std::byte* const where,
 		const std::byte* const sentinel,
 		const instruction_head& head,
-		const T& payload
+		const T& payload,
+		const Args& ...args
 	){
-		if(sentinel - where < get_instr_size<T>() + sizeof(instruction_head))return nullptr;
+		static_assert(((sizeof(Args) % 16 == 0) && ...));
 
-		const auto pwhere = std::assume_aligned<16>(where);
+		static constexpr auto total_size = draw::get_instr_size<T, Args...>();
+
+		if(sentinel - where < total_size + sizeof(instruction_head))return nullptr;
+
+		auto pwhere = std::assume_aligned<16>(where);
+		std::memset(pwhere + total_size, 0, sizeof(instruction_head));
 
 		std::construct_at(reinterpret_cast<instruction_head*>(pwhere), head);
-		std::construct_at(reinterpret_cast<T*>(pwhere + sizeof(instruction_head)), payload);
-		std::memset(pwhere + get_instr_size<T>(), 0, sizeof(instruction_head));
-		return std::assume_aligned<16>(pwhere + get_instr_size<T>());
+
+		pwhere += sizeof(instruction_head);
+		std::construct_at(reinterpret_cast<T*>(pwhere), payload);
+
+
+		if constexpr (sizeof...(args) > 0){
+			pwhere += sizeof(instruction_head);
+
+			return [&]<std::size_t ...Idx>(std::index_sequence<Idx...>) FORCE_INLINE {
+				return ((std::construct_at(reinterpret_cast<Args*>(pwhere), args), pwhere = std::assume_aligned<16>(pwhere + sizeof(Args))), ...);
+			}(std::make_index_sequence<sizeof...(Args)>{});
+		}else{
+			return std::assume_aligned<16>(pwhere + total_size - sizeof(instruction_head));
+		}
 	}
 
 	export
-	template <known_instruction T>
-		requires (std::is_trivially_copyable_v<T>)
+	template <known_instruction T, typename ...Args>
+		requires (std::is_trivially_copyable_v<T> && valid_consequent_argument<T, Args...>)
 	[[nodiscard]] FORCE_INLINE std::byte* place_instruction_at(
 		std::byte* const where,
 		const std::byte* const sentinel,
-		const T& payload) noexcept{
-		return draw::place_instr_at_impl(where, sentinel, draw::make_instruction_head(payload), payload);
+		const T& payload,
+		const Args& ...args
+		) noexcept{
+		return draw::place_instr_at_impl(where, sentinel, draw::make_instruction_head(payload, args...), payload, args...);
 	}
 
 	export
@@ -611,7 +659,7 @@ namespace mo_yanxi::graphic::draw{
 		) noexcept{
 		return draw::place_instr_at_impl(where, sentinel, instruction_head{
 			.type = draw_instruction_type::uniform_update,
-			.size = get_instr_size<T>() / 16,
+			.size = get_instr_size<T>(),
 			.payload = {.ubo = {.offset = offset}}
 		}, payload);
 	}
@@ -642,10 +690,6 @@ namespace mo_yanxi::graphic::draw{
 		}
 	};
 
-	export
-	[[nodiscard]] FORCE_INLINE const instruction_head& get_instr_head(const std::byte* p) noexcept{
-		return *start_lifetime_as<instruction_head>(std::assume_aligned<16>(p));
-	}
 
 	export
 	[[nodiscard]] FORCE_INLINE std::span<const std::byte> get_ubo_data(const std::byte* p) noexcept{
@@ -729,7 +773,7 @@ namespace mo_yanxi::graphic::draw{
 			const auto save_chunk_head_and_incr = [&] FORCE_INLINE {
 				if(pushedPrimitives == 0)return;
 				assert((ptr_to_chunk_head - ptr_to_src) % GPU_BUF_UNIT_SIZE == 0);
-				storage[currentMeshCount].instruction_offset = (ptr_to_chunk_head - ptr_to_src) / GPU_BUF_UNIT_SIZE;
+				storage[currentMeshCount].instruction_offset = ptr_to_chunk_head - ptr_to_src;
 				storage[currentMeshCount].primitive_count = pushedPrimitives;
 				++currentMeshCount;
 
@@ -765,7 +809,7 @@ namespace mo_yanxi::graphic::draw{
 				}
 
 
-				auto nextVertices = get_vertex_count(head.type, ptr_to_head + sizeof(instruction_head));
+				auto nextVertices = get_vertex_count(head.type, ptr_to_head);
 
 				if(verticesBreakpoint){
 					assert(verticesBreakpoint >= 3);
@@ -776,7 +820,7 @@ namespace mo_yanxi::graphic::draw{
 				if(pushedVertices + nextVertices <= MaxVerticesPerMesh){
 					verticesBreakpoint = 0;
 					pushedVertices += nextVertices;
-					pushedPrimitives += get_primitive_count(head.type, ptr_to_head + sizeof(instruction_head), nextVertices);
+					pushedPrimitives += get_primitive_count(nextVertices);
 					nextPrimitiveOffset = 0;
 
 					ptr_to_head = std::assume_aligned<16>(ptr_to_head + head.get_instr_byte_size());
@@ -785,7 +829,7 @@ namespace mo_yanxi::graphic::draw{
 					if(pushedVertices == MaxVerticesPerMesh)break;
 				}else{
 					const auto remains = get_remain_vertices();
-					const auto primits = get_primitive_count(head.type, ptr_to_head + sizeof(instruction_head), remains);
+					const auto primits = get_primitive_count(remains);
 					nextPrimitiveOffset += primits;
 					pushedPrimitives += primits;
 					verticesBreakpoint += remains;

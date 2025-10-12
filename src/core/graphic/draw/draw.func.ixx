@@ -462,8 +462,8 @@ namespace mo_yanxi::graphic::draw{
 				const auto normalL = quad.edge_normal_at(i - 1);
 				const auto normalR = quad.edge_normal_at(i);
 				const auto vert_normal = (normalR + normalL).normalize();
-				const auto ang = vert_normal.angle_between_rad(normalL);
-				pos[i] = v - vert_normal * (expand / mo_yanxi::math::cos(ang));
+
+				pos[i] = v - vert_normal * (expand / vert_normal.dot(normalL));
 			}
 
 			acquirer_guard _{auto_param, 4};

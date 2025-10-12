@@ -176,12 +176,12 @@ namespace mo_yanxi::graphic{
 
 	private:
 
-		template <typename T, typename Fn>
-		FORCE_INLINE void push_impl(Fn psh_fn){
-			assert(draw::get_instr_placement_size_requirement<T>() <= instruction_buffer_.size());
+		template <typename T, typename Fn, typename ...Args>
+		FORCE_INLINE void push_impl(Fn psh_fn, const Args&...){
+			// assert(draw::get_instr_placement_size_requirement<T>() <= instruction_buffer_.size());
 
 			std::byte* rst{nullptr};
-			while(check_need_block<T>(instruction_idle_ptr_)){
+			while(check_need_block<T, Args...>(instruction_idle_ptr_)){
 				if(is_all_idle())consume_n(working_group_count / 2);
 				wait_last_group_and_pop();
 			}
@@ -190,23 +190,25 @@ namespace mo_yanxi::graphic{
 
 			if(rst == nullptr){
 				//Reverse buffer to head
-				while(check_need_block<T>(instruction_buffer_.begin())){
+				while(check_need_block<T, Args...>(instruction_buffer_.begin())){
 					if(is_all_idle())consume_n(working_group_count / 2);
 					wait_last_group_and_pop();
 				}
 
 				rst = psh_fn(instruction_buffer_.begin());
 			}
+
 			assert(instruction_idle_ptr_ != nullptr);
 			instruction_idle_ptr_ = rst;
 		}
 
 	public:
-		template <draw::known_instruction T>
-		void push_instruction(const T& instr){
+		template <draw::known_instruction T, typename ...Args>
+			requires (draw::valid_consequent_argument<T, Args...>)
+		void push_instruction(const T& instr, const Args& ...args){
 			this->push_impl<T>([&, this](std::byte* where){
-				return draw::place_instruction_at(where, instruction_buffer_.end(), instr);
-			});
+				return draw::place_instruction_at(where, instruction_buffer_.end(), instr, args...);
+			}, args...);
 		}
 
 		template <typename T>
@@ -227,6 +229,7 @@ namespace mo_yanxi::graphic{
 
 
 		bool consume_n(unsigned count){
+			// count = 1;
 			assert(count <= working_group_count);
 			assert(count > 0);
 			std::array<VkSemaphoreSubmitInfo, working_group_count * 2> semaphores{};
@@ -234,12 +237,17 @@ namespace mo_yanxi::graphic{
 			std::array<VkSubmitInfo2, working_group_count> submitInfo2{};
 			unsigned actuals{};
 			const auto intital_wait = get_pushed_group_count();
-			const auto initial_remain = groups_.size() - intital_wait;
+			const auto initial_idle = groups_.size() - intital_wait;
 			bool unfinished = true;
+
+			auto need_wait = [&](const unsigned has_dispatched_count) -> bool{
+				return has_dispatched_count >= initial_idle;
+			};
 
 			while(true){
 				auto& group = groups_[current_idle_group_index_];
 				const auto begin = instruction_pend_ptr_;
+
 				const auto sentinel = instruction_idle_ptr_ >= instruction_pend_ptr_ ? instruction_idle_ptr_ : instruction_buffer_.end();
 				const auto dspcinfo = draw::get_dispatch_info(instruction_pend_ptr_, sentinel, temp_dispatch_info_.group_info, group.image_view_history, last_primit_offset_, last_vertex_offset_);
 				const auto next_instr_type = draw::get_instr_head(dspcinfo.next).type;
@@ -260,7 +268,7 @@ namespace mo_yanxi::graphic{
 				if(dspcinfo.ubo_requires_update){
 					const auto data = draw::get_ubo_data(dspcinfo.next);
 
-					if(actuals <= intital_wait && actuals >= initial_remain){
+					if(need_wait(actuals)){
 						wait_last_group_and_pop();
 					}
 
@@ -285,7 +293,7 @@ namespace mo_yanxi::graphic{
 
 					const bool is_img_history_changed = group.image_view_history.check_changed();
 
-					if(actuals <= intital_wait && actuals >= initial_remain){
+					if(need_wait(actuals)){
 						//If requires wait and is not undispatched command
 						wait_last_group_and_pop(is_img_history_changed);
 					}
@@ -320,7 +328,7 @@ namespace mo_yanxi::graphic{
 					}
 
 					(void)vk::buffer_mapper{dispatch_info_buffer}
-						.load(static_cast<const void*>(&temp_dispatch_info_), 16 + sizeof(draw::instruction_head) * dspcinfo.count, sizeof(dspt_info_buffer) * current_idle_group_index_);
+						.load(static_cast<const void*>(&temp_dispatch_info_), 16 + sizeof(draw::dispatch_group_info) * dspcinfo.count, sizeof(dspt_info_buffer) * current_idle_group_index_);
 
 					(void)vk::descriptor_mapper{descriptor_buffer_}
 						.set_storage_buffer(0,
@@ -479,6 +487,17 @@ namespace mo_yanxi::graphic{
 			return descriptor_layout_;
 		}
 
+		void reset(){
+			assert(is_all_done());
+			assert(is_all_idle());
+
+			current_idle_group_index_ = 0;
+			instruction_idle_ptr_ = instruction_buffer_.begin();
+			instruction_pend_ptr_ = instruction_buffer_.begin();
+			instruction_dspt_ptr_ = instruction_buffer_.begin();
+			instruction_buffer_.clear();
+		}
+
 	private:
 		template <std::invocable<unsigned, working_group&> Fn>
 		FORCE_INLINE auto for_each_submit(Fn fn){
@@ -507,7 +526,7 @@ namespace mo_yanxi::graphic{
 			return is_all_idle() ? nullptr : groups_.data() + current_dspt_group_index_;
 		}
 
-		template <typename InstrT>
+		template <typename InstrT, typename ...Args>
 		bool check_need_block(const std::byte* where) const noexcept{
 			const bool directly_done = draw::get_instr_head(where).type == draw::draw_instruction_type::noop;
 			// return std::any_of(where, where + draw::get_instr_size<InstrT>(), std::to_integer<bool>);
@@ -516,7 +535,7 @@ namespace mo_yanxi::graphic{
 			// 	return directly_done;
 			// }
 			//
-			const auto end = where + draw::get_instr_size<InstrT>() + sizeof(draw::instruction_head);
+			const auto end = where + draw::get_instr_size<InstrT, Args...>() + sizeof(draw::instruction_head);
 			if(instruction_dspt_ptr_ == where)return !directly_done;
 
 			if(instruction_dspt_ptr_ > where){
