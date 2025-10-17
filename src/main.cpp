@@ -943,6 +943,10 @@ int main(){
 		vk::shader_module msh{ctx.get_device(), assets::dir::shader_spv / "test.mesh_mesh.spv"};
 		msh.set_no_deduced_stage();
 
+
+		vk::shader_module highlight_pick{ctx.get_device(), assets::dir::shader_spv / "post_process.highlight_extract.spv", VK_SHADER_STAGE_COMPUTE_BIT};
+		vk::shader_module hdr_to_sdr{ctx.get_device(), assets::dir::shader_spv / "post_process.hdr_to_sdr.spv", VK_SHADER_STAGE_COMPUTE_BIT};
+
 		vk::pipeline_layout pipeline_layout{ctx.get_device(), 0,
 			{batch.get_batch_descriptor_layout(), batch_external_data.descriptor_set_layout()}};
 
@@ -951,46 +955,82 @@ int main(){
 			msh.get_create_info(VK_SHADER_STAGE_MESH_BIT_EXT, nullptr, "main_mesh"),
 			msh.get_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, nullptr, "main_frag")
 		});
-		gtp.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::alpha_blend);
+		gtp.push_color_attachment_format(VK_FORMAT_R16G16B16A16_SFLOAT, vk::blending::alpha_blend);
 
 		vk::pipeline p{ctx.get_device(), pipeline_layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, gtp};
 
 		vk::color_attachment attachment{ctx.get_allocator(), ctx.get_extent(),
-			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+			VK_FORMAT_R16G16B16A16_SFLOAT
 		};
 
 		attachment.init_layout(ctx.get_transient_graphic_command_buffer());
 
 		render_graph::render_graph_manager manager{ctx};
+		auto& res = manager.add_explicit_resource(render_graph::resource_desc::explicit_resource{render_graph::resource_desc::external_image{}});
+		res.as_image().handle = attachment;
+		res.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		auto highligh_pass = manager.add_stage<render_graph::post_process_stage>(render_graph::post_process_meta{highlight_pick, {
+			{{0}, render_graph::no_slot, 0},
+			{{1}, 0, render_graph::no_slot},
+		}});
+		highligh_pass.pass.add_input({render_graph::resource_desc::explicit_resource_usage{res, 0}});
+
 		{
-			auto& res = manager.add_explicit_resource(render_graph::resource_desc::explicit_resource{render_graph::resource_desc::external_image{}});
-			res.as_image().handle = attachment;
-			res.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			auto& req = highligh_pass.meta.sockets().at_out<render_graph::resource_desc::image_requirement>(0);
+			req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		}
+
+		{
+
 			auto world_clear = manager.add_stage<render_graph::image_clear>(1);
 
-			world_clear.pass.add_inout({
+			world_clear.pass.add_in_out({
 				render_graph::resource_desc::explicit_resource_usage{res, 0},
 			});
+			world_clear.pass.add_exec_dep(highligh_pass.id());
 
-			manager.update_external_resources();
-			manager.resize();
-			manager.reset_resources();
-			manager.create_command();
+
 		}
 
 
+		const auto ui_bloom = manager.add_stage<render_graph::bloom_pass>(game::fx::get_bloom_default_meta());
+		ui_bloom.meta.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
+		ui_bloom.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+		ui_bloom.pass.add_dep({highligh_pass.id()});
+
+		const auto hdr_to_sdr_pass = manager.add_stage<render_graph::post_process_stage>(render_graph::post_process_meta{hdr_to_sdr, {
+			{{0}, render_graph::no_slot, 0},
+			{{1}, 0, render_graph::no_slot},
+		}});
+		{
+			auto& req = hdr_to_sdr_pass.meta.sockets().at_in<render_graph::resource_desc::image_requirement>(0);
+			req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		}
+
+		hdr_to_sdr_pass.pass.add_dep({ui_bloom.id()});
+		hdr_to_sdr_pass.pass.add_output({
+				{0, false},
+			});
+
+		manager.init_after_pass_initialized();
+		manager.update_external_resources();
+		manager.resize();
+		manager.reset_resources();
+		manager.create_command();
+
 
 		core::global::graphic::context.set_staging_image({
-			.image = attachment.get_image(),
+			.image = hdr_to_sdr_pass.pass.at_out(0).as_image().image.image,
 			.extent = core::global::graphic::context.get_extent(),
-			.clear = true,
+			.clear = false,
 			.owner_queue_family = core::global::graphic::context.graphic_family(),
-			.src_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			.src_access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-			.dst_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			.dst_access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-			.src_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			.dst_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+			.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			.src_access = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			.dst_access = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+			.dst_layout = VK_IMAGE_LAYOUT_GENERAL
 		});
 
 		camera.resize_screen(core::global::graphic::context.get_extent().width, core::global::graphic::context.get_extent().height);
@@ -1000,7 +1040,7 @@ int main(){
 		};
 
 		{
-			batch.record_command(pipeline_layout, [&] -> std::generator<const vk::command_buffer&> {
+			batch.record_command(pipeline_layout, [&] -> std::generator<VkCommandBuffer&&> {
 				for (const auto & [idx, group] : batch_external_data.groups | std::views::enumerate){
 					vk::scoped_recorder recorder{group.command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
 
@@ -1011,7 +1051,7 @@ int main(){
 					vk::cmd::set_viewport(recorder, ctx.get_screen_area());
 					vk::cmd::set_scissor(recorder, ctx.get_screen_area());
 
-					co_yield group.command_buffer;
+					co_yield group.command_buffer.get();
 
 					vkCmdEndRendering(recorder);
 				}
@@ -1026,13 +1066,6 @@ int main(){
 		}
 
 		camera.set_scale_range({0.2f, 4.f});
-		// batch.update_ubo(VertexUBO{
-		// 	.proj = math::mat3_idt,
-		// 	.view = camera.get_world_to_uniformed()
-		// });
-
-		vk::fence fence{ctx.get_device(), false};
-
 
 		graphic::image_atlas& atlas{core::global::assets::atlas};
 		graphic::image_page& main_page = atlas.create_image_page("main");
@@ -1060,114 +1093,106 @@ int main(){
 			}
 
 			for(unsigned i = 0; i < 10; ++i){
-				batch.push_instruction(
-					instruction::poly{
-						.pos = {.35f + i * 270.1f, .25f},
-						.segments = 6000,
-						.initial_angle = 0,
-
-						.radius = {10.01f, 100.2f},
-
-						.inner = {0, 1, 0, 0},
-						.outer = {1, 0, 1, .4f},
-				});
-
-				batch.push_instruction(
-					instruction::poly{
-						.pos = {.35f + i * 270.1f, .25f},
-						.segments = 6000,
-						.initial_angle = 0,
-
-						.radius = {10.01f, 100.2f},
-
-						.inner = {0, 1, 0, 0},
-						.outer = {1, 0, 1, .4f},
-				});
-
-				batch.push_instruction(
-					instruction::poly_partial{
-						.pos = {.35f + i * 270.1f, -200.25f},
-						.segments = 64,
-
-						.radius = {.from = 30, .to = 120},
-						.range = {0.1f, 0.8f},
-
-						.inner = {0, 1, 0, 0},
-						.outer = {1, 1, 1, .7f}
-				});
-
-				batch.push_instruction(instruction::rectangle{
-					.generic = {.image = light_region->view},
-					.pos = {.5f, -300 + i * 270.1f},
-					.angle = 30 * math::deg_to_rad,
-					.scale = 1,
-					.c0 = {0, 0, 0, 1},
-					.c1 = {1, 0, 0, 1},
-					.c2 = {0, 1, 0, 1},
-					.c3 = {1, 1, 0, 1},
-					.extent = {100.15f, 100.15f},
-					.uv00 = light_region->uv.v00(),
-					.uv11 = light_region->uv.v11(),
-				});
-
-				batch.push_instruction(instruction::rectangle{
-					.generic = {.image = r1->view},
-					.pos = {200.5f, -300 + i * 270.1f},
-					.angle = 30 * math::deg_to_rad,
-					.scale = 1,
-					.c0 = {0, 0, 1, 1},
-					.c1 = {1, 0, 1, 1},
-					.c2 = {0, 1, 1, 1},
-					.c3 = {1, 1, 1, 1},
-					.extent = {100.15f, 100.15f},
-					.uv00 = r1->uv.v00(),
-					.uv11 = r1->uv.v11(),
-				});
-
-				batch.push_instruction(instruction::rectangle{
-					.generic = {.image = r2->view},
-					.pos = {400.5f, -300 + i * 270.1f},
-					.angle = 30 * math::deg_to_rad,
-					.scale = 1,
-					.c0 = {0, 0, 1, 1},
-					.c1 = {1, 0, 1, 1},
-					.c2 = {0, 1, 1, 1},
-					.c3 = {1, 1, 1, 1},
-					.extent = {100.15f, 100.15f},
-					.uv00 = r2->uv.v00(),
-					.uv11 = r2->uv.v11(),
-				});
-
-				batch.push_instruction(instruction::rectangle{
-					.generic = {.image = r3->view},
-					.pos = {600.5f, -300 + i * 270.1f},
-					.angle = 30 * math::deg_to_rad,
-					.scale = 1,
-					.c0 = {0, 0, 1, 1},
-					.c1 = {1, 0, 1, 1},
-					.c2 = {0, 1, 1, 1},
-					.c3 = {1, 1, 1, 1},
-					.extent = {100.15f, 100.15f},
-					.uv00 = r3->uv.v00(),
-					.uv11 = r3->uv.v11(),
-				});
-
-				batch.push_instruction(instruction::rectangle{
-					.generic = {.image = r4->view},
-					.pos = {800.5f, -300 + i * 270.1f},
-					.angle = 30 * math::deg_to_rad,
-					.scale = 1,
-					.c0 = {0, 0, 1, 1},
-					.c1 = {1, 0, 1, 1},
-					.c2 = {0, 1, 1, 1},
-					.c3 = {1, 1, 1, 1},
-					.extent = {100.15f, 100.15f},
-					.uv00 = r4->uv.v00(),
-					.uv11 = r4->uv.v11(),
-				});
-
+				// batch.push_instruction(
+				// 	instruction::poly{
+				// 		.pos = {.35f + i * 270.1f, .25f},
+				// 		.segments = 6000,
+				// 		.initial_angle = 0,
+				//
+				// 		.radius = {10.01f, 100.2f},
+				//
+				// 		.inner = {0, 1, 0, 0},
+				// 		.outer = {1, 0, 1, .4f},
+				// });
+				//
+				// batch.push_instruction(
+				// 	instruction::poly{
+				// 		.pos = {.35f + i * 270.1f, .25f},
+				// 		.segments = 6000,
+				// 		.initial_angle = 0,
+				//
+				// 		.radius = {10.01f, 100.2f},
+				//
+				// 		.inner = {0, 1, 0, 0},
+				// 		.outer = {1, 0, 1, .4f},
+				// });
+				//
+				// batch.push_instruction(
+				// 	instruction::poly_partial{
+				// 		.pos = {.35f + i * 270.1f, -200.25f},
+				// 		.segments = 64,
+				//
+				// 		.radius = {.from = 30, .to = 120},
+				// 		.range = {0.1f, 0.8f},
+				//
+				// 		.inner = {0, 1, 0, 0},
+				// 		.outer = {1, 1, 1, .7f}
+				// });
+				//
+				//
+				// draw::instruction::quad_vert_color vc{
+				// 		{0, 0, 0, 1},
+				// 		{1, 0, 0, 1},
+				// 		{0, 1, 0, 1},
+				// 		{1, 1, 0, 1},
+				// 	};
+				// batch.push_instruction(instruction::rectangle{
+				// 	.generic = {.image = light_region->view},
+				// 	.pos = {.5f, -300 + i * 270.1f},
+				// 	.angle = 30 * math::deg_to_rad,
+				// 	.scale = 1,
+				// 	.vert_color = vc,
+				// 	.extent = {100.15f, 100.15f},
+				// 	.uv00 = light_region->uv.v00(),
+				// 	.uv11 = light_region->uv.v11(),
+				// });
+				//
+				// batch.push_instruction(instruction::rectangle{
+				// 	.generic = {.image = r1->view},
+				// 	.pos = {200.5f, -300 + i * 270.1f},
+				// 	.angle = 30 * math::deg_to_rad,
+				// 	.scale = 1,
+				// 	.vert_color = vc,
+				// 	.extent = {100.15f, 100.15f},
+				// 	.uv00 = r1->uv.v00(),
+				// 	.uv11 = r1->uv.v11(),
+				// });
+				//
+				// batch.push_instruction(instruction::rectangle{
+				// 	.generic = {.image = r2->view},
+				// 	.pos = {400.5f, -300 + i * 270.1f},
+				// 	.angle = 30 * math::deg_to_rad,
+				// 	.scale = 1,
+				// 	.vert_color = vc,
+				// 	.extent = {100.15f, 100.15f},
+				// 	.uv00 = r2->uv.v00(),
+				// 	.uv11 = r2->uv.v11(),
+				// });
+				//
+				// batch.push_instruction(instruction::rectangle{
+				// 	.generic = {.image = r3->view},
+				// 	.pos = {600.5f, -300 + i * 270.1f},
+				// 	.angle = 30 * math::deg_to_rad,
+				// 	.scale = 1,
+				// 	.vert_color = vc,
+				// 	.extent = {100.15f, 100.15f},
+				// 	.uv00 = r3->uv.v00(),
+				// 	.uv11 = r3->uv.v11(),
+				// });
+				//
+				// batch.push_instruction(instruction::rectangle{
+				// 	.generic = {.image = r4->view},
+				// 	.pos = {800.5f, -300 + i * 270.1f},
+				// 	.angle = 30 * math::deg_to_rad,
+				// 	.scale = 1,
+				// 	.vert_color = vc,
+				// 	.extent = {100.15f, 100.15f},
+				// 	.uv00 = r4->uv.v00(),
+				// 	.uv11 = r4->uv.v11(),
+				// });
+				//
 				auto cursor_world = camera.get_screen_to_world(core::global::input.get_cursor_pos(), {}, true);
-
+				//
 				batch.push_instruction(instruction::constrained_curve{
 					.param = instruction::curve_trait_mat::bezier * instruction::curve_ctrl_handle{{
 						{0, 0}, {0, 50}, cursor_world.copy().add_y(-50), cursor_world
@@ -1177,71 +1202,98 @@ int main(){
 					.segments = 32,
 					.stroke = 16,
 					.src_color = colors::white,
-					.dst_color = colors::aqua
+					.dst_color = colors::aqua.to_light()
 				});
-
-				batch.push_instruction(instruction::constrained_curve{
-					.param = instruction::curve_trait_mat::hermite * instruction::curve_ctrl_handle{{
-						{0 - 100, 0}, {0 - 100, 50}, cursor_world.copy().add_x(-100), cursor_world.copy().add( - 100, -50)
-					}},
-
-					.factor_range = {0, 1},
-					.segments = 32,
-					.stroke = 16,
-					.src_color = colors::white,
-					.dst_color = colors::aqua
-				});
-
-				batch.push_instruction(instruction::constrained_curve{
-					.param = instruction::curve_trait_mat::catmull_rom<> * instruction::curve_ctrl_handle{{
-						{0 + 100, 0}, {0 + 100, 50}, cursor_world.copy().add( + 100, -50), cursor_world.copy().add_x(+100)
-					}},
-
-					.factor_range = {0, 1},
-					.segments = 32,
-					.stroke = 16,
-					.src_color = colors::white,
-					.dst_color = colors::aqua
-				});
-
-
-				batch.push_instruction(instruction::constrained_curve{
-					.param = instruction::curve_trait_mat::b_spline * instruction::curve_ctrl_handle{{
-						{0 + 200, 0}, {0 + 200, 50}, cursor_world.copy().add( + 200, -50), cursor_world.copy().add_x(+200)
-					}},
-
-					.factor_range = {0, 1},
-					.segments = 32,
-					.stroke = 16,
-					.src_color = colors::white,
-					.dst_color = colors::aqua
-				});
-
-				float off = i == 0 ? core::global::timer.global_time() * 5.f : 0.f;
-
-				batch.push_instruction(instruction::line_segments{
-
-				}, instruction::line_node{
-					.pos = {30, 70},
-					.stroke = 4,
-					.offset = off,
-					.color = colors::red_dusted,
-				}, instruction::line_node{
-					.pos = {305, 170},
-					.stroke = 12,
-					.offset = off,
-					.color = colors::pale_yellow,
-				}, instruction::line_node{
-					.pos = {630, -370},
-					.stroke = 16,
-					.offset = off,
-					.color = colors::pale_green,
-				}, instruction::line_node{
-					.pos = {30, 200},
-					.stroke = 8,
-					.offset = off,
-					.color = colors::aqua,
-				});
+				//
+				// batch.push_instruction(instruction::constrained_curve{
+				// 	.param = instruction::curve_trait_mat::hermite * instruction::curve_ctrl_handle{{
+				// 		{0 - 100, 0}, {0 - 100, 50}, cursor_world.copy().add_x(-100), cursor_world.copy().add( - 100, -50)
+				// 	}},
+				//
+				// 	.factor_range = {0, 1},
+				// 	.segments = 32,
+				// 	.stroke = 16,
+				// 	.src_color = colors::white,
+				// 	.dst_color = colors::aqua
+				// });
+				//
+				// batch.push_instruction(instruction::constrained_curve{
+				// 	.param = instruction::curve_trait_mat::catmull_rom<> * instruction::curve_ctrl_handle{{
+				// 		{0 + 100, 0}, {0 + 100, 50}, cursor_world.copy().add( + 100, -50), cursor_world.copy().add_x(+100)
+				// 	}},
+				//
+				// 	.factor_range = {0, 1},
+				// 	.segments = 32,
+				// 	.stroke = 16,
+				// 	.src_color = colors::white,
+				// 	.dst_color = colors::aqua
+				// });
+				//
+				//
+				// batch.push_instruction(instruction::constrained_curve{
+				// 	.param = instruction::curve_trait_mat::b_spline * instruction::curve_ctrl_handle{{
+				// 		{0 + 200, 0}, {0 + 200, 50}, cursor_world.copy().add( + 200, -50), cursor_world.copy().add_x(+200)
+				// 	}},
+				//
+				// 	.factor_range = {0, 1},
+				// 	.segments = 32,
+				// 	.stroke = 16,
+				// 	.src_color = colors::white,
+				// 	.dst_color = colors::aqua
+				// });
+				//
+				// float off = 0;//i == 0 ? core::global::timer.global_time() * 5.f : 0.f;
+				//
+				// batch.push_instruction(instruction::line_segments_closed{
+				//
+				// }, instruction::line_node{
+				// 	.pos = {30, 200},
+				// 	.stroke = 8,
+				// 	.offset = off,
+				// 	.color = colors::aqua,
+				// }, instruction::line_node{
+				// 	.pos = {70, 70},
+				// 	.stroke = 8,
+				// 	.offset = off,
+				// 	.color = colors::red_dusted,
+				// }, instruction::line_node{
+				// 	.pos = cursor_world,
+				// 	.stroke = 8,
+				// 	.offset = off,
+				// 	.color = colors::pale_yellow,
+				// }, instruction::line_node{
+				// 	.pos = {230, 370},
+				// 	.stroke = 8,
+				// 	.offset = off,
+				// 	.color = colors::pale_green,
+				// });
+				//
+				// batch.push_instruction(instruction::rectangle_ortho_vert_color{
+				// 	.generic = {r1->view},
+				// 	.v00 = {0, 0},
+				// 	.v11 = {600, 600},
+				// 	.uv00 = r1->uv.v00(),
+				// 	.uv11 = r1->uv.v11(),
+				// 	.vert_color = vc,
+				// });
+				//
+				// batch.push_instruction(instruction::line{
+				// 	.src = {-600, -600},
+				// 	.dst = {-500, -700},
+				// 	.src_color = colors::ACID,
+				// 	.dst_color = colors::CRIMSON,
+				// 	.stroke = 65,
+				// });
+				// batch.push_instruction(instruction::row_patch{
+				// 	.generic = {r2->view},
+				// 	.coords = {
+				// 		.x = {0, 100, 500, 600},
+				// 		.y = {0, 200},
+				// 		.uv_y = {r2->uv.v00().y, r2->uv.v11().y},
+				// 		.uv_x = {r2->uv.v00().x, r2->uv.v00().x + .1f, r2->uv.v11().x - .1f, r2->uv.v11().x}
+				// 	},
+				// 	.color = colors::white,
+				// });
 
 			}
 
@@ -1252,8 +1304,8 @@ int main(){
 			assert(batch.is_all_done());
 
 			// batch.reset();
-			ctx.flush();
 			vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {manager.get_main_command_buffer()});
+			ctx.flush();
 		}
 
 		ctx.wait_on_device();

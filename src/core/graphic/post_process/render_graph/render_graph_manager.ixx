@@ -291,7 +291,7 @@ namespace mo_yanxi::graphic::render_graph{
 			external_inputs_.append(externals);
 		}
 
-		void add_inout(const std::initializer_list<resource_desc::explicit_resource_usage> externals){
+		void add_in_out(const std::initializer_list<resource_desc::explicit_resource_usage> externals){
 			external_inputs_.append(externals);
 			external_outputs_.append(externals);
 		}

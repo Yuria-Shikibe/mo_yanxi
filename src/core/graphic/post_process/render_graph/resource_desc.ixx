@@ -283,7 +283,7 @@ namespace mo_yanxi::graphic::render_graph{
 						}
 
 						//TODO format compatibility check, consider sampler and other...
-						if(l.format != r.format){
+						if(l.format != r.format && (l.format != VK_FORMAT_UNDEFINED && r.format != VK_FORMAT_UNDEFINED)){
 							return "Format Incompatible";
 						}
 

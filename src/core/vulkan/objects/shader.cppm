@@ -28,16 +28,16 @@ export namespace mo_yanxi::vk{
 			std::pair{std::string_view{".mesh"}, VK_SHADER_STAGE_MESH_BIT_EXT},
 		};
 
-		[[nodiscard]] shader_module(VkDevice device, const std::span<const char> code) : device(device){
+		[[nodiscard]] shader_module(VkDevice device, const std::span<const char> code, VkShaderStageFlagBits stageFlagBits = {}) : device(device), declStage(stageFlagBits){
 			createShaderModule(code);
 		}
 
-		[[nodiscard]] shader_module(VkDevice device, const std::filesystem::path& path) : device(device), name(path.stem().string()){
+		[[nodiscard]] shader_module(VkDevice device, const std::filesystem::path& path, VkShaderStageFlagBits stageFlagBits = {}) : device(device), name(path.stem().string()), declStage(stageFlagBits){
 			createShaderModule(path);
 			declShaderStage(path);
 		}
 
-		[[nodiscard]] shader_module(VkDevice device, const std::string_view path) : shader_module(device, std::filesystem::path{path}){
+		[[nodiscard]] shader_module(VkDevice device, const std::string_view path, VkShaderStageFlagBits stageFlagBits = {}) : shader_module(device, std::filesystem::path{path}, stageFlagBits){
 
 		}
 
@@ -102,6 +102,7 @@ export namespace mo_yanxi::vk{
 		}
 
 		void declShaderStage(const std::filesystem::path& path){
+			if(declStage)return;
 			const auto fileName = path.filename().string();
 
 			for (const auto & [type, stage] : ShaderType){
@@ -140,6 +141,9 @@ export namespace mo_yanxi::vk{
 
 		void set_no_deduced_stage() noexcept{
 			declStage = {};
+		}
+		void set_stage(VkShaderStageFlagBits stage) noexcept{
+			declStage = stage;
 		}
 	};
 

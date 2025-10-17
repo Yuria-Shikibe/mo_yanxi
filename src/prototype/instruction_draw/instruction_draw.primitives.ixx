@@ -19,6 +19,11 @@ using float2 = math::vec2;
 struct alignas(16) float4 : color{
 };
 
+export
+struct quad_vert_color{
+	float4 c00, c10, c01, c11;
+};
+
 constexpr inline float CircleVertPrecision{12};
 
 export
@@ -40,36 +45,51 @@ export struct alignas(16) triangle{
 		this const triangle& instruction) noexcept{ return 1; }
 };
 
-export struct alignas(16) rectangle{
+struct rect_like{
+
+
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count() noexcept{ return 4; }
+
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count() noexcept{ return 2; }
+};
+
+export struct alignas(16) rectangle : rect_like{
 	primitive_generic generic;
 	float2 pos;
 	float angle;
 	float scale; //TODO uses other?
 
-	float4 c0, c1, c2, c3;
+	quad_vert_color vert_color;
 	float2 extent;
 	float2 uv00, uv11;
 
 
-	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(
-		this const rectangle& instruction) noexcept{ return 4; }
-
-	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(
-		this const rectangle& instruction) noexcept{ return 2; }
 };
 
-export struct alignas(16) rectangle_ortho{
+
+export struct alignas(16) rectangle_ortho : rect_like{
 	primitive_generic generic;
 	float2 v00, v11;
-	float4 c0, c1, c2, c3;
 	float2 uv00, uv11;
+	float4 color;
 
+};
 
-	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(
-		this const rectangle& instruction) noexcept{ return 4; }
+export struct alignas(16) rectangle_ortho_vert_color : rect_like{
+	primitive_generic generic;
+	float2 v00, v11;
+	float2 uv00, uv11;
+	quad_vert_color vert_color;
+};
 
-	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(
-		this const rectangle& instruction) noexcept{ return 2; }
+export struct alignas(16) line : rect_like{
+	primitive_generic generic;
+	float2 src, dst;
+	float4 src_color;
+	float4 dst_color;
+	float stroke;
+
+	std::uint32_t _cap[3];
 };
 
 export struct alignas(16) line_segments{
@@ -102,6 +122,36 @@ export struct alignas(16) line_segments{
 		const Args&...
 	) noexcept{
 		return line_segments::get_primitive_count(sizeof...(Args));
+	}
+};
+
+export struct line_segments_closed : line_segments{
+
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
+		std::size_t node_payload_size
+	) noexcept{
+		return line_segments::get_vertex_count(node_payload_size) + 2;
+	}
+
+	template <typename... Args>
+		[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
+			const Args&...
+		) noexcept{
+		return line_segments_closed::get_vertex_count(sizeof...(Args));
+	}
+
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count(
+		std::size_t node_payload_size
+	) noexcept{
+		return line_segments::get_primitive_count(node_payload_size) + 2;
+	}
+
+
+	template <typename... Args>
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count(
+		const Args&...
+	) noexcept{
+		return line_segments_closed::get_primitive_count(sizeof...(Args));
 	}
 };
 
@@ -242,8 +292,48 @@ constexpr inline curve_trait_matrix b_spline{
 	};
 }
 
+export struct row_patch_coords{
+	float x[4];
+	float y[2];
+	float uv_y[2];
+	float uv_x[4];
+};
+
+export struct alignas(16) row_patch{
+	primitive_generic generic;
+
+	row_patch_coords coords;
+	float4 color;
+
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count() noexcept{
+		return 8;
+	}
+
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count() noexcept{
+		return 6;
+	}
+};
+
+export struct alignas(16) row_patch_vert_color{
+	primitive_generic generic;
+
+	row_patch_coords coords;
+	quad_vert_color vert_color;
+
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count() noexcept{
+		return 8;
+	}
+
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count() noexcept{
+		return 6;
+	}
+};
+
 template <>
 constexpr inline bool is_valid_consequent_argument<line_segments, line_node> = true;
+
+template <>
+constexpr inline bool is_valid_consequent_argument<line_segments_closed, line_node> = true;
 
 template <>
 constexpr inline instr_type instruction_type_of<triangle> = instr_type::triangle;
@@ -252,18 +342,34 @@ template <>
 constexpr inline instr_type instruction_type_of<rectangle> = instr_type::rectangle;
 
 template <>
+constexpr inline instr_type instruction_type_of<line> = instr_type::line;
+
+template <>
 constexpr inline instr_type instruction_type_of<line_segments> = instr_type::line_segments;
+
+template <>
+constexpr inline instr_type instruction_type_of<line_segments_closed> = instr_type::line_segments_closed;
+
+template <>
+constexpr inline instr_type instruction_type_of<rectangle_ortho> = instr_type::rect_ortho;
+
+template <>
+constexpr inline instr_type instruction_type_of<rectangle_ortho_vert_color> = instr_type::rect_ortho_vert_color;
 
 template <>
 constexpr inline instr_type instruction_type_of<poly> = instr_type::poly;
 
 template <>
-constexpr inline instr_type instruction_type_of<poly_partial> =
-	instr_type::poly_partial;
+constexpr inline instr_type instruction_type_of<poly_partial> = instr_type::poly_partial;
 
 template <>
-constexpr inline instr_type instruction_type_of<constrained_curve> =
-	instr_type::constrained_curve;
+constexpr inline instr_type instruction_type_of<constrained_curve> = instr_type::constrained_curve;
+
+template <>
+constexpr inline instr_type instruction_type_of<row_patch> = instr_type::row_patch;
+//
+// template <>
+// constexpr inline instr_type instruction_type_of<row_patch_vert_color> = instr_type::constrained_curve;
 
 
 [[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_vertex_count(
@@ -273,12 +379,22 @@ constexpr inline instr_type instruction_type_of<constrained_curve> =
 	switch(type){
 	case instr_type::triangle : return 3U;
 	case instr_type::rectangle : return 4U;
-	case instr_type::line_segments :{
+	case instr_type::rect_ortho : return 4U;
+	case instr_type::rect_ortho_vert_color : return 4U;
+	case instr_type::line : return 4U;
+	case instr_type::line_segments:{
 		const auto size = get_instr_head(ptr_to_instr).get_instr_byte_size();
 		const auto payloadByteSize = (size - get_instr_size<line_segments>());
 		assert(payloadByteSize % sizeof(line_node) == 0);
 		const auto payloadCount = payloadByteSize / sizeof(line_node);
 		return line_segments::get_vertex_count(payloadCount);
+	}
+	case instr_type::line_segments_closed :{
+		const auto size = get_instr_head(ptr_to_instr).get_instr_byte_size();
+		const auto payloadByteSize = (size - get_instr_size<line_segments>());
+		assert(payloadByteSize % sizeof(line_node) == 0);
+		const auto payloadCount = payloadByteSize / sizeof(line_node);
+		return line_segments_closed::get_vertex_count(payloadCount);
 	}
 	case instr_type::poly : return reinterpret_cast<const poly*>(ptr_to_instr + sizeof(
 			instruction_head))->get_vertex_count();
@@ -286,11 +402,12 @@ constexpr inline instr_type instruction_type_of<constrained_curve> =
 			sizeof(instruction_head))->get_vertex_count();
 	case instr_type::constrained_curve : return reinterpret_cast<const constrained_curve*>(ptr_to_instr +
 			sizeof(instruction_head))->get_vertex_count();
+	case instr_type::row_patch: return 8;
 	default : std::unreachable();
 	}
 }
 
-[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(std::uint32_t vtx) noexcept{
+[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(instr_type type, const std::byte* ptr_to_payload, std::uint32_t vtx) noexcept{
 	return vtx < 3 ? 0 : vtx - 2;
 }
 

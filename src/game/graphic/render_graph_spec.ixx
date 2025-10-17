@@ -22,6 +22,39 @@ namespace mo_yanxi::game::fx{
 	using namespace graphic::render_graph::resource_desc;
 
 	export
+	post_process_meta get_bloom_default_meta(){
+		post_process_meta meta{
+			assets::graphic::shaders::comp::bloom,
+			{
+										{{0}, {0, no_slot}}, //Input
+										{{1}, {1, no_slot}},
+										{{2}, {no_slot, 0}}, //Output
+										{{3}, {no_slot, 0}},
+									}
+		};
+
+		{
+			auto& req = meta.sockets.at_out<image_requirement>(0);
+
+			req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
+			req.mip_levels = 6;
+			req.scaled_times = 0;
+			req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		}
+
+		{
+			auto& req = meta.sockets.at_in<image_requirement>(1);
+
+			req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
+			req.mip_levels = 6;
+			req.scaled_times = 1;
+			req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		}
+
+		return meta;
+	}
+
+	export
 	struct post_process_graph{
 		render_graph_manager graph{};
 
@@ -91,37 +124,7 @@ namespace mo_yanxi::game::fx{
 			});
 
 
-			const post_process_meta bloom_meta = []{
-				post_process_meta meta{
-					assets::graphic::shaders::comp::bloom,
-					{
-								{{0}, {0, no_slot}}, //Input
-								{{1}, {1, no_slot}},
-								{{2}, {no_slot, 0}}, //Output
-								{{3}, {no_slot, 0}},
-							}
-				};
-
-				{
-					auto& req = meta.sockets.at_out<image_requirement>(0);
-
-					req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
-					req.mip_levels = 6;
-					req.scaled_times = 0;
-					req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-				}
-
-				{
-					auto& req = meta.sockets.at_in<image_requirement>(1);
-
-					req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
-					req.mip_levels = 6;
-					req.scaled_times = 1;
-					req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-				}
-
-				return meta;
-			}();
+			const auto bloom_meta = get_bloom_default_meta();
 
 			const auto world_bloom = graph.add_stage<bloom_pass>(bloom_meta);
 			world_bloom.meta.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
@@ -230,7 +233,7 @@ namespace mo_yanxi::game::fx{
 				auto ui_clear = graph.add_stage<image_clear>(2);
 
 				ui_clear.pass.add_exec_dep(&final_merge.pass);
-				ui_clear.pass.add_inout({
+				ui_clear.pass.add_in_out({
 						{ui_base, 0},
 						{ui_light, 1},
 					});
@@ -240,7 +243,7 @@ namespace mo_yanxi::game::fx{
 				auto world_clear = graph.add_stage<image_clear>(2);
 
 				world_clear.pass.add_exec_dep(&world_merge.pass);
-				world_clear.pass.add_inout({
+				world_clear.pass.add_in_out({
 						{world_blit_base, 0},
 						{world_blit_light, 1},
 					});
@@ -250,7 +253,7 @@ namespace mo_yanxi::game::fx{
 				auto world_clear = graph.add_stage<image_clear>(2);
 
 				world_clear.pass.add_exec_dep(&oit.pass);
-				world_clear.pass.add_inout({
+				world_clear.pass.add_in_out({
 						explicit_resource_usage{world_draw_resolved_base, 0},
 						explicit_resource_usage{world_draw_resolved_light, 1},
 					});
@@ -261,13 +264,13 @@ namespace mo_yanxi::game::fx{
 
 				world_depth_clear.pass.add_exec_dep(&ssao.pass);
 				world_depth_clear.pass.add_exec_dep(&oit.pass);
-				world_depth_clear.pass.add_inout({{world_draw_resolved_depth, 0}});
+				world_depth_clear.pass.add_in_out({{world_draw_resolved_depth, 0}});
 			}
 
 			{
 				auto world_clear = graph.add_stage<image_clear>(2);
 
-				world_clear.pass.add_inout({
+				world_clear.pass.add_in_out({
 						explicit_resource_usage{world_draw_base, 0},
 						explicit_resource_usage{world_draw_light, 1},
 					});
@@ -276,7 +279,7 @@ namespace mo_yanxi::game::fx{
 				auto world_depth_clear =
 					graph.add_stage<depth_stencil_image_clear>(std::initializer_list<depth_stencil_image_clear::clear_info>{{{1}}});
 
-				world_depth_clear.pass.add_inout({{world_draw_depth, 0}});
+				world_depth_clear.pass.add_in_out({{world_draw_depth, 0}});
 			}
 
 			{
@@ -286,7 +289,7 @@ namespace mo_yanxi::game::fx{
 					std::initializer_list<image_clear::clear_info>{{color}});
 
 				oit_clear.pass.add_exec_dep(&oit.pass);
-				oit_clear.pass.add_inout({{world_draw_oit_head, 0}});
+				oit_clear.pass.add_in_out({{world_draw_oit_head, 0}});
 
 
 				auto off = std::bit_cast<std::uint32_t>(&graphic::oit_statistic::size);
@@ -295,7 +298,7 @@ namespace mo_yanxi::game::fx{
 					});
 
 				oit_buf_clear.pass.add_exec_dep(&oit.pass);
-				oit_buf_clear.pass.add_inout({
+				oit_buf_clear.pass.add_in_out({
 						explicit_resource_usage{world_draw_oit_buffer_stat, 0},
 					});
 			}

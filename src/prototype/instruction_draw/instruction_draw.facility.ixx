@@ -216,17 +216,20 @@ enum struct instr_type : std::uint32_t{
 	triangle,
 	rectangle,
 
-	//TODO trivial line
+	line,
 	line_segments,
-	//TODO line_segments_closed,
+	line_segments_closed,
 
 	poly,
 	poly_partial,
 
 	constrained_curve,
 
-	//TODO nine patch
-	//TODO ortho rect
+
+	rect_ortho,
+	rect_ortho_vert_color,
+
+	row_patch,
 	//TODO ortho rect bound
 
 	SIZE,
@@ -294,6 +297,11 @@ consteval std::size_t get_instr_size() noexcept{
 }
 
 template <typename T, typename... Args>
+	requires requires{
+		requires !known_instruction<T> || requires(const T& instr, const Args&... args){
+			{instr.get_vertex_count(args...)} -> std::convertible_to<std::uint32_t>;
+		};
+	}
 constexpr instruction_head make_instruction_head(const T& instr, const Args&... args) noexcept{
 	static constexpr std::ptrdiff_t required = get_instr_size<T, Args...>();
 	static_assert(required % 16 == 0);

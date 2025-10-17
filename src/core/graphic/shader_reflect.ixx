@@ -1,6 +1,7 @@
 module;
 
 #include <spirv_cross/spirv_glsl.hpp>
+#include <spirv_cross/spirv_hlsl.hpp>
 
 export module mo_yanxi.graphic.shader_reflect;
 
@@ -23,10 +24,11 @@ namespace mo_yanxi::graphic{
 	public:
 		[[nodiscard]] shader_reflection() = default;
 
-		[[nodiscard]] shader_reflection(std::span<const std::uint32_t> binary) : compiler_ {binary.data(), binary.size()}, resources_{compiler_.get_shader_resources()}{
+		[[nodiscard]] shader_reflection(std::span<const std::uint32_t> binary) :
+		compiler_ {binary.data(), binary.size()}, resources_{compiler_.get_shader_resources()}{
 		}
 
-		[[nodiscard]] const spirv_cross::CompilerGLSL& compiler() const noexcept{
+		[[nodiscard]] const auto& compiler() const noexcept{
 			return compiler_;
 		}
 

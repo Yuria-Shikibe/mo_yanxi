@@ -144,7 +144,7 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 
 			if(pushedVertices + nextVertices <= MaxVerticesPerMesh){
 				pushedVertices += nextVertices;
-				pushedPrimitives += get_primitive_count(nextVertices);
+				pushedPrimitives += get_primitive_count(head.type, ptr_to_head, nextVertices);
 
 				verticesBreakpoint = 0;
 				nextPrimitiveOffset = 0;
@@ -155,7 +155,7 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 				if(pushedVertices == MaxVerticesPerMesh) break;
 			} else{
 				const auto remains = get_remain_vertices();
-				const auto primits = get_primitive_count(remains);
+				const auto primits = get_primitive_count(head.type, ptr_to_head, remains);
 				nextPrimitiveOffset += primits;
 				pushedPrimitives += primits;
 
@@ -619,7 +619,7 @@ public:
 		wait_n(get_pushed_group_count(), wait_on_frag);
 	}
 
-	void record_command(const VkPipelineLayout layout, std::generator<const vk::command_buffer&>&& cmdGen) const{
+	void record_command(const VkPipelineLayout layout, std::generator<VkCommandBuffer&&>&& cmdGen) const{
 		for(auto&& [idx, buf] : std::move(cmdGen) | std::views::take(groups_.size()) | std::ranges::views::enumerate){
 			descriptor_buffer_.bind_chunk_to(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, idx);
 			vk::cmd::drawMeshTasksIndirect(buf, indirect_buffer, idx * sizeof(VkDrawMeshTasksIndirectCommandEXT));
@@ -672,11 +672,9 @@ private:
 	}
 
 	template <typename InstrT, typename... Args>
-	bool check_need_block(const std::byte* where) const noexcept{
-		const bool directly_done = get_instr_head(where).type == instr_type::noop;
-
+	FORCE_INLINE bool check_need_block(const std::byte* where) const noexcept{
 		const auto end = where + instruction::get_instr_size<InstrT, Args...>() + sizeof(instruction_head);
-		if(instruction_dspt_ptr_ == where) return !directly_done;
+		if(instruction_dspt_ptr_ == where) return !is_all_idle();
 
 		if(instruction_dspt_ptr_ > where){
 			return end > instruction_dspt_ptr_;

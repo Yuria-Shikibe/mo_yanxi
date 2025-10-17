@@ -188,6 +188,7 @@ namespace mo_yanxi::graphic::render_graph{
 				descriptor_layout_builder_.push(binding.binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 			}
 
+
 			for(const auto& pass : inout_map.connection()){
 				if(!std::ranges::contains(resources_, pass.binding)){
 					throw std::invalid_argument("pass does not exist");

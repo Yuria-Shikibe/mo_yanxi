@@ -1,133 +1,229 @@
-import os
-import sys
-import subprocess
 import argparse
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
+import shlex
 
-def compile_slang_to_spv(input_dir, output_dir, slangc_path="slangc"):
-    """
-    将输入文件夹中的.slang着色器文件编译成SPIR-V文件
+def check_slangc_compiler(slangc_path):
+    """检查slangc编译器是否有效"""
+    try:
+        result = subprocess.run([slangc_path, "-v"],
+                                capture_output=True,
+                                text=True,
+                                timeout=10)
+        if result.returncode == 0:
+            print(f"✓ slangc编译器有效: {slangc_path}")
+            return True
+        else:
+            print(f"✗ slangc编译器无效: {result.stderr}")
+            return False
+    except FileNotFoundError:
+        print(f"✗ 找不到slangc编译器: {slangc_path}")
+        return False
+    except subprocess.TimeoutExpired:
+        print(f"✗ slangc编译器执行超时")
+        return False
+    except Exception as e:
+        print(f"✗ 检查slangc编译器时出错: {e}")
+        return False
 
-    Args:
-        input_dir (str): 输入文件夹路径
-        output_dir (str): 输出文件夹路径
-        slangc_path (str): slangc编译器路径，默认为'slangc'
-    """
+def check_json_file(json_path):
+    """检查JSON配置文件是否存在"""
+    if not os.path.isfile(json_path):
+        print(f"✗ JSON配置文件不存在: {json_path}")
+        return False
 
-    # 确保输出目录存在
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            json.load(f)  # 尝试解析JSON
+        print(f"✓ JSON配置文件有效: {json_path}")
+        return True
+    except json.JSONDecodeError as e:
+        print(f"✗ JSON配置文件格式错误: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ 读取JSON配置文件时出错: {e}")
+        return False
 
-    # 查找所有的.slang文件:cite[2]:cite[5]:cite[8]
-    slang_files = []
-    for item in Path(input_dir).iterdir():
-        if item.is_file() and item.suffix.lower() == '.slang':
-            slang_files.append(item)
+def parse_config(json_path):
+    """解析JSON配置文件"""
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
 
-    if not slang_files:
-        print(f"在目录 {input_dir} 中未找到任何.slang文件")
-        return
+        # 验证必需字段
+        if 'common_options' not in config:
+            raise ValueError("JSON配置中缺少 'common_options' 字段")
 
-    print(f"找到 {len(slang_files)} 个.slang文件")
+        if 'shaders' not in config:
+            raise ValueError("JSON配置中缺少 'shaders' 字段")
 
-    successful_compiles = 0
-    failed_compiles = 0
+        common_options = config.get('common_options', [])
+        shaders = config.get('shaders', [])
+        shader_root = config.get('shader_root', '')  # 可选字段
 
-    for slang_file in slang_files:
-        try:
-            # 构建输出文件路径
-            output_filename = slang_file.stem + ".spv"
-            output_path = Path(output_dir) / output_filename
+        # 验证shaders数组结构
+        for i, shader in enumerate(shaders):
+            if 'file' not in shader:
+                raise ValueError(f"shaders[{i}] 中缺少 'file' 字段")
+            if 'options' not in shader:
+                shader['options'] = []
 
-            print(f"正在编译: {slang_file.name} -> {output_filename}")
+        print(f"✓ 成功解析配置文件: {len(shaders)} 个着色器文件")
+        if shader_root:
+            print(f"✓ 使用着色器根目录: {shader_root}")
 
-            # 构建slangc命令:cite[1]
-            # 使用优化选项 -O 进行优化
-            cmd = [
-                slangc_path,
-                "-O",  # 启用优化
-                "-fvk-use-gl-layout",
-                "-matrix-layout-column-major",
-                "-o", str(output_path),
-                str(slang_file)
-            ]
+        return common_options, shaders, shader_root
 
-            # 执行编译命令
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30  # 30秒超时
-            )
+    except Exception as e:
+        print(f"✗ 解析配置文件时出错: {e}")
+        return None, None, None
 
-            if result.returncode == 0:
-                print(f"✓ 成功编译: {slang_file.name}\n")
-                successful_compiles += 1
-            else:
-                print(f"✗ 编译失败: {slang_file.name}")
-                print(f"  错误信息: {result.stderr}")
-                failed_compiles += 1
+def compile_shader(
+        slangc_path: str,
+        output_dir: str,
+        common_options ,
+        shader_file : str,
+        input_file : str,
+        shader_options):
+    """编译单个着色器文件"""
+    try:
+        shader_name = shader_file.replace(os.sep, '.').replace('/', '.')
+        shader_name = Path(shader_name).with_suffix('.spv')
+        output_file = os.path.join(output_dir, shader_name)
 
-        except subprocess.TimeoutExpired:
-            print(f"✗ 编译超时: {slang_file.name}")
-            failed_compiles += 1
-        except Exception as e:
-            print(f"✗ 处理文件时出错 {slang_file.name}: {str(e)}")
-            failed_compiles += 1
+        args = [slangc_path]
+        args.extend(common_options)
+        args.extend(shader_options)
+        args.extend(['-o', output_file])
+        args.append(input_file)
 
-    # 输出总结信息
-    print(f"\n编译完成!")
-    print(f"成功: {successful_compiles}, 失败: {failed_compiles}")
+        print(f"\n正在编译: {shader_file}")
+        print(f"输出文件: {output_file}")
+        print(f"编译命令: {' '.join(args)}")
 
-    # if failed_compiles > 0:
-    #     sys.exit(1)
+        # 执行编译
+        result = subprocess.run(args, capture_output=True, text=True, timeout=30)
+
+        if result.returncode == 0:
+            print(f"✓ 编译成功: {shader_file}")
+            return True, result.stdout
+        else:
+            print(f"✗ 编译失败: {shader_file}")
+            print(f"错误信息: {result.stderr}")
+
+            # 如果编译失败，删除目标文件
+            if os.path.exists(output_file):
+                os.remove(output_file)
+                print(f"已删除编译失败的目标文件: {output_file}")
+
+            return False, result.stderr
+
+    except subprocess.TimeoutExpired:
+        print(f"✗ 编译超时: {shader_file}")
+        # 删除可能部分生成的文件
+        output_file = os.path.join(output_dir, f"{Path(shader_file).stem}.spv")
+        if os.path.exists(output_file):
+            os.remove(output_file)
+        return False, "编译超时"
+    except Exception as e:
+        print(f"✗ 编译过程中发生异常: {e}")
+        return False, str(e)
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="将.slang着色器文件编译为SPIR-V字节码",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-使用示例:
-  python slang_compiler.py input_shaders/ output_spv/
-  python slang_compiler.py -c /usr/local/bin/slangc input/ output/
-        """
-    )
-
-    parser.add_argument(
-        "input_dir",
-        help="包含.slang文件的输入目录"
-    )
-
-    parser.add_argument(
-        "output_dir",
-        help="SPIR-V文件的输出目录"
-    )
-
-    parser.add_argument(
-        "-c", "--compiler",
-        dest="slangc_path",
-        default="slangc",
-        help="slangc编译器路径 (默认: 'slangc')"
-    )
+    parser = argparse.ArgumentParser(description='SLANG着色器批量编译工具')
+    parser.add_argument('slangc_path', help='slangc编译器路径')
+    parser.add_argument('output_dir', help='输出目录（相对路径）')
+    parser.add_argument('config_file', help='配置文件路径（相对路径）')
 
     args = parser.parse_args()
 
-    # 验证输入目录
-    if not os.path.isdir(args.input_dir):
-        print(f"错误: 输入目录 '{args.input_dir}' 不存在")
+    # 获取当前脚本所在目录的绝对路径
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # 处理相对路径
+    slangc_path = Path(args.slangc_path).absolute()
+    output_dir = Path(args.output_dir).absolute()
+    config_file = Path(args.config_file).absolute()
+
+    print("=" * 50)
+    print("SLANG着色器批量编译工具")
+    print("=" * 50)
+    print(f"编译器路径: {slangc_path}")
+    print(f"输出目录: {output_dir}")
+    print(f"配置文件: {config_file}")
+    print("-" * 50)
+
+    # 步骤1: 检查slangc编译器
+    if not check_slangc_compiler(slangc_path):
         sys.exit(1)
 
-    # 检查编译器是否存在
-    try:
-        subprocess.run([args.slangc_path, "--version"],
-                       capture_output=True, timeout=5)
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        print(f"错误: 找不到slangc编译器 '{Path(args.slangc_path).resolve()}'")
-        print("请确保已安装Shader-Slang并正确配置PATH环境变量")
-        print("或使用 -c 参数指定完整的编译器路径")
+    # 步骤2: 检查JSON配置文件
+    if not check_json_file(config_file):
         sys.exit(1)
 
-    # 执行编译
-    compile_slang_to_spv(args.input_dir, args.output_dir, args.slangc_path)
+    # 步骤3: 解析JSON配置
+    common_options, shaders, shader_root = parse_config(config_file)
+    if common_options is None:
+        sys.exit(1)
+
+    # 创建输出目录
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"✓ 输出目录已创建/确认: {output_dir}")
+
+    # 步骤4: 编译所有着色器
+    print("\n开始编译着色器...")
+    print("-" * 50)
+
+    success_count = 0
+    fail_count = 0
+
+    for shader_config in shaders:
+        shader_file = shader_config['file']
+        shader_options = shader_config['options']
+
+
+        # 处理着色器文件的路径
+        if shader_root:
+            # 如果指定了shader_root，则相对于脚本目录+shader_root
+            full_shader_path = Path(shader_root).resolve().joinpath(shader_file)
+        else:
+            # 否则相对于脚本目录
+            full_shader_path = os.path.join(script_dir, shader_file)
+
+        if not os.path.isfile(full_shader_path):
+            print(f"✗ 着色器文件不存在: {full_shader_path}")
+            fail_count += 1
+            continue
+
+        success, message = compile_shader(
+            str(slangc_path),
+            str(output_dir),
+            common_options,
+            str(shader_file),
+            str(full_shader_path),
+            shader_options
+        )
+
+        if success:
+            success_count += 1
+        else:
+            fail_count += 1
+
+    # 输出总结
+    print("\n" + "=" * 50)
+    print("编译总结:")
+    print(f"成功: {success_count} 个文件")
+    print(f"失败: {fail_count} 个文件")
+    print(f"总计: {len(shaders)} 个文件")
+
+    if fail_count > 0:
+        print("\n注意: 有编译失败的文件，已自动删除对应的.spv目标文件")
+        # sys.exit(1)
+    else:
+        print("\n✓ 所有着色器编译完成!")
 
 if __name__ == "__main__":
     main()

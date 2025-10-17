@@ -1,0 +1,21 @@
+{
+  "shader_root": "./prop/assets/shader/slangs",
+
+  "common_options": [
+    "-O",
+    "-fvk-use-gl-layout",
+    "-matrix-layout-column-major"
+  ],
+
+  "shaders": [
+    {
+      "file": "test.mesh_mesh.slang"
+    },
+    {
+      "file": "post_process/hdr_to_sdr.slang"
+    },
+    {
+      "file": "post_process/highlight_extract.slang"
+    }
+  ]
+}

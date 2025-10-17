@@ -35,6 +35,7 @@ namespace mo_yanxi::assets::graphic{
 
 			export inline vk::shader_module anti_aliasing{};
 
+
 			namespace smaa{
 				export inline vk::shader_module edge_detection{};
 				export inline vk::shader_module weight_calculate{};
