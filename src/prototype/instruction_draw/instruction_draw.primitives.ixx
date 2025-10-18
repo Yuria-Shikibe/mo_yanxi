@@ -19,6 +19,7 @@ using float2 = math::vec2;
 struct alignas(16) float4 : color{
 };
 
+
 export
 struct quad_vert_color{
 	float4 c00, c10, c01, c11;
@@ -45,15 +46,21 @@ export struct alignas(16) triangle{
 		this const triangle& instruction) noexcept{ return 1; }
 };
 
-struct rect_like{
-
-
+struct quad_like{
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count() noexcept{ return 4; }
 
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count() noexcept{ return 2; }
 };
 
-export struct alignas(16) rectangle : rect_like{
+export struct alignas(16) quad : quad_like{
+	primitive_generic generic;
+	float2 v00, v10, v01, v11;
+	float2 uv00, uv10, uv01, uv11;
+
+	quad_vert_color vert_color;
+};
+
+export struct alignas(16) rectangle : quad_like{
 	primitive_generic generic;
 	float2 pos;
 	float angle;
@@ -67,7 +74,7 @@ export struct alignas(16) rectangle : rect_like{
 };
 
 
-export struct alignas(16) rectangle_ortho : rect_like{
+export struct alignas(16) rectangle_ortho : quad_like{
 	primitive_generic generic;
 	float2 v00, v11;
 	float2 uv00, uv11;
@@ -75,18 +82,17 @@ export struct alignas(16) rectangle_ortho : rect_like{
 
 };
 
-export struct alignas(16) rectangle_ortho_vert_color : rect_like{
+export struct alignas(16) rectangle_ortho_vert_color : quad_like{
 	primitive_generic generic;
 	float2 v00, v11;
 	float2 uv00, uv11;
 	quad_vert_color vert_color;
 };
 
-export struct alignas(16) line : rect_like{
+export struct alignas(16) line : quad_like{
 	primitive_generic generic;
 	float2 src, dst;
-	float4 src_color;
-	float4 dst_color;
+	math::section<float4> color;
 	float stroke;
 
 	std::uint32_t _cap[3];
@@ -176,7 +182,7 @@ export struct alignas(16) poly{
 
 	math::range radius;
 	float2 uv00, uv11;
-	float4 inner, outer;
+	math::section<float4> color;
 
 
 	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(
@@ -199,7 +205,7 @@ export struct alignas(16) poly_partial{
 	math::range radius;
 	math::based_section<float> range;
 	float2 uv00, uv11;
-	float4 inner, outer;
+	math::section<float4> color;
 
 	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(
 		this const poly_partial& instruction) noexcept{
@@ -221,12 +227,18 @@ export struct alignas(16) constrained_curve{
 	primitive_generic generic;
 	curve_parameter param;
 
-	math::based_section<float> factor_range;
+	math::range margin;
+	math::range stroke;
+
 	std::uint32_t segments;
-	float stroke;
+
+
+	std::uint32_t _cap1;
+	std::uint32_t _cap2;
+	std::uint32_t _cap3;
 
 	float2 uv00, uv11;
-	float4 src_color, dst_color;
+	math::section<float4> color;
 
 	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_vertex_count(
 		this const constrained_curve& instruction) noexcept{
@@ -257,15 +269,15 @@ struct curve_trait_matrix{
 		: trait(trait){
 	}
 
-	FORCE_INLINE constexpr friend curve_parameter operator*(const curve_trait_matrix& lhs,
-	                                                        const curve_ctrl_handle& rhs) noexcept{
-		std::array<math::vec4, 2> rst_0;
-		rst_0[0] = lhs.trait.c0 * rhs[0].x + lhs.trait.c1 * rhs[1].x + lhs.trait.c2 * rhs[2].x + lhs.trait.c3 * rhs[3].
-			x;
-		rst_0[1] = lhs.trait.c0 * rhs[0].y + lhs.trait.c1 * rhs[1].y + lhs.trait.c2 * rhs[2].y + lhs.trait.c3 * rhs[3].
-			y;
+	[[nodiscard]] FORCE_INLINE constexpr curve_parameter apply_to(math::vec2 p0, math::vec2 p1, math::vec2 p2, math::vec2 p3) const noexcept{
+		return {
+			trait.c0 * p0.x + trait.c1 * p1.x + trait.c2 * p2.x + trait.c3 * p3.x,
+			trait.c0 * p0.y + trait.c1 * p1.y + trait.c2 * p2.y + trait.c3 * p3.y
+		};
+	}
 
-		return {rst_0};
+	FORCE_INLINE constexpr friend curve_parameter operator*(const curve_trait_matrix& lhs, const curve_ctrl_handle& rhs) noexcept{
+		return lhs.apply_to(rhs[0], rhs[1], rhs[2], rhs[3]);
 	}
 };
 
@@ -339,6 +351,9 @@ template <>
 constexpr inline instr_type instruction_type_of<triangle> = instr_type::triangle;
 
 template <>
+constexpr inline instr_type instruction_type_of<quad> = instr_type::quad;
+
+template <>
 constexpr inline instr_type instruction_type_of<rectangle> = instr_type::rectangle;
 
 template <>
@@ -378,6 +393,7 @@ constexpr inline instr_type instruction_type_of<row_patch> = instr_type::row_pat
 
 	switch(type){
 	case instr_type::triangle : return 3U;
+	case instr_type::quad : return 4U;
 	case instr_type::rectangle : return 4U;
 	case instr_type::rect_ortho : return 4U;
 	case instr_type::rect_ortho_vert_color : return 4U;

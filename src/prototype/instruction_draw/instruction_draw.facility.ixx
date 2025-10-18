@@ -214,6 +214,7 @@ enum struct instr_type : std::uint32_t{
 	uniform_update,
 
 	triangle,
+	quad,
 	rectangle,
 
 	line,
@@ -422,6 +423,7 @@ FORCE_INLINE inline image_set_result set_image_index(void* instruction, image_vi
 	auto& generic = *static_cast<primitive_generic*>(instruction);
 
 	const auto view = generic.image.get_image_view();
+	assert(std::bit_cast<std::uintptr_t>(view) != 0x00000000'ffffffffULL);
 	const auto idx = cache.try_push(view);
 	if(idx == image_view_history::max_cache_count) return image_set_result{view, false};
 	generic.image.set_index(idx);

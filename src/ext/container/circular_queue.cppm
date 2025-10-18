@@ -375,18 +375,22 @@ namespace mo_yanxi{
 			return {std::move(ret)};
 		}
 
-		value_type& operator[](size_type index) noexcept{
+		FORCE_INLINE value_type& operator[](size_type index) noexcept{
 			assert(index < size());
 
 			assert(index < capacity());
 			return data_[(index + head) % capacity_];
 		}
 
-		const value_type& operator[](size_type index) const noexcept{
+		FORCE_INLINE const value_type& operator[](size_type index) const noexcept{
 			assert(index < size());
 
 			assert(index < capacity());
 			return data_[(index + head) % capacity_];
+		}
+
+		const value_type* data_at(size_type index) const noexcept{
+			return data_ + (index + head) % capacity_;
 		}
 
 		template <std::invocable<size_type, value_type&> Fn>

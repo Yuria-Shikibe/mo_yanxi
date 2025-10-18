@@ -444,6 +444,12 @@ namespace mo_yanxi::math {
 		return {a, b};
 	}
 
+	export
+	template <std::floating_point T = float, typename IdxT>
+	[[nodiscard]] MATH_ATTR constexpr T idx_to_factor(IdxT idx, IdxT total) noexcept {
+		assert(idx <= total);
+		return static_cast<T>(idx) / static_cast<T>(total);
+	}
 
 	export
 	template <small_object T>
@@ -1045,10 +1051,10 @@ namespace mo_yanxi::math {
 	MATH_ATTR constexpr Fp curve(const Fp f, const Fp from, const Fp to) noexcept {
 		MATH_ASSERT(from < to);
 
-		if(f < from) {
+		if(f <= from) {
 			return 0.0f;
 		}
-		if(f > to) {
+		if(f >= to) {
 			return 1.0f;
 		}
 		return (f - from) / (to - from);

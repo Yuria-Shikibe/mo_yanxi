@@ -174,6 +174,7 @@ namespace mo_yanxi::math{
 				return (self = mo_yanxi::math::lerp(self, tgt, alpha));
 			}
 
+
 			template <typename S>
 			FORCE_INLINE constexpr S& clamp(this S& self) noexcept{
 				self.r = math::clamp(self.r);

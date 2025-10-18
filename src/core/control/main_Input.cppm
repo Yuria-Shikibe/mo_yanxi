@@ -90,6 +90,7 @@ export namespace mo_yanxi::core::ctrl{
 		}
 
 		void cursor_move_inform(const float x, const float y){
+			last_mouse_pos_ = mouse_pos_;
 			mouse_pos_.set(x, y);
 
 			for(auto& listener : cursor_move_listeners){
@@ -99,6 +100,14 @@ export namespace mo_yanxi::core::ctrl{
 
 		[[nodiscard]] math::vec2 get_cursor_pos() const noexcept{
 			return mouse_pos_;
+		}
+
+		[[nodiscard]] math::vec2 get_cursor_delta() const noexcept{
+			return mouse_pos_ - last_mouse_pos_;
+		}
+
+		[[nodiscard]] math::vec2 get_last_cursor_pos() const noexcept{
+			return last_mouse_pos_;
 		}
 
 		[[nodiscard]] math::vec2 get_scroll() const noexcept{
@@ -127,8 +136,6 @@ export namespace mo_yanxi::core::ctrl{
 			mouse_velocity_ = mouse_pos_;
 			mouse_velocity_ -= last_mouse_pos_;
 			mouse_velocity_ /= delta_in_tick;
-
-			last_mouse_pos_ = mouse_pos_;
 
 			for(auto& listener : velocity_listeners){
 				listener(mouse_velocity_.x, mouse_velocity_.y);

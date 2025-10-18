@@ -34,7 +34,7 @@ struct dispatch_result{
 	VkImageView current_img{};
 
 	[[nodiscard]] bool contains_next() const noexcept{
-		return next_primit_offset != 0;
+		return next_vertex_offset != 0;
 	}
 
 	bool host_process_required() const noexcept{
@@ -76,6 +76,8 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 	VkImageView current_img{};
 
 	auto ptr_to_head = std::assume_aligned<16>(instr_begin);
+	// auto last_instr = ptr_to_head;
+
 	bool requires_image_try_push{true};
 
 	while(currentMeshCount < storage.size()){
@@ -142,6 +144,7 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 				nextVertices -= (verticesBreakpoint -= 2); //make sure a complete primitive is draw
 			}
 
+
 			if(pushedVertices + nextVertices <= MaxVerticesPerMesh){
 				pushedVertices += nextVertices;
 				pushedPrimitives += get_primitive_count(head.type, ptr_to_head, nextVertices);
@@ -149,6 +152,7 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 				verticesBreakpoint = 0;
 				nextPrimitiveOffset = 0;
 
+				// last_instr = ptr_to_head;
 				ptr_to_head = std::assume_aligned<16>(ptr_to_head + head.get_instr_byte_size());
 				requires_image_try_push = true;
 
@@ -167,6 +171,12 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 
 		save_chunk_head_and_incr();
 	}
+
+	// if(nextPrimitiveOffset == 0 && verticesBreakpoint != 0){
+	// 	ptr_to_head = std::assume_aligned<16>(last_instr);
+	// 	reinterpret_cast<primitive_generic*>(ptr_to_head + sizeof(instruction_head))->image.set_view(current_img);
+	// 	verticesBreakpoint = 0;
+	// }
 
 	return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, false, current_img};
 }
@@ -415,6 +425,8 @@ public:
 			                                                     temp_dispatch_info_.group_info,
 			                                                     group.image_view_history, last_primit_offset_,
 			                                                     last_vertex_offset_);
+
+
 			const auto next_instr_type = instruction::get_instr_head(dspcinfo.next).type;
 
 			last_primit_offset_ = dspcinfo.next_primit_offset;
@@ -486,6 +498,7 @@ public:
 					//Resume next image from index to pointer to view
 					auto& generic = reinterpret_cast<instruction::primitive_generic&>(*(dspcinfo.next + sizeof(
 						instruction::instruction_head)));
+
 					generic.image.set_view(dspcinfo.current_img);
 				}
 

@@ -18,8 +18,8 @@ import mo_yanxi.handle_wrapper;
 import mo_yanxi.vk.exception;
 
 namespace mo_yanxi{
-	constexpr std::uint32_t WIDTH = 800;
-	constexpr std::uint32_t HEIGHT = 800;
+	constexpr std::uint32_t WIDTH = 1280;
+	constexpr std::uint32_t HEIGHT = 720;
 
 	export namespace core::glfw{
 		void init(){

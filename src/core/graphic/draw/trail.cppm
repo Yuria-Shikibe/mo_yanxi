@@ -66,7 +66,7 @@ namespace mo_yanxi::graphic{
 			: points(length){
 		}
 
-		[[nodiscard]] float lastScale() const noexcept{
+		[[nodiscard]] float last_scale() const noexcept{
 			return head().scale;
 		}
 
@@ -89,6 +89,24 @@ namespace mo_yanxi::graphic{
 		void push(const vec_t pos, float scale = 1.0f){
 			assert(points.capacity() > 0);
 			// if(lastPos.dst2(x, y) < minSpacingSqr)return;
+
+			if(points.full()){
+				points.pop_front();
+			}
+
+			points.emplace_back(pos, scale);
+		}
+
+		void push_diff(const vec_t pos, float scale = 1.0f){
+			assert(points.capacity() > 0);
+			if(!points.empty()){
+				if(points.back().pos.equals(pos, 1.f)){
+					points.pop_front();
+
+					return;
+				}
+			}
+
 
 			if(points.full()){
 				points.pop_front();
@@ -199,6 +217,83 @@ namespace mo_yanxi::graphic{
 			}
 		}
 
+		template <typename Func>
+		FORCE_INLINE void slide_each(
+			const math::vec2 head_indicator_vec,
+			Func consumer,
+			float percent = 1.f) const noexcept{
+			percent = math::clamp(percent);
+
+			const auto len = static_cast<size_type>(points.size() * percent);
+			if(len < 3U)return;
+			const auto total = len - 3U;
+			const auto factor_total = total + 1;
+
+			size_type idx{};
+			for(; idx < total; ++idx){
+				std::invoke(consumer, points[idx].pos, points[idx + 1].pos, points[idx + 2].pos, points[idx + 3].pos, idx, factor_total, points[idx + 1].scale, points[idx + 2].scale);
+			}
+
+			std::invoke(consumer, points[idx].pos, points[idx + 1].pos, points[idx + 2].pos, points[idx + 2].pos + head_indicator_vec, idx, factor_total, points[idx + 1].scale, points[idx + 2].scale);
+		}
+
+		template <
+			typename Cons,
+			typename Prov
+		>
+			requires requires{
+			requires std::invocable<
+				Cons,
+				math::vec2, math::vec2, math::vec2, math::vec2,
+				size_type, size_type,
+				float, float,
+				std::array<std::invoke_result_t<Prov, size_type, size_type, std::uintptr_t>, 4>
+			>;
+			requires std::invocable<Prov, size_type, size_type, std::uintptr_t>;
+		}
+		FORCE_INLINE void slide_each(
+			const math::vec2 head_indicator_vec,
+			Cons consumer,
+			Prov prov,
+			float percent = 1.f) const noexcept{
+			percent = math::clamp(percent);
+
+			const auto len = static_cast<size_type>(points.size() * percent);
+			if(len < 3U)return;
+			const auto adjoinLen = len + 1;
+			const auto total = len - 3U;
+			const auto factor_total = total + 1;
+
+			std::array adjoint{
+				prov(0, adjoinLen, std::bit_cast<std::uintptr_t>(points.data_at(0))),
+				prov(1, adjoinLen, std::bit_cast<std::uintptr_t>(points.data_at(1))),
+				prov(2, adjoinLen, std::bit_cast<std::uintptr_t>(points.data_at(2))),
+				prov(3, adjoinLen, std::bit_cast<std::uintptr_t>(points.data_at(3))),
+			};
+
+			size_type idx{};
+			for(; idx < total; ++idx){
+				std::invoke(
+					consumer,
+					points[idx].pos, points[idx + 1].pos, points[idx + 2].pos, points[idx + 3].pos,
+					idx, factor_total,
+					points[idx + 1].scale, points[idx + 2].scale,
+					adjoint
+					);
+
+				std::ranges::move(++std::ranges::begin(adjoint), std::ranges::end(adjoint), std::ranges::begin(adjoint));
+				adjoint[3] = prov(idx + 4, adjoinLen, std::bit_cast<std::uintptr_t>(points.data_at(idx + 4)));
+			}
+
+			std::invoke(
+				consumer,
+				points[idx].pos, points[idx + 1].pos, points[idx + 2].pos, points[idx + 2].pos + head_indicator_vec,
+				idx, factor_total,
+				points[idx + 1].scale, points[idx + 2].scale,
+				adjoint
+			);
+		}
+
 		/**
 		 * @tparam Func void(CapPos, radius, angle)
 		 */
@@ -238,6 +333,12 @@ namespace mo_yanxi::graphic{
 			//TODO when delta > spacing, fetch missing points?
 			if(!spacing || interval.update_and_get(0, spacing, delta_tick)){
 				push(pos, scale);
+			}
+		}
+		void update_diff(const float delta_tick, const vec_t pos, float scale = 1.0f){
+			//TODO when delta > spacing, fetch missing points?
+			if(!spacing || interval.update_and_get(0, spacing, delta_tick)){
+				push_diff(pos, scale);
 			}
 		}
 	};

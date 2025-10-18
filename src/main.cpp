@@ -935,7 +935,7 @@ int main(){
 			// b.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
 		}};
 
-		batch_external_data.bind([&](std::uint32_t idx, const vk::descriptor_mapper& mapper){
+		batch_external_data.bind([&](const std::uint32_t idx, const vk::descriptor_mapper& mapper){
 			(void)mapper.set_uniform_buffer(0, usr_ubo.get_address() + idx * sizeof(VertexUBO), sizeof(VertexUBO), idx);
 			// (void)mapper.set_storage_buffer(1, b.get_address() + idx * debugSize, debugSize, idx);
 		});
@@ -994,10 +994,10 @@ int main(){
 		}
 
 
-		const auto ui_bloom = manager.add_stage<render_graph::bloom_pass>(game::fx::get_bloom_default_meta());
-		ui_bloom.meta.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
-		ui_bloom.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
-		ui_bloom.pass.add_dep({highligh_pass.id()});
+		const auto bloom_pass = manager.add_stage<render_graph::bloom_pass>(game::fx::get_bloom_default_meta());
+		bloom_pass.meta.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
+		bloom_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+		bloom_pass.pass.add_dep({highligh_pass.id()});
 
 		const auto hdr_to_sdr_pass = manager.add_stage<render_graph::post_process_stage>(render_graph::post_process_meta{hdr_to_sdr, {
 			{{0}, render_graph::no_slot, 0},
@@ -1008,7 +1008,7 @@ int main(){
 			req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 		}
 
-		hdr_to_sdr_pass.pass.add_dep({ui_bloom.id()});
+		hdr_to_sdr_pass.pass.add_dep({bloom_pass.id()});
 		hdr_to_sdr_pass.pass.add_output({
 				{0, false},
 			});
@@ -1057,7 +1057,7 @@ int main(){
 				}
 			}());
 
-			batch.on_submit = [&](std::uint32_t idx, std::span<const std::byte> spn) -> VkCommandBuffer {
+			batch.on_submit = [&](const std::uint32_t idx, const std::span<const std::byte> spn) -> VkCommandBuffer {
 				if(!spn.empty() && spn.size_bytes() == sizeof(VertexUBO)){
 					vk::buffer_mapper{usr_ubo}.load_range(spn, sizeof(VertexUBO) * idx);
 				}
@@ -1076,6 +1076,8 @@ int main(){
 		graphic::borrowed_image_region r3 = atlas.create_image_page("3").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
 		graphic::borrowed_image_region r4 = atlas.create_image_page("4").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
 
+		graphic::uniformed_trail trail{120, 0.5f};
+
 		core::global::timer.reset_time();
 		while(!ctx.window().should_close()){
 			using namespace draw;
@@ -1090,9 +1092,44 @@ int main(){
 					.proj = math::mat3_idt,
 					.view = camera.get_world_to_uniformed()
 				});
+
+				bloom_pass.meta.set_scale(camera.map_scale(0.9f, 1.5f));
+
 			}
 
-			for(unsigned i = 0; i < 10; ++i){
+			auto cursor_world = camera.get_screen_to_world(core::global::input.get_cursor_pos(), {}, true);
+			trail.update(core::global::timer.global_delta_tick(), cursor_world);
+
+
+			trail.slide_each(cursor_world - trail.head().pos, [&](
+				const math::vec2 p0, const math::vec2 p1, const math::vec2 p2, const math::vec2 p3,
+				const unsigned idx, const unsigned total,
+				const float scaleP, const float scaleN,
+				const std::array<float, 4> adjoin
+			){
+				const auto seg = math::max(static_cast<unsigned>(p1.dst(p2) / 16.f), 2U);
+				const auto fac_tail = math::idx_to_factor(idx, total);
+				const auto fac_head = math::idx_to_factor(idx + 1, total);
+				const auto colorA = math::lerp(colors::pale_green.to_light(1.5f), colors::aqua.to_light(2.5f), fac_tail);
+				const auto colorB = math::lerp(colors::pale_green.to_light(1.5f), colors::aqua.to_light(2.5f), fac_head);
+
+				const auto tan = (p1 - p2).normalize().rotate_rt_counter_clockwise();
+
+				batch.push_instruction(instruction::constrained_curve{
+						.param = instruction::curve_trait_mat::b_spline.apply_to(
+							p0 + adjoin[0] * tan, p1 + adjoin[1] * tan, p2 + adjoin[2] * tan, p3 + adjoin[3] * tan
+						),
+						.stroke = math::range{fac_tail * scaleP, fac_head * scaleN} * 15.f,
+						.segments = seg,
+						.color = {colorA, colorB},
+					});
+			}, [&](const unsigned idx, const unsigned total, const std::uintptr_t id){
+				math::rand rand{id};
+				const auto fac = (1 - math::idx_to_factor(idx, total)) | math::interp::pow3In;
+				return rand.range(1.25f) * (rand.random(1.f) | math::interp::pow5In) * 200 * fac * math::curve(float(total - idx), 12.f, 20.f);
+			});
+
+			for(unsigned i = 0; i < 0; ++i){
 				// batch.push_instruction(
 				// 	instruction::poly{
 				// 		.pos = {.35f + i * 270.1f, .25f},
@@ -1130,22 +1167,22 @@ int main(){
 				// });
 				//
 				//
-				// draw::instruction::quad_vert_color vc{
-				// 		{0, 0, 0, 1},
-				// 		{1, 0, 0, 1},
-				// 		{0, 1, 0, 1},
-				// 		{1, 1, 0, 1},
-				// 	};
-				// batch.push_instruction(instruction::rectangle{
-				// 	.generic = {.image = light_region->view},
-				// 	.pos = {.5f, -300 + i * 270.1f},
-				// 	.angle = 30 * math::deg_to_rad,
-				// 	.scale = 1,
-				// 	.vert_color = vc,
-				// 	.extent = {100.15f, 100.15f},
-				// 	.uv00 = light_region->uv.v00(),
-				// 	.uv11 = light_region->uv.v11(),
-				// });
+				draw::instruction::quad_vert_color vc{
+						color{0, 0, 0, 1}.to_light(1.5f),
+						color{1, 0, 0, 1}.to_light(2),
+						color{0, 1, 0, 1}.to_light(1.5f),
+						color{1, 1, 0, 1}.to_light(2),
+					};
+				batch.push_instruction(instruction::rectangle{
+					.generic = {.image = light_region->view},
+					.pos = {.5f, -300 + i * 270.1f},
+					.angle = 30 * math::deg_to_rad,
+					.scale = 1,
+					.vert_color = vc,
+					.extent = {300, 300},
+					.uv00 = light_region->uv.v00(),
+					.uv11 = light_region->uv.v11(),
+				});
 				//
 				// batch.push_instruction(instruction::rectangle{
 				// 	.generic = {.image = r1->view},
@@ -1191,19 +1228,73 @@ int main(){
 				// 	.uv11 = r4->uv.v11(),
 				// });
 				//
-				auto cursor_world = camera.get_screen_to_world(core::global::input.get_cursor_pos(), {}, true);
-				//
-				batch.push_instruction(instruction::constrained_curve{
-					.param = instruction::curve_trait_mat::bezier * instruction::curve_ctrl_handle{{
-						{0, 0}, {0, 50}, cursor_world.copy().add_y(-50), cursor_world
-					}},
 
-					.factor_range = {0, 1},
-					.segments = 32,
-					.stroke = 16,
-					.src_color = colors::white,
-					.dst_color = colors::aqua.to_light()
-				});
+				std::vector<math::vec2> arr {
+					{-30, 20},
+					{-10, -10},
+					{0, 0},
+					{20, 40},
+					{50, 80},
+					{80, 20},
+					{120, 50},
+						{180, -20},
+						{250, 70},
+				};
+
+				for (auto && vector2 : arr){
+					vector2 *= 15;
+				}
+
+				for (auto [idx, tup] : arr | std::views::adjacent<4> | std::views::enumerate){
+					auto [v0, v1, v2, v3] = tup;
+					auto sp = 32 * (1 - float(idx) / float(arr.size() - 3));
+					auto sn = 32 * (1 - float(idx + 1) / float(arr.size() - 3));
+					batch.push_instruction(instruction::constrained_curve{
+						.param = instruction::curve_trait_mat::catmull_rom<.5f> * instruction::curve_ctrl_handle{
+							v0, v1, v2, v3
+						},
+
+						.stroke = {sp, sn},
+						.segments = 32,
+
+						.color = {colors::aqua.to_light(2), colors::aqua.to_light(2)},
+					});
+				}
+
+				// for (auto [v0, v1, v2, v3] : arr | std::views::adjacent<4> | std::views::drop(1) | std::views::stride(2)){
+				// 	batch.push_instruction(instruction::constrained_curve{
+				// 		.param = instruction::curve_trait_mat::hermite * instruction::curve_ctrl_handle{
+				// 			v0, v1, v2, v3
+				// 		},
+				//
+				// 		.stroke = {15},
+				// 		.segments = 32,
+				//
+				// 		.src_color = colors::pale_green.to_light(2),
+				// 		.dst_color = colors::pale_green.to_light(2)
+				// 	});
+				// }
+				for (auto pos : arr){
+					batch.push_instruction(instruction::poly{
+						.pos = pos,
+						.segments = 32,
+						.radius = {0, 8},
+						.color = {colors::ACID.to_light(2), colors::ACID.to_light(2)}
+					});
+				}
+
+				//
+				// batch.push_instruction(instruction::constrained_curve{
+				// 	.param = instruction::curve_trait_mat::bezier * instruction::curve_ctrl_handle{{
+				// 		{0, 0}, {0, 50}, cursor_world.copy().add_y(-50), cursor_world
+				// 	}},
+				//
+				// 	.factor_range = {0, 1},
+				// 	.segments = 32,
+				// 	.stroke = 16,
+				// 	.src_color = colors::white,
+				// 	.dst_color = colors::aqua.to_light()
+				// });
 				//
 				// batch.push_instruction(instruction::constrained_curve{
 				// 	.param = instruction::curve_trait_mat::hermite * instruction::curve_ctrl_handle{{

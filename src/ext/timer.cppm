@@ -51,12 +51,24 @@ export namespace mo_yanxi{
 			}
 		}
 
+		constexpr bool update_and_get_strict(std::size_t index, const value_type spacing, const value_type delta = 0) noexcept{
+			auto& reload = reloads[index];
+			reload += delta;
+
+			if(reload >= spacing){
+				reload = std::fmod(reload, spacing);
+				return true;
+			}
+
+			return false;
+		}
+
 		constexpr bool update_and_get(std::size_t index, const value_type spacing, const value_type delta = 0) noexcept{
 			auto& reload = reloads[index];
 			reload += delta;
 
-			if(reload >= delta){
-				reload = std::fmod(reload, spacing);
+			if(reload >= spacing){
+				reload = 0;
 				return true;
 			}
 
