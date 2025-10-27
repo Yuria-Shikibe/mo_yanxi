@@ -12,6 +12,7 @@ export import mo_yanxi.vk.shader;
 export import mo_yanxi.vk.pipeline;
 export import mo_yanxi.vk.pipeline.layout;
 export import mo_yanxi.vk.resources;
+export import mo_yanxi.vk.ext;
 export import mo_yanxi.vk.context;
 export import mo_yanxi.vk.uniform_buffer;
 export import mo_yanxi.vk.descriptor_buffer;
@@ -107,7 +108,7 @@ namespace mo_yanxi::graphic::render_graph{
 			return image_requirement{
 				.decr = decr,
 				.sample_count = type.image.sampled == 1,
-				// .format = convertImageFormatToVkFormat(type.image.format),
+				.format = convertImageFormatToVkFormat(type.image.format),
 				.dim = static_cast<unsigned>(type.image.dim == spv::Dim1D
 												 ? 1
 												 : type.image.dim == spv::Dim2D
@@ -191,7 +192,7 @@ namespace mo_yanxi::graphic::render_graph{
 
 			for(const auto& pass : inout_map.connection()){
 				if(!std::ranges::contains(resources_, pass.binding)){
-					throw std::invalid_argument("pass does not exist");
+					throw std::invalid_argument("binding not match");
 				}
 			}
 
@@ -217,7 +218,6 @@ namespace mo_yanxi::graphic::render_graph{
 			throw std::out_of_range("pass does not exist");
 		}
 
-
 		[[nodiscard]] std::string_view name() const noexcept{
 			return shader_->get_name();
 		}
@@ -242,7 +242,7 @@ namespace mo_yanxi::graphic::render_graph{
 		template <typename Fn>
 		void visit_in(inout_index index, Fn fn){
 			using ArgTy = std::remove_cvref_t<typename function_arg_at_last<Fn>::type>;
-			for(const auto& connection : inout_map_.connection){
+			for(const auto& connection : inout_map_.connection()){
 				if(connection.slot.in == index){
 					std::invoke(fn, (*this)[connection.binding].get<ArgTy>());
 				}
@@ -252,12 +252,22 @@ namespace mo_yanxi::graphic::render_graph{
 		template <typename Fn>
 		void visit_out(inout_index index, Fn fn){
 			using ArgTy = std::remove_cvref_t<typename function_arg_at_last<Fn>::type>;
-			for(const auto& connection : inout_map_.connection){
+			for(const auto& connection : inout_map_.connection()){
 				if(connection.slot.out == index){
 					std::invoke(fn, (*this)[connection.binding].get<ArgTy>());
 				}
 			}
 		}
+
+
+
+		void set_format_at_in(std::uint32_t slot, VkFormat format) {
+			sockets.at_in<resource_desc::image_requirement>(slot).format = format;
+		}
+		void set_format_at_out(std::uint32_t slot, VkFormat format) {
+			sockets.at_out<resource_desc::image_requirement>(slot).format = format;
+		}
+
 
 		auto get_local_uniform_buffer() const noexcept{
 			return uniform_buffers_ | std::views::filter([](const stage_ubo& ubo){
@@ -292,6 +302,8 @@ namespace mo_yanxi::graphic::render_graph{
 
 		vk::descriptor_buffer descriptor_buffer_{};
 
+		std::vector<external_descriptor_usage> external_descriptor_usages_{};
+
 	public:
 		[[nodiscard]] explicit(false) post_process_stage(vk::context& ctx, post_process_meta&& meta)
 			: pass_meta(ctx),
@@ -322,10 +334,37 @@ namespace mo_yanxi::graphic::render_graph{
 			return uniform_buffer_;
 		}
 
+		void add_external_descriptor(const external_descriptor& entry, std::uint32_t setIdx, VkDeviceSize offset = 0){
+			if(setIdx == 0)throw std::invalid_argument{"[0] is reserved for local descriptors"};
+
+			auto itr = std::ranges::lower_bound(external_descriptor_usages_, setIdx, {}, &external_descriptor_usage::set_index);
+			if(itr == external_descriptor_usages_.end()){
+				external_descriptor_usages_.emplace_back(&entry, setIdx, offset);
+			}else{
+				if(itr->set_index == setIdx){
+					throw std::invalid_argument{"Duplicate descriptor set index"};
+				}
+
+				external_descriptor_usages_.emplace(itr, &entry, setIdx, offset);
+			}
+		}
+
+
 	protected:
 		void init_pipeline(const vk::context& ctx) noexcept{
 			descriptor_layout_ = {ctx.get_device(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, meta_.descriptor_layout_builder_};
-			pipeline_layout_ = vk::pipeline_layout{ctx.get_device(), 0, {descriptor_layout_}};
+			if(external_descriptor_usages_.empty()){
+				pipeline_layout_ = vk::pipeline_layout{ctx.get_device(), 0, {descriptor_layout_}};
+			}else{
+				std::vector<VkDescriptorSetLayout> layouts{};
+				layouts.reserve(1 + external_descriptor_usages_.size());
+				layouts.push_back(descriptor_layout_);
+				layouts.append_range(external_descriptor_usages_ | std::views::transform([](const external_descriptor_usage& u){
+					return u.entry->layout;
+				}));
+				pipeline_layout_ = vk::pipeline_layout{ctx.get_device(), 0, layouts};
+			}
+
 			pipeline_ = vk::pipeline{ctx.get_device(), pipeline_layout_, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, meta_.shader_->get_create_info()};
 		}
 
@@ -376,7 +415,10 @@ namespace mo_yanxi::graphic::render_graph{
 						},
 					}, res->resource);
 			};
+
 			for(const auto& connection : meta_.inout_map_.connection()){
+				if(connection.binding.set != 0)continue;
+
 				if(auto res = resources.get_in_if(connection.slot.in)){
 					bind(connection, res, meta_.sockets.at_in(connection.slot.in));
 					continue;
@@ -409,7 +451,32 @@ namespace mo_yanxi::graphic::render_graph{
 			const pass_resource_reference& resources, math::u32size2 extent, VkCommandBuffer buffer) override{
 
 			pipeline_.bind(buffer, VK_PIPELINE_BIND_POINT_COMPUTE);
-			descriptor_buffer_.bind_to(buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0);
+			if(external_descriptor_usages_.empty()){
+				descriptor_buffer_.bind_to(buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0);
+			}else{
+				std::array<std::byte, 1024> buf;
+				std::pmr::monotonic_buffer_resource pool{buf.data(), buf.size(), std::pmr::new_delete_resource()};
+				std::pmr::vector<VkDescriptorBufferBindingInfoEXT> infos(external_descriptor_usages_.size() + 1, &pool);
+
+				infos[0] = descriptor_buffer_;
+
+				std::pmr::vector<VkDeviceSize> offsets(infos.size(), &pool);
+				std::pmr::vector<std::uint32_t> indices(std::from_range, std::views::iota(0U) | std::views::take(infos.size()), &pool);
+
+				for(std::uint32_t i = 0; i < external_descriptor_usages_.size(); ++i){
+					const auto setIdx = i + 1;
+					const auto itr = std::ranges::lower_bound(external_descriptor_usages_, setIdx, {}, &external_descriptor_usage::set_index);
+					if(itr == external_descriptor_usages_.end() || itr->set_index != setIdx){
+						throw std::out_of_range("failed to find external descriptor usage, set index must be contiguous from 1");
+					}
+					infos[setIdx] = itr->entry->dbo_info;
+					offsets[setIdx] = itr->offset;
+				}
+
+				vk::cmd::bindDescriptorBuffersEXT(buffer, infos.size(), infos.data());
+				vk::cmd::setDescriptorBufferOffsetsEXT(buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0, infos.size(), indices.data(), offsets.data());
+			}
+
 
 			auto groups = get_work_group_size(extent);
 			vkCmdDispatch(buffer, groups.x, groups.y, 1);
@@ -430,6 +497,11 @@ namespace mo_yanxi::graphic::render_graph{
 		[[nodiscard]] const vk::shader_module& shader() const{
 			return *meta_.shader_;
 		}
+
+		[[nodiscard]] post_process_meta& meta() {
+			return meta_;
+		}
+
 
 	protected:
 		[[nodiscard]] std::span<const inout_index> get_required_internal_buffer_slots() const noexcept override{

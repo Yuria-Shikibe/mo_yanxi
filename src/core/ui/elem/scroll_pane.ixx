@@ -77,7 +77,7 @@ namespace mo_yanxi::ui{
 
 				if(util::try_modify(
 					scroll.base,
-						scroll.base.fma(scrollVelocity, delta_in_ticks).clamp_xy({}, get_scrollable_size()) * get_vel_clamp())){
+						math::fma(scrollVelocity, delta_in_ticks, scroll.base).clamp_xy({}, get_scrollable_size()) * get_vel_clamp())){
 					scroll.resume();
 					updateChildrenAbsSrc();
 				}

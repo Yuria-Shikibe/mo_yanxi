@@ -63,9 +63,45 @@ namespace mo_yanxi::math{
 		};
 	}
 
+	namespace cpo_fma {
+		template <class T>
+		void fma(const T&) noexcept = delete;
+
+		struct impl {
+			template <typename T1, typename T2, typename T3>
+				requires requires(T1 v1, T2 v2, T3 v3){
+					{ fma(v1, v2, v3) } noexcept -> std::convertible_to<T1>;
+				}
+			[[nodiscard]] CONST_FN FORCE_INLINE static constexpr auto operator()(
+				const T1& a, const T2& b, const T3& c) noexcept{
+				return fma(a, b, c);
+			}
+
+			template <typename T1, typename T2, typename T3>
+			[[nodiscard]] CONST_FN FORCE_INLINE static constexpr auto operator()(
+				const T1& a, const T2& b, const T3& c) noexcept{
+				return a * b + c;
+			}
+
+
+			template <std::floating_point T>
+				requires requires(T v1, T v2, T v3){
+					{ std::fma(v1, v2, v3) } noexcept -> std::convertible_to<T>;
+				}
+			[[nodiscard]] CONST_FN FORCE_INLINE static constexpr auto operator()(
+				const T a, const T b, const T c) noexcept{
+				if consteval{
+					return a * b + c;
+				}
+				return std::fma(a, b, c);
+			}
+		};
+	}
+
 	inline namespace cpo {
 		export inline constexpr cpo_abs::impl abs;
 		export inline constexpr cpo_sqr::impl sqr;
+		export inline constexpr cpo_fma::impl fma;
 	}
 
 
@@ -580,7 +616,7 @@ namespace mo_yanxi::math {
 		if(math::zero(rng))return mappedFrom;
 		const auto prog = (value - from) / rng;
 		if constexpr (std::floating_point<T2> && std::floating_point<decltype(prog)>){
-			return std::fma(prog, mappedTo - mappedFrom, mappedFrom);
+			return math::fma(prog, mappedTo - mappedFrom, mappedFrom);
 		}else{
 			return prog * (mappedTo - mappedFrom) + mappedFrom;
 		}
@@ -798,7 +834,7 @@ namespace mo_yanxi::math {
 			[[nodiscard]] FORCE_INLINE static constexpr T operator()(const T fromValue, const T toValue, const Prog progress) noexcept{
 				if constexpr (std::floating_point<T> && std::floating_point<Prog>){
 					if !consteval{
-						return std::fma((toValue - fromValue), progress, fromValue);
+						return math::fma((toValue - fromValue), progress, fromValue);
 					}
 				}
 
@@ -868,7 +904,7 @@ namespace mo_yanxi::math {
 	FORCE_INLINE constexpr void lerp_inplace(T& fromValue, const T toValue, const Prog progress) noexcept {
 		if constexpr (std::floating_point<T> && std::floating_point<Prog>){
 			if !consteval{
-				fromValue = std::fma((toValue - fromValue), progress, fromValue);
+				fromValue = math::fma((toValue - fromValue), progress, fromValue);
 				return;
 			}
 		}
@@ -907,6 +943,17 @@ namespace mo_yanxi::math {
 		}else{
 			return value;
 		}
+	}
+
+	export
+	template <std::floating_point T>
+	MATH_ATTR constexpr T frac(T value) noexcept{
+		if consteval{
+			return value - static_cast<long long>(value);
+		}else{
+			return value - std::trunc(value);
+		}
+
 	}
 
 
@@ -1128,18 +1175,6 @@ namespace mo_yanxi::math {
 		return (x1 * x1 + y1 * y1) < dst * dst;
 	}
 
-
-	export
-	template <small_object T>
-	MATH_ATTR constexpr T fma(const T x, const T y, const T z) noexcept {
-		if constexpr (std::floating_point<T>){
-			if !consteval{
-				return std::fma(x, y, z);
-			}
-		}
-
-		return x * y + z;
-	}
 
 
 	export

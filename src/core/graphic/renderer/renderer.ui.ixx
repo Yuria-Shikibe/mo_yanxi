@@ -28,6 +28,7 @@ namespace mo_yanxi::graphic{
 		constexpr friend bool operator==(const ui_vertex_uniform& lhs, const ui_vertex_uniform& rhs) noexcept = default;
 	};
 
+
 	struct scissor{
 		math::vec2 src{};
 		math::vec2 dst{};

@@ -16,6 +16,7 @@ import mo_yanxi.graphic.bitmap;
 
 import mo_yanxi.math;
 import mo_yanxi.math.angle;
+import mo_yanxi.math.matrix3;
 import mo_yanxi.math.vector2;
 import mo_yanxi.math.vector4;
 import mo_yanxi.math.rand;
@@ -112,15 +113,20 @@ import mo_yanxi.game.ui.hitbox_editor;
 import mo_yanxi.game.ui.grid_editor;
 import mo_yanxi.game.content;
 import mo_yanxi.game.meta.grid.srl;
+import mo_yanxi.game.graphic.lightning;
 
 import mo_yanxi.graphic.render_graph.manager;
 import mo_yanxi.graphic.render_graph.fill;
+import mo_yanxi.graphic.render_graph.volume;
 import mo_yanxi.graphic.post_processor.oit_blender;
 import mo_yanxi.game.graphic.render_graph_spec;
 
 import mo_yanxi.graphic.draw.instruction_draw;
 
+import mo_yanxi.slide_window_buf;
 
+
+import prototype.renderer.ui;
 import test;
 import std;
 
@@ -884,6 +890,22 @@ void draw_main(){
 	core::glfw::terminate();
 }
 
+mo_yanxi::slide_window_generator<int, 1> foo(){
+	for(int i = 0; i < 10; ++i){
+		co_yield i;
+	}
+}
+
+// int main(){
+// 	using namespace mo_yanxi;
+//
+// 	auto gen = foo();
+// 	for(auto& buf : gen){
+// 		std::println("{}", buf);
+// 	}
+//
+// }
+
 int main(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
@@ -901,15 +923,6 @@ int main(){
 	camera2 camera;
 	math::vec2 cursor;
 	assets::ctrl::spec_camera = &camera;
-	//
-	// while(!core::global::graphic::context.window().should_close()){
-	// 	core::global::graphic::context.window().poll_events();
-	// }
-	//
-	// core::global::graphic::context.wait_on_device();
-	// graph_small_test();
-	// graphic::shader_reflection reflection{assets::graphic::shaders::comp::bloom.get_binary()};
-	// reflection.foo();
 
 	core::global::ui::init();
 	game::content::load();
@@ -919,26 +932,16 @@ int main(){
 	struct VertexUBO{
 		vk::padded_mat3 proj{};
 		vk::padded_mat3 view{};
+		vk::padded_mat3 reverse{};
+
+		[[nodiscard]] VertexUBO(math::matrix3 proj, math::matrix3 view) : proj(proj), view(view), reverse((view * proj).inv()){}
 	};
 
 	{
 
+#pragma region Shader
 		auto& ctx = core::global::graphic::context;
-		draw::instruction::batch batch{ctx, assets::graphic::samplers::texture_sampler};
-
-		vk::uniform_buffer usr_ubo{ctx.get_allocator(), sizeof(VertexUBO) * batch.batch_work_group_count};
-		constexpr std::size_t debugSize = 4096 * 8;
-		vk::buffer b = vk::templates::create_storage_buffer(ctx.get_allocator(), debugSize * batch.batch_work_group_count, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
-
-		draw::instruction::batch_external_data batch_external_data{ctx, [](vk::descriptor_layout_builder& b){
-			b.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
-			// b.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
-		}};
-
-		batch_external_data.bind([&](const std::uint32_t idx, const vk::descriptor_mapper& mapper){
-			(void)mapper.set_uniform_buffer(0, usr_ubo.get_address() + idx * sizeof(VertexUBO), sizeof(VertexUBO), idx);
-			// (void)mapper.set_storage_buffer(1, b.get_address() + idx * debugSize, debugSize, idx);
-		});
+		draw::instruction::batch batch{ctx, assets::graphic::samplers::texture_sampler, draw::instruction::make_ubo_table<VertexUBO>()};
 
 		vk::shader_module msh{ctx.get_device(), assets::dir::shader_spv / "test.mesh_mesh.spv"};
 		msh.set_no_deduced_stage();
@@ -946,6 +949,31 @@ int main(){
 
 		vk::shader_module highlight_pick{ctx.get_device(), assets::dir::shader_spv / "post_process.highlight_extract.spv", VK_SHADER_STAGE_COMPUTE_BIT};
 		vk::shader_module hdr_to_sdr{ctx.get_device(), assets::dir::shader_spv / "post_process.hdr_to_sdr.spv", VK_SHADER_STAGE_COMPUTE_BIT};
+		vk::shader_module volume_shader{ctx.get_device(), assets::dir::shader_spv / "post_process.volume_pass.spv", VK_SHADER_STAGE_COMPUTE_BIT};
+		vk::shader_module bloom_merge_shader{ctx.get_device(), assets::dir::shader_spv / "post_process.bloom.merge.spv", VK_SHADER_STAGE_COMPUTE_BIT};
+#pragma endregion
+
+#pragma region VK_RES
+		vk::uniform_buffer general_proj_ubo{ctx.get_allocator(), sizeof(VertexUBO), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
+		vk::descriptor_layout general_proj_descriptor_layout{ctx.get_device(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, [](vk::descriptor_layout_builder& b){
+			b.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		}};
+		vk::descriptor_buffer general_proj_dbo{ctx.get_allocator(), general_proj_descriptor_layout, general_proj_descriptor_layout.binding_count()};
+		(void)vk::descriptor_mapper{general_proj_dbo}.set_uniform_buffer(0, general_proj_ubo);
+
+		vk::uniform_buffer usr_ubo{ctx.get_allocator(), sizeof(VertexUBO) * batch.batch_work_group_count};
+		constexpr std::size_t debugSize = 4096 * 8;
+		vk::buffer b = vk::templates::create_storage_buffer(ctx.get_allocator(), debugSize * batch.batch_work_group_count, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+
+		draw::instruction::batch_external_data batch_external_data{ctx, [](vk::descriptor_layout_builder& b){
+			b.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
+		}};
+
+		batch_external_data.bind([&](const std::uint32_t idx, const vk::descriptor_mapper& mapper){
+			(void)mapper.set_uniform_buffer(0, usr_ubo.get_address() + idx * sizeof(VertexUBO), sizeof(VertexUBO), idx);
+			// (void)mapper.set_storage_buffer(1, b.get_address() + idx * debugSize, debugSize, idx);
+		});
+
 
 		vk::pipeline_layout pipeline_layout{ctx.get_device(), 0,
 			{batch.get_batch_descriptor_layout(), batch_external_data.descriptor_set_layout()}};
@@ -960,65 +988,91 @@ int main(){
 		vk::pipeline p{ctx.get_device(), pipeline_layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, gtp};
 
 		vk::color_attachment attachment{ctx.get_allocator(), ctx.get_extent(),
-			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 			VK_FORMAT_R16G16B16A16_SFLOAT
 		};
 
 		attachment.init_layout(ctx.get_transient_graphic_command_buffer());
+#pragma endregion
 
+#pragma region render_graph
 		render_graph::render_graph_manager manager{ctx};
 		auto& res = manager.add_explicit_resource(render_graph::resource_desc::explicit_resource{render_graph::resource_desc::external_image{}});
 		res.as_image().handle = attachment;
 		res.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		auto volume_pass = manager.add_stage<render_graph::volume_pass>(render_graph::post_process_meta{volume_shader, {
+			{{0}, render_graph::no_slot, 0},
+			{{1}, 0, render_graph::no_slot},
+		}});
+		volume_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+
+		{
+			auto& d = manager.add_external_descriptor({general_proj_descriptor_layout, general_proj_dbo});
+			volume_pass.meta.add_external_descriptor(d, 2);
+			volume_pass.meta.batch.flush();
+		}
+
+		volume_pass.pass.add_input({render_graph::resource_desc::explicit_resource_usage{res, 0}});
+
+
+
 		auto highligh_pass = manager.add_stage<render_graph::post_process_stage>(render_graph::post_process_meta{highlight_pick, {
 			{{0}, render_graph::no_slot, 0},
 			{{1}, 0, render_graph::no_slot},
 		}});
-		highligh_pass.pass.add_input({render_graph::resource_desc::explicit_resource_usage{res, 0}});
 
-		{
-			auto& req = highligh_pass.meta.sockets().at_out<render_graph::resource_desc::image_requirement>(0);
-			req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-		}
-
-		{
-
-			auto world_clear = manager.add_stage<render_graph::image_clear>(1);
-
-			world_clear.pass.add_in_out({
-				render_graph::resource_desc::explicit_resource_usage{res, 0},
-			});
-			world_clear.pass.add_exec_dep(highligh_pass.id());
-
-
-		}
+		highligh_pass.pass.add_dep({volume_pass.id()});
 
 
 		const auto bloom_pass = manager.add_stage<render_graph::bloom_pass>(game::fx::get_bloom_default_meta());
 		bloom_pass.meta.set_sampler_at_binding(0, assets::graphic::samplers::blit_sampler);
 		bloom_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
 		bloom_pass.pass.add_dep({highligh_pass.id()});
+		bloom_pass.meta.meta().set_format_at_in(0, VK_FORMAT_R16G16B16A16_SFLOAT);
+
 
 		const auto hdr_to_sdr_pass = manager.add_stage<render_graph::post_process_stage>(render_graph::post_process_meta{hdr_to_sdr, {
 			{{0}, render_graph::no_slot, 0},
 			{{1}, 0, render_graph::no_slot},
 		}});
-		{
-			auto& req = hdr_to_sdr_pass.meta.sockets().at_in<render_graph::resource_desc::image_requirement>(0);
-			req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-		}
 
-		hdr_to_sdr_pass.pass.add_dep({bloom_pass.id()});
+		auto bloom_merge_pass = manager.add_stage<render_graph::post_process_stage>(render_graph::post_process_meta{bloom_merge_shader, {
+			{{0}, render_graph::no_slot, 0},
+			{{1}, 0, render_graph::no_slot},
+			{{2}, 1, render_graph::no_slot},
+			{{3}, 2, render_graph::no_slot},
+		}});
+
+		bloom_merge_pass.pass.add_dep({volume_pass.id(), 0, 0});
+		bloom_merge_pass.pass.add_dep({highligh_pass.id(), 0, 1});
+		bloom_merge_pass.pass.add_dep({bloom_pass.id(), 0, 2});
+		bloom_merge_pass.meta.meta().set_format_at_out(0, VK_FORMAT_R16G16B16A16_SFLOAT);
+
+		auto smaa_final_pass = game::fx::add_smaa(manager, bloom_merge_pass.id());
+		smaa_final_pass.meta.meta().set_format_at_out(0, VK_FORMAT_R16G16B16A16_SFLOAT);
+
+		hdr_to_sdr_pass.pass.add_dep({smaa_final_pass.id()});
+
 		hdr_to_sdr_pass.pass.add_output({
 				{0, false},
 			});
+
+		{
+			auto world_clear = manager.add_stage<render_graph::image_clear>(1);
+
+			world_clear.pass.add_in_out({
+				render_graph::resource_desc::explicit_resource_usage{res, 0},
+			});
+			world_clear.pass.add_exec_dep(volume_pass.id());
+		}
 
 		manager.init_after_pass_initialized();
 		manager.update_external_resources();
 		manager.resize();
 		manager.reset_resources();
 		manager.create_command();
-
+#pragma endregion
 
 		core::global::graphic::context.set_staging_image({
 			.image = hdr_to_sdr_pass.pass.at_out(0).as_image().image.image,
@@ -1057,12 +1111,10 @@ int main(){
 				}
 			}());
 
-			batch.on_submit = [&](const std::uint32_t idx, const std::span<const std::byte> spn) -> VkCommandBuffer {
-				if(!spn.empty() && spn.size_bytes() == sizeof(VertexUBO)){
-					vk::buffer_mapper{usr_ubo}.load_range(spn, sizeof(VertexUBO) * idx);
-				}
+			batch.set_submit_callback([&](const std::uint32_t idx, draw::instruction::batch::ubo_data_entries spn) -> VkCommandBuffer {
+				if(!spn[0].empty())(void)vk::buffer_mapper{usr_ubo}.load_range(spn[0], sizeof(VertexUBO) * idx);
 				return batch_external_data.groups[idx].command_buffer;
-			};
+			});
 		}
 
 		camera.set_scale_range({0.2f, 4.f});
@@ -1078,7 +1130,39 @@ int main(){
 
 		graphic::uniformed_trail trail{120, 0.5f};
 
+
+		auto& wgfx_input =
+		core::global::input.register_sub_input<
+			math::vec2,
+			draw::instruction::volume::batch&
+				>("gfx");
+
+		wgfx_input.set_context(math::vec2{}, std::ref(volume_pass.meta.batch));
+		{
+			using namespace core::ctrl;
+			wgfx_input.register_bind(mouse::RIGHT, act::press, [](packed_key_t, math::vec2 pos, draw::instruction::volume::batch& b){
+				math::rand rand{};
+				b.push_instr(draw::instruction::volume::shockwave{
+					.generic = {
+						.lifetime = rand.random(60.f, 180.f)
+					},
+					.pos = pos,
+					.radius = rand.random(100.f, 400.f),
+					.stroke = rand.random(20.f, 60.f),
+					.intensity = rand.random(15.f, 50),
+
+					.color_from = colors::ORANGE.to_light(2.5f),
+					.color_to = colors::clear,
+				});
+			});
+		}
+
 		core::global::timer.reset_time();
+
+		static std::chrono::microseconds callbacks{};
+		static std::chrono::microseconds coroutine{};
+		static std::size_t count{};
+
 		while(!ctx.window().should_close()){
 			using namespace draw;
 
@@ -1088,46 +1172,213 @@ int main(){
 			camera.update(core::global::timer.global_delta_tick());
 
 			if(camera.check_changed()){
-				batch.update_ubo(VertexUBO{
-					.proj = math::mat3_idt,
-					.view = camera.get_world_to_uniformed()
-				});
+				const VertexUBO proj{
+					math::mat3_idt,
+					camera.get_world_to_uniformed()
+				};
+				batch.update_ubo(proj);
 
-				bloom_pass.meta.set_scale(camera.map_scale(0.9f, 1.5f));
+				(void)vk::buffer_mapper{general_proj_ubo}.load(proj);
+
+				// bloom_pass.meta.set_scale(camera.map_scale(0.9f, 1.5f));
 
 			}
 
+			volume_pass.meta->update(core::global::timer.global_time() * 60.f);
+
 			auto cursor_world = camera.get_screen_to_world(core::global::input.get_cursor_pos(), {}, true);
-			trail.update(core::global::timer.global_delta_tick(), cursor_world);
+			wgfx_input.set_context(cursor_world);
+			trail.update_diff(core::global::timer.global_delta_tick(), cursor_world);
+			draw::instruction::quad_vert_color vc{
+				color{1, 1, 1, 1},
+				color{1, 1, 1, 1},
+				color{1, 1, 1, 1},
+				color{1, 1, 1, 1},
+			};
+			// batch.push_instruction(instruction::rectangle{
+			// 	.generic = {.image = light_region->view},
+			// 	.pos = {0, 0},
+			// 	.angle = 30 * math::deg_to_rad,
+			// 	.scale = 1,
+			// 	.vert_color = vc,
+			// 	.extent = {1200, 1200},
+			// 	.uv00 = light_region->uv.v00(),
+			// 	.uv11 = light_region->uv.v11(),
+			// });
+
+			auto time = core::global::timer.global_time() * .75f;
+			float time_fac = math::clamp(math::frac(time)) | math::interp::pow3Out;
+			struct state{
+				math::vec2 last_pos{};
+				color last_color{};
+			};
+
+			for(int i = 0; i < 2; ++i){
+				math::rand rand{static_cast<std::uint64_t>(time) + i * 114514};
 
 
-			trail.slide_each(cursor_world - trail.head().pos, [&](
-				const math::vec2 p0, const math::vec2 p1, const math::vec2 p2, const math::vec2 p3,
-				const unsigned idx, const unsigned total,
-				const float scaleP, const float scaleN,
-				const std::array<float, 4> adjoin
-			){
-				const auto seg = math::max(static_cast<unsigned>(p1.dst(p2) / 16.f), 2U);
-				const auto fac_tail = math::idx_to_factor(idx, total);
-				const auto fac_head = math::idx_to_factor(idx + 1, total);
-				const auto colorA = math::lerp(colors::pale_green.to_light(1.5f), colors::aqua.to_light(2.5f), fac_tail);
-				const auto colorB = math::lerp(colors::pale_green.to_light(1.5f), colors::aqua.to_light(2.5f), fac_head);
+				auto gen =
+					fx::lightning_generator<slide_window_generator>(
+						cursor_world, trail.tail_pos_or(cursor_world),
+						{rand.random(60.f, 120), rand.random(240.f, 360)},
+						time_fac, rand,
+						[s = state{cursor_world}](fx::lightning_segment&& segment) mutable {
+					const auto rand_mov = segment.rand.range(1 - segment.factor_global) * (segment.pos - s.last_pos).rotate_rt_counter_clockwise();
+					const auto lerp_tgt = segment.pos + rand_mov;
+					const auto pos =
+						segment.factor_local >= 1.f ? lerp_tgt : math::lerp(s.last_pos, lerp_tgt, segment.factor_local);
+					const auto color_tgt = math::lerp(colors::aqua.to_light(), colors::clear_light, segment.factor_global);
+					const auto color = math::lerp(s.last_color, color_tgt, segment.factor_local);
+					s = {pos, color};
 
-				const auto tan = (p1 - p2).normalize().rotate_rt_counter_clockwise();
+					return instruction::line_node{
+						.pos = pos,
+						.stroke = math::lerp(8.f, 4.f, segment.factor_global),
+						.color = color
+					};
+				});
 
-				batch.push_instruction(instruction::constrained_curve{
-						.param = instruction::curve_trait_mat::b_spline.apply_to(
-							p0 + adjoin[0] * tan, p1 + adjoin[1] * tan, p2 + adjoin[2] * tan, p3 + adjoin[3] * tan
-						),
-						.stroke = math::range{fac_tail * scaleP, fac_head * scaleN} * 15.f,
-						.segments = seg,
-						.color = {colorA, colorB},
+				for (const auto & buf : gen){
+					batch.push_instruction(instruction::line_segments{}, buf);
+				}
+			}
+
+			struct trail_node_data : trail::node_type{
+				float idx_scale;
+				color color;
+
+				[[nodiscard]] float get_width() const noexcept{
+					return idx_scale * scale;
+				}
+			};
+
+			{
+				auto c1 = std::chrono::high_resolution_clock::now();
+
+				auto gen = trail.trivial_each<slide_window_generator>(
+					1,
+					[last = trail.head_pos_or({})](trail::node_type node, const unsigned idx, const unsigned total, const std::uintptr_t id) mutable {
+						math::rand rand{id};
+
+						const float factor_global = math::idx_to_factor(idx, total);
+						const auto fac = factor_global | math::interp::pow2Out;
+						const auto off = rand.range(1.5f) * fac * math::curve(factor_global, .05f, .2f);
+						const auto tan = (node.pos - last).rotate_rt_counter_clockwise() * off;
+
+						last = node.pos;
+						// node.pos += tan;
+						const auto color = math::lerp(colors::aqua.to_light(2.5f), colors::pale_green.to_light(1.5f), factor_global);
+						return trail_node_data{node, factor_global | math::interp::pow2In | math::interp::reverse, color};
 					});
-			}, [&](const unsigned idx, const unsigned total, const std::uintptr_t id){
-				math::rand rand{id};
-				const auto fac = (1 - math::idx_to_factor(idx, total)) | math::interp::pow3In;
-				return rand.range(1.25f) * (rand.random(1.f) | math::interp::pow5In) * 200 * fac * math::curve(float(total - idx), 12.f, 20.f);
-			});
+
+				for (const auto & buf : gen){
+					for (const auto & sspn : buf.span() | std::views::slide(4)){
+						const auto appr = sspn[1].pos - sspn[2].pos;
+						const auto apprLen = appr.length();
+						const auto seg = math::max(static_cast<unsigned>(apprLen / 16.f), 2U);
+
+						batch.push_instruction(instruction::constrained_curve{
+								.param = instruction::curve_trait_mat::b_spline * (sspn | std::views::transform(&trail_node_data::pos)),
+								.stroke = math::range{sspn[1].get_width(), sspn[2].get_width()} * 15.f,
+								.segments = seg,
+								.color = {sspn[1].color, sspn[2].color},
+							});
+
+					}
+				}
+
+				auto c2 = std::chrono::high_resolution_clock::now();
+				auto dur = std::chrono::duration_cast<std::chrono::microseconds>(c2 - c1);
+				coroutine += dur;
+			}
+
+
+			/*
+			{
+				auto c1 = std::chrono::high_resolution_clock::now();
+				slide_window_buffer<trail_node_data, 8> buffer{};
+				trail.trivial_each_2(1, [&, last = trail.head_pos_or({})](trail::node_type node, unsigned idx, unsigned total, std::uintptr_t id) mutable {
+					math::rand rand{id};
+					const float factor_global = math::idx_to_factor(idx, total);
+
+					const auto fac = factor_global | math::interp::pow2Out;
+					const auto off = rand.range(1.5f) * fac * math::curve(factor_global, .05f, .2f);
+					const auto color = math::lerp(colors::aqua.to_light(2.5f), colors::pale_green.to_light(1.5f), factor_global);
+
+					last = node.pos;
+					if(buffer.push({node, factor_global | math::interp::pow2In | math::interp::reverse, color})){
+						for (const auto & sspn : buffer.span() | std::views::slide(4)){
+							const auto appr = sspn[1].pos - sspn[2].pos;
+							const auto apprLen = appr.length();
+							const auto seg = math::max(static_cast<unsigned>(apprLen / 16.f), 2U);
+
+							batch.push_instruction(instruction::constrained_curve{
+								.param = instruction::curve_trait_mat::b_spline * (sspn | std::views::transform([&](const trail_node_data& v) {
+									return v.pos;
+								})),
+								.stroke = math::range{sspn[1].get_width(), sspn[2].get_width()} * 15.f,
+								.segments = seg,
+								.color = {sspn[1].color, sspn[2].color},
+							});
+
+						}
+						buffer.advance();
+					}
+				});
+
+				if(buffer.finalize()){
+					for (const auto & sspn : buffer.span() | std::views::slide(4)){
+						const auto appr = sspn[1].pos - sspn[2].pos;
+						const auto apprLen = appr.length();
+						const auto seg = math::max(static_cast<unsigned>(apprLen / 16.f), 2U);
+
+						batch.push_instruction(instruction::constrained_curve{
+							.param = instruction::curve_trait_mat::b_spline * (sspn | std::views::transform([&](const trail_node_data& v){
+								return v.pos;
+							})),
+							.stroke = math::range{sspn[1].get_width(), sspn[2].get_width()} * 15.f,
+							.segments = seg,
+							.color = {sspn[1].color, sspn[2].color},
+						});
+					}
+				}
+
+				auto c2 = std::chrono::high_resolution_clock::now();
+				auto dur = std::chrono::duration_cast<std::chrono::microseconds>(c2 - c1);
+				callbacks += dur;
+			}
+			*/
+
+
+			// trail.slide_each(cursor_world - trail.head().pos, [&](
+			// 	const math::vec2 p0, const math::vec2 p1, const math::vec2 p2, const math::vec2 p3,
+			// 	const unsigned idx, const unsigned total,
+			// 	const float scaleP, const float scaleN,
+			// 	const std::array<float, 4>& adjoin
+			// ){
+			// 	const auto seg = math::max(static_cast<unsigned>(p1.dst(p2) / 16.f), 2U);
+			// 	const auto fac_tail = math::idx_to_factor(idx, total);
+			// 	const auto fac_head = math::idx_to_factor(idx + 1, total);
+			// 	const auto colorA = math::lerp(colors::pale_green.to_light(1.5f), colors::aqua.to_light(2.5f), fac_tail);
+			// 	const auto colorB = math::lerp(colors::pale_green.to_light(1.5f), colors::aqua.to_light(2.5f), fac_head);
+			//
+			// 	const auto tan = (p1 - p2).normalize().rotate_rt_counter_clockwise();
+			//
+			// 	batch.push_instruction(instruction::constrained_curve{
+			// 			.param = instruction::curve_trait_mat::b_spline.apply_to(
+			// 				p0 + adjoin[0] * tan, p1 + adjoin[1] * tan, p2 + adjoin[2] * tan, p3 + adjoin[3] * tan
+			// 			),
+			// 			.stroke = math::range{fac_tail * scaleP, fac_head * scaleN} * 15.f,
+			// 			.segments = seg,
+			// 			.color = {colorA, colorB},
+			// 		});
+			// }, [&](const unsigned idx, const unsigned total, const std::uintptr_t id){
+			// 	math::rand rand{id};
+			// 	const auto fac = (1 - math::idx_to_factor(idx, total)) | math::interp::pow3In;
+			// 	return rand.range(1.25f) * (rand.random(1.f) | math::interp::pow5In) * 200 * fac * math::curve(float(total - idx), 12.f, 20.f);
+			// });
+
+#pragma region DrawTest
 
 			for(unsigned i = 0; i < 0; ++i){
 				// batch.push_instruction(
@@ -1388,6 +1639,7 @@ int main(){
 
 			}
 
+#pragma endregion
 
 
 			batch.consume_all();
@@ -1397,7 +1649,14 @@ int main(){
 			// batch.reset();
 			vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {manager.get_main_command_buffer()});
 			ctx.flush();
+
+			++count;
 		}
+
+
+		std::println(std::cerr, "[SUM] Callback : {}", (callbacks / count).count());
+		std::println(std::cerr, "[SUM] Coroutine: {}", (coroutine / count).count());
+
 
 		ctx.wait_on_device();
 	}

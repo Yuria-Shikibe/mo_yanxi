@@ -289,6 +289,15 @@ namespace mo_yanxi::math{
 			return this->add(other.x, other.y);
 		}
 
+		[[nodiscard]] PURE_FN FORCE_INLINE friend constexpr vector2 fma(vector2 a, vector2 b, vector2 c) noexcept {
+			return {math::fma(a.x, b.x, c.x), math::fma(a.y, b.y, c.y)};
+		}
+
+		[[nodiscard]] PURE_FN FORCE_INLINE friend constexpr vector2 fma(vector2 a, T b, vector2 c) noexcept {
+			return {math::fma(a.x, b, c.x), math::fma(a.y, b, c.y)};
+		}
+
+	private:
 		/**
 		 * @return self * mul + add
 		 */
@@ -321,6 +330,7 @@ namespace mo_yanxi::math{
 			return rst;
 		}
 
+	public:
 		FORCE_INLINE constexpr vector2& sub(const T ox, const T oy) noexcept {
 			x -= ox;
 			y -= oy;
@@ -474,6 +484,16 @@ namespace mo_yanxi::math{
 
 		FORCE_INLINE constexpr vector2& normalize() noexcept {
 			return div(length());
+		}
+
+		FORCE_INLINE constexpr vector2& normalize_or_zero() noexcept {
+			const auto len = length();
+			if(len > std::numeric_limits<floating_point_t>::epsilon()){
+				return div(len);
+			}else{
+				return set_zero();
+			}
+
 		}
 
 		FORCE_INLINE constexpr vector2& to_sign() noexcept{

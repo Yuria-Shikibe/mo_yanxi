@@ -2,6 +2,7 @@ module;
 
 #include <vulkan/vulkan.h>
 #include "ext/adapted_attributes.hpp"
+#include "gch/small_vector.hpp"
 
 export module mo_yanxi.graphic.draw.instruction_draw:batch;
 
@@ -18,7 +19,9 @@ import mo_yanxi.vk.util.cmd.render;
 import :primitives;
 import :facility;
 
+import mo_yanxi.type_register;
 import std;
+
 
 namespace mo_yanxi::graphic::draw::instruction{
 
@@ -76,7 +79,6 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 	VkImageView current_img{};
 
 	auto ptr_to_head = std::assume_aligned<16>(instr_begin);
-	// auto last_instr = ptr_to_head;
 
 	bool requires_image_try_push{true};
 
@@ -172,12 +174,6 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 		save_chunk_head_and_incr();
 	}
 
-	// if(nextPrimitiveOffset == 0 && verticesBreakpoint != 0){
-	// 	ptr_to_head = std::assume_aligned<16>(last_instr);
-	// 	reinterpret_cast<primitive_generic*>(ptr_to_head + sizeof(instruction_head))->image.set_view(current_img);
-	// 	verticesBreakpoint = 0;
-	// }
-
 	return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, false, current_img};
 }
 #pragma endregion
@@ -186,34 +182,87 @@ constexpr inline std::size_t maximum_images = 4;
 constexpr inline std::size_t max_dispatch_per_workgroup = 32;
 constexpr inline std::size_t working_group_count = 4;
 
+
+
+export
+struct ubo_index_table{
+	struct usr_entry{
+		std::uint32_t index;
+		std::uint32_t size;
+		std::uint32_t offset;
+	};
+private:
+	struct entry{
+		type_identity_index id{};
+		std::uint32_t size{};
+		std::uint32_t offset{};
+	};
+
+
+	std::size_t maximum_size{};
+	gch::small_vector<entry> entries{};
+
+	template <typename T>
+	void push(){
+		entries.push_back({
+			unstable_type_identity_of<T>(),
+			static_cast<std::uint32_t>(sizeof(T)),
+			static_cast<std::uint32_t>(maximum_size),
+		});
+
+		maximum_size += math::div_ceil(sizeof(T), alignof(std::max_align_t)) * alignof(std::max_align_t);
+	}
+
+public:
+	template <typename ...Ts>
+	friend ubo_index_table make_ubo_table();
+
+	[[nodiscard]] ubo_index_table() = default;
+
+	[[nodiscard]] auto max_size() const noexcept{
+		return maximum_size;
+	}
+
+	[[nodiscard]] auto count() const noexcept{
+		return entries.size();
+	}
+
+	[[nodiscard]] std::uint32_t offset_at(std::uint32_t idx) const noexcept{
+		assert(idx < entries.size());
+		return entries[idx].offset;
+	}
+
+	[[nodiscard]] std::uint32_t size_at(std::uint32_t idx) const noexcept{
+		assert(idx < entries.size());
+		return entries[idx].size;
+	}
+
+	[[nodiscard]] const entry* operator[](type_identity_index id) const noexcept{
+		const auto beg = entries.data();
+		const auto end = beg + maximum_size;
+		return std::ranges::find(beg, end, id, &entry::id);
+	}
+
+	template <typename T>
+	[[nodiscard]] std::uint32_t index_of() const noexcept{
+		return (*this)[unstable_type_identity_of<T>()] - entries.data();
+	}
+};
+
+export
+template <typename ...Ts>
+[[nodiscard]] ubo_index_table make_ubo_table(){
+	ubo_index_table table{};
+	(table.push<Ts>(), ...);
+	return table;
+}
+
 struct dspt_info_buffer{
 	std::uint32_t shared_instr_image_index_override;
 	std::uint32_t cap[3];
 	std::array<instruction::dispatch_group_info, max_dispatch_per_workgroup> group_info;
 };
 
-struct working_group{
-	image_view_history image_view_history{};
-	//TODO UBO data
-	VkDrawMeshTasksIndirectCommandEXT indirect{};
-
-	std::byte* span_begin;
-	std::byte* span_end;
-
-	std::size_t current_ubo_index_{};
-	std::uint64_t current_signal_index{};
-	vk::semaphore mesh_semaphore{};
-	vk::semaphore frag_semaphore{};
-
-
-	void dispatch(std::uint32_t groups, std::byte* instr_span_begin,
-	              std::byte* instr_span_end/*, vk::buffer& ubo, std::span<std::byte> ubo_data*/) noexcept{
-		indirect = {groups, 1, 1};
-		span_begin = instr_span_begin;
-		span_end = instr_span_end;
-		// vk::buffer_mapper{ubo}.load_range(ubo_data, )
-	}
-};
 
 export
 struct batch_external_data{
@@ -234,7 +283,7 @@ struct batch_external_data{
 	)
 		:
 		user_descriptor_layout_(ctx.get_device(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
-		                        desc_layout_builder),
+								desc_layout_builder),
 		user_descriptor_buffer_{
 			ctx.get_allocator(), user_descriptor_layout_, user_descriptor_layout_.binding_count(),
 			static_cast<std::uint32_t>(groups.size())
@@ -259,6 +308,34 @@ struct batch_external_data{
 };
 
 export
+struct batch;
+
+struct working_group{
+	friend batch;
+private:
+	image_view_history image_view_history{};
+	//TODO UBO data
+	VkDrawMeshTasksIndirectCommandEXT indirect{};
+
+	std::byte* span_begin;
+	std::byte* span_end;
+
+	gch::small_vector<std::size_t> ubo_timeline_mark_{};
+
+	std::uint64_t current_signal_index{};
+	vk::semaphore mesh_semaphore{};
+	vk::semaphore frag_semaphore{};
+
+
+	void dispatch(std::uint32_t groups,
+		std::byte* instr_span_begin, std::byte* instr_span_end) noexcept{
+		indirect = {groups, 1, 1};
+		span_begin = instr_span_begin;
+		span_end = instr_span_end;
+	}
+};
+
+
 struct batch{
 	static constexpr std::uint32_t batch_work_group_count = working_group_count;
 
@@ -272,10 +349,11 @@ private:
 	std::uint32_t current_idle_group_index_{};
 	std::uint32_t current_dspt_group_index_ = groups_.size();
 
-	//TODO ubo data
-	alignas(16) std::array<std::byte, 1024> latest_user_ubo_data_{};
-	std::uint32_t user_ubo_data_size_{};
-	std::size_t current_ubo_index_{};
+	ubo_index_table ubo_table_;
+	std::vector<std::byte> ubo_cache_{};
+	gch::small_vector<std::size_t> ubo_timeline_mark_{};
+
+	// std::size_t current_ubo_index_{};
 
 
 	instruction::instruction_buffer instruction_buffer_{};
@@ -289,19 +367,29 @@ private:
 	vk::uniform_buffer dispatch_info_buffer{};
 
 	//TODO merge these two?
-	vk::buffer indirect_buffer{};
-	vk::buffer instruction_gpu_buffer{};
+	vk::buffer_cpu_to_gpu indirect_buffer{};
+	vk::buffer_cpu_to_gpu instruction_gpu_buffer{};
 
 	VkSampler sampler_{};
 
 public:
-	std::move_only_function<VkCommandBuffer(std::uint32_t, std::span<const std::byte>)> on_submit{};
+	using ubo_data_entries = std::span<const std::span<const std::byte>>;
+private:
+	/**
+	 *
+	 * @brief
+	 * (batch group index, ubo data update) -> Buffer to execute
+	 */
+	std::move_only_function<VkCommandBuffer(std::uint32_t, ubo_data_entries, const std::byte*)> on_submit{};
+
+public:
 
 	[[nodiscard]] batch() = default;
 
-	[[nodiscard]] explicit batch(
+	[[nodiscard]] batch(
 		vk::context& context,
-		VkSampler sampler
+		VkSampler sampler,
+		ubo_index_table ubo_index_table
 	)
 		:
 		context_(&context),
@@ -316,18 +404,25 @@ public:
 		}
 		, descriptor_buffer_(context.get_allocator(), descriptor_layout_, descriptor_layout_.binding_count(),
 		                     working_group_count)
-		, instruction_buffer_(1U << 16U)
-		, dispatch_info_buffer(context.get_allocator(), sizeof(dspt_info_buffer) * working_group_count,
-		                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
-		, indirect_buffer(vk::templates::create_storage_buffer(context.get_allocator(),
-		                                                       sizeof(VkDrawMeshTasksIndirectCommandEXT) *
-		                                                       working_group_count,
-		                                                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		                                                       VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT))
-		, instruction_gpu_buffer(vk::templates::create_storage_buffer(context.get_allocator(),
-		                                                              instruction_buffer_.size(),
-		                                                              VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT))
-		, sampler_(sampler){
+		, ubo_table_(std::move(ubo_index_table))
+		, ubo_cache_(ubo_table_.max_size())
+		, ubo_timeline_mark_(ubo_table_.count())
+		, instruction_buffer_(1U << 13U)
+		, dispatch_info_buffer(
+			context.get_allocator(),
+			sizeof(dspt_info_buffer) * working_group_count,
+				VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
+		, indirect_buffer(vk::buffer_cpu_to_gpu(
+			context.get_allocator(),
+			sizeof(VkDrawMeshTasksIndirectCommandEXT) *
+			working_group_count,
+			VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT))
+		, instruction_gpu_buffer(vk::buffer_cpu_to_gpu(
+			context.get_allocator(),
+			instruction_buffer_.size(),
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT))
+		, sampler_(sampler)
+	{
 		instruction_idle_ptr_ = instruction_buffer_.begin();
 		instruction_dspt_ptr_ = instruction_buffer_.begin();
 		instruction_pend_ptr_ = instruction_buffer_.begin();
@@ -344,13 +439,23 @@ public:
 		}
 	}
 
+	void set_submit_callback(std::invocable<std::uint32_t, ubo_data_entries, const std::byte*> auto&& fn){
+		on_submit = std::forward<decltype(fn)>(fn);
+	}
+
+	void set_submit_callback(std::invocable<std::uint32_t, ubo_data_entries> auto&& fn){
+		on_submit = [f = std::forward<decltype(fn)>(fn)](std::uint32_t a, ubo_data_entries b, const std::byte* c){
+			return f(a, b);
+		};
+	}
+
 private:
 	template <typename T, typename Fn, typename... Args>
-	FORCE_INLINE void push_impl(Fn psh_fn, const Args&...){
+	FORCE_INLINE void push_impl(Fn psh_fn, const Args&... args){
 		// assert(draw::get_instr_placement_size_requirement<T>() <= instruction_buffer_.size());
 
 		std::byte* rst{nullptr};
-		while(check_need_block<T, Args...>(instruction_idle_ptr_)){
+		while(this->check_need_block<false, T, Args...>(instruction_idle_ptr_, args...)){
 			if(is_all_idle()) consume_n(working_group_count / 2);
 			wait_last_group_and_pop();
 		}
@@ -359,7 +464,7 @@ private:
 
 		if(rst == nullptr){
 			//Reverse buffer to head
-			while(check_need_block<T, Args...>(instruction_buffer_.begin())){
+			while(this->check_need_block<true, T, Args...>(instruction_buffer_.begin(), args...)){
 				if(is_all_idle()) consume_n(working_group_count / 2);
 				wait_last_group_and_pop();
 			}
@@ -369,6 +474,13 @@ private:
 
 		assert(instruction_idle_ptr_ != nullptr);
 		instruction_idle_ptr_ = rst;
+
+		if(is_all_idle()){
+			const auto dst = instruction_idle_ptr_ - instruction_dspt_ptr_;
+			if(dst > instruction_buffer_.size() / 2 || (dst < 0 && dst > -instruction_buffer_.size() / 2)){
+				consume_n(working_group_count / 2);
+			}
+		}
 	}
 
 public:
@@ -384,7 +496,7 @@ public:
 		requires (!instruction::known_instruction<T>)
 	void update_ubo(const T& instr){
 		this->push_impl<T>([&, this](std::byte* where){
-			return instruction::place_ubo_update_at(where, instruction_buffer_.end(), instr);
+			return instruction::place_ubo_update_at(where, instruction_buffer_.end(), instr, ubo_table_.index_of<T>());
 		});
 	}
 
@@ -447,9 +559,12 @@ public:
 					wait_last_group_and_pop();
 				}
 
-				std::memcpy(latest_user_ubo_data_.data(), data.data(), data.size_bytes());
-				user_ubo_data_size_ = data.size_bytes();
-				++current_ubo_index_;
+				const auto idx = get_instr_head(dspcinfo.next).payload.ubo.index;
+				const auto offset = ubo_table_.offset_at(idx);
+				assert(idx < ubo_table_.count());
+				assert(ubo_table_.size_at(idx) == data.size_bytes());
+				std::memcpy(ubo_cache_.data() + offset, data.data(), data.size_bytes());
+				++ubo_timeline_mark_[idx];
 
 				instruction_pend_ptr_ = dspcinfo.next + data.size_bytes() + sizeof(instruction::instruction_head);
 				if(!dspcinfo.count && is_all_idle()){
@@ -531,14 +646,17 @@ public:
 
 				//usr update
 				assert(on_submit);
-				std::span<const std::byte> ubodata{};
-				if(group.current_ubo_index_ < current_ubo_index_){
-					ubodata = {latest_user_ubo_data_.data(), user_ubo_data_size_};
-					group.current_ubo_index_ = current_ubo_index_;
+				auto ubo_count = ubo_table_.count();
+				gch::small_vector<std::span<const std::byte>> ubo_data(ubo_count);
+				for(unsigned i = 0; i < ubo_count; ++i){
+					if(group.ubo_timeline_mark_[i] < ubo_timeline_mark_[i]){
+						group.ubo_timeline_mark_[i] = ubo_timeline_mark_[i];
+						ubo_data[i] = {ubo_cache_.data() + ubo_table_.offset_at(i), ubo_table_.size_at(i)};
+					}
 				}
 
 				const auto cmdbuf =
-					on_submit(current_idle_group_index_, ubodata);
+					on_submit(current_idle_group_index_, std::span{ubo_data.data(), ubo_data.size()}, ubo_cache_.data());
 
 				++group.current_signal_index;
 
@@ -647,11 +765,12 @@ public:
 		assert(is_all_done());
 		assert(is_all_idle());
 
-		current_idle_group_index_ = 0;
+		// current_idle_group_index_ = 0;
 		instruction_idle_ptr_ = instruction_buffer_.begin();
 		instruction_pend_ptr_ = instruction_buffer_.begin();
 		instruction_dspt_ptr_ = instruction_buffer_.begin();
 		instruction_buffer_.clear();
+		temp_dispatch_info_ = {};
 	}
 
 private:
@@ -684,12 +803,12 @@ private:
 		return is_all_idle() ? nullptr : groups_.data() + current_dspt_group_index_;
 	}
 
-	template <typename InstrT, typename... Args>
-	FORCE_INLINE bool check_need_block(const std::byte* where) const noexcept{
-		const auto end = where + instruction::get_instr_size<InstrT, Args...>() + sizeof(instruction_head);
-		if(instruction_dspt_ptr_ == where) return !is_all_idle();
+	template <bool onReverse, typename InstrT, typename... Args>
+	FORCE_INLINE bool check_need_block(const std::byte* where, const Args& ...args) const noexcept{
+		if(instruction_dspt_ptr_ == where) return onReverse || !is_all_idle();
 
 		if(instruction_dspt_ptr_ > where){
+			const auto end = where + instruction::get_instr_size<InstrT, Args...>(args...) + sizeof(instruction_head);
 			return end > instruction_dspt_ptr_;
 		} else{
 			//reversed, where next instruction will never directly collide with dispatched instructions;
@@ -747,5 +866,12 @@ FORCE_INLINE batch& operator<<(batch& batch, const T& instr){
 	}
 	return batch;
 }
+
+struct batch_stream{
+	batch* batch;
+	primitive_generic generic;
+
+
+};
 
 }

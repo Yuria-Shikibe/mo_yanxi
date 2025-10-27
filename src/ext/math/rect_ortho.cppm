@@ -115,9 +115,12 @@ namespace mo_yanxi::math{
 			this->set_size(size);
 		}
 
-		constexpr rect_ortho(typename vec_t::const_pass_t center, const T size) noexcept{
-			this->set_size(size, size);
-			this->set_center(center.x, center.y);
+		constexpr rect_ortho(typename vec_t::const_pass_t center, T size) noexcept
+			: src(center - vec_t{size / 2, size / 2}), size_(size, size)
+		{
+			if constexpr (!std::unsigned_integral<T>){
+				assert(size >= 0);
+			}
 		}
 
 		/**

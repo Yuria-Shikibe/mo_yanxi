@@ -71,12 +71,23 @@ namespace mo_yanxi::graphic{
 		}
 
 		[[nodiscard]] node_type head() const noexcept{
-			return points.back_or({});
+			return points.front_or({});
 		}
 
 		[[nodiscard]] node_type tail() const noexcept{
-			return points.front_or({});
+			return points.back_or({});
 		}
+
+		[[nodiscard]] math::vec2 head_pos_or(math::vec2 p) const noexcept{
+			if(points.empty())return p;
+			return points.front().pos;
+		}
+
+		[[nodiscard]] math::vec2 tail_pos_or(math::vec2 p) const noexcept{
+			if(points.empty())return p;
+			return points.back().pos;
+		}
+
 
 		[[nodiscard]] float head_angle() const noexcept{
 			const auto sz = points.size();
@@ -91,17 +102,17 @@ namespace mo_yanxi::graphic{
 			// if(lastPos.dst2(x, y) < minSpacingSqr)return;
 
 			if(points.full()){
-				points.pop_front();
+				points.pop_back();
 			}
 
-			points.emplace_back(pos, scale);
+			points.emplace_front(pos, scale);
 		}
 
 		void push_diff(const vec_t pos, float scale = 1.0f){
 			assert(points.capacity() > 0);
 			if(!points.empty()){
-				if(points.back().pos.equals(pos, 1.f)){
-					points.pop_front();
+				if(head().pos.equals(pos, 1.f)){
+					points.pop_back();
 
 					return;
 				}
@@ -109,15 +120,15 @@ namespace mo_yanxi::graphic{
 
 
 			if(points.full()){
-				points.pop_front();
+				points.pop_back();
 			}
 
-			points.emplace_back(pos, scale);
+			points.emplace_front(pos, scale);
 		}
 
 		void pop() noexcept{
 			if(!points.empty()){
-				points.pop_front();
+				points.pop_back();
 			}
 		}
 
@@ -216,6 +227,39 @@ namespace mo_yanxi::graphic{
 				lastAngle = drawImpl(i - initialFloor, nodeCurrent, nodeNext, cur, cur + 1.f);
 			}
 		}
+
+		template <template <typename > typename Generator, std::invocable<node_type, size_type, size_type, std::uintptr_t> Func>
+		FORCE_INLINE Generator<std::invoke_result_t<Func, node_type, size_type, size_type, std::uintptr_t>> trivial_each(
+			float percent,
+			Func consumer
+			) const noexcept{
+			percent = math::clamp(percent);
+
+			const auto len = static_cast<size_type>(points.size() * percent);
+			if(!len)co_return;
+
+			for(size_type idx{}; idx < len; ++idx){
+				auto ptr = points.data_at(idx);
+				co_yield std::invoke(consumer, *ptr, idx, len, std::bit_cast<std::uintptr_t>(ptr));
+			}
+		}
+
+		template <std::invocable<node_type, size_type, size_type, std::uintptr_t> Func>
+		FORCE_INLINE void trivial_each_2(
+			float percent,
+			Func consumer
+			) const noexcept{
+			percent = math::clamp(percent);
+
+			const auto len = static_cast<size_type>(points.size() * percent);
+			if(!len)return;
+
+			for(size_type idx{}; idx < len; ++idx){
+				auto ptr = points.data_at(idx);
+				std::invoke(consumer, *ptr, idx, len, std::bit_cast<std::uintptr_t>(ptr));
+			}
+		}
+
 
 		template <typename Func>
 		FORCE_INLINE void slide_each(

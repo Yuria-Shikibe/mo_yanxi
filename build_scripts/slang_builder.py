@@ -4,15 +4,25 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-import shlex
+from typing import List, Optional, Tuple, Dict, Any, Union
 
-def check_slangc_compiler(slangc_path):
-    """检查slangc编译器是否有效"""
+
+def check_slangc_compiler(slangc_path: Union[str, Path]) -> bool:
+    """检查slangc编译器是否有效
+
+    Args:
+        slangc_path: slangc编译器路径
+
+    Returns:
+        bool: 编译器是否有效
+    """
     try:
-        result = subprocess.run([slangc_path, "-v"],
-                                capture_output=True,
-                                text=True,
-                                timeout=10)
+        result = subprocess.run(
+            [str(slangc_path), "-v"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
         if result.returncode == 0:
             print(f"✓ slangc编译器有效: {slangc_path}")
             return True
@@ -23,15 +33,24 @@ def check_slangc_compiler(slangc_path):
         print(f"✗ 找不到slangc编译器: {slangc_path}")
         return False
     except subprocess.TimeoutExpired:
-        print(f"✗ slangc编译器执行超时")
+        print("✗ slangc编译器执行超时")
         return False
     except Exception as e:
         print(f"✗ 检查slangc编译器时出错: {e}")
         return False
 
-def check_json_file(json_path):
-    """检查JSON配置文件是否存在"""
-    if not os.path.isfile(json_path):
+
+def check_json_file(json_path: Union[str, Path]) -> bool:
+    """检查JSON配置文件是否存在且格式正确
+
+    Args:
+        json_path: JSON配置文件路径
+
+    Returns:
+        bool: 配置文件是否有效
+    """
+    json_path = Path(json_path)
+    if not json_path.is_file():
         print(f"✗ JSON配置文件不存在: {json_path}")
         return False
 
@@ -47,22 +66,33 @@ def check_json_file(json_path):
         print(f"✗ 读取JSON配置文件时出错: {e}")
         return False
 
-def parse_config(json_path):
-    """解析JSON配置文件"""
+
+def parse_config(json_path: Union[str, Path]) -> Tuple[Optional[List[str]],
+Optional[List[Dict[str, Any]]],
+Optional[str],
+Optional[List[str]]]:
+    """解析JSON配置文件
+
+    Args:
+        json_path: JSON配置文件路径
+
+    Returns:
+        Tuple: (common_options, shaders, shader_root, include_dirs)
+    """
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
+            config: Dict[str, Any] = json.load(f)
 
         # 验证必需字段
         if 'common_options' not in config:
             raise ValueError("JSON配置中缺少 'common_options' 字段")
-
         if 'shaders' not in config:
             raise ValueError("JSON配置中缺少 'shaders' 字段")
 
-        common_options = config.get('common_options', [])
-        shaders = config.get('shaders', [])
-        shader_root = config.get('shader_root', '')  # 可选字段
+        common_options: List[str] = config.get('common_options', [])
+        shaders: List[Dict[str, Any]] = config.get('shaders', [])
+        shader_root: str = config.get('shader_root', '')  # 可选字段
+        include_dirs: List[str] = config.get('include_dir', [])
 
         # 验证shaders数组结构
         for i, shader in enumerate(shaders):
@@ -75,26 +105,53 @@ def parse_config(json_path):
         if shader_root:
             print(f"✓ 使用着色器根目录: {shader_root}")
 
-        return common_options, shaders, shader_root
+        return common_options, shaders, shader_root, include_dirs
 
     except Exception as e:
         print(f"✗ 解析配置文件时出错: {e}")
-        return None, None, None
+        return None, None, None, None
+
 
 def compile_shader(
         slangc_path: str,
+        shader_root: str,
         output_dir: str,
-        common_options ,
-        shader_file : str,
-        input_file : str,
-        shader_options):
-    """编译单个着色器文件"""
+        common_options: List[str],
+        shader_file: str,
+        input_file: str,
+        shader_options: List[str],
+        include_dirs: List[str]
+) -> Tuple[bool, str]:
+    """编译单个着色器文件
+
+    Args:
+        slangc_path: slangc编译器路径
+        shader_root: 着色器根目录
+        output_dir: 输出目录
+        common_options: 通用编译选项
+        shader_file: 着色器文件名
+        input_file: 输入文件完整路径
+        shader_options: 着色器特定选项
+        include_dirs: 包含目录列表
+
+    Returns:
+        Tuple[bool, str]: (是否成功, 输出信息或错误信息)
+    """
     try:
-        shader_name = shader_file.replace(os.sep, '.').replace('/', '.')
-        shader_name = Path(shader_name).with_suffix('.spv')
+        # 生成输出文件名
+        shader_name = Path(shader_file).with_suffix('.spv')
+        shader_name = str(shader_name).replace(os.sep, '.').replace('/', '.')
         output_file = os.path.join(output_dir, shader_name)
 
-        args = [slangc_path]
+        # 构建编译命令
+        args: List[str] = [slangc_path]
+
+        # 添加包含目录
+        for include_dir in include_dirs:
+            include_path = Path(shader_root).absolute().joinpath(include_dir)
+            args.append(f'-I{include_path}\\')
+
+        # 添加编译选项
         args.extend(common_options)
         args.extend(shader_options)
         args.extend(['-o', output_file])
@@ -132,7 +189,9 @@ def compile_shader(
         print(f"✗ 编译过程中发生异常: {e}")
         return False, str(e)
 
-def main():
+
+def main() -> None:
+    """主函数"""
     parser = argparse.ArgumentParser(description='SLANG着色器批量编译工具')
     parser.add_argument('slangc_path', help='slangc编译器路径')
     parser.add_argument('output_dir', help='输出目录（相对路径）')
@@ -141,7 +200,7 @@ def main():
     args = parser.parse_args()
 
     # 获取当前脚本所在目录的绝对路径
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    script_dir = Path(__file__).parent.absolute()
 
     # 处理相对路径
     slangc_path = Path(args.slangc_path).absolute()
@@ -165,12 +224,12 @@ def main():
         sys.exit(1)
 
     # 步骤3: 解析JSON配置
-    common_options, shaders, shader_root = parse_config(config_file)
+    common_options, shaders, shader_root, include_dirs = parse_config(config_file)
     if common_options is None:
         sys.exit(1)
 
     # 创建输出目录
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     print(f"✓ 输出目录已创建/确认: {output_dir}")
 
     # 步骤4: 编译所有着色器
@@ -181,9 +240,8 @@ def main():
     fail_count = 0
 
     for shader_config in shaders:
-        shader_file = shader_config['file']
-        shader_options = shader_config['options']
-
+        shader_file: str = shader_config['file']
+        shader_options: List[str] = shader_config['options']
 
         # 处理着色器文件的路径
         if shader_root:
@@ -191,20 +249,22 @@ def main():
             full_shader_path = Path(shader_root).resolve().joinpath(shader_file)
         else:
             # 否则相对于脚本目录
-            full_shader_path = os.path.join(script_dir, shader_file)
+            full_shader_path = script_dir / shader_file
 
-        if not os.path.isfile(full_shader_path):
+        if not full_shader_path.is_file():
             print(f"✗ 着色器文件不存在: {full_shader_path}")
             fail_count += 1
             continue
 
         success, message = compile_shader(
             str(slangc_path),
+            shader_root,
             str(output_dir),
             common_options,
-            str(shader_file),
+            shader_config.get('alias', shader_file),
             str(full_shader_path),
-            shader_options
+            shader_options,
+            include_dirs
         )
 
         if success:
@@ -221,9 +281,10 @@ def main():
 
     if fail_count > 0:
         print("\n注意: 有编译失败的文件，已自动删除对应的.spv目标文件")
-        # sys.exit(1)
+        sys.exit(1)
     else:
         print("\n✓ 所有着色器编译完成!")
+
 
 if __name__ == "__main__":
     main()

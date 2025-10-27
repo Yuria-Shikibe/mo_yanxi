@@ -45,6 +45,7 @@ namespace mo_yanxi{
 			return static_cast<copy_qualifier_t<Ty, seq_chunk>*>(p);
 		}
 
+		static constexpr auto chunk_element_count = sizeof...(T);
 		using tuple_type = std::tuple<T...>;
 
 		[[nodiscard]] constexpr seq_chunk() noexcept = default;

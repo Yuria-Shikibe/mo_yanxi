@@ -22,6 +22,62 @@ namespace mo_yanxi::game::fx{
 	using namespace graphic::render_graph::resource_desc;
 
 	export
+	add_result<post_process_stage> add_smaa(render_graph_manager& graph, pass_data* dependency){
+		{
+			auto smaa_edge_pass = graph.add_stage<post_process_stage>(post_process_meta{
+					assets::graphic::shaders::comp::smaa::edge_detection, {
+						{{0}, no_slot, 0},
+						{{1}, 0, no_slot},
+					}
+				});
+
+			smaa_edge_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+			smaa_edge_pass.pass.add_dep({.id = dependency});
+
+			auto smaa_weight_pass = graph.add_stage<post_process_stage>(post_process_meta{
+					assets::graphic::shaders::comp::smaa::weight_calculate, {
+						{{0}, no_slot, 0},
+						{{1}, 0, no_slot},
+						{{2}, 1, no_slot},
+						{{3}, 2, no_slot},
+					}
+				});
+
+			auto& areaTex = graph.add_explicit_resource(explicit_resource{external_image{}});
+			auto& searchTex = graph.add_explicit_resource(explicit_resource{external_image{}});
+
+			smaa_weight_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+			smaa_weight_pass.meta.set_sampler_at_binding(2, assets::graphic::samplers::texture_sampler);
+			smaa_weight_pass.meta.set_sampler_at_binding(3, assets::graphic::samplers::texture_sampler);
+			smaa_weight_pass.pass.add_dep({.id = smaa_edge_pass.id()});
+			smaa_weight_pass.pass.add_input({{areaTex, 1}});
+			smaa_weight_pass.pass.add_input({{searchTex, 2}});
+
+			const auto smaaTex = assets::graphic::get_smaa_tex();
+			areaTex.as_image().handle = smaaTex.area_tex;
+			areaTex.as_image().expected_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			searchTex.as_image().handle = smaaTex.search_tex;
+			searchTex.as_image().expected_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			auto smaa_final_pass = graph.add_stage<post_process_stage>(post_process_meta{
+					assets::graphic::shaders::comp::smaa::neighborhood_blending, {
+						{{0}, no_slot, 0},
+						{{1}, 0, no_slot},
+						{{2}, 1, no_slot},
+					}
+				});
+
+
+			smaa_final_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
+			smaa_final_pass.meta.set_sampler_at_binding(2, assets::graphic::samplers::blit_sampler);
+			smaa_final_pass.pass.add_dep({dependency, 0, 0});
+			smaa_final_pass.pass.add_dep({smaa_weight_pass.id(), 0, 1});
+
+			return smaa_final_pass;
+		}
+	}
+	export
 	post_process_meta get_bloom_default_meta(){
 		post_process_meta meta{
 			assets::graphic::shaders::comp::bloom,
@@ -33,13 +89,14 @@ namespace mo_yanxi::game::fx{
 									}
 		};
 
+		meta.set_format_at_in(1, VK_FORMAT_R16G16B16A16_SFLOAT);
+		meta.set_format_at_out(0, VK_FORMAT_R16G16B16A16_SFLOAT);
 		{
 			auto& req = meta.sockets.at_out<image_requirement>(0);
 
 			req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
 			req.mip_levels = 6;
 			req.scaled_times = 0;
-			req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 		}
 
 		{
@@ -48,7 +105,6 @@ namespace mo_yanxi::game::fx{
 			req.override_layout = req.override_output_layout = VK_IMAGE_LAYOUT_GENERAL;
 			req.mip_levels = 6;
 			req.scaled_times = 1;
-			req.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 		}
 
 		return meta;
@@ -160,10 +216,11 @@ namespace mo_yanxi::game::fx{
 					{world_bloom.id(), 0, 2}
 				});
 
+			{
 				auto smaa_edge_pass = graph.add_stage<post_process_stage>(post_process_meta{assets::graphic::shaders::comp::smaa::edge_detection, {
-					   {{0}, no_slot, 0},
-					   {{1}, 0, no_slot},
-				   }});
+					  {{0}, no_slot, 0},
+					  {{1}, 0, no_slot},
+				  }});
 
 				smaa_edge_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
 				smaa_edge_pass.pass.add_dep({.id = world_merge.id()});
@@ -201,6 +258,7 @@ namespace mo_yanxi::game::fx{
 				smaa_final_pass.meta.set_sampler_at_binding(2, assets::graphic::samplers::blit_sampler);
 				smaa_final_pass.pass.add_dep({world_merge.id(), 0, 0});
 				smaa_final_pass.pass.add_dep({smaa_weight_pass.id(), 0, 1});
+			}
 				// smaa_final_pass.pass.add_output({{0, true}});
 
 
@@ -217,6 +275,8 @@ namespace mo_yanxi::game::fx{
 			final_merge.pass.add_output({
 					{0, false},
 				});
+
+			auto smaa_final_pass = add_smaa(graph, world_merge.id());
 
 
 			final_merge.pass.add_dep({

@@ -295,6 +295,29 @@ namespace mo_yanxi::graphic::render_graph{
 				}, desc, req.desc);
 			}
 
+
+			[[nodiscard]] bool must_compatible_with(const resource_requirement& req) const noexcept{
+				if(!is_type_valid_equal_to(req)){
+					return false;
+				}
+
+				return std::visit<bool>(overload_def_noop{
+					std::in_place_type<bool>,
+					[](const image_requirement& l, const image_requirement& r){
+						if(l.aspect_flags != r.aspect_flags)return false;
+						if(l.scaled_times != r.scaled_times)return false;
+						if(l.format != r.format && (l.format != VK_FORMAT_UNDEFINED && r.format != VK_FORMAT_UNDEFINED))return false;
+
+						return true;
+					},
+					[](const buffer_requirement& l, const buffer_requirement& r) -> bool {
+						//TODO
+						throw std::invalid_argument("not implemented");
+						return false;
+					}
+				}, desc, req.desc);
+			}
+
 			void promote(const resource_requirement& other){
 				std::visit(overload_narrow{
 					[](image_requirement& l, const image_requirement& r) {

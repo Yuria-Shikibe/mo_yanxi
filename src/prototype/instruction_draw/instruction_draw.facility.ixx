@@ -6,6 +6,8 @@ module;
 
 export module mo_yanxi.graphic.draw.instruction_draw:facility;
 
+export import mo_yanxi.graphic.draw.instruction.general;
+
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.math.vector4;
 export import mo_yanxi.math.matrix4;
@@ -96,82 +98,6 @@ public:
 };
 
 
-struct instruction_buffer{
- 	static constexpr std::size_t align = 32;
-
-private:
-	std::byte* src{};
-	std::byte* dst{};
-
-public:
-	[[nodiscard]] constexpr instruction_buffer() noexcept = default;
-
-	[[nodiscard]] explicit instruction_buffer(std::size_t byte_size){
-		const auto actual_size = ((byte_size + (align - 1)) / align) * align;
-		const auto p = ::operator new(actual_size, std::align_val_t{align});
-		src = new(p) std::byte[actual_size]{};
-		dst = src + actual_size;
-	}
-
-	~instruction_buffer(){
-		std::destroy_n(src, size());
-		::operator delete(src, size(), std::align_val_t{align});
-	}
-
-	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::size_t size() const noexcept{
-		return dst - src;
-	}
-
-	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::byte* begin() const noexcept{
-		return std::assume_aligned<align>(src);
-	}
-
-	void clear() const noexcept{
-		std::memset(src, 0, size());
-	}
-
-	//
-	// [[nodiscard]] FORCE_INLINE CONST_FN constexpr std::byte* begin() noexcept{
-	// 	return std::assume_aligned<align>(src);
-	// }
-
-	[[nodiscard]] FORCE_INLINE CONST_FN constexpr std::byte* end() const noexcept{
-		return std::assume_aligned<align>(dst);
-	}
-
-	//
-	// [[nodiscard]] FORCE_INLINE CONST_FN constexpr std::byte* end() noexcept{
-	// 	return std::assume_aligned<align>(dst);
-	// }
-
-	instruction_buffer(const instruction_buffer& other)
-		: instruction_buffer(other.size()){
-		std::memcpy(src, other.src, size());
-	}
-
-	constexpr instruction_buffer(instruction_buffer&& other) noexcept
-		: src{std::exchange(other.src, {})},
-		  dst{std::exchange(other.dst, {})}{
-	}
-
-	instruction_buffer& operator=(const instruction_buffer& other){
-		if(this == &other) return *this;
-		*this = instruction_buffer{other};
-		return *this;
-	}
-
-	constexpr instruction_buffer& operator=(instruction_buffer&& other) noexcept{
-		if(this == &other) return *this;
-		std::destroy_n(src, size());
-		::operator delete(src, size(), std::align_val_t{align});
-
-		src = std::exchange(other.src, {});
-		dst = std::exchange(other.dst, {});
-		return *this;
-	}
-};
-
-
 struct image_set_result{
 	VkImageView image;
 	bool succeed;
@@ -236,65 +162,37 @@ enum struct instr_type : std::uint32_t{
 	SIZE,
 };
 
-
-union dispatch_info_payload{
-	struct{
-		std::uint32_t vertex_count;
-		std::uint32_t primitive_count;
-	} draw;
-
-	struct{
-		std::uint32_t offset;
-		std::uint32_t cap;
-	} ubo;
+struct draw_payload{
+	std::uint32_t vertex_count;
+	std::uint32_t primitive_count;
 };
 
-struct alignas(16) instruction_head{
-	instr_type type;
-	std::uint32_t size; //size include head
-	dispatch_info_payload payload;
-
-	[[nodiscard]] constexpr std::ptrdiff_t get_instr_byte_size() const noexcept{
-		return size;
-	}
-
-	[[nodiscard]] constexpr std::ptrdiff_t get_payload_byte_size() const noexcept{
-		return size - sizeof(instruction_head);
-	}
-};
+using instruction_head = generic_instruction_head<instr_type, draw_payload>;
 
 static_assert(std::is_standard_layout_v<instruction_head>);
 
+template <typename Instr, typename Arg>
+struct is_valid_consequent_argument : std::false_type{
+
+};
 
 template <typename Instr, typename Arg>
-constexpr inline bool is_valid_consequent_argument = false;
+constexpr inline bool is_valid_consequent_argument_v = is_valid_consequent_argument<Instr, Arg>::value;
 
-export
 template <typename Instr, typename... Args>
-concept valid_consequent_argument = (is_valid_consequent_argument<Instr, Args> && ...);
+concept valid_consequent_argument = (is_valid_consequent_argument_v<Instr, Args> && ...);
 
-export
 template <typename T>
 constexpr inline instr_type instruction_type_of = instr_type::uniform_update;
 
-export
 template <typename T>
 concept known_instruction = instruction_type_of<T> != instr_type::uniform_update;
 
 
-
-
 template <typename T, typename... Args>
 	requires (std::is_trivially_copyable_v<T> && valid_consequent_argument<T, Args...>)
-consteval std::size_t get_instr_size() noexcept{
-	const auto ret = sizeof(instruction_head) + sizeof(T);
-	return ret + []{
-		if constexpr(sizeof...(Args) > 0){
-			return (sizeof(Args) + ...);
-		} else{
-			return 0;
-		}
-	}();
+constexpr std::size_t get_instr_size(const Args& ...args) noexcept{
+	return sizeof(instruction_head)  + sizeof(T) + instruction::get_type_size_sum<Args...>(args...);
 }
 
 template <typename T, typename... Args>
@@ -304,8 +202,8 @@ template <typename T, typename... Args>
 		};
 	}
 constexpr instruction_head make_instruction_head(const T& instr, const Args&... args) noexcept{
-	static constexpr std::ptrdiff_t required = get_instr_size<T, Args...>();
-	static_assert(required % 16 == 0);
+	const auto required = instruction::get_instr_size<T, Args...>(args...);
+	assert(required % 16 == 0);
 
 	const auto vtx = [&] -> std::uint32_t{
 		if constexpr(known_instruction<T>){
@@ -326,20 +224,12 @@ constexpr instruction_head make_instruction_head(const T& instr, const Args&... 
 
 	return instruction_head{
 		.type = instruction_type_of<T>,
-		.size = required,
+		.size = static_cast<std::uint32_t>(required),
 		.payload = {.draw = {.vertex_count = vtx, .primitive_count = pmt}}
 	};
 }
 
 
-template <typename T>
-[[nodiscard]] const T* start_lifetime_as(const void* p) noexcept{
-	const auto mp = const_cast<void*>(p);
-	const auto bytes = new(mp) std::byte[sizeof(T)];
-	const auto ptr = reinterpret_cast<const T*>(bytes);
-	(void)*ptr;
-	return ptr;
-}
 
 [[nodiscard]] FORCE_INLINE const instruction_head& get_instr_head(const void* p) noexcept{
 	return *start_lifetime_as<instruction_head>(std::assume_aligned<16>(p));
@@ -357,23 +247,33 @@ template <typename T, typename... Args>
 ){
 	static_assert(((sizeof(Args) % 16 == 0) && ...));
 
-	static constexpr auto total_size = instruction::get_instr_size<T, Args...>();
+	const auto total_size = instruction::get_instr_size<T, Args...>(args...);
 
 	if(sentinel - where < total_size + sizeof(instruction_head)) return nullptr;
 
 	auto pwhere = std::assume_aligned<16>(where);
 
-	std::construct_at(reinterpret_cast<instruction_head*>(pwhere), head);
-
+	std::memcpy(pwhere, &head, sizeof(instruction_head));
 	pwhere += sizeof(instruction_head);
-	std::construct_at(reinterpret_cast<T*>(pwhere), payload);
+	std::memcpy(pwhere, &payload, sizeof(payload));
+
+	static constexpr auto place_at = []<typename Ty>(std::byte*& w, const Ty& arg){
+		if constexpr (std::ranges::contiguous_range<Ty>){
+			//no use uniti
+			const auto byte_size = sizeof(std::ranges::range_value_t<Ty>) * std::ranges::size(arg);
+			std::memcpy(w, std::ranges::data(arg), byte_size);
+			return w = std::assume_aligned<16>(w + byte_size);
+		}else{
+			std::memcpy(w, &arg, sizeof(Ty));
+			return w = std::assume_aligned<16>(w + sizeof(Ty));
+		}
+	};
 
 	if constexpr(sizeof...(args) > 0){
 		pwhere += sizeof(instruction_head);
 
 		[&]<std::size_t ... Idx>(std::index_sequence<Idx...>) FORCE_INLINE{
-			((std::construct_at(reinterpret_cast<Args*>(pwhere), args), pwhere = std::assume_aligned<16>(
-				pwhere + sizeof(Args))), ...);
+			(place_at.template operator()<Args>(pwhere, args), ...);
 		}(std::make_index_sequence<sizeof...(Args)>{});
 
 		std::memset(pwhere, 0, sizeof(instruction_head));
@@ -403,13 +303,14 @@ template <typename T>
 	std::byte* const where,
 	const std::byte* const sentinel,
 	const T& payload,
+	const std::uint32_t slot_index = 0,
 	const std::uint32_t offset = 0
 ) noexcept{
 	return instruction::place_instr_at_impl(
 		where, sentinel, instruction_head{
 			.type = instr_type::uniform_update,
 			.size = get_instr_size<T>(),
-			.payload = {.ubo = {.offset = offset}}
+			.payload = {.ubo = {.index = slot_index, .offset = offset}}
 		}, payload);
 }
 

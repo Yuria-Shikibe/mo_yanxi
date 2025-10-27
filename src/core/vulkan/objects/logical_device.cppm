@@ -32,6 +32,15 @@ namespace mo_yanxi::vk{
 			return features;
 		}()};
 
+		constexpr VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR PhysicalDeviceComputeShaderDerivativesFeaturesKHR{[]{
+			VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_KHR};
+
+			features.computeDerivativeGroupQuads = true;
+			features.computeDerivativeGroupLinear = true;
+
+			return features;
+		}()};
+
 		const VkPhysicalDeviceVulkan12Features PhysicalDeviceVulkan12Features{[]{
 			VkPhysicalDeviceVulkan12Features features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
 
@@ -163,6 +172,8 @@ namespace mo_yanxi::vk{
 			PhysicalDeviceVulkan11Features,
 			PhysicalDeviceVulkan12Features,
 			PhysicalDeviceVulkan13Features,
+
+			PhysicalDeviceComputeShaderDerivativesFeaturesKHR,
 			// RequiredDescriptorIndexingFeatures,
 			// PhysicalDeviceBufferDeviceAddressFeatures,
 			DescriptorBufferFeatures,

@@ -7,9 +7,10 @@ export module mo_yanxi.vk.ext;
 import std;
 
 namespace mo_yanxi::vk{
-	export std::add_pointer_t<decltype(vkGetPhysicalDeviceProperties2KHR)> getPhysicalDeviceProperties2KHR = nullptr;
-	export std::add_pointer_t<decltype(vkGetDescriptorSetLayoutSizeEXT)> getDescriptorSetLayoutSizeEXT = nullptr;
-	export std::add_pointer_t<decltype(vkGetDescriptorSetLayoutBindingOffsetEXT)> getDescriptorSetLayoutBindingOffsetEXT = nullptr;
+	export inline std::add_pointer_t<decltype(vkGetPhysicalDeviceProperties2KHR)> getPhysicalDeviceProperties2KHR = nullptr;
+	export inline std::add_pointer_t<decltype(vkGetDescriptorSetLayoutSizeEXT)> getDescriptorSetLayoutSizeEXT = nullptr;
+	export inline std::add_pointer_t<decltype(vkGetDescriptorSetLayoutBindingOffsetEXT)> getDescriptorSetLayoutBindingOffsetEXT = nullptr;
+
 	std::add_pointer_t<decltype(vkGetDescriptorEXT)> getDescriptorEXT_ = nullptr;
 	std::add_pointer_t<decltype(vkCmdDrawMeshTasksEXT)> drawMeshTasksEXT = nullptr;
 	std::add_pointer_t<decltype(vkCmdDrawMeshTasksIndirectEXT)> drawMeshTasksIndirectEXT = nullptr;
@@ -18,6 +19,7 @@ namespace mo_yanxi::vk{
 
 	std::add_pointer_t<decltype(vkCmdBindDescriptorBuffersEXT)> PFN_cmdBindDescriptorBuffersEXT = nullptr;
 	std::add_pointer_t<decltype(vkCmdSetDescriptorBufferOffsetsEXT)> PFN_cmdSetDescriptorBufferOffsetsEXT = nullptr;
+	std::add_pointer_t<decltype(vkCmdSetDescriptorBufferOffsets2EXT)> PFN_cmdSetDescriptorBufferOffsets2EXT = nullptr;
 
 	export void getDescriptorEXT(
 		VkDevice                                    device,
@@ -59,6 +61,12 @@ namespace mo_yanxi::vk{
 			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 		};
 		constexpr VkDeviceSize OffsetDesignator[MaxStackBufferSize]{};
+
+	export void setDescriptorBufferOffsets2(
+		VkCommandBuffer                             commandBuffer,
+		const VkSetDescriptorBufferOffsetsInfoEXT*  pSetDescriptorBufferOffsetsInfo){
+		PFN_cmdSetDescriptorBufferOffsets2EXT(commandBuffer, pSetDescriptorBufferOffsetsInfo);
+	}
 
 		export void drawMeshTasks(
 			   VkCommandBuffer                             commandBuffer,
@@ -225,6 +233,7 @@ namespace mo_yanxi::vk{
 
 		PFN_cmdBindDescriptorBuffersEXT = LoadFuncPtr(instance, vkCmdBindDescriptorBuffersEXT);
 		PFN_cmdSetDescriptorBufferOffsetsEXT = LoadFuncPtr(instance, vkCmdSetDescriptorBufferOffsetsEXT);
+		PFN_cmdSetDescriptorBufferOffsets2EXT = LoadFuncPtr(instance, vkCmdSetDescriptorBufferOffsets2EXT);
 
 
 		vkGetDeviceFaultInfoEXT = LoadFuncPtr(instance, vkGetDeviceFaultInfoEXT);

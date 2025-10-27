@@ -45,7 +45,13 @@ namespace mo_yanxi{
 		return remain.substr(initial_pos, size);
 #endif
 	}
+	export
+	struct type_identity_data;
 
+	export using type_identity_index = const type_identity_data*;
+
+	template <typename T>
+	[[nodiscard]] constexpr type_identity_index unstable_type_identity_of_impl() noexcept;
 
 	export
 	struct type_identity_data{
@@ -65,6 +71,11 @@ namespace mo_yanxi{
 		[[nodiscard]] constexpr std::type_index type_idx() const noexcept{
 			return fn();
 		}
+		template <typename T = std::ptrdiff_t>
+			requires (sizeof(T) >= sizeof(std::ptrdiff_t))
+		[[nodiscard]] constexpr T to() const noexcept{
+			return std::bit_cast<T>(this - unstable_type_identity_of_impl<void>());
+		}
 
 		[[nodiscard]] constexpr std::string_view name() const noexcept{
 			return name_;
@@ -73,9 +84,6 @@ namespace mo_yanxi{
 
 	template <typename T>
 	inline constexpr type_identity_data idt{std::in_place_type<T>};
-
-	export using type_identity_index = const type_identity_data*;
-
 
 	template <typename T>
 	[[nodiscard]] constexpr type_identity_index unstable_type_identity_of_impl() noexcept{
@@ -87,6 +95,7 @@ namespace mo_yanxi{
 	[[nodiscard]] constexpr type_identity_index unstable_type_identity_of() noexcept{
 		return unstable_type_identity_of_impl<std::remove_cvref_t<T>>();
 	}
+
 
 	// // Constexpr pointer hash for 64-bit systems
 	// export struct type_identity_constexpr_hasher {

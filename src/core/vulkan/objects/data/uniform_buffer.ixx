@@ -12,20 +12,14 @@ import mo_yanxi.vk.vma;
 
 namespace mo_yanxi::vk{
 	export
-	struct uniform_buffer : buffer{
-		using buffer::buffer;
+	struct uniform_buffer : buffer_cpu_to_gpu{
+		using buffer_cpu_to_gpu::buffer_cpu_to_gpu;
 
 		[[nodiscard]] uniform_buffer(
 			vk::allocator& allocator,
 			const VkDeviceSize size,
 			const VkBufferUsageFlags append_usage = 0)
-			: buffer(allocator, {
-				.sType =  VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-				.size = size,
-				.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | append_usage
-			}, {
-				.usage = VMA_MEMORY_USAGE_CPU_TO_GPU
-			}){
+			: buffer_cpu_to_gpu(allocator, size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | append_usage){
 		}
 
 		[[nodiscard]] VkDescriptorBufferInfo get_descriptor_info() const noexcept{

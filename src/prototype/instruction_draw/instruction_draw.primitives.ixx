@@ -12,13 +12,6 @@ namespace mo_yanxi::graphic::draw::instruction{
 constexpr inline std::uint32_t MaxTaskDispatchPerTime = 32;
 constexpr inline std::uint32_t MaxVerticesPerMesh = 64;
 
-using float1 = float;
-using float2 = math::vec2;
-
-
-struct alignas(16) float4 : color{
-};
-
 
 export
 struct quad_vert_color{
@@ -98,36 +91,55 @@ export struct alignas(16) line : quad_like{
 	std::uint32_t _cap[3];
 };
 
+
+export struct alignas(16) line_node{
+	float2 pos;
+	float stroke;
+	float offset; //TODO ?
+	float4 color;
+
+	//TODO uv?
+};
+
 export struct alignas(16) line_segments{
 	primitive_generic generic;
 
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
 		std::size_t node_payload_size
 	) noexcept{
-		assert(node_payload_size >= 2);
-		return node_payload_size * 2;
+		assert(node_payload_size >= 4);
+		return (node_payload_size - 2) * 2;
 	}
 
-	template <typename... Args>
-	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
-		const Args&...
-	) noexcept{
-		return line_segments::get_vertex_count(sizeof...(Args));
-	}
 
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count(
 		std::size_t node_payload_size
 	) noexcept{
-		assert(node_payload_size >= 2);
-		return (node_payload_size - 1) * 2;
+		assert(node_payload_size >= 4);
+		return (node_payload_size - 3) * 2;
 	}
 
+	template <typename... Args>
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
+		const Args&... args
+	) noexcept{
+		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<Args..., line_node>){
+			return line_segments::get_vertex_count(std::ranges::size(args...));
+		}else{
+			return line_segments::get_vertex_count(sizeof...(Args));
+		}
+
+	}
 
 	template <typename... Args>
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count(
-		const Args&...
+		const Args&... args
 	) noexcept{
-		return line_segments::get_primitive_count(sizeof...(Args));
+		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<Args..., line_node>){
+			return line_segments::get_primitive_count(std::ranges::size(args...));
+		}else{
+			return line_segments::get_primitive_count(sizeof...(Args));
+		}
 	}
 };
 
@@ -139,36 +151,35 @@ export struct line_segments_closed : line_segments{
 		return line_segments::get_vertex_count(node_payload_size) + 2;
 	}
 
-	template <typename... Args>
-		[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
-			const Args&...
-		) noexcept{
-		return line_segments_closed::get_vertex_count(sizeof...(Args));
-	}
-
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count(
 		std::size_t node_payload_size
 	) noexcept{
 		return line_segments::get_primitive_count(node_payload_size) + 2;
 	}
 
+	template <typename... Args>
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
+		const Args&... args
+	) noexcept{
+		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<Args..., line_node>){
+			return line_segments::get_vertex_count(std::ranges::size(args...));
+		}else{
+			return line_segments::get_vertex_count(sizeof...(Args));
+		}
+	}
 
 	template <typename... Args>
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count(
-		const Args&...
+		const Args&... args
 	) noexcept{
-		return line_segments_closed::get_primitive_count(sizeof...(Args));
+		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<Args..., line_node>){
+			return line_segments::get_primitive_count(std::ranges::size(args...));
+		}else{
+			return line_segments::get_primitive_count(sizeof...(Args));
+		}
 	}
 };
 
-export struct alignas(16) line_node{
-	float2 pos;
-	float stroke;
-	float offset; //TODO ?
-	float4 color;
-
-	//TODO uv?
-};
 
 export struct alignas(16) poly{
 	primitive_generic generic;
@@ -276,7 +287,19 @@ struct curve_trait_matrix{
 		};
 	}
 
+
 	FORCE_INLINE constexpr friend curve_parameter operator*(const curve_trait_matrix& lhs, const curve_ctrl_handle& rhs) noexcept{
+		return lhs.apply_to(rhs[0], rhs[1], rhs[2], rhs[3]);
+	}
+
+	FORCE_INLINE constexpr friend curve_parameter operator*(const curve_trait_matrix& lhs, std::span<const math::vec2, 4> rhs) noexcept{
+		return lhs.apply_to(rhs[0], rhs[1], rhs[2], rhs[3]);
+	}
+
+	template <std::ranges::random_access_range Rng>
+		requires std::convertible_to<std::ranges::range_value_t<Rng>, math::vec2>
+	FORCE_INLINE constexpr friend curve_parameter operator*(const curve_trait_matrix& lhs, Rng&& rhs) noexcept{
+		assert(std::ranges::size(rhs) >= 4);
 		return lhs.apply_to(rhs[0], rhs[1], rhs[2], rhs[3]);
 	}
 };
@@ -341,11 +364,12 @@ export struct alignas(16) row_patch_vert_color{
 	}
 };
 
-template <>
-constexpr inline bool is_valid_consequent_argument<line_segments, line_node> = true;
 
-template <>
-constexpr inline bool is_valid_consequent_argument<line_segments_closed, line_node> = true;
+template <std::derived_from<line_segments> T>
+struct is_valid_consequent_argument<T, line_node> : std::true_type{};
+
+template <std::derived_from<line_segments> T, contiguous_range_of<line_node> Rng>
+struct is_valid_consequent_argument<T, Rng> : std::true_type{};
 
 template <>
 constexpr inline instr_type instruction_type_of<triangle> = instr_type::triangle;
@@ -407,7 +431,7 @@ constexpr inline instr_type instruction_type_of<row_patch> = instr_type::row_pat
 	}
 	case instr_type::line_segments_closed :{
 		const auto size = get_instr_head(ptr_to_instr).get_instr_byte_size();
-		const auto payloadByteSize = (size - get_instr_size<line_segments>());
+		const auto payloadByteSize = (size - get_instr_size<line_segments_closed>());
 		assert(payloadByteSize % sizeof(line_node) == 0);
 		const auto payloadCount = payloadByteSize / sizeof(line_node);
 		return line_segments_closed::get_vertex_count(payloadCount);

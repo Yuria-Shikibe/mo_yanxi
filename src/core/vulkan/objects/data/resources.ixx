@@ -134,6 +134,43 @@ namespace mo_yanxi::vk{
 
 	};
 
+	export struct buffer_cpu_to_gpu : buffer{
+	private:
+		exclusive_handle_member<std::byte*> mapped{};
+
+	public:
+		[[nodiscard]] buffer_cpu_to_gpu() = default;
+
+		[[nodiscard]] buffer_cpu_to_gpu(vk::allocator& allocator, VkDeviceSize size_in_bytes, VkBufferUsageFlags usage)
+		: buffer(allocator, {
+			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			.size = size_in_bytes,
+			.usage = usage
+		}, {
+			.usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+			.preferredFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT
+		}), mapped(static_cast<std::byte*>(buffer::map())){
+
+		}
+
+		~buffer_cpu_to_gpu(){
+			if(mapped && buffer::operator bool()){
+				buffer::unmap();
+			}
+		}
+
+		buffer_cpu_to_gpu(buffer_cpu_to_gpu&& other) noexcept = default;
+		buffer_cpu_to_gpu& operator=(buffer_cpu_to_gpu&& other) noexcept = default;
+
+		[[nodiscard]] void* map() const noexcept{
+			return mapped;
+		}
+
+		static void unmap() noexcept{
+
+		}
+	};
+
 	export struct storage_buffer : buffer{
 
 	private:
@@ -178,6 +215,10 @@ namespace mo_yanxi::vk{
 					buffer_obj->flush();
 				}
 			}
+		}
+
+		[[nodiscard]] std::byte* get_mapper_ptr() const noexcept{
+			return mapped;
 		}
 
 		buffer_type& base() noexcept{

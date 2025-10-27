@@ -46,8 +46,12 @@ export namespace mo_yanxi::math {
 		// }
 
 	public:
+		static auto get_default_seed() noexcept {
+			return std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		}
+
 		rand() noexcept { // NOLINT(*-use-equals-default)
-			set_seed(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()));
+			set_seed(get_default_seed());
 		}
 
 		/**
