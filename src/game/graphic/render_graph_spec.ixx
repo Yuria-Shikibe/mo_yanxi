@@ -22,7 +22,7 @@ namespace mo_yanxi::game::fx{
 	using namespace graphic::render_graph::resource_desc;
 
 	export
-	add_result<post_process_stage> add_smaa(render_graph_manager& graph, pass_data* dependency){
+	add_result<post_process_stage> add_smaa(render_graph_manager& graph, pass_unit* dependency){
 		{
 			auto smaa_edge_pass = graph.add_stage<post_process_stage>(post_process_meta{
 					assets::graphic::shaders::comp::smaa::edge_detection, {
@@ -43,8 +43,8 @@ namespace mo_yanxi::game::fx{
 					}
 				});
 
-			auto& areaTex = graph.add_explicit_resource(explicit_resource{external_image{}});
-			auto& searchTex = graph.add_explicit_resource(explicit_resource{external_image{}});
+			auto& areaTex = graph.add_explicit_resource(independent_resource{independent_image{}});
+			auto& searchTex = graph.add_explicit_resource(independent_resource{independent_image{}});
 
 			smaa_weight_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
 			smaa_weight_pass.meta.set_sampler_at_binding(2, assets::graphic::samplers::texture_sampler);
@@ -114,23 +114,23 @@ namespace mo_yanxi::game::fx{
 	struct post_process_graph{
 		render_graph_manager graph{};
 
-		explicit_resource& ui_base{graph.add_explicit_resource(explicit_resource{external_image{}})};
-		explicit_resource& ui_light{graph.add_explicit_resource(explicit_resource{external_image{}})};
+		independent_resource& ui_base{graph.add_explicit_resource(independent_resource{independent_image{}})};
+		independent_resource& ui_light{graph.add_explicit_resource(independent_resource{independent_image{}})};
 
-		explicit_resource& world_blit_base{graph.add_explicit_resource(explicit_resource{external_image{}})};
-		explicit_resource& world_blit_light{graph.add_explicit_resource(explicit_resource{external_image{}})};
+		independent_resource& world_blit_base{graph.add_explicit_resource(independent_resource{independent_image{}})};
+		independent_resource& world_blit_light{graph.add_explicit_resource(independent_resource{independent_image{}})};
 
-		explicit_resource& world_draw_depth{graph.add_explicit_resource(explicit_resource{external_image{}})};
-		explicit_resource& world_draw_base{graph.add_explicit_resource(explicit_resource{external_image{}})};
-		explicit_resource& world_draw_light{graph.add_explicit_resource(explicit_resource{external_image{}})};
+		independent_resource& world_draw_depth{graph.add_explicit_resource(independent_resource{independent_image{}})};
+		independent_resource& world_draw_base{graph.add_explicit_resource(independent_resource{independent_image{}})};
+		independent_resource& world_draw_light{graph.add_explicit_resource(independent_resource{independent_image{}})};
 
-		explicit_resource& world_draw_resolved_depth{graph.add_explicit_resource(explicit_resource{external_image{}})};
-		explicit_resource& world_draw_resolved_base{graph.add_explicit_resource(explicit_resource{external_image{}})};
-		explicit_resource& world_draw_resolved_light{graph.add_explicit_resource(explicit_resource{external_image{}})};
+		independent_resource& world_draw_resolved_depth{graph.add_explicit_resource(independent_resource{independent_image{}})};
+		independent_resource& world_draw_resolved_base{graph.add_explicit_resource(independent_resource{independent_image{}})};
+		independent_resource& world_draw_resolved_light{graph.add_explicit_resource(independent_resource{independent_image{}})};
 
-		explicit_resource& world_draw_oit_head{graph.add_explicit_resource(explicit_resource{external_image{}})};
-		explicit_resource& world_draw_oit_buffer{graph.add_explicit_resource(explicit_resource{external_buffer{}})};
-		explicit_resource& world_draw_oit_buffer_stat{graph.add_explicit_resource(explicit_resource{external_buffer{}})};
+		independent_resource& world_draw_oit_head{graph.add_explicit_resource(independent_resource{independent_image{}})};
+		independent_resource& world_draw_oit_buffer{graph.add_explicit_resource(independent_resource{independent_buffer{}})};
+		independent_resource& world_draw_oit_buffer_stat{graph.add_explicit_resource(independent_resource{independent_buffer{}})};
 
 	private:
 		add_result<post_process_stage> final_merge{graph.add_stage<post_process_stage>(post_process_meta{
@@ -170,13 +170,13 @@ namespace mo_yanxi::game::fx{
 				});
 			oit.meta.set_sampler_at_binding(2, assets::graphic::samplers::blit_sampler);
 			oit.pass.add_input({
-				explicit_resource_usage{world_draw_oit_buffer, 0},
-				explicit_resource_usage{world_draw_oit_head, 1},
-				explicit_resource_usage{world_draw_resolved_depth, 2},
-				explicit_resource_usage{world_draw_resolved_base, 3},
-				explicit_resource_usage{world_draw_resolved_light, 4},
-				explicit_resource_usage{world_blit_base, 5},
-				explicit_resource_usage{world_blit_light, 6},
+				independent_resource_usage{world_draw_oit_buffer, 0},
+				independent_resource_usage{world_draw_oit_head, 1},
+				independent_resource_usage{world_draw_resolved_depth, 2},
+				independent_resource_usage{world_draw_resolved_base, 3},
+				independent_resource_usage{world_draw_resolved_light, 4},
+				independent_resource_usage{world_blit_base, 5},
+				independent_resource_usage{world_blit_light, 6},
 			});
 
 
@@ -232,8 +232,8 @@ namespace mo_yanxi::game::fx{
 					   {{3}, 2, no_slot},
 				   }});
 
-				auto& areaTex = graph.add_explicit_resource(explicit_resource{external_image{}});
-				auto& searchTex = graph.add_explicit_resource(explicit_resource{external_image{}});
+				auto& areaTex = graph.add_explicit_resource(independent_resource{independent_image{}});
+				auto& searchTex = graph.add_explicit_resource(independent_resource{independent_image{}});
 
 				smaa_weight_pass.meta.set_sampler_at_binding(1, assets::graphic::samplers::blit_sampler);
 				smaa_weight_pass.meta.set_sampler_at_binding(2, assets::graphic::samplers::texture_sampler);
@@ -314,8 +314,8 @@ namespace mo_yanxi::game::fx{
 
 				world_clear.pass.add_exec_dep(&oit.pass);
 				world_clear.pass.add_in_out({
-						explicit_resource_usage{world_draw_resolved_base, 0},
-						explicit_resource_usage{world_draw_resolved_light, 1},
+						independent_resource_usage{world_draw_resolved_base, 0},
+						independent_resource_usage{world_draw_resolved_light, 1},
 					});
 
 
@@ -331,8 +331,8 @@ namespace mo_yanxi::game::fx{
 				auto world_clear = graph.add_stage<image_clear>(2);
 
 				world_clear.pass.add_in_out({
-						explicit_resource_usage{world_draw_base, 0},
-						explicit_resource_usage{world_draw_light, 1},
+						independent_resource_usage{world_draw_base, 0},
+						independent_resource_usage{world_draw_light, 1},
 					});
 
 
@@ -359,12 +359,12 @@ namespace mo_yanxi::game::fx{
 
 				oit_buf_clear.pass.add_exec_dep(&oit.pass);
 				oit_buf_clear.pass.add_in_out({
-						explicit_resource_usage{world_draw_oit_buffer_stat, 0},
+						independent_resource_usage{world_draw_oit_buffer_stat, 0},
 					});
 			}
 
 			graph.init_after_pass_initialized();
-			std::println("{}", graph.get_exec_seq() | std::views::transform([](const pass_data& pass){
+			std::println("{}", graph.get_exec_seq() | std::views::transform([](const pass_unit& pass){
 				return pass.get_identity_name();
 			}));
 
@@ -384,9 +384,8 @@ namespace mo_yanxi::game::fx{
 
 		void update_resources(){
 			updater(*this);
-			graph.update_external_resources();
 			graph.resize();
-			graph.reset_resources();
+			graph.reset_pass_resources();
 			graph.create_command();
 		}
 

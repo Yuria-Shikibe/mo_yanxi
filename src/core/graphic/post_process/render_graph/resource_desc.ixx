@@ -482,22 +482,25 @@ namespace mo_yanxi::graphic::render_graph{
 			[[nodiscard]] const buffer_entity& as_buffer() const noexcept{
 				return std::get<buffer_entity>(resource);
 			}
+
+
+
 		};
 
 
 		export
-		struct external_image{
+		struct independent_image{
 			VkImageLayout expected_layout{};
 			vk::image_handle handle{};
 		};
 
 		export
-		struct external_buffer{
+		struct independent_buffer{
 			vk::buffer_borrow handle{};
 		};
 
 		export
-		struct external_resource_dependency{
+		struct independent_resource_dependency{
 			VkPipelineStageFlags2    src_stage{VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT};
 			VkAccessFlags2           src_access{VK_ACCESS_2_NONE};
 			VkPipelineStageFlags2    dst_stage{VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT};
@@ -505,19 +508,19 @@ namespace mo_yanxi::graphic::render_graph{
 		};
 
 		export
-		struct explicit_resource{
-			using variant_t = std::variant<external_image, external_buffer, std::monostate>;
+		struct independent_resource{
+			using variant_t = std::variant<independent_image, independent_buffer, std::monostate>;
 
 			variant_t desc{std::monostate{}};
-			external_resource_dependency dependency{};
+			independent_resource_dependency dependency{};
 
-			[[nodiscard]] explicit_resource() = default;
+			[[nodiscard]] independent_resource() = default;
 
-			[[nodiscard]] explicit explicit_resource(const variant_t& desc)
+			[[nodiscard]] explicit independent_resource(const variant_t& desc)
 				: desc(desc){
 			}
 
-			[[nodiscard]] explicit_resource(const variant_t& desc, const external_resource_dependency& dependency)
+			[[nodiscard]] independent_resource(const variant_t& desc, const independent_resource_dependency& dependency)
 				: desc(desc),
 				  dependency(dependency){
 			}
@@ -527,46 +530,54 @@ namespace mo_yanxi::graphic::render_graph{
 			}
 
 			[[nodiscard]] VkImageLayout get_layout() const noexcept{
-				if(auto img = std::get_if<external_image>(&desc)){
+				if(auto img = std::get_if<independent_image>(&desc)){
 					return img->expected_layout;
 				}
 				return VK_IMAGE_LAYOUT_UNDEFINED;
 			}
 
 
-			[[nodiscard]] external_image& as_image() noexcept{
-				return std::get<external_image>(desc);
+			[[nodiscard]] independent_image& as_image() noexcept{
+				return std::get<independent_image>(desc);
 			}
 
-			[[nodiscard]] const external_image& as_image() const noexcept{
-				return std::get<external_image>(desc);
+			[[nodiscard]] const independent_image& as_image() const noexcept{
+				return std::get<independent_image>(desc);
 			}
 
-			[[nodiscard]] external_buffer& as_buffer() noexcept{
-				return std::get<external_buffer>(desc);
+			[[nodiscard]] independent_buffer& as_buffer() noexcept{
+				return std::get<independent_buffer>(desc);
 			}
 
-			[[nodiscard]] const external_buffer& as_buffer() const noexcept{
-				return std::get<external_buffer>(desc);
+			[[nodiscard]] const independent_buffer& as_buffer() const noexcept{
+				return std::get<independent_buffer>(desc);
+			}
+
+			void load_entity(const resource_entity& entity){
+				std::visit(overload_narrow{[](independent_image& i, const image_entity& e){
+					i.handle = e.image;
+				}, [](independent_buffer& b, const buffer_entity& e){
+					b.handle = e.buffer;
+				}}, desc, entity.resource);
 			}
 		};
 
 		export
-		struct explicit_resource_usage{
-			explicit_resource* resource{};
+		struct independent_resource_usage{
+			independent_resource* resource{};
 			inout_index slot{no_slot};
 			bool shared{};
 
-			[[nodiscard]] explicit_resource_usage() = default;
+			[[nodiscard]] independent_resource_usage() = default;
 
 			//Construct for borrow external resource
-			[[nodiscard]] explicit_resource_usage(explicit_resource& resource, inout_index slot)
+			[[nodiscard]] independent_resource_usage(independent_resource& resource, inout_index slot)
 				: resource(&resource),
 				  slot(slot){
 			}
 
 			//Construct for internal explicit allocation
-			[[nodiscard]] explicit_resource_usage(inout_index slot, bool shared)
+			[[nodiscard]] independent_resource_usage(inout_index slot, bool shared)
 				: slot(slot), shared(shared){
 			}
 
@@ -604,12 +615,12 @@ namespace mo_yanxi::graphic::render_graph{
 
 			[[nodiscard]] entity_state() = default;
 
-			[[nodiscard]] explicit(false) entity_state(const explicit_resource& ext){
+			[[nodiscard]] explicit(false) entity_state(const independent_resource& ext){
 				last_stage = ext.dependency.src_stage;
 				last_access = ext.dependency.src_access;
 
 				std::visit(overload_narrow{
-					[&, this](const external_image& image){
+					[&, this](const independent_image& image){
 						auto& s = desc.emplace<image_entity_state>();
 						s.current_layout = image.expected_layout;
 
@@ -619,7 +630,7 @@ namespace mo_yanxi::graphic::render_graph{
 							if(last_access == VK_ACCESS_2_NONE)last_access = deduce_external_image_access(last_stage);
 						}
 					},
-					[](const external_buffer& buffer){
+					[](const independent_buffer& buffer){
 
 					}
 				}, ext.desc);
@@ -833,6 +844,18 @@ namespace mo_yanxi::graphic::render_graph{
 			}
 			if(out){
 				output_slots.push_back(sz);
+			}
+		}
+		template <typename T>
+			requires std::constructible_from<resource_desc::resource_requirement, T&&>
+		void add(const bool in, const bool out, inout_index index, T&& val){
+			const auto sz = data.size();
+			data.push_back(std::forward<T>(val));
+			if(in){
+				resize_and_set_in(index, sz);
+			}
+			if(out){
+				resize_and_set_out(index, sz);
 			}
 		}
 

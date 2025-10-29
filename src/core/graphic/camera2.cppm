@@ -25,8 +25,8 @@ namespace mo_yanxi::graphic{
 	protected:
 		bool changed{};
 
-		math::mat3 worldToScreen{};
-		math::mat3 screenToWorld{};
+		math::mat3 viewport_to_uniform{};
+		math::mat3 inv_transform{};
 
 		math::vec2 screenSize{};
 
@@ -55,7 +55,7 @@ namespace mo_yanxi::graphic{
 
 		camera2() = default;
 
-		void resumeSpeed() noexcept{
+		void resume_speed() noexcept{
 			speed_scale = 1.f;
 		}
 
@@ -91,6 +91,10 @@ namespace mo_yanxi::graphic{
 
 		constexpr void move(const math::vec2 vec2) noexcept {
 			move(vec2.x, vec2.y);
+		}
+
+		[[nodiscard]] constexpr math::mat3 get_v2v_mat(math::vec2 offset) const noexcept{
+			return math::mat3{}.set_rect_transform(viewport.src, viewport.extent(), offset, screenSize);
 		}
 
 		/**
@@ -144,12 +148,12 @@ namespace mo_yanxi::graphic{
 				changed = true;
 
 				if(flip_y){
-					worldToScreen.set_orthogonal(viewport.get_src(), viewport.extent());
+					viewport_to_uniform.set_orthogonal(viewport.get_src(), viewport.extent());
 				}else{
-					worldToScreen.set_orthogonal_flip_y(viewport.get_src(), viewport.extent());
+					viewport_to_uniform.set_orthogonal_flip_y(viewport.get_src(), viewport.extent());
 				}
 
-				screenToWorld.set(worldToScreen).inv();
+				inv_transform.set(viewport_to_uniform).inv();
 			}
 
 			lastViewport = viewport;
@@ -160,7 +164,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		[[nodiscard]] const math::mat3& get_world_to_uniformed() const noexcept {
-			return worldToScreen;
+			return viewport_to_uniform;
 		}
 
 		[[nodiscard]] math::mat3 get_world_to_uniformed_flip_y() const noexcept {
@@ -174,7 +178,7 @@ namespace mo_yanxi::graphic{
 		}
 
 		[[nodiscard]] const math::mat3& get_uniformed_to_world() const noexcept {
-			return screenToWorld;
+			return inv_transform;
 		}
 
 		[[nodiscard]] float get_scale() const noexcept{
@@ -215,11 +219,11 @@ namespace mo_yanxi::graphic{
 
 		[[nodiscard]] math::vec2 get_screen_to_world(const math::vec2 where, const math::vec2 offset = {}, const bool flip_y = false) const{
 			auto offed = where - offset;
-			return screenToWorld * uniform(flip_y ? math::vec2{offed.x, screenSize.y - offed.y} : offed);
+			return inv_transform * uniform(flip_y ? math::vec2{offed.x, screenSize.y - offed.y} : offed);
 		}
 
 		[[nodiscard]] math::vec2 get_world_to_screen(const math::vec2 inWorld, const bool flip_y = true) const noexcept{
-			return (worldToScreen * inWorld).scl(1, flip_y ? -1 : 1).add(1.f, 1.f).scl(.5f, .5f) * screenSize.as<float>();
+			return (viewport_to_uniform * inWorld).scl(1, flip_y ? -1 : 1).add(1.f, 1.f).scl(.5f, .5f) * screenSize.as<float>();
 		}
 	};
 
@@ -270,8 +274,8 @@ namespace mo_yanxi::graphic{
 			if(viewport != lastViewport){
 				changed = true;
 
-				worldToScreen.set_orthogonal_flip_y(viewport.get_src(), viewport.extent());
-				screenToWorld.set(worldToScreen).inv();
+				viewport_to_uniform.set_orthogonal_flip_y(viewport.get_src(), viewport.extent());
+				inv_transform.set(viewport_to_uniform).inv();
 			}
 
 			lastViewport = viewport;

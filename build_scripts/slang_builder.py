@@ -157,7 +157,7 @@ def compile_shader(
         args.extend(['-o', output_file])
         args.append(input_file)
 
-        print(f"\n正在编译: {shader_file}")
+        print(f"\n正在编译: {shader_file} << {input_file}")
         print(f"输出文件: {output_file}")
         print(f"编译命令: {' '.join(args)}")
 

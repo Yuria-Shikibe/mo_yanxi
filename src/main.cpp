@@ -121,8 +121,7 @@ import mo_yanxi.graphic.render_graph.volume;
 import mo_yanxi.graphic.post_processor.oit_blender;
 import mo_yanxi.game.graphic.render_graph_spec;
 
-import mo_yanxi.graphic.draw.instruction_draw;
-
+import mo_yanxi.graphic.draw.instruction;
 import mo_yanxi.slide_window_buf;
 
 
@@ -890,21 +889,6 @@ void draw_main(){
 	core::glfw::terminate();
 }
 
-mo_yanxi::slide_window_generator<int, 1> foo(){
-	for(int i = 0; i < 10; ++i){
-		co_yield i;
-	}
-}
-
-// int main(){
-// 	using namespace mo_yanxi;
-//
-// 	auto gen = foo();
-// 	for(auto& buf : gen){
-// 		std::println("{}", buf);
-// 	}
-//
-// }
 
 int main(){
 	using namespace mo_yanxi;
@@ -941,10 +925,10 @@ int main(){
 
 #pragma region Shader
 		auto& ctx = core::global::graphic::context;
-		draw::instruction::batch batch{ctx, assets::graphic::samplers::texture_sampler, draw::instruction::make_ubo_table<VertexUBO>()};
 
-		vk::shader_module msh{ctx.get_device(), assets::dir::shader_spv / "test.mesh_mesh.spv"};
+		vk::shader_module msh{ctx.get_device(), assets::dir::shader_spv / "ui.draw.basic.spv"};
 		msh.set_no_deduced_stage();
+
 
 
 		vk::shader_module highlight_pick{ctx.get_device(), assets::dir::shader_spv / "post_process.highlight_extract.spv", VK_SHADER_STAGE_COMPUTE_BIT};
@@ -952,6 +936,11 @@ int main(){
 		vk::shader_module volume_shader{ctx.get_device(), assets::dir::shader_spv / "post_process.volume_pass.spv", VK_SHADER_STAGE_COMPUTE_BIT};
 		vk::shader_module bloom_merge_shader{ctx.get_device(), assets::dir::shader_spv / "post_process.bloom.merge.spv", VK_SHADER_STAGE_COMPUTE_BIT};
 #pragma endregion
+
+		mo_yanxi::ui::renderer renderer{ctx, assets::graphic::samplers::texture_sampler, msh};
+		renderer.resize({0, 0, ctx.get_extent().width, ctx.get_extent().height});
+		// renderer.get_top_viewport().push_scissor({{200, 200, 520, 420}});
+		auto& batch = renderer.batch;
 
 #pragma region VK_RES
 		vk::uniform_buffer general_proj_ubo{ctx.get_allocator(), sizeof(VertexUBO), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
@@ -961,44 +950,12 @@ int main(){
 		vk::descriptor_buffer general_proj_dbo{ctx.get_allocator(), general_proj_descriptor_layout, general_proj_descriptor_layout.binding_count()};
 		(void)vk::descriptor_mapper{general_proj_dbo}.set_uniform_buffer(0, general_proj_ubo);
 
-		vk::uniform_buffer usr_ubo{ctx.get_allocator(), sizeof(VertexUBO) * batch.batch_work_group_count};
-		constexpr std::size_t debugSize = 4096 * 8;
-		vk::buffer b = vk::templates::create_storage_buffer(ctx.get_allocator(), debugSize * batch.batch_work_group_count, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
-
-		draw::instruction::batch_external_data batch_external_data{ctx, [](vk::descriptor_layout_builder& b){
-			b.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
-		}};
-
-		batch_external_data.bind([&](const std::uint32_t idx, const vk::descriptor_mapper& mapper){
-			(void)mapper.set_uniform_buffer(0, usr_ubo.get_address() + idx * sizeof(VertexUBO), sizeof(VertexUBO), idx);
-			// (void)mapper.set_storage_buffer(1, b.get_address() + idx * debugSize, debugSize, idx);
-		});
-
-
-		vk::pipeline_layout pipeline_layout{ctx.get_device(), 0,
-			{batch.get_batch_descriptor_layout(), batch_external_data.descriptor_set_layout()}};
-
-		vk::graphic_pipeline_template gtp{};
-		gtp.set_shaders({
-			msh.get_create_info(VK_SHADER_STAGE_MESH_BIT_EXT, nullptr, "main_mesh"),
-			msh.get_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, nullptr, "main_frag")
-		});
-		gtp.push_color_attachment_format(VK_FORMAT_R16G16B16A16_SFLOAT, vk::blending::alpha_blend);
-
-		vk::pipeline p{ctx.get_device(), pipeline_layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, gtp};
-
-		vk::color_attachment attachment{ctx.get_allocator(), ctx.get_extent(),
-			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-			VK_FORMAT_R16G16B16A16_SFLOAT
-		};
-
-		attachment.init_layout(ctx.get_transient_graphic_command_buffer());
 #pragma endregion
 
 #pragma region render_graph
 		render_graph::render_graph_manager manager{ctx};
-		auto& res = manager.add_explicit_resource(render_graph::resource_desc::explicit_resource{render_graph::resource_desc::external_image{}});
-		res.as_image().handle = attachment;
+		auto& res = manager.add_explicit_resource(render_graph::resource_desc::independent_resource{render_graph::resource_desc::independent_image{}});
+		res.as_image().handle = renderer.get_base();
 		res.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		auto volume_pass = manager.add_stage<render_graph::volume_pass>(render_graph::post_process_meta{volume_shader, {
@@ -1013,7 +970,7 @@ int main(){
 			volume_pass.meta.batch.flush();
 		}
 
-		volume_pass.pass.add_input({render_graph::resource_desc::explicit_resource_usage{res, 0}});
+		volume_pass.pass.add_input({render_graph::resource_desc::independent_resource_usage{res, 0}});
 
 
 
@@ -1062,15 +1019,14 @@ int main(){
 			auto world_clear = manager.add_stage<render_graph::image_clear>(1);
 
 			world_clear.pass.add_in_out({
-				render_graph::resource_desc::explicit_resource_usage{res, 0},
+				render_graph::resource_desc::independent_resource_usage{res, 0},
 			});
 			world_clear.pass.add_exec_dep(volume_pass.id());
 		}
 
 		manager.init_after_pass_initialized();
-		manager.update_external_resources();
 		manager.resize();
-		manager.reset_resources();
+		manager.reset_pass_resources();
 		manager.create_command();
 #pragma endregion
 
@@ -1087,36 +1043,9 @@ int main(){
 			.dst_layout = VK_IMAGE_LAYOUT_GENERAL
 		});
 
+
+
 		camera.resize_screen(core::global::graphic::context.get_extent().width, core::global::graphic::context.get_extent().height);
-
-		vk::dynamic_rendering dynamic_rendering{
-			{attachment.get_image_view()}, nullptr
-		};
-
-		{
-			batch.record_command(pipeline_layout, [&] -> std::generator<VkCommandBuffer&&> {
-				for (const auto & [idx, group] : batch_external_data.groups | std::views::enumerate){
-					vk::scoped_recorder recorder{group.command_buffer, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
-
-					dynamic_rendering.begin_rendering(recorder, ctx.get_screen_area());
-					p.bind(recorder, VK_PIPELINE_BIND_POINT_GRAPHICS);
-
-					batch_external_data.user_descriptor_buffer_.bind_chunk_to(recorder, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, idx);
-					vk::cmd::set_viewport(recorder, ctx.get_screen_area());
-					vk::cmd::set_scissor(recorder, ctx.get_screen_area());
-
-					co_yield group.command_buffer.get();
-
-					vkCmdEndRendering(recorder);
-				}
-			}());
-
-			batch.set_submit_callback([&](const std::uint32_t idx, draw::instruction::batch::ubo_data_entries spn) -> VkCommandBuffer {
-				if(!spn[0].empty())(void)vk::buffer_mapper{usr_ubo}.load_range(spn[0], sizeof(VertexUBO) * idx);
-				return batch_external_data.groups[idx].command_buffer;
-			});
-		}
-
 		camera.set_scale_range({0.2f, 4.f});
 
 		graphic::image_atlas& atlas{core::global::assets::atlas};
@@ -1176,11 +1105,15 @@ int main(){
 					math::mat3_idt,
 					camera.get_world_to_uniformed()
 				};
-				batch.update_ubo(proj);
+				// batch.update_ubo(proj);
 
 				(void)vk::buffer_mapper{general_proj_ubo}.load(proj);
 
+				renderer.top_viewport().set_local_transform(camera.get_v2v_mat({}));
+				auto screenP = renderer.top_viewport().get_element_to_root_screen() * camera.get_viewport_center();
+				auto pos = renderer.get_screen_uniform_proj() * screenP;
 				// bloom_pass.meta.set_scale(camera.map_scale(0.9f, 1.5f));
+				renderer.notify_viewport_changed();
 
 			}
 
@@ -1189,22 +1122,21 @@ int main(){
 			auto cursor_world = camera.get_screen_to_world(core::global::input.get_cursor_pos(), {}, true);
 			wgfx_input.set_context(cursor_world);
 			trail.update_diff(core::global::timer.global_delta_tick(), cursor_world);
+
 			draw::instruction::quad_vert_color vc{
 				color{1, 1, 1, 1},
-				color{1, 1, 1, 1},
-				color{1, 1, 1, 1},
-				color{1, 1, 1, 1},
+				color{0, 1, 1, 1},
+				color{1, 0, 1, 1},
+				color{1, 1, 0, 1},
 			};
-			// batch.push_instruction(instruction::rectangle{
-			// 	.generic = {.image = light_region->view},
-			// 	.pos = {0, 0},
-			// 	.angle = 30 * math::deg_to_rad,
-			// 	.scale = 1,
-			// 	.vert_color = vc,
-			// 	.extent = {1200, 1200},
-			// 	.uv00 = light_region->uv.v00(),
-			// 	.uv11 = light_region->uv.v11(),
-			// });
+
+			batch.push_instruction(instruction::rectangle_ortho_outline{
+				.v00 = {0, 0},
+				.v11 = {150, 300},
+				.stroke = {2},
+				.vert_color = vc
+			});
+
 
 			auto time = core::global::timer.global_time() * .75f;
 			float time_fac = math::clamp(math::frac(time)) | math::interp::pow3Out;
@@ -1348,35 +1280,6 @@ int main(){
 				callbacks += dur;
 			}
 			*/
-
-
-			// trail.slide_each(cursor_world - trail.head().pos, [&](
-			// 	const math::vec2 p0, const math::vec2 p1, const math::vec2 p2, const math::vec2 p3,
-			// 	const unsigned idx, const unsigned total,
-			// 	const float scaleP, const float scaleN,
-			// 	const std::array<float, 4>& adjoin
-			// ){
-			// 	const auto seg = math::max(static_cast<unsigned>(p1.dst(p2) / 16.f), 2U);
-			// 	const auto fac_tail = math::idx_to_factor(idx, total);
-			// 	const auto fac_head = math::idx_to_factor(idx + 1, total);
-			// 	const auto colorA = math::lerp(colors::pale_green.to_light(1.5f), colors::aqua.to_light(2.5f), fac_tail);
-			// 	const auto colorB = math::lerp(colors::pale_green.to_light(1.5f), colors::aqua.to_light(2.5f), fac_head);
-			//
-			// 	const auto tan = (p1 - p2).normalize().rotate_rt_counter_clockwise();
-			//
-			// 	batch.push_instruction(instruction::constrained_curve{
-			// 			.param = instruction::curve_trait_mat::b_spline.apply_to(
-			// 				p0 + adjoin[0] * tan, p1 + adjoin[1] * tan, p2 + adjoin[2] * tan, p3 + adjoin[3] * tan
-			// 			),
-			// 			.stroke = math::range{fac_tail * scaleP, fac_head * scaleN} * 15.f,
-			// 			.segments = seg,
-			// 			.color = {colorA, colorB},
-			// 		});
-			// }, [&](const unsigned idx, const unsigned total, const std::uintptr_t id){
-			// 	math::rand rand{id};
-			// 	const auto fac = (1 - math::idx_to_factor(idx, total)) | math::interp::pow3In;
-			// 	return rand.range(1.25f) * (rand.random(1.f) | math::interp::pow5In) * 200 * fac * math::curve(float(total - idx), 12.f, 20.f);
-			// });
 
 #pragma region DrawTest
 
@@ -1642,9 +1545,7 @@ int main(){
 #pragma endregion
 
 
-			batch.consume_all();
-			batch.wait_all();
-			assert(batch.is_all_done());
+			renderer.wait_idle();
 
 			// batch.reset();
 			vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {manager.get_main_command_buffer()});

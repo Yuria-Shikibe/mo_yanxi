@@ -3,20 +3,52 @@ module;
 #include <vulkan/vulkan.h>
 #include "ext/adapted_attributes.hpp"
 
-export module mo_yanxi.graphic.draw.instruction_draw:primitives;
+export module mo_yanxi.graphic.draw.instruction;
 
-import :facility;
+export import mo_yanxi.graphic.draw.instruction.general;
+export import mo_yanxi.math.vector2;
+export import mo_yanxi.math.vector4;
+export import mo_yanxi.graphic.color;
+export import mo_yanxi.math.matrix4;
+import mo_yanxi.hlsl_alias;
+import mo_yanxi.math;
+import std;
 
 namespace mo_yanxi::graphic::draw::instruction{
 
-constexpr inline std::uint32_t MaxTaskDispatchPerTime = 32;
-constexpr inline std::uint32_t MaxVerticesPerMesh = 64;
-
 
 export
-struct quad_vert_color{
-	float4 c00, c10, c01, c11;
+template <typename T>
+struct quad_group{
+	T v00, v10, v01, v11;
+
+	[[nodiscard]] FORCE_INLINE constexpr quad_group() = default;
+
+	[[nodiscard]] FORCE_INLINE explicit(false) constexpr quad_group(const T& v) noexcept : v00(v), v10(v), v01(v), v11(v){}
+
+	template <typename Ty>
+		requires (std::constructible_from<T, const Ty&>)
+	[[nodiscard]] FORCE_INLINE explicit(false) constexpr quad_group(const Ty& v) noexcept : v00(v), v10(v), v01(v), v11(v){}
+
+	template <typename T1, typename T2, typename T3, typename T4>
+		requires (std::constructible_from<T, const T1&> && std::constructible_from<T, const T2&> && std::constructible_from<T, const T3&> && std::constructible_from<T, const T4&>)
+	[[nodiscard]] FORCE_INLINE quad_group(const T1& v00, const T2& v10, const T3& v01, const T4& v11) noexcept
+			: v00(v00),
+			  v10(v10),
+			  v01(v01),
+			  v11(v11){
+	}
+
+	[[nodiscard]] FORCE_INLINE quad_group(const T& v00, const T& v10, const T& v01, const T& v11) noexcept
+		: v00(v00),
+		  v10(v10),
+		  v01(v01),
+		  v11(v11){
+	}
 };
+
+export
+using  quad_vert_color = quad_group<float4>;
 
 constexpr inline float CircleVertPrecision{12};
 
@@ -25,7 +57,7 @@ FORCE_INLINE constexpr std::uint32_t get_circle_vertices(const float radius) noe
 	return math::clamp<std::uint32_t>(static_cast<std::uint32_t>(radius * math::pi / CircleVertPrecision), 10U, 256U);
 }
 
-export struct alignas(16) triangle{
+export struct triangle{
 	primitive_generic generic;
 	float2 p0, p1, p2;
 	float2 uv0, uv1, uv2;
@@ -45,7 +77,7 @@ struct quad_like{
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count() noexcept{ return 2; }
 };
 
-export struct alignas(16) quad : quad_like{
+export struct quad : quad_like{
 	primitive_generic generic;
 	float2 v00, v10, v01, v11;
 	float2 uv00, uv10, uv01, uv11;
@@ -53,7 +85,7 @@ export struct alignas(16) quad : quad_like{
 	quad_vert_color vert_color;
 };
 
-export struct alignas(16) rectangle : quad_like{
+export struct rectangle : quad_like{
 	primitive_generic generic;
 	float2 pos;
 	float angle;
@@ -67,22 +99,30 @@ export struct alignas(16) rectangle : quad_like{
 };
 
 
-export struct alignas(16) rectangle_ortho : quad_like{
-	primitive_generic generic;
-	float2 v00, v11;
-	float2 uv00, uv11;
-	float4 color;
-
-};
-
-export struct alignas(16) rectangle_ortho_vert_color : quad_like{
+export struct rectangle_ortho : quad_like{
 	primitive_generic generic;
 	float2 v00, v11;
 	float2 uv00, uv11;
 	quad_vert_color vert_color;
+
 };
 
-export struct alignas(16) line : quad_like{
+export struct rectangle_ortho_outline{
+	primitive_generic generic;
+	float2 v00, v11;
+	quad_group<float> stroke;
+
+	quad_vert_color vert_color;
+
+
+
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count() noexcept{ return 10; }
+
+	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count() noexcept{ return 8; }
+};
+
+
+export struct line : quad_like{
 	primitive_generic generic;
 	float2 src, dst;
 	math::section<float4> color;
@@ -92,7 +132,7 @@ export struct alignas(16) line : quad_like{
 };
 
 
-export struct alignas(16) line_node{
+export struct line_node{
 	float2 pos;
 	float stroke;
 	float offset; //TODO ?
@@ -101,7 +141,7 @@ export struct alignas(16) line_node{
 	//TODO uv?
 };
 
-export struct alignas(16) line_segments{
+export struct line_segments{
 	primitive_generic generic;
 
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
@@ -181,7 +221,7 @@ export struct line_segments_closed : line_segments{
 };
 
 
-export struct alignas(16) poly{
+export struct poly{
 	primitive_generic generic;
 	float2 pos;
 	std::uint32_t segments;
@@ -207,7 +247,7 @@ export struct alignas(16) poly{
 	}
 };
 
-export struct alignas(16) poly_partial{
+export struct poly_partial{
 	primitive_generic generic;
 	float2 pos;
 	std::uint32_t segments;
@@ -234,7 +274,7 @@ export struct curve_parameter{
 	// std::array<math::vec4, 2> constrain_vector_derivative;
 };
 
-export struct alignas(16) constrained_curve{
+export struct constrained_curve{
 	primitive_generic generic;
 	curve_parameter param;
 
@@ -327,32 +367,14 @@ constexpr inline curve_trait_matrix b_spline{
 	};
 }
 
-export struct row_patch_coords{
+export struct row_patch{
+	primitive_generic generic;
+
 	float x[4];
 	float y[2];
 	float uv_y[2];
 	float uv_x[4];
-};
 
-export struct alignas(16) row_patch{
-	primitive_generic generic;
-
-	row_patch_coords coords;
-	float4 color;
-
-	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count() noexcept{
-		return 8;
-	}
-
-	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count() noexcept{
-		return 6;
-	}
-};
-
-export struct alignas(16) row_patch_vert_color{
-	primitive_generic generic;
-
-	row_patch_coords coords;
 	quad_vert_color vert_color;
 
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count() noexcept{
@@ -393,9 +415,6 @@ template <>
 constexpr inline instr_type instruction_type_of<rectangle_ortho> = instr_type::rect_ortho;
 
 template <>
-constexpr inline instr_type instruction_type_of<rectangle_ortho_vert_color> = instr_type::rect_ortho_vert_color;
-
-template <>
 constexpr inline instr_type instruction_type_of<poly> = instr_type::poly;
 
 template <>
@@ -405,12 +424,12 @@ template <>
 constexpr inline instr_type instruction_type_of<constrained_curve> = instr_type::constrained_curve;
 
 template <>
+constexpr inline instr_type instruction_type_of<rectangle_ortho_outline> = instr_type::rect_ortho_outline;
+
+template <>
 constexpr inline instr_type instruction_type_of<row_patch> = instr_type::row_patch;
-//
-// template <>
-// constexpr inline instr_type instruction_type_of<row_patch_vert_color> = instr_type::constrained_curve;
 
-
+export
 [[nodiscard]] FORCE_INLINE CONST_FN std::uint32_t get_vertex_count(
 	instr_type type,
 	const std::byte* ptr_to_instr) noexcept{
@@ -420,7 +439,6 @@ constexpr inline instr_type instruction_type_of<row_patch> = instr_type::row_pat
 	case instr_type::quad : return 4U;
 	case instr_type::rectangle : return 4U;
 	case instr_type::rect_ortho : return 4U;
-	case instr_type::rect_ortho_vert_color : return 4U;
 	case instr_type::line : return 4U;
 	case instr_type::line_segments:{
 		const auto size = get_instr_head(ptr_to_instr).get_instr_byte_size();
@@ -442,11 +460,13 @@ constexpr inline instr_type instruction_type_of<row_patch> = instr_type::row_pat
 			sizeof(instruction_head))->get_vertex_count();
 	case instr_type::constrained_curve : return reinterpret_cast<const constrained_curve*>(ptr_to_instr +
 			sizeof(instruction_head))->get_vertex_count();
+	case instr_type::rect_ortho_outline: return 10;
 	case instr_type::row_patch: return 8;
 	default : std::unreachable();
 	}
 }
 
+export
 [[nodiscard]] FORCE_INLINE CONST_FN constexpr std::uint32_t get_primitive_count(instr_type type, const std::byte* ptr_to_payload, std::uint32_t vtx) noexcept{
 	return vtx < 3 ? 0 : vtx - 2;
 }

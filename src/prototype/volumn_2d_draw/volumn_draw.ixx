@@ -5,7 +5,7 @@ module;
 export module volume_draw:primitives;
 
 import mo_yanxi.math.rect_ortho;
-import mo_yanxi.graphic.draw.instruction.general;
+import mo_yanxi.hlsl_alias;
 import std;
 
 namespace mo_yanxi::graphic::draw::instruction{

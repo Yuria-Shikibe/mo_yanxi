@@ -60,7 +60,7 @@ namespace mo_yanxi::vk{
 		constexpr std::uint32_t IndicesDesignator[MaxStackBufferSize]{
 			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 		};
-		constexpr VkDeviceSize OffsetDesignator[MaxStackBufferSize]{};
+		export constexpr inline VkDeviceSize zero_offset_designator[MaxStackBufferSize]{};
 
 	export void setDescriptorBufferOffsets2(
 		VkCommandBuffer                             commandBuffer,
@@ -139,7 +139,7 @@ namespace mo_yanxi::vk{
 
 			if(bufferCount <= MaxStackBufferSize){
 				setDescriptorBufferOffsetsEXT(commandBuffer, pipelineBindPoint, layout, firstSet, bufferCount,
-				                              IndicesDesignator, OffsetDesignator);
+				                              IndicesDesignator, zero_offset_designator);
 			} else{
 				throw std::overflow_error("Too many descriptor buffers in the command buffer.");
 			}

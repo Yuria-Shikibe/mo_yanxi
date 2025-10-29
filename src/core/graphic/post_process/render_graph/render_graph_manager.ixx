@@ -33,22 +33,22 @@ struct external_descriptor_usage{
 };
 
 export
-struct pass_data;
+struct pass_unit;
 
 export
 struct pass_dependency{
-	pass_data* id;
+	pass_unit* id;
 	inout_index src_idx;
 	inout_index dst_idx;
 };
 
 struct pass_identity{
-	pass_data* where{nullptr};
-	pass_data* external_target{nullptr};
+	pass_unit* where{nullptr};
+	pass_unit* external_target{nullptr};
 	inout_index slot_in{no_slot};
 	inout_index slot_out{no_slot};
 
-	const pass_data* operator->() const noexcept{
+	const pass_unit* operator->() const noexcept{
 		return where;
 	}
 
@@ -191,7 +191,7 @@ public:
 
 export
 struct pass_meta{
-	friend pass_data;
+	friend pass_unit;
 	friend render_graph_manager;
 
 	static constexpr math::u32size2 compute_group_unit_size2{16, 16};
@@ -209,6 +209,7 @@ protected:
 	[[nodiscard]] virtual const pass_inout_connection& sockets() const noexcept = 0;
 
 	virtual void post_init(vk::context& context, const math::u32size2 extent){
+
 	}
 
 	virtual void record_command(
@@ -232,18 +233,24 @@ protected:
 	}
 };
 
-export
-struct pass_data{
-	gch::small_vector<pass_dependency> dependencies_resource_{};
-	gch::small_vector<pass_data*> dependencies_executions_{};
+struct life_trace_group;
 
-	gch::small_vector<resource_desc::explicit_resource_usage> external_inputs_{};
-	gch::small_vector<resource_desc::explicit_resource_usage> external_outputs_{};
+export
+struct pass_unit{
+	friend render_graph_manager;
+	friend life_trace_group;
+private:
+	gch::small_vector<pass_dependency> dependencies_resource_{};
+	gch::small_vector<pass_unit*> dependencies_executions_{};
+	gch::small_vector<resource_desc::independent_resource_usage> external_inputs_{};
+	gch::small_vector<resource_desc::independent_resource_usage> external_outputs_{};
 	pass_resource_reference used_resources_{};
 
 	std::unique_ptr<pass_meta> meta{};
 
-	[[nodiscard]] explicit pass_data(std::unique_ptr<pass_meta>&& meta)
+public:
+
+	[[nodiscard]] explicit pass_unit(std::unique_ptr<pass_meta>&& meta)
 		: meta(std::move(meta)){
 	}
 
@@ -264,29 +271,41 @@ struct pass_data{
 		dependencies_resource_.append(dep);
 	}
 
-	void add_exec_dep(pass_data* dep){
+	void add_exec_dep(pass_unit* dep){
 		dependencies_executions_.push_back(dep);
 	}
 
-	void add_exec_dep(const std::initializer_list<pass_data*> dep){
+	void add_exec_dep(const std::initializer_list<pass_unit*> dep){
 		dependencies_executions_.append(dep);
 	}
 
-	void add_output(const std::initializer_list<resource_desc::explicit_resource_usage> externals){
+	void add_output(const std::initializer_list<resource_desc::independent_resource_usage> externals){
 		external_outputs_.append(externals);
 	}
 
-	void add_input(const std::initializer_list<resource_desc::explicit_resource_usage> externals){
+	void add_input(const std::initializer_list<resource_desc::independent_resource_usage> externals){
 		external_inputs_.append(externals);
 	}
 
-	void add_in_out(const std::initializer_list<resource_desc::explicit_resource_usage> externals){
+	void add_in_out(const std::initializer_list<resource_desc::independent_resource_usage> externals){
 		external_inputs_.append(externals);
 		external_outputs_.append(externals);
 	}
 
-	auto& at_out(inout_index slot) const{
+	auto get_external_inputs() const noexcept{
+		return std::span{external_inputs_.data(), external_inputs_.size()};
+	}
+
+	auto get_external_outputs() const noexcept{
+		return std::span{external_outputs_.data(), external_outputs_.size()};
+	}
+
+	[[nodiscard]] const resource_desc::resource_entity& at_out(inout_index slot) const{
 		return used_resources_.at_out(slot);
+	}
+
+	[[nodiscard]] const resource_desc::resource_entity& at_in(inout_index slot) const{
+		return used_resources_.at_in(slot);
 	}
 };
 
@@ -332,9 +351,9 @@ public:
 	[[nodiscard]] life_trace_group() = default;
 
 	template <std::ranges::input_range T>
-		requires (std::convertible_to<std::ranges::range_reference_t<T&&>, const pass_data&>)
+		requires (std::convertible_to<std::ranges::range_reference_t<T&&>, const pass_unit&>)
 	[[nodiscard]] life_trace_group(T&& pass_execute_sequence){
-		for(pass_data& pass : pass_execute_sequence){
+		for(pass_unit& pass : pass_execute_sequence){
 			auto& inout = pass.sockets();
 			auto inout_indices = inout.get_inout_indices();
 
@@ -439,10 +458,10 @@ public:
 export
 template </*std::derived_from<pass_meta>*/ typename T>
 struct add_result{
-	pass_data& pass;
+	pass_unit& pass;
 	T& meta;
 
-	[[nodiscard]] pass_data* id() const noexcept{
+	[[nodiscard]] pass_unit* id() const noexcept{
 		return std::addressof(pass);
 	}
 };
@@ -451,14 +470,14 @@ struct render_graph_manager{
 private:
 	vk::context* context_{};
 
-	plf::hive<pass_data> passes_{};
-	std::vector<pass_data*> execute_sequence_{};
+	plf::hive<pass_unit> passes_{};
+	std::vector<pass_unit*> execute_sequence_{};
 
 	std::vector<resource_desc::resource_entity> shared_resources{};
 	std::vector<resource_desc::resource_entity> exclusive_resources{};
 	std::vector<resource_desc::resource_entity> borrowed_resources{};
 
-	plf::hive<resource_desc::explicit_resource> explicit_resources{};
+	plf::hive<resource_desc::independent_resource> explicit_resources{};
 	plf::hive<external_descriptor> external_descriptors_{};
 
 	math::u32size2 extent_{};
@@ -477,7 +496,7 @@ public:
 	// requires (std::constructible_from<T, vk::context&, Args&& ...>)
 	add_result<T> add_stage(Args&&... args){
 		// static_assert(std::derived_from<T, pass_meta>);
-		pass_data& pass = *passes_.insert(pass_data{std::make_unique<T>(*context_, std::forward<Args>(args)...)});
+		pass_unit& pass = *passes_.insert(pass_unit{std::make_unique<T>(*context_, std::forward<Args>(args)...)});
 		return {pass, static_cast<T&>(*pass.meta)};
 	}
 
@@ -485,7 +504,7 @@ public:
 		return *external_descriptors_.insert(desc);
 	}
 
-	auto& add_explicit_resource(resource_desc::explicit_resource res){
+	auto& add_explicit_resource(resource_desc::independent_resource res){
 		return *explicit_resources.insert(std::move(res));
 	}
 
@@ -494,7 +513,7 @@ public:
 		sort();
 		check_sockets_connection();
 		analysis_minimal_allocation();
-		post_init();
+		pass_post_init();
 	}
 
 private:
@@ -506,7 +525,7 @@ private:
 		struct node{
 			unsigned in_degree{};
 		};
-		std::unordered_map<pass_data*, node> nodes;
+		std::unordered_map<pass_unit*, node> nodes;
 
 
 		for(auto& v : passes_){
@@ -521,7 +540,7 @@ private:
 			}
 		}
 
-		std::vector<pass_data*> queue;
+		std::vector<pass_unit*> queue;
 		queue.reserve(passes_.size() * 2);
 		execute_sequence_.reserve(passes_.size());
 
@@ -642,7 +661,7 @@ private:
 
 		struct partition{
 			std::vector<resource_requirement> requirements{};
-			std::unordered_map<const pass_data*, std::vector<std::uint8_t>> stage_captures{};
+			std::unordered_map<const pass_unit*, std::vector<std::uint8_t>> stage_captures{};
 			std::vector<unsigned> indices{};
 
 			unsigned prefix_sum{};
@@ -719,7 +738,7 @@ private:
 
 				const auto subrange = get_maximum_region(bound.passed_by);
 				for(auto& candidate : partition_itr.indices){
-					if(std::ranges::any_of(subrange, [&](const pass_data* passed_by){
+					if(std::ranges::any_of(subrange, [&](const pass_unit* passed_by){
 						return partition_itr.stage_captures.at(passed_by)[candidate];
 					})){
 						continue;
@@ -737,7 +756,7 @@ private:
 
 				//No currently compatibled, promote the minimal found one to fit
 				for(unsigned candidate : partition_itr.indices | std::views::reverse){
-					if(std::ranges::any_of(subrange, [&](const pass_data* passed_by){
+					if(std::ranges::any_of(subrange, [&](const pass_unit* passed_by){
 						return partition_itr.stage_captures.at(passed_by)[candidate];
 					})){
 						continue;
@@ -822,7 +841,7 @@ private:
 		}
 
 		{
-			std::unordered_map<const explicit_resource*, resource_entity*> group;
+			std::unordered_map<const independent_resource*, resource_entity*> group;
 			std::unordered_map<pass_identity, resource_entity* *> pass_to_group;
 
 			for(auto& pass : passes_){
@@ -886,17 +905,22 @@ private:
 		}
 	}
 
-	void post_init(){
+	void pass_post_init(){
 		for(auto& stage : passes_){
 			stage.meta->post_init(*context_, extent_);
 		}
 	}
 
 public:
-	auto get_exec_seq() const noexcept{
+	[[nodiscard]] auto get_exec_seq() const noexcept{
 		return execute_sequence_ | ranges::views::deref;
 	}
 
+	[[nodiscard]] const auto& get_passes() const noexcept{
+		return passes_;
+	}
+
+private:
 	void update_external_resources() noexcept{
 		static constexpr auto get_resource = [](std::vector<resource_desc::resource_entity>& range,
 		                                        const resource_desc::resource_entity* ptr) ->
@@ -910,15 +934,15 @@ public:
 			}
 		};
 
-		static constexpr auto update = [](const resource_desc::explicit_resource& external_resource,
+		static constexpr auto update = [](const resource_desc::independent_resource& external_resource,
 		                                  resource_desc::resource_entity& entity){
 			using namespace resource_desc;
 			std::visit(overload_def_noop{
 				           std::in_place_type<void>,
-				           [](const external_buffer& ext, buffer_entity& ent){
+				           [](const independent_buffer& ext, buffer_entity& ent){
 					           ent.buffer = ext.handle;
 				           },
-				           [](const external_image& ext, image_entity& ent){
+				           [](const independent_image& ext, image_entity& ent){
 					           ent.image = ext.handle;
 				           }
 			           }, external_resource.desc, entity.resource);
@@ -954,6 +978,7 @@ public:
 			}
 		}
 	}
+public:
 
 	void resize(math::u32size2 size){
 		if(extent_ != size){
@@ -970,6 +995,7 @@ public:
 		resize(context_->get_extent());
 	}
 
+private:
 	void allocate(){
 		for(auto& local_resource : shared_resources){
 			local_resource.allocate_image(context_->get_allocator(), std::bit_cast<VkExtent2D>(extent_));
@@ -979,8 +1005,10 @@ public:
 			local_resource.allocate_image(context_->get_allocator(), std::bit_cast<VkExtent2D>(extent_));
 		}
 	}
+public:
 
-	void reset_resources(){
+	void reset_pass_resources(){
+		update_external_resources();
 		for(const auto& stage : passes_){
 			stage.meta->reset_resources(*context_, stage.used_resources_, extent_);
 		}
@@ -1222,7 +1250,7 @@ public:
 		create_command(scoped_recorder);
 	}
 
-	VkCommandBuffer get_main_command_buffer() const noexcept{
+	[[nodiscard]] VkCommandBuffer get_main_command_buffer() const noexcept{
 		return main_command_buffer;
 	}
 };
@@ -1230,17 +1258,97 @@ public:
 
 //TODO
 struct nested_render_graph : render_graph_manager, pass_meta{
-	using render_graph_manager::render_graph_manager;
 
 protected:
-	[[nodiscard]] const pass_inout_connection& sockets() const noexcept override;
-	void post_init(vk::context& context, const math::u32size2 extent) override;
-	void record_command(vk::context& context, const pass_resource_reference& resources, math::u32size2 extent,
-	                    VkCommandBuffer buffer) override;
+	struct output_resource_entry{
+		inout_index manager_slot;
+		pass_unit* pass;
+		inout_index pass_slot;
+	};
+
+	struct input_resource_entry{
+		inout_index manager_slot;
+		resource_desc::independent_resource* resource;
+	};
+
+	gch::small_vector<input_resource_entry> inputs_;
+	gch::small_vector<output_resource_entry> outputs_;
+
+	pass_inout_connection sockets_{};
+
+public:
+	[[nodiscard]] nested_render_graph(vk::context& context)
+		: pass_meta(context){
+
+	}
+
+	void add_input(input_resource_entry entry){
+		assert(entry.resource != nullptr);
+
+		inputs_.push_back(entry);
+	}
+
+	void add_output(output_resource_entry entry){
+		assert(entry.pass != nullptr);
+		outputs_.push_back(entry);
+	}
+
+protected:
+	[[nodiscard]] const pass_inout_connection& sockets() const noexcept override{
+		return sockets_;
+	}
+
+	void post_init(vk::context& context, const math::u32size2 extent) override{
+		init_after_pass_initialized();
+		for (const auto & entry : inputs_){
+			std::optional<resource_desc::resource_requirement> requirement{};
+			for (const auto & pass : get_passes()){
+				for (const auto & external_input : pass.get_external_inputs()){
+					if(external_input.resource != entry.resource)continue;
+					if(auto req = pass.sockets().get_in(external_input.slot)){
+						if(!requirement){
+							requirement = req;
+						}else{
+							if(requirement->get_incompatible_info(req.value()).has_value()){
+								throw std::invalid_argument{"Incompatible resource requirement"};
+							}
+							requirement->promote(req.value());
+						}
+					}
+				}
+			}
+
+			if(!requirement.has_value())throw std::invalid_argument{"resource requirement not found"};
+			sockets_.add(true, false, entry.manager_slot, requirement.value());
+		}
+
+		for (const auto & entry : outputs_){
+			sockets_.add(false, true, entry.manager_slot, entry.pass->sockets().get_out(entry.pass_slot).value());
+		}
+	}
+
+	void record_command(
+		vk::context& context,
+		const pass_resource_reference& resources,
+		math::u32size2 extent,
+		VkCommandBuffer buffer) override{
+		create_command(buffer);
+	}
+
 	void reset_resources(vk::context& context, const pass_resource_reference& resources,
-	                     const math::u32size2 extent) override;
-	[[nodiscard]] std::span<const inout_index> get_required_internal_buffer_slots() const noexcept override;
-	[[nodiscard]] std::string_view get_name() const noexcept override;
+	                     const math::u32size2 extent) override{
+
+		for (const auto & input : inputs_){
+			input.resource->load_entity(resources.at_in(input.manager_slot));
+		}
+
+		resize(extent);
+		reset_pass_resources();
+	}
+
+	[[nodiscard]] std::string_view get_name() const noexcept override{
+		return "Nested Render Graph";
+	}
 };
 }
 

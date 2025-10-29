@@ -26,6 +26,10 @@
     },
     {
       "file": "post_process/bloom.merge.slang"
+    },
+    {
+      "file": "ui/draw.slang",
+      "alias": "ui/draw/basic"
     }
   ]
 }

@@ -441,6 +441,16 @@ namespace mo_yanxi::math{
 
 			return *this;
 		}
+
+		constexpr matrix3& set_rect_transform(const vec2_t src, const vec2_t src_w, const vec2_t dst, const vec2_t w) noexcept{
+			const auto scl = w / src_w;
+			const auto mov = dst - src * scl;
+
+			c1 = {scl.x, 0, 0};
+			c2 = {0, scl.y, 0};
+			c3 = {mov.x, mov.y, 1};
+			return *this;
+		}
 	};
 
 	export using mat3 = matrix3;
