@@ -5,7 +5,7 @@ module;
 export module mo_yanxi.ui.primitives:dialog_manager;
 
 import :elem;
-import mo_yanxi.basic_util;
+import mo_yanxi.utility;
 
 namespace mo_yanxi::ui{
 	export enum struct dialog_extent_type : std::uint8_t{

@@ -6,7 +6,7 @@ export module mo_yanxi.graphic.renderer;
 
 export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.heterogeneous.open_addr_hash;
-export import mo_yanxi.vk.context;
+export import mo_yanxi.vk;
 export import mo_yanxi.vk.batch;
 export import mo_yanxi.graphic.batch_proxy;
 import std;

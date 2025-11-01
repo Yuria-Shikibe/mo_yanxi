@@ -5,19 +5,13 @@ module;
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 
-export module mo_yanxi.vk.vma;
+export module mo_yanxi.vk.util:vma;
 
-export import mo_yanxi.vk.exception;
+export import :exception;
 import mo_yanxi.handle_wrapper;
 
 // NOLINTBEGIN(*-misplaced-const)
 namespace mo_yanxi::vk{
-	// export{
-	// 	using ::VmaAllocatorCreateInfo;
-	// 	using ::VmaAllocationCreateInfo;
-	// 	using ::VmaAllocator;
-	// }
-
 	export
 	template <typename T>
 	struct allocate_info{

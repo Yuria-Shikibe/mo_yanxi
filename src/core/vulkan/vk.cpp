@@ -1,10 +1,35 @@
 module;
 
-#include <vulkan/vulkan.h>
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 
-module mo_yanxi.vk.context;
+module mo_yanxi.vk;
 
-import mo_yanxi.vk.ext;
+namespace mo_yanxi::vk{
+/**
+ * @return All Required Extensions
+ */
+std::vector<const char*> get_required_extensions_glfw(){
+	std::uint32_t glfwExtensionCount{};
+	const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+	return {glfwExtensions, glfwExtensions + glfwExtensionCount};
+}
+
+std::vector<const char*> get_required_extensions(){
+	auto extensions = get_required_extensions_glfw();
+
+	if(enable_validation_layers){
+		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+	}
+
+	extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+
+	return extensions;
+}
+}
+
 
 namespace mo_yanxi::vk{
 	void context::flush(){

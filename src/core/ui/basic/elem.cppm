@@ -394,7 +394,7 @@ namespace mo_yanxi::ui{
 			property.set_empty_drawer();
 		}
 
-		bool resize_masked(const math::vec2 size, spread_direction mask = spread_direction::none){
+		bool resize_masked(const math::vec2 size, propagate_mask mask = propagate_mask::none){
 			auto last = std::exchange(layout_state.acceptMask_inherent, mask);
 			auto rst = resize(size);
 			layout_state.acceptMask_inherent = last;
@@ -483,24 +483,24 @@ namespace mo_yanxi::ui{
 
 
 		template <typename T>
-		bool fire_event(const T& event, spread_direction spread_direction = spread_direction::lower, bool force_spread = false){
-			if(spread_direction & spread_direction::local){
+		bool fire_event(const T& event, propagate_mask spread_direction = propagate_mask::lower, bool force_spread = false){
+			if(spread_direction & propagate_mask::local){
 				if(spreadable_event_handler::spreadable_event_handler_fire(event) && !force_spread){
 					return true;
 				}
 			}
 
-			if(spread_direction & spread_direction::super && !is_root_element()){
+			if(spread_direction & propagate_mask::super && !is_root_element()){
 				auto p = get_parent_to_elem();
-				auto rst = p->fire_event(event, (spread_direction | spread_direction::local) - spread_direction::child, force_spread);
+				auto rst = p->fire_event(event, (spread_direction | propagate_mask::local) - propagate_mask::child, force_spread);
 				if(!force_spread && rst){
 					return true;
 				}
 			}
 
-			if(spread_direction & spread_direction::child){
+			if(spread_direction & propagate_mask::child){
 				for (auto && child : get_children()){
-					auto rst = child->fire_event(event, (spread_direction | spread_direction::local) - spread_direction::super, force_spread);
+					auto rst = child->fire_event(event, (spread_direction | propagate_mask::local) - propagate_mask::super, force_spread);
 					if(!force_spread && rst){
 						return true;
 					}
@@ -573,11 +573,11 @@ namespace mo_yanxi::ui{
 
 		[[nodiscard]] virtual bool contains_parent(math::vec2 cursorPos) const noexcept;
 
-		/*virtual*/ void notify_layout_changed(spread_direction toDirection) noexcept;
+		/*virtual*/ void notify_layout_changed(propagate_mask toDirection) noexcept;
 
 		virtual bool resize(const math::vec2 size/*, spread_direction Mask*/){
 			if(property.size.set_size(size)){
-				notify_layout_changed(spread_direction::all);
+				notify_layout_changed(propagate_mask::all);
 				return true;
 			}
 			return false;

@@ -4,10 +4,10 @@ module;
 #include <cassert>
 #include <vk_mem_alloc.h>
 
-export module mo_yanxi.vk.uniform_buffer;
+export module mo_yanxi.vk:uniform_buffer;
 
-import mo_yanxi.vk.resources;
-import mo_yanxi.vk.vma;
+import :resources;
+import mo_yanxi.vk.util;
 
 
 namespace mo_yanxi::vk{

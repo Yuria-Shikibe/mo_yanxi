@@ -5,7 +5,7 @@ import std;
 import mo_yanxi.math.vector2;
 import mo_yanxi.math;
 
-namespace mo_yanxi::gui{
+namespace mo_yanxi::gui::layout{
 	export struct illegal_layout : std::exception{
 		[[nodiscard]] explicit illegal_layout(char const* msg)
 			: exception(msg){

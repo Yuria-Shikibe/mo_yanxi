@@ -1,7 +1,7 @@
 module mo_yanxi.game.ecs.component.command;
 
 import mo_yanxi.game.ecs.system.motion_system;
-import mo_yanxi.basic_util;
+import mo_yanxi.utility;
 
 
 //TODO make it return {} by default?

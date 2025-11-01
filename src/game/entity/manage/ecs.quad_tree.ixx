@@ -9,7 +9,7 @@ export import mo_yanxi.game.quad_tree_interface;
 
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.math.rect_ortho;
-import mo_yanxi.basic_util;
+import mo_yanxi.utility;
 import mo_yanxi.concepts;
 import mo_yanxi.handle_wrapper;
 import mo_yanxi.math;

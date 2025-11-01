@@ -5,7 +5,7 @@ module;
 
 module mo_yanxi.graphic.image_manage;
 
-import mo_yanxi.vk.util.cmd.render;
+import mo_yanxi.vk.cmd;
 
 namespace mo_yanxi::graphic{
 	void async_image_loader::load(allocated_image_load_description&& desc){

@@ -2,13 +2,11 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.logical_deivce;
+export module mo_yanxi.vk:logical_deivce;
 
 export import mo_yanxi.handle_wrapper;
-// import Core.Vulkan.Validation;
-import mo_yanxi.vk.physical_device;
-import mo_yanxi.vk.validation;
-import mo_yanxi.vk.exception;
+import :physical_device;
+import mo_yanxi.vk.util;
 import std;
 
 namespace mo_yanxi::vk{

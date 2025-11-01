@@ -17,7 +17,7 @@ export import align;
 import :events;
 import :scene;
 export import :elem_ptr;
-
+#include <assert.h>
 
 
 namespace mo_yanxi::gui{
@@ -27,7 +27,7 @@ export using ui::clamped_fsize;
 export constexpr inline boarder default_boarder{8, 8, 8, 8};
 
 export
-[[nodiscard]] stated_extent clip_boarder_from(stated_extent extent, const boarder boarder) noexcept{
+[[nodiscard]] layout::stated_extent clip_boarder_from(layout::stated_extent extent, const boarder boarder) noexcept{
 	if(extent.width.mastering()){extent.width.value = std::fdim(extent.width.value, boarder.width());}
 	if(extent.height.mastering()){extent.height.value = std::fdim(extent.height.value, boarder.height());}
 
@@ -35,7 +35,7 @@ export
 }
 
 export
-[[nodiscard]] optional_mastering_extent clip_boarder_from(optional_mastering_extent extent, const boarder boarder) noexcept{
+[[nodiscard]] layout::optional_mastering_extent clip_boarder_from(layout::optional_mastering_extent extent, const boarder boarder) noexcept{
 	auto [dx, dy] = extent.get_mastering();
 	if(dx)extent.set_width(std::fdim(extent.potential_width(), boarder.width()));
 	if(dy)extent.set_height(std::fdim(extent.potential_height(), boarder.height()));
@@ -99,13 +99,17 @@ private:
 	boarder boarder_{default_boarder};
 
 public:
-	optional_mastering_extent restriction_extent{};
+	layout::optional_mastering_extent restriction_extent{};
 
-private:
+protected:
 	cursor_states cursor_states_{};
 
 	math::bool2 fill_parent_{};
 	bool extend_focus_until_mouse_drop_{};
+
+	math::vec2 inherent_scaling_{1.f, 1.f};
+	math::vec2 context_scaling_{1.f, 1.f};
+	bool propagate_scaling_{true};
 
 public:
 	//TODO using bit flags?
@@ -240,14 +244,14 @@ protected:
 	 * @param extent : any tag of the length should be within {mastering, external}
 	 * @return expected size, or nullopt
 	 */
-	virtual std::optional<math::vec2> pre_acquire_size_impl(optional_mastering_extent extent){
+	virtual std::optional<math::vec2> pre_acquire_size_impl(layout::optional_mastering_extent extent){
 		return std::nullopt;
 	}
 
 public:
-	std::optional<math::vec2> pre_acquire_size_no_boarder_clip(const optional_mastering_extent extent);
+	std::optional<math::vec2> pre_acquire_size_no_boarder_clip(const layout::optional_mastering_extent extent);
 
-	std::optional<math::vec2> pre_acquire_size(const optional_mastering_extent extent);
+	std::optional<math::vec2> pre_acquire_size(const layout::optional_mastering_extent extent);
 
 	void notify_layout_changed(propagate_mask propagation) noexcept;
 
@@ -301,6 +305,23 @@ public:
 		return !children().empty();
 	}
 
+	virtual bool set_scaling(math::vec2 scl) noexcept {
+		assert(!scl.is_NaN());
+		if(!util::try_modify(context_scaling_, scl))return false;
+		context_scaling_ = scl;
+		layout_state.notify_self_changed();
+		auto c = children();
+		if(!c.empty() && propagate_scaling_){
+			layout_state.notify_children_changed();
+			auto s = get_scaling();
+			for (auto && elem : c){
+				elem->set_scaling(s);
+			}
+		}
+		return true;
+	}
+
+
 #pragma endregion
 
 #pragma region Bound
@@ -336,8 +357,16 @@ public:
 
 #pragma region Trivial_Getter_Setters
 public:
+	[[nodiscard]] math::vec2 get_scaling() const noexcept{
+		return context_scaling_ * inherent_scaling_;
+	}
+
 	[[nodiscard]] math::bool2 get_fill_parent() const noexcept{
 		return fill_parent_;
+	}
+
+	void set_fill_parent(math::bool2 f) noexcept{
+		fill_parent_ = f;
 	}
 
 	[[nodiscard]] constexpr bool is_toggled() const noexcept{ return toggled; }
@@ -426,6 +455,10 @@ public:
 
 	[[nodiscard]] constexpr math::vec2 rel_content_src_pos() const noexcept{
 		return rel_pos() + content_src_offset();
+	}
+
+	constexpr void set_rel_pos(math::vec2 p) noexcept{
+		relative_pos_ = p;
 	}
 
 

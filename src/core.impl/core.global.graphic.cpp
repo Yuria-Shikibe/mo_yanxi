@@ -1,7 +1,7 @@
 module mo_yanxi.core.global.graphic;
 
 import mo_yanxi.assets.graphic;
-import mo_yanxi.vk.ext;
+import mo_yanxi.vk;
 import std;
 
 namespace mo_yanxi::core::global::graphic{

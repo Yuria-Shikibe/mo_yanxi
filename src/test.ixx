@@ -7,8 +7,8 @@ export module test;
 import mo_yanxi.assets.directories;
 import mo_yanxi.assets.ctrl;
 
-import mo_yanxi.vk.validation;
-import mo_yanxi.vk.context;
+import mo_yanxi.vk;
+import mo_yanxi.vk.util;
 import mo_yanxi.core.window;
 
 
@@ -26,97 +26,119 @@ import mo_yanxi.game.meta.projectile;
 import mo_yanxi.game.meta.turret;
 import mo_yanxi.core.global.assets;
 
+import mo_yanxi.gui.infrastructure;
+import mo_yanxi.gui.infrastructure.group;
+import mo_yanxi.gui.elem.manual_table;
+import mo_yanxi.gui.global;
+
 import std;
 
 namespace test{
-	using namespace mo_yanxi;
-	using namespace mo_yanxi::game::meta::turret;
+using namespace mo_yanxi;
 
-	export turret_drawer drawer;
+using namespace mo_yanxi::game::meta::turret;
 
-	void load(){
-		drawer = {
-			.base_component = {.base_image = core::global::assets::atlas["main"].register_named_region(graphic::bitmap_path_load{
-				R"(D:\projects\mo_yanxi\prop\assets\texture\test\turret\beam-laser-turret.png)"
-			}).first}
+export
+void build_main_ui(gui::scene& scene, gui::loose_group& root){
+	auto e = scene.create<gui::manual_table>();
+	e->set_fill_parent({true, true});
+	auto& r = static_cast<gui::manual_table&>(root.insert(0, std::move(e)));
+
+	{
+		auto hdl = r.emplace_back<gui::elem>();
+		hdl.cell().region_scale = {.1f, .1f, .3f, .3f};
+		hdl.cell().align = gui::align::pos::bottom_left;
+	}
+
+}
+
+export turret_drawer drawer;
+
+void load(){
+	drawer = {
+			.base_component = {
+				.base_image = core::global::assets::atlas["main"].register_named_region(graphic::bitmap_path_load{
+						R"(D:\projects\mo_yanxi\prop\assets\texture\test\turret\beam-laser-turret.png)"
+					}).first
+			}
 		};
 
 
-		drawer.base_component.set_extent_by_scale({0.02f, 0.02f});
-	}
+	drawer.base_component.set_extent_by_scale({0.02f, 0.02f});
+}
 
-	void dispose(){
-		drawer = {};
-	}
+void dispose(){
+	drawer = {};
+}
 }
 
 namespace test{
-	export void check_validation_layer_activation(){
-		if(!DEBUG_CHECK){
-			vk::enable_validation_layers = false;
-		}else if(auto ptr = std::getenv("NSIGHT"); ptr != nullptr && std::strcmp(ptr, "1") == 0){
-			vk::enable_validation_layers = false;
-		}
+export void check_validation_layer_activation(){
+	if(!DEBUG_CHECK){
+		vk::enable_validation_layers = false;
+	} else if(auto ptr = std::getenv("NSIGHT"); ptr != nullptr && std::strcmp(ptr, "1") == 0){
+		vk::enable_validation_layers = false;
 	}
+}
 
-	export void foot(){
-		// using namespace mo_yanxi;
-		// math::vec2 v{114, 514};
-		// math::vec2 v2;
-		// io::pb::math::vector2 buf;
-		// io::store(buf, v);
-		// io::load(buf, v2);
-		// std::println("{} -> {}", v, v2);
-	}
+export void foot(){
+	// using namespace mo_yanxi;
+	// math::vec2 v{114, 514};
+	// math::vec2 v2;
+	// io::pb::math::vector2 buf;
+	// io::store(buf, v);
+	// io::load(buf, v2);
+	// std::println("{} -> {}", v, v2);
+}
+
+using namespace mo_yanxi;
+
+export void load_tex(graphic::image_atlas& atlas){
+	ui::theme::load(&atlas);
+}
+
+export void init_assets(){
+	mo_yanxi::assets::load_dir(R"(D:\projects\mo_yanxi\prop)");
+	mo_yanxi::assets::ctrl::load();
+}
+
+export void compile_shaders(){
 	using namespace mo_yanxi;
 
-	export void load_tex(graphic::image_atlas& atlas){
-		ui::theme::load(&atlas);
-	}
+	graphic::shader_runtime_compiler compiler{};
+	graphic::shader_wrapper wrapper{compiler, assets::dir::shader_spv.path()};
 
-	export void init_assets(){
-		mo_yanxi::assets::load_dir(R"(D:\projects\mo_yanxi\prop)");
-		mo_yanxi::assets::ctrl::load();
-	}
+	assets::dir::shader_src.for_all_subs([&](io::file&& file){
+		wrapper.compile(file);
+	});
+}
 
-	export void compile_shaders(){
-		using namespace mo_yanxi;
+export
+void set_up_flush_setter(auto append, auto prov){
+	core::global::graphic::context.register_post_resize("test", [=](window_instance::resize_event event){
+		core::global::ui::root->resize_all(math::frect{math::vector2{event.size.width, event.size.height}.as<float>()});
 
-		graphic::shader_runtime_compiler compiler{};
-		graphic::shader_wrapper wrapper{compiler, assets::dir::shader_spv.path()};
-
-		assets::dir::shader_src.for_all_subs([&](io::file&& file){
-			wrapper.compile(file);
-		});
-	}
-
-	export
-	void set_up_flush_setter(auto append, auto prov){
-
-		core::global::graphic::context.register_post_resize("test", [=](window_instance::resize_event event){
-			core::global::ui::root->resize_all(math::frect{math::vector2{event.size.width, event.size.height}.as<float>()});
-
-			core::global::graphic::world.resize(event.size);
-			core::global::graphic::ui.resize(event.size);
-
-			append();
-			core::global::graphic::context.set_staging_image(
-				{
-					.image = prov(),
-					.extent = core::global::graphic::context.get_extent(),
-					.clear = false,
-					.owner_queue_family = core::global::graphic::context.compute_family(),
-					.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-					.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-					.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-					.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
-					.src_layout = VK_IMAGE_LAYOUT_GENERAL,
-					.dst_layout = VK_IMAGE_LAYOUT_GENERAL
-				}, false);
-		});
+		core::global::graphic::world.resize(event.size);
+		core::global::graphic::ui.resize(event.size);
 
 		append();
-		core::global::graphic::context.set_staging_image({
+		core::global::graphic::context.set_staging_image(
+			{
+				.image = prov(),
+				.extent = core::global::graphic::context.get_extent(),
+				.clear = false,
+				.owner_queue_family = core::global::graphic::context.compute_family(),
+				.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				.src_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+				.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+				.dst_access = VK_ACCESS_2_SHADER_WRITE_BIT,
+				.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+				.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+			}, false);
+	});
+
+	append();
+	core::global::graphic::context.set_staging_image({
 			.image = prov(),
 			.extent = core::global::graphic::context.get_extent(),
 			.clear = false,
@@ -128,22 +150,23 @@ namespace test{
 			.src_layout = VK_IMAGE_LAYOUT_GENERAL,
 			.dst_layout = VK_IMAGE_LAYOUT_GENERAL
 		});
-	}
+}
 
-	export
-	void load_content(){
-		test::load();
-	}
-	export
-	void dispose_content(){
-		test::dispose();
-	}
+export
+void load_content(){
+	test::load();
+}
 
-	export
-	mo_yanxi::game::meta::projectile projectile_meta = [](){
-		using namespace mo_yanxi;
+export
+void dispose_content(){
+	test::dispose();
+}
 
-		return game::meta::projectile{
+export
+mo_yanxi::game::meta::projectile projectile_meta = [](){
+	using namespace mo_yanxi;
+
+	return game::meta::projectile{
 			.hitbox = {{game::meta::hitbox::comp{.box = {math::vec2{80, 10} * -0.5f, {80, 10}}}}},
 			.rigid = {
 				.drag = 0.001f
@@ -161,5 +184,5 @@ namespace test{
 				50
 			}
 		};
-	}();
+}();
 }

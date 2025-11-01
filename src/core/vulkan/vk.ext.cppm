@@ -3,7 +3,7 @@ module;
 #include <vulkan/vulkan.h>
 #include "vk_loader.hpp"
 
-export module mo_yanxi.vk.ext;
+export module mo_yanxi.vk:ext;
 import std;
 
 namespace mo_yanxi::vk{

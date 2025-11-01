@@ -3,13 +3,13 @@ module;
 #include <vulkan/vulkan.h>
 #include <cassert>
 
-export module mo_yanxi.vk.descriptor_buffer;
+export module mo_yanxi.vk:descriptor_buffer;
 
 import std;
-export import mo_yanxi.vk.resources;
+import mo_yanxi.vk.util;
 import mo_yanxi.handle_wrapper;
-import mo_yanxi.vk.vma;
-import mo_yanxi.vk.ext;
+import :resources;
+import :ext;
 
 
 //TODO more compact dbo using descriptorBufferOffsetAlignment

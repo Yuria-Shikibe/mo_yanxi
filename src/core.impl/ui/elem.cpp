@@ -31,7 +31,7 @@ namespace mo_yanxi{
 	void ui::elem::set_style(const style_drawer<elem>& drawer){
 		property.graphic_data.drawer = &drawer;
 		if(drawer.apply_to(*this)){
-			notify_layout_changed(spread_direction::all_visible);
+			notify_layout_changed(propagate_mask::all_visible);
 		}
 	}
 
@@ -153,21 +153,21 @@ namespace mo_yanxi{
 		return (!parent || parent->contains_parent(cursorPos));
 	}
 
-	void ui::elem::notify_layout_changed(spread_direction toDirection) noexcept{
-		if(toDirection & spread_direction::local) layout_state.notify_self_changed();
+	void ui::elem::notify_layout_changed(propagate_mask toDirection) noexcept{
+		if(toDirection & propagate_mask::local) layout_state.notify_self_changed();
 
 		if(parent){
-			if(toDirection & spread_direction::super || toDirection & spread_direction::from_content){
-				if(parent->layout_state.notify_children_changed(toDirection & spread_direction::from_content)){
-					parent->notify_layout_changed(toDirection - spread_direction::child);
+			if(toDirection & propagate_mask::super || toDirection & propagate_mask::from_content){
+				if(parent->layout_state.notify_children_changed(toDirection & propagate_mask::from_content)){
+					parent->notify_layout_changed(toDirection - propagate_mask::child);
 				}
 			}
 		}
 
-		if(toDirection & spread_direction::child){
+		if(toDirection & propagate_mask::child){
 			for(auto&& element : get_children()){
 				if(element->layout_state.notify_parent_changed()){
-					element->notify_layout_changed(toDirection - spread_direction::super);
+					element->notify_layout_changed(toDirection - propagate_mask::super);
 				}
 			}
 		}

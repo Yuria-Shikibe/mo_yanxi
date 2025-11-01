@@ -435,7 +435,7 @@ namespace mo_yanxi::ui{
 
 		void set_entire_align(const align::pos align){
 			if(util::try_modify(entire_align, align)){
-				notify_layout_changed(spread_direction::from_content);
+				notify_layout_changed(propagate_mask::from_content);
 			}
 		}
 
@@ -445,7 +445,7 @@ namespace mo_yanxi::ui{
 
 		void set_layout_policy(layout_policy policy){
 			if(policy != layout_policy){
-				notify_layout_changed(spread_direction::from_content);
+				notify_layout_changed(propagate_mask::from_content);
 				layout_policy = policy;
 			}
 		}
@@ -516,7 +516,7 @@ namespace mo_yanxi::ui{
 			}
 
 			if(changed){
-				notify_layout_changed(spread_direction::all_visible);
+				notify_layout_changed(propagate_mask::all_visible);
 			}
 		}
 

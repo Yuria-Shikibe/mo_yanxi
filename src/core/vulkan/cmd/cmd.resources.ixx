@@ -2,11 +2,10 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.util.cmd.resources;
+export module mo_yanxi.vk.cmd:resources;
 
 import std;
-import mo_yanxi.vk.exception;
-import mo_yanxi.vk.concepts;
+import mo_yanxi.vk.util;
 import mo_yanxi.meta_programming;
 
 namespace mo_yanxi::vk::cmd{

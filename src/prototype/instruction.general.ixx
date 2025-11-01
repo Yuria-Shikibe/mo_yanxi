@@ -293,7 +293,6 @@ export enum struct instr_type : std::uint32_t{
 	rect_ortho,
 	rect_ortho_outline,
 	row_patch,
-	//TODO ortho rect bound
 
 	SIZE,
 };

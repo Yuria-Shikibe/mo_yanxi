@@ -1,13 +1,10 @@
 module;
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.instance;
+export module mo_yanxi.vk:instance;
 
-import mo_yanxi.vk.exception;
 import mo_yanxi.vk.util;
-import mo_yanxi.vk.validation;
 import mo_yanxi.handle_wrapper;
 
 import std;
@@ -16,25 +13,9 @@ namespace mo_yanxi::vk{
 	/**
 	 * @return All Required Extensions
 	 */
-	std::vector<const char*> get_required_extensions_glfw(){
-		std::uint32_t glfwExtensionCount{};
-		const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+	std::vector<const char*> get_required_extensions_glfw();
 
-		return {glfwExtensions, glfwExtensions + glfwExtensionCount};
-	}
-
-	std::vector<const char*> get_required_extensions(){
-		auto extensions = get_required_extensions_glfw();
-
-		if(enable_validation_layers){
-			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-		}
-
-		extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-
-
-		return extensions;
-	}
+	std::vector<const char*> get_required_extensions();
 
 	export constexpr VkApplicationInfo ApplicationInfo{
 		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,

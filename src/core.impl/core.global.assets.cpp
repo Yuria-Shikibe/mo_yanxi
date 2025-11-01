@@ -2,7 +2,7 @@ module mo_yanxi.core.global.assets;
 
 import mo_yanxi.graphic.draw;
 import mo_yanxi.font.typesetting;
-import mo_yanxi.vk.context;
+import mo_yanxi.vk;
 import std;
 
 void mo_yanxi::core::global::assets::init(void* vk_context_ptr){

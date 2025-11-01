@@ -10,24 +10,14 @@ import mo_yanxi.math.vector2;
 import mo_yanxi.math.matrix3;
 
 import mo_yanxi.graphic.draw.instruction.batch;
-import mo_yanxi.vk.context;
 import mo_yanxi.vk.util.uniform;
-import mo_yanxi.vk.resources;
-import mo_yanxi.vk.image_derives;
-import mo_yanxi.vk.descriptor_buffer;
-import mo_yanxi.vk.uniform_buffer;
-
-import mo_yanxi.vk.pipeline.layout;
-import mo_yanxi.vk.pipeline;
-import mo_yanxi.vk.command_buffer;
-import mo_yanxi.vk.shader;
-import mo_yanxi.vk.dynamic_rendering;
-import mo_yanxi.vk.util.cmd.render;
+import mo_yanxi.vk;
+import mo_yanxi.vk.cmd;
 
 
 import std;
 
-namespace mo_yanxi::ui{
+namespace mo_yanxi::gui{
 
 struct scissor{
 	math::vec2 src{};
@@ -272,12 +262,9 @@ private:
 	}
 
 	void record_command(){
-
 		vk::dynamic_rendering dynamic_rendering{
 			{attachment_base.get_image_view()},
 			nullptr};
-
-
 
 		const graphic::draw::instruction::batch_descriptor_buffer_binding_info dbo_info{
 			general_descriptors_.dbo(),
@@ -321,7 +308,7 @@ private:
 		math::frect initial_viewport = region_.as<float>();
 		viewports.clear();
 		viewports.push_back(layer_viewport{initial_viewport, {{initial_viewport}}, pool_resource.get(), math::mat3_idt});
-		uniform_proj = math::mat3{}.set_orthogonal_flip_y(initial_viewport.get_src(), initial_viewport.extent());
+		uniform_proj = math::mat3{}.set_orthogonal(initial_viewport.get_src(), initial_viewport.extent());
 
 		update_ubo(ubo_screen_info{uniform_proj});
 		notify_viewport_changed();
@@ -359,7 +346,7 @@ public:
 	}
 
 	void pop_viewport() noexcept{
-		assert(!viewports.size() > 1);
+		assert(viewports.size() > 1);
 		viewports.pop_back();
 	}
 
@@ -429,7 +416,7 @@ private:
 	friend guard_base;
 
 	void pop() const{
-		renderer_->pop_scissor();
+		renderer_->pop_viewport();
 		renderer_->notify_viewport_changed();
 	}
 

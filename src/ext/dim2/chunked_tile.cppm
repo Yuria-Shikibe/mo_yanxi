@@ -5,7 +5,7 @@ module;
 
 export module mo_yanxi.dim2.grid;
 
-export import mo_yanxi.basic_util;
+export import mo_yanxi.utility;
 export import ext.dim2.plane_concept;
 export import mo_yanxi.math.vector2;
 export import mo_yanxi.dim2.tile;

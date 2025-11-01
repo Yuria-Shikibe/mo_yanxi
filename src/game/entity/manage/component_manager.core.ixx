@@ -27,7 +27,7 @@ import mo_yanxi.strided_span;
 import mo_yanxi.game.srl;
 
 import mo_yanxi.algo.hash;
-import mo_yanxi.basic_util;
+import mo_yanxi.utility;
 import mo_yanxi.concepts;
 import mo_yanxi.meta_programming;
 import mo_yanxi.heterogeneous.open_addr_hash;

@@ -84,7 +84,7 @@ void mo_yanxi::ui::scroll_pane::update_item_layout(){
 			}
 		}
 
-		item->resize_masked(*sz, spread_direction::local | spread_direction::child);
+		item->resize_masked(*sz, propagate_mask::local | propagate_mask::child);
 
 		if(need_self_relayout){
 			auto elemSz = item->get_size();

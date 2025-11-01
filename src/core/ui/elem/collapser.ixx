@@ -55,7 +55,7 @@ namespace mo_yanxi::ui{
 			if(e.code.action() != core::ctrl::act::release)return;
 
 			expanded = !expanded;
-			fire_event(input_event::collapser_state_changed{expanded}, spread_direction::child, true);
+			fire_event(input_event::collapser_state_changed{expanded}, propagate_mask::child, true);
 		}
 
 	public:
@@ -158,7 +158,7 @@ namespace mo_yanxi::ui{
 			}
 
 			if(util::try_modify(expand_progress, prog)){
-				notify_layout_changed(spread_direction::from_content | spread_direction::local);
+				notify_layout_changed(propagate_mask::from_content | propagate_mask::local);
 				content_->update_opacity(get_interped_progress());
 
 			}

@@ -3,7 +3,7 @@ module;
 #include <vulkan/vulkan.h>
 #include <cassert>
 
-export module mo_yanxi.vk.util.invoker;
+export module mo_yanxi.vk.util:invoker;
 
 import std;
 

@@ -5,15 +5,8 @@ module;
 
 export module mo_yanxi.graphic.batch_proxy;
 
-export import mo_yanxi.vk.command_buffer;
-export import mo_yanxi.vk.uniform_buffer;
 export import mo_yanxi.vk.batch;
-export import mo_yanxi.vk.pipeline;
-export import mo_yanxi.vk.dynamic_rendering;
-export import mo_yanxi.vk.image_derives;
-export import mo_yanxi.vk.util.cmd.render;
-
-export import mo_yanxi.vk.concepts;
+export import mo_yanxi.vk;
 
 import mo_yanxi.heterogeneous.open_addr_hash;
 

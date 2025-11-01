@@ -111,7 +111,9 @@ public:
 
 	virtual elem_ptr exchange(std::size_t where, elem_ptr&& elem, bool force_isolated_notify){
 		assert(elem != nullptr);
-		if(where >= children_.size()) return {};
+		if(where >= children_.size()){
+			throw std::out_of_range{"index out of range"};
+		}
 
 		if(force_isolated_notify){
 			notify_isolated_layout_changed();
@@ -121,12 +123,22 @@ public:
 
 		return std::exchange(children_[where], std::move(elem));
 	}
+
+	elem& front() const noexcept{
+		return *children_.front();
+	}
+
+	elem& back() const noexcept{
+		return *children_.back();
+	}
+
 #pragma endregion
 
 #pragma region Add
 public:
 	virtual elem& insert(std::size_t where, elem_ptr&& elemPtr){
 		elem& e = **children_.insert(children_.begin() + std::min<std::size_t>(where, children_.size()), std::move(elemPtr));
+		e.set_parent(this);
 		notify_layout_changed_on_element_change();
 
 		util::set_fillparent(e, content_extent());
@@ -186,11 +198,13 @@ public:
 
 protected:
 	bool resize_impl(const math::vec2 size) override{
-		if(elem::resize_impl(size)){
+		if(elem::resize_impl(size * get_scaling())){
 			const auto newSize = content_extent();
+			bool any = false;
 			for(auto& element : children()){
-				util::set_fillparent(*element, newSize);
+				any = any || util::set_fillparent(*element, newSize);
 			}
+			if(any)notify_layout_changed_on_element_change();
 			return true;
 		}
 
@@ -226,6 +240,8 @@ struct loose_group : basic_group{
 	[[nodiscard]] loose_group(scene& scene, elem* parent)
 		: basic_group(scene, parent){
 		layout_state.ignore_children();
+		layout_state.inherent_broadcast_mask -= propagate_mask::child;
+		layout_state.intercept_lower_to_isolated = true;
 	}
 
 protected:

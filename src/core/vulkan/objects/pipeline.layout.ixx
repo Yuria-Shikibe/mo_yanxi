@@ -2,11 +2,10 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.pipeline.layout;
+export module mo_yanxi.vk:pipeline_layout;
 
 import mo_yanxi.handle_wrapper;
-import mo_yanxi.vk.exception;
-import mo_yanxi.vk.concepts;
+import mo_yanxi.vk.util;
 import std;
 
 namespace mo_yanxi::vk{

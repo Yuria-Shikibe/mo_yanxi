@@ -7,13 +7,11 @@ module;
 
 export module mo_yanxi.graphic.render_graph.resource_desc;
 
-import mo_yanxi.vk.image_derives;
-import mo_yanxi.vk.resources;
-import mo_yanxi.vk.vma;
+import mo_yanxi.vk;
 
 import mo_yanxi.graphic.shader_reflect;
 import mo_yanxi.meta_programming;
-import mo_yanxi.basic_util;
+import mo_yanxi.utility;
 import mo_yanxi.referenced_ptr;
 
 import std;

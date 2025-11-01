@@ -21,6 +21,7 @@ void scene::update(float delta_in_tick){
 }
 
 void scene::draw(rect clip) const{
+	gui::viewport_guard _{renderer(), region_};
 	root_->draw(clip);
 }
 

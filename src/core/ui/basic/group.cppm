@@ -96,7 +96,7 @@ namespace mo_yanxi::ui{
 			math::vec2 boundSize,
 			math::bool2 mask = {true, true},
 			bool set_restriction_to_mastering = true,
-			spread_direction direction_mask = spread_direction::all_visible){
+			propagate_mask direction_mask = propagate_mask::all_visible){
 			const auto [fx, fy] = item.prop().fill_parent && mask;
 			if(!fx && !fy) return false;
 
@@ -187,7 +187,7 @@ namespace mo_yanxi::ui{
 		virtual void clear_children() noexcept{
 			expired.clear();
 			children.clear();
-			notify_layout_changed(spread_direction::super | spread_direction::from_content);
+			notify_layout_changed(propagate_mask::super | propagate_mask::from_content);
 		}
 
 		virtual void post_remove(elem* elem){
@@ -195,14 +195,14 @@ namespace mo_yanxi::ui{
 				expired.push_back(std::move(*itr));
 				children.erase(itr);
 			}
-			notify_layout_changed(spread_direction::all_visible);
+			notify_layout_changed(propagate_mask::all_visible);
 		}
 
 		virtual void instant_remove(elem* elem){
 			if(const auto itr = find(elem); itr != children.end()){
 				children.erase(itr);
 			}
-			notify_layout_changed(spread_direction::all_visible);
+			notify_layout_changed(propagate_mask::all_visible);
 		}
 
 		virtual elem_ptr exchange_element(std::size_t where, elem_ptr&& elem, bool isolated_notify){
@@ -212,7 +212,7 @@ namespace mo_yanxi::ui{
 			if(isolated_notify){
 				notify_isolated_layout_changed();
 			}else{
-				notify_layout_changed(spread_direction::all_visible);
+				notify_layout_changed(propagate_mask::all_visible);
 			}
 			return std::exchange(children[where], std::move(elem));
 		}
@@ -223,7 +223,7 @@ namespace mo_yanxi::ui{
 			setChildrenFillParentSize_legacy(*elem, content_size());
 
 			elem->update_abs_src(content_src_pos());
-			notify_layout_changed(spread_direction::upper | spread_direction::from_content);
+			notify_layout_changed(propagate_mask::upper | propagate_mask::from_content);
 			return **children.insert(children.begin() + std::min<std::size_t>(where, children.size()), std::move(elem));
 		}
 

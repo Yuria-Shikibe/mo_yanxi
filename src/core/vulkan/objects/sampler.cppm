@@ -2,11 +2,11 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.sampler;
+export module mo_yanxi.vk:sampler;
 
 import std;
 import mo_yanxi.handle_wrapper;
-import mo_yanxi.vk.exception;
+import mo_yanxi.vk.util;
 
 namespace mo_yanxi::vk{
 	namespace preset{

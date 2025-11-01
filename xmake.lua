@@ -40,14 +40,6 @@ add_requires("protobuf-cpp", {
     }
 })
 
-target("magic_enum")
-    set_kind("static")
-    set_languages("c++latest")
-
-    add_includedirs("submodules/magic_enum/include")
-    add_files("submodules/magic_enum/module/magic_enum.cppm", {install = true, public = true})
-target_end()
-
 target("protobuf_gen")
     set_kind("static")
     set_languages("cxx17")
@@ -107,7 +99,7 @@ target("mo_yanxi")
     add_includedirs("src")
 
     add_includedirs("submodules/magic_enum/include")
-    --add_files("submodules/magic_enum/module/**.cppm")
+    add_files("submodules/magic_enum/module/**.cppm")
 
     add_includedirs("submodules/VulkanMemoryAllocator/include")
     add_includedirs("submodules/plf_hive")

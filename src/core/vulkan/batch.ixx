@@ -9,12 +9,8 @@ module;
 
 export module mo_yanxi.vk.batch;
 
-export import mo_yanxi.vk.resources;
-export import mo_yanxi.vk.util.cmd.resources;
-export import mo_yanxi.vk.descriptor_buffer;
-export import mo_yanxi.vk.pipeline.layout;
-export import mo_yanxi.vk.context;
-export import mo_yanxi.vk.sync;
+export import mo_yanxi.vk;
+export import mo_yanxi.vk.cmd;
 import mo_yanxi.circular_array;
 import mo_yanxi.circular_queue;
 import std;

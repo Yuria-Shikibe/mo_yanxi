@@ -4,7 +4,7 @@
 
 export module mo_yanxi.core.global.graphic;
 
-export import mo_yanxi.vk.context;
+export import mo_yanxi.vk;
 
 export import mo_yanxi.graphic.renderer;
 export import mo_yanxi.graphic.renderer.world;

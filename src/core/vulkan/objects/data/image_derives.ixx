@@ -2,14 +2,16 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.image_derives;
+export module mo_yanxi.vk:image_derives;
 
 import std;
 import mo_yanxi.handle_wrapper;
-import mo_yanxi.vk.resources;
-import mo_yanxi.vk.concepts;
-import mo_yanxi.vk.vma;
+import mo_yanxi.vk.util;
+
+//TODO remove bitmap
 import mo_yanxi.graphic.bitmap;
+
+import :resources;
 
 namespace mo_yanxi::vk{
 	export

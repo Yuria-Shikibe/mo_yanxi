@@ -342,6 +342,12 @@ namespace mo_yanxi::math{
 			return this->sub(other.x, other.y);
 		}
 
+		FORCE_INLINE constexpr vector2& fdim(const_pass_t other) noexcept requires (std::floating_point<T>)  {
+			x = math::fdim(x, other.x);
+			x = math::fdim(y, other.y);
+			return *this;
+		}
+
 		FORCE_INLINE constexpr vector2& sub(const_pass_t other, const T scale) noexcept {
 			return this->sub(other.x * scale, other.y * scale);
 		}

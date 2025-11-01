@@ -6,15 +6,7 @@ module;
 
 export module mo_yanxi.graphic.draw.instruction.batch;
 
-import mo_yanxi.vk.context;
-import mo_yanxi.vk.command_buffer;
-import mo_yanxi.vk.uniform_buffer;
-import mo_yanxi.vk.descriptor_buffer;
-import mo_yanxi.vk.pipeline.layout;
-import mo_yanxi.vk.resources;
-import mo_yanxi.vk.sync;
-import mo_yanxi.vk.ext;
-import mo_yanxi.vk.util.cmd.render;
+import mo_yanxi.vk;
 
 import mo_yanxi.graphic.draw.instruction;
 
@@ -825,6 +817,9 @@ public:
 					instruction_pend_ptr_ += data.size_bytes() + sizeof(instruction_head);
 					if(is_all_idle()){
 						instruction_dspt_ptr_ = instruction_pend_ptr_;
+					}else{
+						auto idx = get_back_group() - groups_.data();
+						get_back_group()->span_end = instruction_pend_ptr_;
 					}
 				}
 			}
@@ -969,6 +964,10 @@ private:
 
 	[[nodiscard]] working_group* get_front_group() noexcept{
 		return is_all_idle() ? nullptr : groups_.data() + current_dspt_group_index_;
+	}
+
+	[[nodiscard]] working_group* get_back_group() noexcept{
+		return is_all_idle() ? nullptr : groups_.data() + ((current_idle_group_index_  + groups_.size() - 1) % groups_.size());
 	}
 
 	template <bool onReverse, typename InstrT, typename... Args>

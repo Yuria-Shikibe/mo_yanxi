@@ -23,12 +23,7 @@ import mo_yanxi.math.rand;
 import mo_yanxi.math.quad;
 import mo_yanxi.math.constrained_system;
 
-import mo_yanxi.vk.context;
-import mo_yanxi.vk.batch;
-
-import mo_yanxi.vk.validation;
-import mo_yanxi.vk.vertex_info;
-import mo_yanxi.vk.ext;
+import mo_yanxi.vk;
 
 import mo_yanxi.assets.graphic;
 import mo_yanxi.assets.directories;
@@ -126,8 +121,13 @@ import mo_yanxi.slide_window_buf;
 
 
 import prototype.renderer.ui;
+import mo_yanxi.gui.infrastructure;
+import mo_yanxi.gui.infrastructure.group;
+import mo_yanxi.gui.global;
+
 import test;
 import std;
+
 
 #pragma region MAIN
 
@@ -937,7 +937,7 @@ int main(){
 		vk::shader_module bloom_merge_shader{ctx.get_device(), assets::dir::shader_spv / "post_process.bloom.merge.spv", VK_SHADER_STAGE_COMPUTE_BIT};
 #pragma endregion
 
-		mo_yanxi::ui::renderer renderer{ctx, assets::graphic::samplers::texture_sampler, msh};
+		mo_yanxi::gui::renderer renderer{ctx, assets::graphic::samplers::texture_sampler, msh};
 		renderer.resize({0, 0, ctx.get_extent().width, ctx.get_extent().height});
 		// renderer.get_top_viewport().push_scissor({{200, 200, 520, 420}});
 		auto& batch = renderer.batch;
@@ -1030,11 +1030,12 @@ int main(){
 		manager.create_command();
 #pragma endregion
 
+#pragma region ResizeSet
 		core::global::graphic::context.set_staging_image({
 			.image = hdr_to_sdr_pass.pass.at_out(0).as_image().image.image,
 			.extent = core::global::graphic::context.get_extent(),
 			.clear = false,
-			.owner_queue_family = core::global::graphic::context.graphic_family(),
+			.owner_queue_family = core::global::graphic::context.compute_family(),
 			.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
 			.src_access = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
 			.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
@@ -1043,9 +1044,45 @@ int main(){
 			.dst_layout = VK_IMAGE_LAYOUT_GENERAL
 		});
 
+		core::global::graphic::context.register_post_resize("test", [&](window_instance::resize_event event){
+			core::global::ui::root->resize_all(math::frect{
+					math::vector2{event.size.width, event.size.height}.as<float>()
+				});
 
+			renderer.resize({tags::from_extent, {}, event.size.width, event.size.height});
+			gui::global::manager.resize(math::rect_ortho{tags::from_extent, {}, event.size.width, event.size.height}.as<float>());
+			res.as_image().handle = renderer.get_base();
+			res.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		camera.resize_screen(core::global::graphic::context.get_extent().width, core::global::graphic::context.get_extent().height);
+			manager.resize(event.size);
+			manager.reset_pass_resources();
+			manager.create_command();
+			core::global::graphic::context.set_staging_image(
+				{
+					.image = hdr_to_sdr_pass.pass.at_out(0).as_image().image.image,
+					.extent = core::global::graphic::context.get_extent(),
+					.clear = false,
+					.owner_queue_family = core::global::graphic::context.compute_family(),
+					.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+					.src_access = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+					.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+					.dst_access = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+					.src_layout = VK_IMAGE_LAYOUT_GENERAL,
+					.dst_layout = VK_IMAGE_LAYOUT_GENERAL
+				}, false);
+		});
+
+		{
+			math::vec2 window_extent = math::vector2{core::global::graphic::context.get_extent().width, core::global::graphic::context.get_extent().height}.as<float>();
+			camera.resize_screen(window_extent.x, window_extent.y);
+
+			auto rst = gui::global::manager.add_scene<gui::loose_group>("main", true, renderer);
+			rst.scene.resize({{}, window_extent});
+			test::build_main_ui(rst.scene, rst.root_group);
+
+		}
+#pragma endregion
+
 		camera.set_scale_range({0.2f, 4.f});
 
 		graphic::image_atlas& atlas{core::global::assets::atlas};
@@ -1059,7 +1096,7 @@ int main(){
 
 		graphic::uniformed_trail trail{120, 0.5f};
 
-
+#pragma region Inputset
 		auto& wgfx_input =
 		core::global::input.register_sub_input<
 			math::vec2,
@@ -1085,13 +1122,13 @@ int main(){
 				});
 			});
 		}
-
-		core::global::timer.reset_time();
+#pragma endregion
 
 		static std::chrono::microseconds callbacks{};
 		static std::chrono::microseconds coroutine{};
 		static std::size_t count{};
 
+		core::global::timer.reset_time();
 		while(!ctx.window().should_close()){
 			using namespace draw;
 
@@ -1099,6 +1136,8 @@ int main(){
 			core::global::timer.fetch_time();
 			core::global::input.update(core::global::timer.global_delta_tick());
 			camera.update(core::global::timer.global_delta_tick());
+			gui::global::manager.update(core::global::timer.global_delta_tick());
+			gui::global::manager.layout();
 
 			if(camera.check_changed()){
 				const VertexUBO proj{
@@ -1109,7 +1148,7 @@ int main(){
 
 				(void)vk::buffer_mapper{general_proj_ubo}.load(proj);
 
-				renderer.top_viewport().set_local_transform(camera.get_v2v_mat({}));
+				// renderer.top_viewport().set_local_transform(camera.get_v2v_mat({}));
 				auto screenP = renderer.top_viewport().get_element_to_root_screen() * camera.get_viewport_center();
 				auto pos = renderer.get_screen_uniform_proj() * screenP;
 				// bloom_pass.meta.set_scale(camera.map_scale(0.9f, 1.5f));
@@ -1121,430 +1160,8 @@ int main(){
 
 			auto cursor_world = camera.get_screen_to_world(core::global::input.get_cursor_pos(), {}, true);
 			wgfx_input.set_context(cursor_world);
-			trail.update_diff(core::global::timer.global_delta_tick(), cursor_world);
 
-			draw::instruction::quad_vert_color vc{
-				color{1, 1, 1, 1},
-				color{0, 1, 1, 1},
-				color{1, 0, 1, 1},
-				color{1, 1, 0, 1},
-			};
-
-			batch.push_instruction(instruction::rectangle_ortho_outline{
-				.v00 = {0, 0},
-				.v11 = {150, 300},
-				.stroke = {2},
-				.vert_color = vc
-			});
-
-
-			auto time = core::global::timer.global_time() * .75f;
-			float time_fac = math::clamp(math::frac(time)) | math::interp::pow3Out;
-			struct state{
-				math::vec2 last_pos{};
-				color last_color{};
-			};
-
-			for(int i = 0; i < 2; ++i){
-				math::rand rand{static_cast<std::uint64_t>(time) + i * 114514};
-
-
-				auto gen =
-					fx::lightning_generator<slide_window_generator>(
-						cursor_world, trail.tail_pos_or(cursor_world),
-						{rand.random(60.f, 120), rand.random(240.f, 360)},
-						time_fac, rand,
-						[s = state{cursor_world}](fx::lightning_segment&& segment) mutable {
-					const auto rand_mov = segment.rand.range(1 - segment.factor_global) * (segment.pos - s.last_pos).rotate_rt_counter_clockwise();
-					const auto lerp_tgt = segment.pos + rand_mov;
-					const auto pos =
-						segment.factor_local >= 1.f ? lerp_tgt : math::lerp(s.last_pos, lerp_tgt, segment.factor_local);
-					const auto color_tgt = math::lerp(colors::aqua.to_light(), colors::clear_light, segment.factor_global);
-					const auto color = math::lerp(s.last_color, color_tgt, segment.factor_local);
-					s = {pos, color};
-
-					return instruction::line_node{
-						.pos = pos,
-						.stroke = math::lerp(8.f, 4.f, segment.factor_global),
-						.color = color
-					};
-				});
-
-				for (const auto & buf : gen){
-					batch.push_instruction(instruction::line_segments{}, buf);
-				}
-			}
-
-			struct trail_node_data : trail::node_type{
-				float idx_scale;
-				color color;
-
-				[[nodiscard]] float get_width() const noexcept{
-					return idx_scale * scale;
-				}
-			};
-
-			{
-				auto c1 = std::chrono::high_resolution_clock::now();
-
-				auto gen = trail.trivial_each<slide_window_generator>(
-					1,
-					[last = trail.head_pos_or({})](trail::node_type node, const unsigned idx, const unsigned total, const std::uintptr_t id) mutable {
-						math::rand rand{id};
-
-						const float factor_global = math::idx_to_factor(idx, total);
-						const auto fac = factor_global | math::interp::pow2Out;
-						const auto off = rand.range(1.5f) * fac * math::curve(factor_global, .05f, .2f);
-						const auto tan = (node.pos - last).rotate_rt_counter_clockwise() * off;
-
-						last = node.pos;
-						// node.pos += tan;
-						const auto color = math::lerp(colors::aqua.to_light(2.5f), colors::pale_green.to_light(1.5f), factor_global);
-						return trail_node_data{node, factor_global | math::interp::pow2In | math::interp::reverse, color};
-					});
-
-				for (const auto & buf : gen){
-					for (const auto & sspn : buf.span() | std::views::slide(4)){
-						const auto appr = sspn[1].pos - sspn[2].pos;
-						const auto apprLen = appr.length();
-						const auto seg = math::max(static_cast<unsigned>(apprLen / 16.f), 2U);
-
-						batch.push_instruction(instruction::constrained_curve{
-								.param = instruction::curve_trait_mat::b_spline * (sspn | std::views::transform(&trail_node_data::pos)),
-								.stroke = math::range{sspn[1].get_width(), sspn[2].get_width()} * 15.f,
-								.segments = seg,
-								.color = {sspn[1].color, sspn[2].color},
-							});
-
-					}
-				}
-
-				auto c2 = std::chrono::high_resolution_clock::now();
-				auto dur = std::chrono::duration_cast<std::chrono::microseconds>(c2 - c1);
-				coroutine += dur;
-			}
-
-
-			/*
-			{
-				auto c1 = std::chrono::high_resolution_clock::now();
-				slide_window_buffer<trail_node_data, 8> buffer{};
-				trail.trivial_each_2(1, [&, last = trail.head_pos_or({})](trail::node_type node, unsigned idx, unsigned total, std::uintptr_t id) mutable {
-					math::rand rand{id};
-					const float factor_global = math::idx_to_factor(idx, total);
-
-					const auto fac = factor_global | math::interp::pow2Out;
-					const auto off = rand.range(1.5f) * fac * math::curve(factor_global, .05f, .2f);
-					const auto color = math::lerp(colors::aqua.to_light(2.5f), colors::pale_green.to_light(1.5f), factor_global);
-
-					last = node.pos;
-					if(buffer.push({node, factor_global | math::interp::pow2In | math::interp::reverse, color})){
-						for (const auto & sspn : buffer.span() | std::views::slide(4)){
-							const auto appr = sspn[1].pos - sspn[2].pos;
-							const auto apprLen = appr.length();
-							const auto seg = math::max(static_cast<unsigned>(apprLen / 16.f), 2U);
-
-							batch.push_instruction(instruction::constrained_curve{
-								.param = instruction::curve_trait_mat::b_spline * (sspn | std::views::transform([&](const trail_node_data& v) {
-									return v.pos;
-								})),
-								.stroke = math::range{sspn[1].get_width(), sspn[2].get_width()} * 15.f,
-								.segments = seg,
-								.color = {sspn[1].color, sspn[2].color},
-							});
-
-						}
-						buffer.advance();
-					}
-				});
-
-				if(buffer.finalize()){
-					for (const auto & sspn : buffer.span() | std::views::slide(4)){
-						const auto appr = sspn[1].pos - sspn[2].pos;
-						const auto apprLen = appr.length();
-						const auto seg = math::max(static_cast<unsigned>(apprLen / 16.f), 2U);
-
-						batch.push_instruction(instruction::constrained_curve{
-							.param = instruction::curve_trait_mat::b_spline * (sspn | std::views::transform([&](const trail_node_data& v){
-								return v.pos;
-							})),
-							.stroke = math::range{sspn[1].get_width(), sspn[2].get_width()} * 15.f,
-							.segments = seg,
-							.color = {sspn[1].color, sspn[2].color},
-						});
-					}
-				}
-
-				auto c2 = std::chrono::high_resolution_clock::now();
-				auto dur = std::chrono::duration_cast<std::chrono::microseconds>(c2 - c1);
-				callbacks += dur;
-			}
-			*/
-
-#pragma region DrawTest
-
-			for(unsigned i = 0; i < 0; ++i){
-				// batch.push_instruction(
-				// 	instruction::poly{
-				// 		.pos = {.35f + i * 270.1f, .25f},
-				// 		.segments = 6000,
-				// 		.initial_angle = 0,
-				//
-				// 		.radius = {10.01f, 100.2f},
-				//
-				// 		.inner = {0, 1, 0, 0},
-				// 		.outer = {1, 0, 1, .4f},
-				// });
-				//
-				// batch.push_instruction(
-				// 	instruction::poly{
-				// 		.pos = {.35f + i * 270.1f, .25f},
-				// 		.segments = 6000,
-				// 		.initial_angle = 0,
-				//
-				// 		.radius = {10.01f, 100.2f},
-				//
-				// 		.inner = {0, 1, 0, 0},
-				// 		.outer = {1, 0, 1, .4f},
-				// });
-				//
-				// batch.push_instruction(
-				// 	instruction::poly_partial{
-				// 		.pos = {.35f + i * 270.1f, -200.25f},
-				// 		.segments = 64,
-				//
-				// 		.radius = {.from = 30, .to = 120},
-				// 		.range = {0.1f, 0.8f},
-				//
-				// 		.inner = {0, 1, 0, 0},
-				// 		.outer = {1, 1, 1, .7f}
-				// });
-				//
-				//
-				draw::instruction::quad_vert_color vc{
-						color{0, 0, 0, 1}.to_light(1.5f),
-						color{1, 0, 0, 1}.to_light(2),
-						color{0, 1, 0, 1}.to_light(1.5f),
-						color{1, 1, 0, 1}.to_light(2),
-					};
-				batch.push_instruction(instruction::rectangle{
-					.generic = {.image = light_region->view},
-					.pos = {.5f, -300 + i * 270.1f},
-					.angle = 30 * math::deg_to_rad,
-					.scale = 1,
-					.vert_color = vc,
-					.extent = {300, 300},
-					.uv00 = light_region->uv.v00(),
-					.uv11 = light_region->uv.v11(),
-				});
-				//
-				// batch.push_instruction(instruction::rectangle{
-				// 	.generic = {.image = r1->view},
-				// 	.pos = {200.5f, -300 + i * 270.1f},
-				// 	.angle = 30 * math::deg_to_rad,
-				// 	.scale = 1,
-				// 	.vert_color = vc,
-				// 	.extent = {100.15f, 100.15f},
-				// 	.uv00 = r1->uv.v00(),
-				// 	.uv11 = r1->uv.v11(),
-				// });
-				//
-				// batch.push_instruction(instruction::rectangle{
-				// 	.generic = {.image = r2->view},
-				// 	.pos = {400.5f, -300 + i * 270.1f},
-				// 	.angle = 30 * math::deg_to_rad,
-				// 	.scale = 1,
-				// 	.vert_color = vc,
-				// 	.extent = {100.15f, 100.15f},
-				// 	.uv00 = r2->uv.v00(),
-				// 	.uv11 = r2->uv.v11(),
-				// });
-				//
-				// batch.push_instruction(instruction::rectangle{
-				// 	.generic = {.image = r3->view},
-				// 	.pos = {600.5f, -300 + i * 270.1f},
-				// 	.angle = 30 * math::deg_to_rad,
-				// 	.scale = 1,
-				// 	.vert_color = vc,
-				// 	.extent = {100.15f, 100.15f},
-				// 	.uv00 = r3->uv.v00(),
-				// 	.uv11 = r3->uv.v11(),
-				// });
-				//
-				// batch.push_instruction(instruction::rectangle{
-				// 	.generic = {.image = r4->view},
-				// 	.pos = {800.5f, -300 + i * 270.1f},
-				// 	.angle = 30 * math::deg_to_rad,
-				// 	.scale = 1,
-				// 	.vert_color = vc,
-				// 	.extent = {100.15f, 100.15f},
-				// 	.uv00 = r4->uv.v00(),
-				// 	.uv11 = r4->uv.v11(),
-				// });
-				//
-
-				std::vector<math::vec2> arr {
-					{-30, 20},
-					{-10, -10},
-					{0, 0},
-					{20, 40},
-					{50, 80},
-					{80, 20},
-					{120, 50},
-						{180, -20},
-						{250, 70},
-				};
-
-				for (auto && vector2 : arr){
-					vector2 *= 15;
-				}
-
-				for (auto [idx, tup] : arr | std::views::adjacent<4> | std::views::enumerate){
-					auto [v0, v1, v2, v3] = tup;
-					auto sp = 32 * (1 - float(idx) / float(arr.size() - 3));
-					auto sn = 32 * (1 - float(idx + 1) / float(arr.size() - 3));
-					batch.push_instruction(instruction::constrained_curve{
-						.param = instruction::curve_trait_mat::catmull_rom<.5f> * instruction::curve_ctrl_handle{
-							v0, v1, v2, v3
-						},
-
-						.stroke = {sp, sn},
-						.segments = 32,
-
-						.color = {colors::aqua.to_light(2), colors::aqua.to_light(2)},
-					});
-				}
-
-				// for (auto [v0, v1, v2, v3] : arr | std::views::adjacent<4> | std::views::drop(1) | std::views::stride(2)){
-				// 	batch.push_instruction(instruction::constrained_curve{
-				// 		.param = instruction::curve_trait_mat::hermite * instruction::curve_ctrl_handle{
-				// 			v0, v1, v2, v3
-				// 		},
-				//
-				// 		.stroke = {15},
-				// 		.segments = 32,
-				//
-				// 		.src_color = colors::pale_green.to_light(2),
-				// 		.dst_color = colors::pale_green.to_light(2)
-				// 	});
-				// }
-				for (auto pos : arr){
-					batch.push_instruction(instruction::poly{
-						.pos = pos,
-						.segments = 32,
-						.radius = {0, 8},
-						.color = {colors::ACID.to_light(2), colors::ACID.to_light(2)}
-					});
-				}
-
-				//
-				// batch.push_instruction(instruction::constrained_curve{
-				// 	.param = instruction::curve_trait_mat::bezier * instruction::curve_ctrl_handle{{
-				// 		{0, 0}, {0, 50}, cursor_world.copy().add_y(-50), cursor_world
-				// 	}},
-				//
-				// 	.factor_range = {0, 1},
-				// 	.segments = 32,
-				// 	.stroke = 16,
-				// 	.src_color = colors::white,
-				// 	.dst_color = colors::aqua.to_light()
-				// });
-				//
-				// batch.push_instruction(instruction::constrained_curve{
-				// 	.param = instruction::curve_trait_mat::hermite * instruction::curve_ctrl_handle{{
-				// 		{0 - 100, 0}, {0 - 100, 50}, cursor_world.copy().add_x(-100), cursor_world.copy().add( - 100, -50)
-				// 	}},
-				//
-				// 	.factor_range = {0, 1},
-				// 	.segments = 32,
-				// 	.stroke = 16,
-				// 	.src_color = colors::white,
-				// 	.dst_color = colors::aqua
-				// });
-				//
-				// batch.push_instruction(instruction::constrained_curve{
-				// 	.param = instruction::curve_trait_mat::catmull_rom<> * instruction::curve_ctrl_handle{{
-				// 		{0 + 100, 0}, {0 + 100, 50}, cursor_world.copy().add( + 100, -50), cursor_world.copy().add_x(+100)
-				// 	}},
-				//
-				// 	.factor_range = {0, 1},
-				// 	.segments = 32,
-				// 	.stroke = 16,
-				// 	.src_color = colors::white,
-				// 	.dst_color = colors::aqua
-				// });
-				//
-				//
-				// batch.push_instruction(instruction::constrained_curve{
-				// 	.param = instruction::curve_trait_mat::b_spline * instruction::curve_ctrl_handle{{
-				// 		{0 + 200, 0}, {0 + 200, 50}, cursor_world.copy().add( + 200, -50), cursor_world.copy().add_x(+200)
-				// 	}},
-				//
-				// 	.factor_range = {0, 1},
-				// 	.segments = 32,
-				// 	.stroke = 16,
-				// 	.src_color = colors::white,
-				// 	.dst_color = colors::aqua
-				// });
-				//
-				// float off = 0;//i == 0 ? core::global::timer.global_time() * 5.f : 0.f;
-				//
-				// batch.push_instruction(instruction::line_segments_closed{
-				//
-				// }, instruction::line_node{
-				// 	.pos = {30, 200},
-				// 	.stroke = 8,
-				// 	.offset = off,
-				// 	.color = colors::aqua,
-				// }, instruction::line_node{
-				// 	.pos = {70, 70},
-				// 	.stroke = 8,
-				// 	.offset = off,
-				// 	.color = colors::red_dusted,
-				// }, instruction::line_node{
-				// 	.pos = cursor_world,
-				// 	.stroke = 8,
-				// 	.offset = off,
-				// 	.color = colors::pale_yellow,
-				// }, instruction::line_node{
-				// 	.pos = {230, 370},
-				// 	.stroke = 8,
-				// 	.offset = off,
-				// 	.color = colors::pale_green,
-				// });
-				//
-				// batch.push_instruction(instruction::rectangle_ortho_vert_color{
-				// 	.generic = {r1->view},
-				// 	.v00 = {0, 0},
-				// 	.v11 = {600, 600},
-				// 	.uv00 = r1->uv.v00(),
-				// 	.uv11 = r1->uv.v11(),
-				// 	.vert_color = vc,
-				// });
-				//
-				// batch.push_instruction(instruction::line{
-				// 	.src = {-600, -600},
-				// 	.dst = {-500, -700},
-				// 	.src_color = colors::ACID,
-				// 	.dst_color = colors::CRIMSON,
-				// 	.stroke = 65,
-				// });
-				// batch.push_instruction(instruction::row_patch{
-				// 	.generic = {r2->view},
-				// 	.coords = {
-				// 		.x = {0, 100, 500, 600},
-				// 		.y = {0, 200},
-				// 		.uv_y = {r2->uv.v00().y, r2->uv.v11().y},
-				// 		.uv_x = {r2->uv.v00().x, r2->uv.v00().x + .1f, r2->uv.v11().x - .1f, r2->uv.v11().x}
-				// 	},
-				// 	.color = colors::white,
-				// });
-
-			}
-
-#pragma endregion
-
-
+			gui::global::manager.draw();
 			renderer.wait_idle();
 
 			// batch.reset();

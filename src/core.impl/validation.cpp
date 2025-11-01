@@ -3,7 +3,7 @@ module;
 #include <vulkan/vulkan.h>
 #include "../core/vulkan/vk_loader.hpp"
 
-module mo_yanxi.vk.validation;
+module mo_yanxi.vk.util;
 
 import mo_yanxi.stack_trace;
 

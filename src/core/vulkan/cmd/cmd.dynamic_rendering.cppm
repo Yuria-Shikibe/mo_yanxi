@@ -2,7 +2,7 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.dynamic_rendering;
+export module mo_yanxi.vk.cmd:dynamic_rendering;
 import std;
 
 namespace mo_yanxi::vk{

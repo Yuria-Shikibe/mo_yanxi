@@ -2,8 +2,8 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.swap_chain_info;
-import mo_yanxi.vk.util.invoker;
+export module mo_yanxi.vk:swap_chain_info;
+import mo_yanxi.vk.util;
 import std;
 
 export namespace mo_yanxi::vk{

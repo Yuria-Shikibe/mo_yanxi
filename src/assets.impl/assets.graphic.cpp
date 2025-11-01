@@ -9,8 +9,7 @@ import mo_yanxi.assets.directories;
 
 import std;
 import mo_yanxi.vk.vertex_info;
-import mo_yanxi.vk.resources;
-import mo_yanxi.vk.command_buffer;
+import mo_yanxi.vk;
 
 using namespace mo_yanxi;
 

@@ -6,10 +6,8 @@ module;
 
 export module mo_yanxi.graphic.render_graph.smaa_asserts;
 
-import mo_yanxi.vk.image_derives;
-import mo_yanxi.vk.resources;
+import mo_yanxi.vk;
 import mo_yanxi.core.global.graphic;
-import mo_yanxi.vk.context;
 
 import std;
 

@@ -2,9 +2,9 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.validation;
+export module mo_yanxi.vk.util:validation;
 
-import mo_yanxi.vk.exception;
+import :exception;
 import mo_yanxi.handle_wrapper;
 import std;
 

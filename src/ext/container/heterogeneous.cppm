@@ -238,13 +238,13 @@ namespace mo_yanxi{
 
 	//TODO allocator tparam
 	export
-	template <typename V>
-	class string_hash_map : public std::unordered_map<std::string, V, transparent::string_hasher, transparent::string_equal_to>{
+	template <typename V, typename Alloc = std::allocator<std::pair<const std::string, V>>>
+	class string_hash_map : public std::unordered_map<std::string, V, transparent::string_hasher, transparent::string_equal_to, Alloc>{
 	private:
-		using self_type = std::unordered_map<std::string, V, transparent::string_hasher, transparent::string_equal_to>;
+		using self_type = std::unordered_map<std::string, V, transparent::string_hasher, transparent::string_equal_to, Alloc>;
 
 	public:
-		using std::unordered_map<std::string, V, transparent::string_hasher, transparent::string_equal_to>::unordered_map;
+		using std::unordered_map<std::string, V, transparent::string_hasher, transparent::string_equal_to, Alloc>::unordered_map;
 
 		V& at(const std::string_view key){
 			return this->find(key)->second;

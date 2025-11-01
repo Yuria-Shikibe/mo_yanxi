@@ -2,13 +2,12 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.physical_device;
+export module mo_yanxi.vk:physical_device;
 
 import std;
 
 import mo_yanxi.vk.util;
-import mo_yanxi.vk.exception;
-import mo_yanxi.vk.swap_chain_info;
+import :swap_chain_info;
 
 import mo_yanxi.meta_programming;
 

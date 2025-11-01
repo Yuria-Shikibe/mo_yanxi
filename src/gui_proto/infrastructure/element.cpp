@@ -28,13 +28,13 @@ void elem::clear_scene_references() noexcept{
 	scene_->drop_all_focus(this);
 }
 
-std::optional<math::vec2> elem::pre_acquire_size_no_boarder_clip(const optional_mastering_extent extent){
+std::optional<math::vec2> elem::pre_acquire_size_no_boarder_clip(const layout::optional_mastering_extent extent){
 	return pre_acquire_size_impl(extent).transform([&, this](const math::vec2 v){
 		return size_.clamp(v + boarder_.extent()).min(extent.potential_extent());
 	});
 }
 
-std::optional<math::vec2> elem::pre_acquire_size(const optional_mastering_extent extent){
+std::optional<math::vec2> elem::pre_acquire_size(const layout::optional_mastering_extent extent){
 	return pre_acquire_size_impl(clip_boarder_from(extent, boarder_)).transform([&, this](const math::vec2 v){
 		return size_.clamp(v + boarder_.extent()).min(extent.potential_extent());
 	});
@@ -47,7 +47,11 @@ void elem::notify_layout_changed(propagate_mask propagation) noexcept{
 		const bool force_upper = check_propagate_satisfy(propagation, propagate_mask::force_upper);
 		if(force_upper || (check_propagate_satisfy(propagation, propagate_mask::super) && layout_state.is_broadcastable(propagate_mask::super))){
 			if(parent_->layout_state.notify_children_changed(force_upper)){
-				parent_->notify_layout_changed(propagation - propagate_mask::child);
+				if(parent_->layout_state.intercept_lower_to_isolated){
+					parent_->notify_isolated_layout_changed();
+				}else{
+					parent_->notify_layout_changed(propagation - propagate_mask::child);
+				}
 			}
 		}
 	}

@@ -113,7 +113,7 @@ struct pos_binding{
 
 	[[nodiscard]] pos_binding() = default;
 
-	[[nodiscard]] explicit(false) pos_binding(void* func)
+	[[nodiscard]] explicit pos_binding(void* func)
 		: func(func){
 	}
 
@@ -140,7 +140,7 @@ struct inbound_binding{
 
 	[[nodiscard]] inbound_binding() = default;
 
-	[[nodiscard]] explicit(false) inbound_binding(void* func)
+	[[nodiscard]] explicit inbound_binding(void* func)
 		: func(func){
 	}
 
@@ -224,7 +224,7 @@ protected:
 	std::array<std::pmr::vector<pos_binding>, magic_enum::enum_count<pos_binding_target>()> pos_bindingses_{[this]{
 		std::array<std::pmr::vector<pos_binding>, magic_enum::enum_count<pos_binding_target>()> rst{};
 		for (auto && pos_bindings : rst){
-			pos_bindings = std::pmr::vector<pos_binding>{memory_pool_};
+			pos_bindings = std::pmr::vector<pos_binding>(memory_pool_);
 		}
 		return rst;
 	}()};

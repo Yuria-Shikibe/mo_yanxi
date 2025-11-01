@@ -8,7 +8,7 @@ export module mo_yanxi.ui.flags;
 import std;
 
 namespace mo_yanxi::ui{
-	export enum struct spread_direction : std::uint8_t{
+	export enum struct propagate_mask : std::uint8_t{
 		none = 0,
 		local = 1u << 0,
 		super = 1u << 1,
@@ -26,8 +26,8 @@ namespace mo_yanxi::ui{
 		upper = local | super,
 	};
 
-	BITMASK_OPS_BOOL(export, spread_direction)
-	BITMASK_OPS_ADDITIONAL(export, spread_direction)
+	BITMASK_OPS_BOOL(export, propagate_mask)
+	BITMASK_OPS_ADDITIONAL(export, propagate_mask)
 
 
 	export struct layout_state{
@@ -40,13 +40,13 @@ namespace mo_yanxi::ui{
 		 * @brief Describes the accept direction in layout context
 		 * e.g. An element in @link BedFace @endlink only accept layout notification from parent
 		 */
-		spread_direction acceptMask_context{spread_direction::all};
+		propagate_mask acceptMask_context{propagate_mask::all};
 
 		/**
 		 * @brief Describes the accept direction an element inherently owns
 		 * e.g. An element of @link ScrollPanel @endlink deny children layout notify
 		 */
-		spread_direction acceptMask_inherent{spread_direction::all};
+		propagate_mask acceptMask_inherent{propagate_mask::all};
 
 
 		/**
@@ -65,7 +65,7 @@ namespace mo_yanxi::ui{
 		// }
 
 		constexpr void ignoreChildren() noexcept{
-			acceptMask_inherent -= spread_direction::child;
+			acceptMask_inherent -= propagate_mask::child;
 		}
 
 		[[nodiscard]] constexpr bool is_children_changed() const noexcept{
@@ -104,13 +104,13 @@ namespace mo_yanxi::ui{
 		}
 
 		constexpr void notify_self_changed() noexcept{
-			if(acceptMask_context & spread_direction::local && acceptMask_inherent & spread_direction::local){
+			if(acceptMask_context & propagate_mask::local && acceptMask_inherent & propagate_mask::local){
 				local_changed = true;
 			}
 		}
 
 		constexpr bool notify_children_changed(const bool force = false) noexcept{
-			if(force || (acceptMask_context & spread_direction::child && acceptMask_inherent & spread_direction::child)){
+			if(force || (acceptMask_context & propagate_mask::child && acceptMask_inherent & propagate_mask::child)){
 				children_changed = true;
 				return true;
 			}
@@ -118,7 +118,7 @@ namespace mo_yanxi::ui{
 		}
 
 		constexpr bool notify_parent_changed() noexcept{
-			if(acceptMask_context & spread_direction::super && acceptMask_inherent & spread_direction::super){
+			if(acceptMask_context & propagate_mask::super && acceptMask_inherent & propagate_mask::super){
 				parent_changed = true;
 				return false;
 			}

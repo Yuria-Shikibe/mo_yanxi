@@ -40,7 +40,7 @@ public:
 		return nullptr;
 	}
 
-	scene& get_current_focus() noexcept{
+	scene& get_current_focus() const noexcept{
 		return *focus;
 	}
 
@@ -57,6 +57,7 @@ public:
 		requires (std::constructible_from<T, scene&, elem*, Args&&...>)
 	scene_add_result<T> add_scene(
 		std::string_view name,
+		bool focus_it,
 		gui::renderer& renderer_ui,
 		Args&&... args){
 		auto& scene_ = this->add_scene(
@@ -64,7 +65,7 @@ public:
 			scene{
 				renderer_ui, std::in_place_type<T>,
 				std::forward<Args>(args)...
-			});
+			}, focus_it);
 
 		auto& root = this->root_of<T>(name);
 		return {scene_, root};
@@ -94,9 +95,9 @@ public:
 		if(focus) focus->update(delta_in_ticks);
 	}
 
-	// void layout() const{
-	// 	if(focus) focus->layout();
-	// }
+	void layout() const{
+		if(focus) focus->layout();
+	}
 
 	void input_key(const input_handle::key_set k) const{
 		if(focus) focus->on_key_action(k);
@@ -115,6 +116,10 @@ public:
 		if(focus) focus->inform_cursor_move({x, y});
 	}
 
+	void scroll_update(const float x, const float y) const{
+		if(focus) focus->on_scroll({x, y});
+	}
+
 	scene* get_scene(const std::string_view sceneName){
 		return scenes.try_find(sceneName);
 	}
@@ -122,7 +127,7 @@ public:
 	template <typename T>
 	[[nodiscard]] T& root_of(const std::string_view sceneName){
 		if(const auto rst = scenes.try_find(sceneName)){
-			rst->root<T>();
+			return rst->root<T>();
 		}
 
 		std::println(std::cerr, "Scene {} Not Found", sceneName);

@@ -51,7 +51,6 @@ private:
 	exclusive_handle_member<renderer*> renderer_{};
 
 protected:
-	elem_ptr root_{};
 	rect region_;
 
 
@@ -65,6 +64,8 @@ protected:
 	std::pmr::vector<elem*> last_inbounds_{resource_.get()};
 	std::pmr::unordered_set<elem*> independent_layouts_{resource_.get()};
 
+	//must be the first to destruct
+	elem_ptr root_{};
 
 	[[nodiscard]] scene_base() = default;
 
@@ -139,6 +140,14 @@ struct scene : scene_base{
 	scene& operator=(const scene& other) = delete;
 	scene& operator=(scene&& other) noexcept;
 
+public:
+	template <std::derived_from<elem> T, typename ...Args>
+	[[nodiscard]] elem_ptr create(Args&& ...args){
+		return elem_ptr{*this, nullptr, std::in_place_type<T>, std::forward<Args>(args)...};
+	}
+
+
+	void resize(const math::frect region);
 
 private:
 	void update(float delta_in_tick);
@@ -174,9 +183,6 @@ private:
 
 	void on_cursor_pos_update(bool force_drop);
 #pragma endregion
-
-
-	void resize(const math::frect region);
 
 	void layout();
 

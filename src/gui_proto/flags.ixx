@@ -49,6 +49,8 @@ export struct layout_state{
 
 	propagate_mask inherent_broadcast_mask{propagate_mask::all};
 
+	bool intercept_lower_to_isolated{false};
+
 private:
 	bool children_changed{};
 	bool parent_changed{};
@@ -139,10 +141,4 @@ export enum struct interactivity_flag : std::uint8_t{
 	enabled,
 	intercept,
 };
-
-export enum struct esc_flag{
-	intercept,
-	fall_through,
-};
-
 }

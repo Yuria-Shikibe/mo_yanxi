@@ -5,11 +5,7 @@ module;
 export module volume_draw;
 
 export import :primitives;
-import mo_yanxi.vk.context;
-import mo_yanxi.vk.pipeline.layout;
-import mo_yanxi.vk.descriptor_buffer;
-import mo_yanxi.vk.resources;
-import mo_yanxi.vk.uniform_buffer;
+import mo_yanxi.vk;
 
 import mo_yanxi.seq_chunk;
 

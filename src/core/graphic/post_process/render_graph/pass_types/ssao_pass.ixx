@@ -2,8 +2,7 @@
 export module mo_yanxi.graphic.render_graph.ssao;
 
 export import mo_yanxi.graphic.render_graph.post_process_pass;
-import mo_yanxi.vk.image_derives;
-import mo_yanxi.vk.ext;
+import mo_yanxi.vk;
 import mo_yanxi.math.vector2;
 import std;
 

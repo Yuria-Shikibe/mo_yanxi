@@ -17,7 +17,7 @@ import mo_yanxi.game.ecs.component.manifold;
 import mo_yanxi.game.ecs.component.command;
 import mo_yanxi.game.ecs.component.ui.builder;
 
-import mo_yanxi.basic_util;
+import mo_yanxi.utility;
 
 namespace mo_yanxi::game{
 	void draw_path(

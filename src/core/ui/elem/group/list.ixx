@@ -105,7 +105,7 @@ namespace mo_yanxi::ui{
 	public:
 		void set_layout_policy(layout_policy policy) noexcept{
 			if(util::try_modify(policy_, policy)){
-				notify_layout_changed(spread_direction::all_visible);
+				notify_layout_changed(propagate_mask::all_visible);
 			}
 		}
 

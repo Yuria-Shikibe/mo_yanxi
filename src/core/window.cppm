@@ -12,10 +12,9 @@ module;
 export module mo_yanxi.core.window;
 import std;
 import mo_yanxi.core.window.callback;
-// import mo_yanxi.math.vector2;
 import mo_yanxi.event;
 import mo_yanxi.handle_wrapper;
-import mo_yanxi.vk.exception;
+import mo_yanxi.vk.util;
 
 namespace mo_yanxi{
 	constexpr std::uint32_t WIDTH = 1280;

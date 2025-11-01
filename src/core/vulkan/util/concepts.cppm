@@ -1,4 +1,4 @@
-export module mo_yanxi.vk.concepts;
+export module mo_yanxi.vk.util:concepts;
 
 import std;
 

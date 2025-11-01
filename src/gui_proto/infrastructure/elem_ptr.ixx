@@ -24,8 +24,8 @@ concept invocable_elem_init_func = invocable_func_initializer_of<Fn, elem>;
 
 export
 template <typename InitFunc>
-struct elem_init_func_trait : protected func_initializer_trait<InitFunc>{
-	using elem_type = typename func_initializer_trait<InitFunc>::target_type;
+struct elem_init_func_trait : protected func_initializer_trait<std::remove_cvref_t<InitFunc>>{
+	using elem_type = typename func_initializer_trait<std::remove_cvref_t<InitFunc>>::target_type;
 };
 
 export

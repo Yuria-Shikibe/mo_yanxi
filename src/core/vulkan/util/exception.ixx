@@ -2,7 +2,7 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.exception;
+export module mo_yanxi.vk.util:exception;
 
 import std;
 

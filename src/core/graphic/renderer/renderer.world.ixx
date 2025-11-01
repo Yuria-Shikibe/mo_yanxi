@@ -11,8 +11,7 @@ export import mo_yanxi.vk.vertex_info;
 export import mo_yanxi.graphic.camera;
 
 import mo_yanxi.assets.graphic;
-import mo_yanxi.vk.util.cmd.render;
-import mo_yanxi.vk.ext;
+import mo_yanxi.vk;
 import mo_yanxi.vk.util.uniform;
 
 import mo_yanxi.graphic.post_processor.oit_blender;

@@ -5,7 +5,7 @@ module;
 module mo_yanxi.game.ui.hitbox_editor;
 
 import mo_yanxi.core.global.assets;
-import mo_yanxi.basic_util;
+import mo_yanxi.utility;
 
 void mo_yanxi::game::ui::hitbox_editor::write_to(const std::filesystem::path& path){
 	auto metas = viewport->channel_hitbox.export_to_meta();

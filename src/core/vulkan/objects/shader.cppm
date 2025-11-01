@@ -2,10 +2,10 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.shader;
+export module mo_yanxi.vk:shader;
 
 import mo_yanxi.handle_wrapper;
-import mo_yanxi.vk.exception;
+import mo_yanxi.vk.util;
 import mo_yanxi.io;
 import std;
 

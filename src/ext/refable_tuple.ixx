@@ -91,9 +91,4 @@ namespace mo_yanxi{
 		return refable_tuple<refable_tuple_decay_ref<std::unwrap_ref_decay_t<Ts>> ...>{std::forward<Ts>(args) ...};
 	}
 
-	void foo(){
-		int a;
-		auto t = std::ref(a);
-		auto b = std::unwrap_ref_decay_t<decltype(t)>{static_cast<std::unwrap_reference_t<decltype(t)>>(t)};
-	}
 }

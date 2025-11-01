@@ -7,7 +7,7 @@ export module mo_yanxi.math.quad_tree;
 
 export import mo_yanxi.math.quad_tree.interface;
 import std;
-import mo_yanxi.basic_util;
+import mo_yanxi.utility;
 import mo_yanxi.concepts;
 import mo_yanxi.object_pool;
 import mo_yanxi.math.vector2;

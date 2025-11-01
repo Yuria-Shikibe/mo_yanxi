@@ -2,10 +2,10 @@ module;
 
 #include <vulkan/vulkan.h>
 
-export module mo_yanxi.vk.command_buffer;
+export module mo_yanxi.vk:command_buffer;
 
 import mo_yanxi.handle_wrapper;
-import mo_yanxi.vk.exception;
+import mo_yanxi.vk.util;
 import std;
 
 namespace mo_yanxi::vk{
@@ -464,4 +464,13 @@ namespace mo_yanxi::vk{
 		}
 
 	};
+
+
+command_buffer::command_buffer(const command_pool& command_pool, const VkCommandBufferLevel level)
+	: command_buffer(command_pool.get_device(), command_pool, level)
+{}
+
+transient_command::transient_command(const command_pool& command_pool, VkQueue targetQueue, VkFence fence) :
+	transient_command(command_pool.get_device(), command_pool.get(), targetQueue, fence){}
+
 }

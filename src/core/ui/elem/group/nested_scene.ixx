@@ -199,7 +199,7 @@ namespace mo_yanxi::ui{
 				children.erase(itr);
 			}
 
-			notify_layout_changed(spread_direction::all_visible);
+			notify_layout_changed(propagate_mask::all_visible);
 		}
 
 		void instant_remove(elem* element) override{
@@ -208,7 +208,7 @@ namespace mo_yanxi::ui{
 				children.erase(itr);
 			}
 
-			notify_layout_changed(spread_direction::all_visible);
+			notify_layout_changed(propagate_mask::all_visible);
 		}
 
 		// void selectionHint(const Event::ElementConnection::CodeType code){

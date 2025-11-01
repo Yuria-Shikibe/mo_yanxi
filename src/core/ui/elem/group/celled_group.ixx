@@ -164,7 +164,7 @@ namespace mo_yanxi::ui{
 				expired.push_back(std::move(*itr));
 				children.erase(itr);
 			}
-			notify_layout_changed(spread_direction::all_visible);
+			notify_layout_changed(propagate_mask::all_visible);
 		}
 
 		void instant_remove(elem* element) override{
@@ -172,7 +172,7 @@ namespace mo_yanxi::ui{
 				cells.erase(cells.begin() + std::distance(children.begin(), itr));
 				children.erase(itr);
 			}
-			notify_layout_changed(spread_direction::all_visible);
+			notify_layout_changed(propagate_mask::all_visible);
 		}
 
 		elem& add_children(elem_ptr&& element, std::size_t where) override{
@@ -251,7 +251,7 @@ namespace mo_yanxi::ui{
 			if(isolated_notify){
 				notify_isolated_layout_changed();
 			}else{
-				notify_layout_changed(spread_direction::all_visible);
+				notify_layout_changed(propagate_mask::all_visible);
 			}
 
 			cells[where].element = elem.get();
