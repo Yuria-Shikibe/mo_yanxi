@@ -100,7 +100,11 @@ public:
 	}
 
 	void input_key(const input_handle::key_set k) const{
-		if(focus) focus->on_key_action(k);
+		if(focus) focus->input_key(k);
+	}
+
+	void input_mouse(const input_handle::key_set k) const{
+		if(focus) focus->input_mouse(k);
 	}
 
 	void input_scroll(const float x, const float y) const{

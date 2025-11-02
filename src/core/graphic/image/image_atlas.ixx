@@ -39,7 +39,7 @@ namespace mo_yanxi::graphic{
 
 	export struct allocated_image_region :
 		region_type,
-		referenced_object<false>{
+		referenced_object{
 	protected:
 		math::urect region{};
 		exclusive_handle_member<sub_page*> page{};
@@ -83,17 +83,17 @@ namespace mo_yanxi::graphic{
 		}
 
 		using referenced_object::droppable;
-		using referenced_object::decr_ref;
-		using referenced_object::incr_ref;
+		using referenced_object::ref_decr;
+		using referenced_object::ref_incr;
 	};
 
-	export struct borrowed_image_region : referenced_ptr<allocated_image_region, false>{
+	export struct borrowed_image_region : referenced_ptr<allocated_image_region, no_deletion_on_ref_count_to_zero>{
 		[[nodiscard]] constexpr explicit(false) borrowed_image_region(allocated_image_region* object)
 			: referenced_ptr(object){
 		}
 
 		[[nodiscard]] constexpr explicit(false) borrowed_image_region(allocated_image_region& object)
-			: referenced_ptr(object){
+			: referenced_ptr(std::addressof(object)){
 		}
 
 		[[nodiscard]] constexpr borrowed_image_region() = default;
@@ -700,7 +700,7 @@ namespace mo_yanxi::graphic{
 			if(const auto page = named_image_regions.try_find(localName)){
 				if(protected_regions.insert(page).second){
 					//not inserted
-					page->incr_ref();
+					page->ref_incr();
 					return true;
 				}
 
@@ -714,7 +714,7 @@ namespace mo_yanxi::graphic{
 		bool mark_unprotected(const std::string_view localName) noexcept{
 			if(const auto page = named_image_regions.try_find(localName)){
 				if(protected_regions.erase(page)){
-					page->decr_ref();
+					page->ref_decr();
 					return true;
 				}
 			}

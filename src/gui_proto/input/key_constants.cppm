@@ -62,7 +62,7 @@ BITMASK_OPS(export, mode);
 export [[nodiscard]] constexpr bool matched(const mode m, const mode expectedMode) noexcept{
 	if(expectedMode == mode::ignore)return true;
 
-	if((expectedMode & mode::strict) != mode{}){
+	if((expectedMode & mode::strict) == mode{}) [[likely]] {
 		return (m & expectedMode) == expectedMode;
 	}
 

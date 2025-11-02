@@ -9,6 +9,8 @@ export import mo_yanxi.gui.layout.policies;
 
 export import mo_yanxi.math.rect_ortho;
 export import align;
+
+import mo_yanxi.math;
 import std;
 
 namespace mo_yanxi::gui::layout{
@@ -35,8 +37,7 @@ namespace mo_yanxi::gui::layout{
 	struct basic_cell{
 		align::pos align{align::pos::center};
 
-		vec2 minimum_size{};
-		vec2 maximum_size{math::vectors::constant2<float>::inf_positive_vec2};
+		math::section<vec2> extent_span{{}, math::vectors::constant2<float>::inf_positive_vec2};
 
 		rect allocated_region{};
 		vec2 scaling{1.f, 1.f};
@@ -44,7 +45,7 @@ namespace mo_yanxi::gui::layout{
 		align::spacing margin{};
 
 		[[nodiscard]] constexpr vec2 clamp_size(vec2 sz) const noexcept{
-			return sz.clamp_xy(minimum_size, maximum_size);
+			return sz.clamp_xy(extent_span.from, extent_span.to);
 		}
 
 		constexpr vec2 get_relative_src(vec2 actual_extent) const noexcept{
@@ -54,24 +55,24 @@ namespace mo_yanxi::gui::layout{
 		void apply_to(
 			const elem& group,
 			elem& elem,
-			optional_mastering_extent cell_restriction_extent) const{
+			optional_mastering_extent cell_expected_restriction_extent) const{
 			elem.set_scaling(group.get_scaling() * scaling);
-			const auto extent = clamp_size(allocated_region.extent() * scaling - margin.extent());
+			const auto extent = allocated_region.extent();
 
 			elem.set_rel_pos(get_relative_src(extent));
-			elem.update_abs_src(group.abs_content_src_pos());
+			elem.update_abs_src(group.content_src_pos_abs());
 			elem.resize(extent, propagate_mask::lower);
 
-			if(!cell_restriction_extent.width_dependent()){
-				cell_restriction_extent.set_width(extent.x);
+			if(!cell_expected_restriction_extent.width_dependent()){
+				cell_expected_restriction_extent.set_width(extent.x);
 			}
 
-			if(!cell_restriction_extent.height_dependent()){
-				cell_restriction_extent.set_height(extent.y);
+			if(!cell_expected_restriction_extent.height_dependent()){
+				cell_expected_restriction_extent.set_height(extent.y);
 			}
 
-			elem.restriction_extent = cell_restriction_extent;
-			elem.layout();
+			elem.restriction_extent = cell_expected_restriction_extent;
+			elem.try_layout();
 		}
 
 
@@ -102,7 +103,7 @@ namespace mo_yanxi::gui::layout{
 			return *this;
 		}
 
-		auto& set_passive(float weight){
+		auto& set_passive(float weight = 1.f){
 			this->stated_size = {size_category::passive, weight};
 			return *this;
 		}

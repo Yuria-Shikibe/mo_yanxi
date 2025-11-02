@@ -16,11 +16,11 @@ export struct scene;
 
 export
 template <typename Fn>
-concept elem_init_func = func_initializer_of<Fn, elem>;
+concept elem_init_func = func_initializer_of<std::remove_const_t<Fn>, elem>;
 
 export
 template <typename Fn>
-concept invocable_elem_init_func = invocable_func_initializer_of<Fn, elem>;
+concept invocable_elem_init_func = invocable_func_initializer_of<std::remove_const_t<Fn>, elem>;
 
 export
 template <typename InitFunc>
@@ -36,11 +36,11 @@ struct elem_ptr{
 		: element{element}{
 	}
 
-	template <typename InitFunc>
+	template <typename InitFunc, typename ...Args>
 		requires (!spec_of<InitFunc, std::in_place_type_t> && invocable_elem_init_func<InitFunc>)
-	[[nodiscard]] elem_ptr(scene& scene, elem* parent, InitFunc initFunc)
+	[[nodiscard]] elem_ptr(scene& scene, elem* parent, InitFunc&& initFunc, Args&& ...args)
 		: elem_ptr{
-			std::addressof(scene), parent, std::in_place_type<typename elem_init_func_trait<InitFunc>::elem_type>
+			scene, parent, std::in_place_type<typename elem_init_func_trait<InitFunc>::elem_type>, std::forward<Args>(args)...
 		}{
 		std::invoke(initFunc,
 		            static_cast<std::add_lvalue_reference_t<typename elem_init_func_trait<InitFunc>::elem_type>>(*

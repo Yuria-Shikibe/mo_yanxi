@@ -55,8 +55,13 @@ namespace mo_yanxi::math{
 		FORCE_INLINE friend constexpr vector2 operator*(const_pass_t v, const T val) noexcept {
 			return {v.x * val, v.y * val};
 		}
+
 		FORCE_INLINE friend constexpr vector2 operator*(const T val, const_pass_t v) noexcept {
 			return {v.x * val, v.y * val};
+		}
+
+		FORCE_INLINE constexpr vector2 operator!() const noexcept requires (std::same_as<T, bool>){
+			return {!x, !y};
 		}
 
 		/*template <ext::number N>
@@ -344,7 +349,7 @@ namespace mo_yanxi::math{
 
 		FORCE_INLINE constexpr vector2& fdim(const_pass_t other) noexcept requires (std::floating_point<T>)  {
 			x = math::fdim(x, other.x);
-			x = math::fdim(y, other.y);
+			y = math::fdim(y, other.y);
 			return *this;
 		}
 

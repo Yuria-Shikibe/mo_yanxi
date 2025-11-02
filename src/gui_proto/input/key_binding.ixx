@@ -169,7 +169,7 @@ enum struct act_state : std::uint8_t{
 	repeating
 };
 
-struct key_mapping_interface : protected referenced_object_base{
+struct key_mapping_interface : protected referenced_object{
 public:
 	using bind_type = key_binding<void>;
 
@@ -212,8 +212,8 @@ private:
 	template <typename ...Args>
 	friend struct input_manager;
 
-	using referenced_object::decr_ref;
-	using referenced_object::incr_ref;
+	using referenced_object::ref_decr;
+	using referenced_object::ref_incr;
 
 	std::pmr::memory_resource* memory_pool_{std::pmr::new_delete_resource()};
 	sparse_pool states_{memory_pool_};

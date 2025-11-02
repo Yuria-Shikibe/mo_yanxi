@@ -46,13 +46,13 @@ public:
 		if(rst.second){
 			rst.first->second = std::make_unique<key_mapping<CtxArgs...>>(memory_resource_.get());
 		}
-		rst.first->second->incr_ref();
+		rst.first->second->ref_incr();
 		return dynamic_cast<key_mapping<CtxArgs...>&>(*rst.first->second);
 	}
 
 	bool erase_sub_input(const std::string_view mappingName){
 		if(const auto itr = subInputs.find(mappingName); itr != subInputs.end()){
-			if(itr->second->decr_ref()){
+			if(itr->second->ref_decr()){
 				subInputs.erase(itr);
 				return true;
 			}

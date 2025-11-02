@@ -7,20 +7,46 @@ module mo_yanxi.gui.infrastructure;
 import mo_yanxi.graphic.draw.instruction;
 
 namespace mo_yanxi::gui{
-void elem::draw_background() const{
-	const auto region = abs_bound();
-	get_scene().renderer().draw(graphic::draw::instruction::rectangle_ortho_outline{
-		.v00 = region.vert_00(),
-		.v11 = region.vert_11(),
-		.stroke = 2,
-		.vert_color = graphic::colors::light_gray
+void debug_elem_drawer::draw(const elem& element, rect region, float opacityScl) const{
+
+	auto cregion = element.clip_to_content_bound(region);
+
+	element.get_scene().renderer().draw(graphic::draw::instruction::rectangle_ortho_outline{
+		.v00 = cregion.vert_00(),
+		.v11 = cregion.vert_11(),
+		.stroke = 1,
+		.vert_color = graphic::colors::YELLOW.copy().set_a(.1f)
 	});
+
+	using namespace graphic;
+	color c = colors::gray;
+	/*if(element.cursor_state().pressed){
+		c = colors::aqua;
+	}else */if(element.cursor_state().focused){
+		c = colors::white;
+	}else if(element.cursor_state().inbound){
+		c = colors::light_gray;
+	}
+	c.set_a(.75f);
+	float f1 = element.cursor_state().get_factor_of(&cursor_states::time_inbound);
+	float f2 = element.cursor_state().get_factor_of(&cursor_states::time_pressed);
+	float f3 = element.cursor_state().get_factor_of(&cursor_states::time_focus);
+
+	element.get_scene().renderer().draw(draw::instruction::rectangle_ortho_outline{
+			.v00 = region.vert_00(),
+			.v11 = region.vert_11(),
+			.stroke = 1,
+			.vert_color = {c, c.create_lerp(colors::ACID, f1), c.create_lerp(colors::ORANGE, f2), c.create_lerp(colors::CRIMSON, f3)}
+		});
+
+}
+
+void elem::draw_background() const{
+	if(style)style->draw(*this, bound_abs(), 1.f);
 }
 
 void elem::update(float delta_in_ticks){
 	cursor_states_.update(delta_in_ticks);
-
-
 }
 
 void elem::clear_scene_references() noexcept{
@@ -69,12 +95,16 @@ void elem::notify_isolated_layout_changed(){
 	get_scene().notify_isolated_layout_update(this);
 }
 
+bool elem::update_abs_src(math::vec2 parent_content_src) noexcept{
+	return util::try_modify(absolute_pos_, parent_content_src + relative_pos_);
+}
+
 bool elem::contains(const math::vec2 absPos) const noexcept{
-	return abs_bound().contains_loose(absPos) && (!parent() || parent()->parent_contain_constrain(absPos));
+	return bound_abs().contains_loose(absPos) && (!parent() || parent()->parent_contain_constrain(absPos));
 }
 
 bool elem::contains_self(const math::vec2 absPos, const float margin) const noexcept{
-	return abs_bound().expand(margin, margin).contains_loose(absPos);
+	return bound_abs().expand(margin, margin).contains_loose(absPos);
 }
 
 bool elem::parent_contain_constrain(const math::vec2 cursorPos) const noexcept{
@@ -104,7 +134,7 @@ bool elem::is_inbounded() const noexcept{
 
 void elem::set_focused_scroll(const bool focus) noexcept{
 	if(!focus && !is_focused_scroll()) return;
-	this->scene_->focus_cursor_ = focus ? this : nullptr;
+	this->scene_->focus_scroll_ = focus ? this : nullptr;
 }
 
 void elem::set_focused_key(const bool focus) noexcept{

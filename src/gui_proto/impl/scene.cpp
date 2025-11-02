@@ -25,7 +25,8 @@ void scene::draw(rect clip) const{
 	root_->draw(clip);
 }
 
-void scene::on_key_action(const input_handle::key_set key){
+void scene::input_key(const input_handle::key_set key){
+	inputs_.inform(key);
 
 	if(key.action == input_handle::act::press && key.key_code == std::to_underlying(input_handle::key::esc)){
 		//TODO onEsc
@@ -50,8 +51,32 @@ void scene::on_unicode_input(char32_t val) const{
 }
 
 void scene::on_scroll(const math::vec2 scroll) const{
+	events::scroll e{scroll, inputs_.main_binds.get_mode()};
 	if(focus_scroll_){
-		focus_scroll_->on_scroll(events::scroll{scroll, inputs_.main_binds.get_mode()});
+		auto rst = focus_scroll_->on_scroll(e, {});
+		if(rst == events::op_afterwards::intercepted)return;
+
+		if(const auto itr = std::ranges::find(last_inbounds_, focus_cursor_); itr == last_inbounds_.end()){
+			auto cur = std::reverse_iterator{itr};
+			while(cur != last_inbounds_.rend()){
+				std::span aboves{cur.base(), last_inbounds_.end()};
+				if((*cur)->on_scroll(e, aboves) != events::op_afterwards::intercepted){
+					++cur;
+				}else{
+					break;
+				}
+			}
+		}
+	}else{
+		auto cur = last_inbounds_.rbegin();
+		while(cur != last_inbounds_.rend()){
+			std::span aboves{cur.base(), last_inbounds_.end()};
+			if((*cur)->on_scroll(e, aboves) != events::op_afterwards::intercepted){
+				++cur;
+			}else{
+				break;
+			}
+		}
 	}
 }
 
@@ -130,6 +155,8 @@ void scene::layout(){
 }
 
 void scene::update_inbounds(std::pmr::vector<elem*>&& next, bool force_drop){
+	if(last_inbounds_.size() == next.size() && (last_inbounds_.empty() || last_inbounds_.back() == next.back()))return;
+
 	auto [i1, i2] = std::ranges::mismatch(last_inbounds_, next);
 
 	for(const auto& element : std::ranges::subrange{i1, last_inbounds_.end()} | std::views::reverse){
@@ -164,7 +191,7 @@ void scene::update_mouse_state(const input_handle::key_set k){
 
 		auto cur = last_inbounds_.rbegin();
 		while(cur != last_inbounds_.rend()){
-			std::span aboves{std::ranges::next(cur.base()), last_inbounds_.end()};
+			std::span aboves{cur.base(), last_inbounds_.end()};
 			if((*cur)->on_click(e, aboves) != events::op_afterwards::intercepted){
 				++cur;
 			}else{

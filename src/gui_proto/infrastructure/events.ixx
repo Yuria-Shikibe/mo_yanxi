@@ -9,22 +9,29 @@ import mo_yanxi.input_handle;
 import std;
 
 namespace mo_yanxi::gui::events{
+
+export
 using key_set = input_handle::key_set;
+
+export
 struct click{
 	math::vec2 pos;
 	key_set key;
 };
 
+export
 struct scroll{
-	math::vec2 pos;
+	math::vec2 delta;
 	input_handle::mode mode;
 };
 
+export
 struct cursor_move{
 	math::vec2 src;
 	math::vec2 dst;
 };
 
+export
 struct drag{
 	math::vec2 src;
 	math::vec2 dst;
@@ -35,6 +42,7 @@ struct drag{
 	}
 };
 
+export
 enum struct op_afterwards{
 	intercepted,
 	fall_through,

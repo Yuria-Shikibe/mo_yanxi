@@ -87,6 +87,10 @@ public:
 		return std::pmr::polymorphic_allocator<T>{resource_.get()};
 	}
 
+	[[nodiscard]] std::pmr::memory_resource* get_memory_resource() const noexcept {
+		return resource_.get();
+	}
+
 	template <std::derived_from<elem> T = elem, bool unchecked = false>
 	T& root(){
 		assert(root_ != nullptr);
@@ -159,15 +163,6 @@ private:
 	}
 
 #pragma region Events
-	void inform_input(const input_handle::key_set k){
-		if(k.key_code < std::to_underlying(input_handle::mouse::Count)){
-			update_mouse_state(k);
-		}else{
-			on_key_action(k);
-		}
-		inputs_.inform(k);
-	}
-
 	void update_mouse_state(input_handle::key_set k);
 
 	void inform_cursor_move(math::vec2 pos){
@@ -175,7 +170,12 @@ private:
 		on_cursor_pos_update(false);
 	}
 
-	void on_key_action(const input_handle::key_set key);
+	void input_key(const input_handle::key_set key);
+
+	void input_mouse(const input_handle::key_set key){
+		inputs_.inform(key);
+		update_mouse_state(key);
+	}
 
 	void on_unicode_input(char32_t val) const;
 

@@ -28,7 +28,7 @@ void mouseBottomCallBack(glfw::Wptr window, const int button, const int action, 
 	{
 		using namespace mo_yanxi::input_handle;
 
-		mo_yanxi::gui::global::manager.input_key(key_set{static_cast<std::uint16_t>(button), static_cast<act>(action), static_cast<mode>(mods)});
+		mo_yanxi::gui::global::manager.input_mouse(key_set{static_cast<std::uint16_t>(button), static_cast<act>(action), static_cast<mode>(mods)});
 	}
 	global::input.inform_mouse_action(button, action, mods);
 	if(global::ui::root)global::ui::root->input_mouse(button, action, mods);

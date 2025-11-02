@@ -167,7 +167,7 @@ namespace mo_yanxi::gui{
 		elem& insert(std::size_t where, elem_ptr&& elemPtr) final {
 			adaptor_type& adpt = *cells_.emplace(cells_.begin() + std::min<std::size_t>(where, cells_.size()), elemPtr.get(), template_cell);
 			auto& rst = basic_group::insert(where, std::move(elemPtr));
-			this->on_add(adpt);
+			this->on_element_add(adpt);
 			return rst;
 		}
 
@@ -175,7 +175,7 @@ namespace mo_yanxi::gui{
 			auto* p = elem.get();
 			auto rst = basic_group::exchange(where, std::move(elem), force_isolated_notify);
 			cells_[where].element = p;
-			this->on_add(cells_[where]);
+			this->on_element_add(cells_[where]);
 
 			return rst;
 		}
@@ -199,41 +199,41 @@ namespace mo_yanxi::gui{
 		}
 
 		template <std::derived_from<elem> E, std::derived_from<universal_group> G, typename ...Args>
-			requires requires{
-				requires std::constructible_from<E, scene&, elem*, Args...>;
-		}
+			requires (std::constructible_from<E, scene&, elem*, Args...>)
 		create_handle<E, cell_type> emplace(this G& self, std::size_t where, Args&&... args){
 			elem_ptr eptr{self.get_scene(), &self, std::in_place_type<E>, std::forward<Args>(args) ...};
 			adaptor_type adaptor{eptr.get(), self.template_cell};
 
 			co_yield layout::cell_create_result{static_cast<E&>(*eptr), adaptor.cell};
 			self.cells_.insert(self.cells_.begin() + std::min<std::size_t>(where, self.cells_.size()), adaptor);
-			static_cast<basic_group&>(self).insert(where, std::move(eptr));
-			static_cast<universal_group&>(self).on_add(adaptor);
+			self.basic_group::insert(where, std::move(eptr));
+			static_cast<universal_group&>(self).on_element_add(adaptor);
 		}
 
-		template <std::derived_from<elem> E, std::derived_from<universal_group> G, typename ...Args>
-			requires requires{
-				requires std::constructible_from<E, scene&, elem*, Args...>;
-		}
-		create_handle<E, cell_type> emplace_back(this G& self, Args&&... args){
-			return self.template emplace<E>(self.children_.size(), std::forward<Args>(args) ...);
-		}
-
-		template <invocable_elem_init_func Fn, std::derived_from<universal_group> G>
-		create_handle<typename elem_init_func_trait<Fn>::elem_type, cell_type> create(this G& self, std::size_t where, Fn&& init){
-			elem_ptr eptr{self.get_scene(), &self, std::forward<Fn>(init) ...};
+		template <invocable_elem_init_func Fn, std::derived_from<universal_group> G, typename ...Args>
+		create_handle<typename elem_init_func_trait<Fn>::elem_type, cell_type> create(
+			this G& self,
+			std::size_t where, Fn&& init,
+			Args&& ...args
+			){
+			elem_ptr eptr{self.get_scene(), &self, std::forward<Fn>(init), std::forward<Args>(args)...};
 			adaptor_type adaptor{eptr.get(), self.template_cell};
 
 			co_yield layout::cell_create_result{static_cast<typename elem_init_func_trait<Fn>::elem_type&>(*eptr), adaptor.cell};
 			cells_.insert(self.cells_.begin() + std::min<std::size_t>(where, self.cells_.size()), adaptor);
-			static_cast<basic_group&>(self).insert(where, std::move(eptr));
-			static_cast<universal_group&>(self).on_add(adaptor);
+			self.basic_group::insert(where, std::move(eptr));
+			static_cast<universal_group&>(self).on_element_add(adaptor);
 		}
 
-		template <invocable_elem_init_func Fn, std::derived_from<universal_group> G>
-		create_handle<typename elem_init_func_trait<Fn>::elem_type, cell_type> create_back(this G& self, Fn init){
-			return self.create(children_.size(), std::ref(init));
+		template <std::derived_from<elem> E, std::derived_from<universal_group> G, typename ...Args>
+			requires (std::constructible_from<E, scene&, elem*, Args...>)
+		create_handle<E, cell_type> emplace_back(this G& self, Args&&... args){
+			return self.template emplace<E>(self.children_.size(), std::forward<Args>(args) ...);
+		}
+
+		template <invocable_elem_init_func Fn, std::derived_from<universal_group> G, typename ...Args>
+		create_handle<typename elem_init_func_trait<Fn>::elem_type, cell_type> create_back(this G& self, Fn&& init, Args&& ...args){
+			return self.create(children_.size(), std::forward<Fn>(init), std::forward<Args>(args)...);
 		}
 
 		cell_type& get_last_cell() noexcept{
@@ -242,8 +242,12 @@ namespace mo_yanxi::gui{
 		}
 
 	protected:
-		virtual void on_add(adaptor_type& adaptor){
-			
+		virtual void on_element_add(adaptor_type& adaptor){
+			basic_group::on_element_add(*adaptor.element);
+		}
+
+		void on_element_add(elem& adaptor) const final{
+
 		}
 
 	};

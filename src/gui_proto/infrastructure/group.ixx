@@ -9,42 +9,6 @@ import std;
 
 namespace mo_yanxi::gui{
 
-namespace util{
-export bool set_fillparent(
-	elem& item,
-	const math::vec2 boundSize,
-	const math::bool2 mask = {true, true},
-	const math::bool2 expansion_mask = {false, false},
-	const propagate_mask direction_mask = propagate_mask::lower){
-	const auto [fx, fy] = item.get_fill_parent() && mask;
-	if(!fx && !fy) return false;
-
-	const auto [ox, oy] = item.extent();
-
-	if(fx) item.restriction_extent.set_width(boundSize.x);
-	else{
-		if(expansion_mask.x){
-			item.restriction_extent.set_width_dependent();
-		} else{
-			item.restriction_extent.set_width(boundSize.x);
-		}
-	}
-
-	if(fy) item.restriction_extent.set_height(boundSize.y);
-	else{
-		if(expansion_mask.y){
-			item.restriction_extent.set_height_dependent();
-		} else{
-			item.restriction_extent.set_height(boundSize.y);
-		}
-	}
-
-	return item.resize({
-						   fx ? boundSize.x : ox,
-						   fy ? boundSize.y : oy
-					   }, direction_mask);
-}
-}
 
 /**
  *
@@ -115,13 +79,16 @@ public:
 			throw std::out_of_range{"index out of range"};
 		}
 
+		auto& e = *elem;
+		auto rst = std::exchange(children_[where], std::move(elem));
 		if(force_isolated_notify){
 			notify_isolated_layout_changed();
 		} else{
 			notify_layout_changed_on_element_change();
 		}
+		on_element_add(e);
 
-		return std::exchange(children_[where], std::move(elem));
+		return rst;
 	}
 
 	elem& front() const noexcept{
@@ -140,9 +107,8 @@ public:
 		elem& e = **children_.insert(children_.begin() + std::min<std::size_t>(where, children_.size()), std::move(elemPtr));
 		e.set_parent(this);
 		notify_layout_changed_on_element_change();
+		on_element_add(e);
 
-		util::set_fillparent(e, content_extent());
-		e.update_abs_src(abs_content_src_pos());
 		return e;
 	}
 
@@ -168,7 +134,7 @@ public:
 	bool update_abs_src(math::vec2 parent_content_src) noexcept override{
 		if(elem::update_abs_src(parent_content_src)){
 			for (const auto & child : children_){
-				child->update_abs_src(abs_content_src_pos());
+				child->update_abs_src(content_src_pos_abs());
 			}
 
 			return true;
@@ -187,7 +153,7 @@ public:
 
 	void draw_content(const rect clipSpace) const override{
 		elem::draw_content(clipSpace);
-		const auto space = abs_content_bound().intersection_with(clipSpace);
+		const auto space = content_bound_abs().intersection_with(clipSpace);
 		draw_children(space);
 	}
 
@@ -198,11 +164,11 @@ public:
 
 protected:
 	bool resize_impl(const math::vec2 size) override{
-		if(elem::resize_impl(size * get_scaling())){
+		if(elem::resize_impl(size)){
 			const auto newSize = content_extent();
 			bool any = false;
 			for(auto& element : children()){
-				any = any || util::set_fillparent(*element, newSize);
+				any = any || util::set_fill_parent(*element, newSize);
 			}
 			if(any)notify_layout_changed_on_element_change();
 			return true;
@@ -228,6 +194,12 @@ public:
 		return std::ranges::find(children_, elem, &elem_ptr::get);
 	}
 #pragma endregion
+
+protected:
+	virtual void on_element_add(elem& elem) const{
+		util::set_fill_parent(elem, content_extent());
+		elem.update_abs_src(content_src_pos_abs());
+	}
 
 };
 

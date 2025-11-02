@@ -58,10 +58,10 @@ namespace mo_yanxi::core::ctrl{
 	};
 
 	export
-	struct key_mapping_interface : public referenced_object<false>{
+	struct key_mapping_interface : public referenced_object{
 	public:
-		using referenced_object::decr_ref;
-		using referenced_object::incr_ref;
+		using referenced_object::ref_decr;
+		using referenced_object::ref_incr;
 
 		bool activated{true};
 

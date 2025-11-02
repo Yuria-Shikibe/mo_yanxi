@@ -20,6 +20,12 @@ namespace mo_yanxi::gui::layout{
 		vert_major,
 	};
 
+	export enum class expand_policy{
+		resize_to_fit,
+		immutable,
+		prefer,
+	};
+
 	export enum class size_category{
 		passive,
 		scaling,

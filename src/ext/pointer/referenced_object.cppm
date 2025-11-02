@@ -9,188 +9,277 @@ import ext.cond_atomic;
 import std;
 
 namespace mo_yanxi{
-	export
-	template <typename T, bool delete_on_release = true>
-	struct referenced_ptr{
-		using element_type = T;
-		using pointer = T*;
 
-		[[nodiscard]] constexpr referenced_ptr() = default;
+export struct no_deletion_on_ref_count_to_zero{};
 
-		[[nodiscard]] constexpr explicit(false) referenced_ptr(T* object) : object{object}{
-			if(this->object)this->object->incr_ref();
-		}
-		[[nodiscard]] constexpr explicit(false) referenced_ptr(T& object) : referenced_ptr(std::addressof(object)){
-		}
+template <typename T>
+constexpr bool no_delete_on_drop = std::is_same_v<T, no_deletion_on_ref_count_to_zero>;
 
-		template <typename ...Args>
-		[[nodiscard]] explicit constexpr referenced_ptr(std::in_place_t, Args&&... args) : referenced_ptr{
-			new T{std::forward<Args>(args)...}
-		}{}
+export
+template <typename T, typename D = std::default_delete<T>>
+struct referenced_ptr;
 
-		explicit constexpr operator bool() const noexcept{
-			return object != nullptr;
-		}
+template <typename T, typename D>
+struct referenced_ptr{
+	using element_type = std::remove_const_t<T>;
+	using pointer = T*;
 
-		constexpr T& operator*() const noexcept{
-			assert(object != nullptr);
-			return *object;
-		}
+	[[nodiscard]] constexpr referenced_ptr() = default;
 
-		constexpr T* operator->() const noexcept{
-			return object;
-		}
+	[[nodiscard]] constexpr explicit(false) referenced_ptr(pointer object) : object{object}{
+		if(this->object) incr();
+	}
 
-		constexpr T* get() const noexcept{
-			return object;
-		}
+	[[nodiscard]] constexpr explicit(false) referenced_ptr(pointer object, D&& deleter) : object{object}, deleter{std::move(deleter)}{
+		if(this->object) incr();
+	}
 
-		constexpr void reset(T* ptr = nullptr) noexcept{
-			if(object){
-				if(object->decr_ref()){
-					delete object;
-				}
-			}
+	[[nodiscard]] constexpr explicit(false) referenced_ptr(pointer object, const D& deleter) : object{object}, deleter{deleter}{
+		if(this->object) incr();
+	}
 
-			object = ptr;
-			if(object)object->incr_ref();
-		}
+	template <typename... Args>
+	[[nodiscard]] explicit constexpr referenced_ptr(std::in_place_t, Args&&... args) : referenced_ptr{
+			new element_type{std::forward<Args>(args)...}
+		}{
+	}
 
-		constexpr ~referenced_ptr() noexcept{
-			if(object){
-				if constexpr (delete_on_release){
-					if(object->decr_ref()){
-						delete object;
-						object = nullptr;
-					}
-				}else{
-					object->decr_ref();
-				}
-			}
-		}
+private:
+	void delete_elem(pointer t) noexcept {
+		std::invoke(deleter, t);
+	}
 
-		constexpr referenced_ptr(const referenced_ptr& other) noexcept
-			: object{other.object}{
-			if(object) object->incr_ref();
-		}
+	void decr() noexcept;
 
-		constexpr referenced_ptr(referenced_ptr&& other) noexcept
-			: object{std::exchange(other.object, {})}{}
+	void incr() noexcept;
 
-		constexpr referenced_ptr& operator=(const referenced_ptr& other){
-			if(this == &other) return *this;
-			if(this->object == other.object) return *this;
+public:
 
-			this->reset(other.object);
+	explicit constexpr operator bool() const noexcept{
+		return object != nullptr;
+	}
 
-			return *this;
+	constexpr T& operator*() const noexcept{
+		assert(object != nullptr);
+		return *object;
+	}
+
+	constexpr T* operator->() const noexcept{
+		return object;
+	}
+
+	constexpr T* get() const noexcept{
+		return object;
+	}
+
+	constexpr void reset(T* ptr = nullptr) noexcept{
+		if(object){
+			decr();
 		}
 
-		constexpr referenced_ptr& operator=(referenced_ptr&& other) noexcept{
-			if(this == &other) return *this;
-			std::swap(object, other.object);
-			return *this;
+		object = ptr;
+		if(object) incr();
+	}
+
+	constexpr ~referenced_ptr() noexcept{
+		if(object){
+			decr();
 		}
+	}
 
-		constexpr bool operator==(std::nullptr_t) const noexcept{
-			return object == nullptr;
-		}
+	constexpr referenced_ptr(const referenced_ptr& other) noexcept
+		: object{other.object}{
+		if(object) incr();
+	}
 
-		constexpr bool operator==(const referenced_ptr&) const noexcept = default;
+	constexpr referenced_ptr(referenced_ptr&& other) noexcept
+		: object{std::exchange(other.object, {})}{
+	}
 
-		// template <typename T1>
-		// 	requires std::is_convertible_v<T*, T1*>
-		// constexpr explicit(false) operator referenced_ptr<T1, delete_on_release>() const noexcept{
-		// 	return referenced_ptr<T1, delete_on_release>{object};
-		// }
+	constexpr referenced_ptr& operator=(const referenced_ptr& other){
+		if(this == &other) return *this;
+		if(this->object == other.object) return *this;
 
-		/*
-		template <typename T1>
-		constexpr referenced_ptr<T1, Deleter> dynamic_cast_to() const noexcept{
-			if constexpr (std::derived_from<std::remove_cvref_t<T>, std::remove_cvref_t<T1>>){
-				return referenced_ptr<T1, Deleter>{object};
-			}else{
-				return referenced_ptr<T1, Deleter>{dynamic_cast<T1*>(object)};
-			}
-		}*/
+		this->reset(other.object);
 
-	private:
-		T* object{};
+		return *this;
+	}
 
-		template <typename Ty, bool b>
-		friend struct referenced_ptr;
-	};
+	constexpr referenced_ptr& operator=(referenced_ptr&& other) noexcept{
+		if(this == &other) return *this;
+		std::swap(object, other.object);
+		return *this;
+	}
+
+	constexpr bool operator==(std::nullptr_t) const noexcept{
+		return object == nullptr;
+	}
+
+	constexpr bool operator==(const referenced_ptr&) const noexcept = default;
 
 
-	//TODO remove wrong atomic support
+private:
+	T* object{};
+	ADAPTED_NO_UNIQUE_ADDRESS D deleter{};
+};
 
-	export
-	template <bool isAtomic = false>
-	struct referenced_object{
-		[[nodiscard]] constexpr std::size_t get_ref_count() const noexcept{
-			return reference_count;
-		}
 
-		[[nodiscard]] constexpr referenced_object() = default;
 
-		//TODO delete these?
-		constexpr referenced_object(const referenced_object& other) noexcept requires (!isAtomic){
-		}
+/**
+ * @brief Specify that lifetime of a style is NOT automatically managed by reference count.
+ */
+constexpr inline std::size_t persistent_spec = std::dynamic_extent;
 
-		constexpr referenced_object& operator=(const referenced_object& other) requires (!isAtomic){
-			return *this;
-		}
+namespace tags{
+export
+struct persistent_tag_t{
+};
 
-		referenced_object(referenced_object&& other) noexcept requires (!isAtomic)
-			: reference_count{std::exchange(other.reference_count, {})}{
-		}
+export constexpr inline persistent_tag_t persistent{};
 
-		referenced_object& operator=(referenced_object&& other) noexcept requires (!isAtomic){
-			if(this == &other) return *this;
-			std::swap(reference_count, other.reference_count);
-			return *this;
-		}
-
-	protected:
-		cond_atomic<std::size_t, isAtomic> reference_count{};
-
-		constexpr bool droppable() const noexcept{
-			return reference_count == 0;
-		}
-
-		/**
-		 * @brief take reference
-		 */
-		constexpr void incr_ref() noexcept{
-			if constexpr (isAtomic){
-				reference_count.fetch_add(1, std::memory_order_relaxed);
-			}else{
-				++reference_count;
-			}
-		}
-
-		/**
-		 * @brief drop referebce
-		 * @return true if should be destructed
-		 */
-		constexpr bool decr_ref() noexcept{
-			if constexpr (isAtomic){
-				auto prev = reference_count.fetch_sub(1, std::memory_order_acq_rel);
-				return prev == 1;
-			}else{
-				//TODO should this marked as illegal?
-				if(reference_count == 0)__debugbreak();
-				assert(reference_count != 0);
-
-				--reference_count;
-				return reference_count == 0;
-			}
-		}
-
-		template <typename T, bool b>
-		friend struct referenced_ptr;
-	};
-
-	export
-	using referenced_object_base = referenced_object<false>;
 }
+
+
+export
+struct referenced_object{
+
+private:
+	std::size_t reference_count_{};
+
+public:
+	[[nodiscard]] constexpr referenced_object() = default;
+
+	constexpr referenced_object(const referenced_object& other) noexcept{
+	}
+
+	constexpr referenced_object& operator=(const referenced_object& other){
+		return *this;
+	}
+
+	constexpr referenced_object(referenced_object&& other) noexcept
+		: reference_count_{std::exchange(other.reference_count_, {})}{
+	}
+
+	constexpr referenced_object& operator=(referenced_object&& other) noexcept{
+		if(this == &other) return *this;
+		std::swap(reference_count_, other.reference_count_);
+		return *this;
+	}
+
+protected:
+
+	[[nodiscard]] constexpr std::size_t ref_count() const noexcept{
+		return reference_count_;
+	}
+
+	[[nodiscard]] constexpr bool droppable() const noexcept{
+		return reference_count_ == 0;
+	}
+
+	/**
+	 * @brief take reference
+	 */
+	constexpr void ref_incr() noexcept{
+		++reference_count_;
+	}
+
+	/**
+	 * @brief drop referebce
+	 * @return true if should be destructed
+	 */
+	constexpr bool ref_decr() noexcept{
+		--reference_count_;
+		return reference_count_ == 0;
+	}
+
+
+	template <typename T, typename D>
+	friend struct referenced_ptr;
+};
+
+
+export
+struct referenced_object_persistable{
+
+private:
+	mutable std::size_t reference_count_{};
+
+public:
+	[[nodiscard]] constexpr referenced_object_persistable() = default;
+
+	[[nodiscard]] constexpr explicit referenced_object_persistable(tags::persistent_tag_t)
+		: reference_count_(persistent_spec){
+	}
+
+	constexpr referenced_object_persistable(const referenced_object_persistable& other) noexcept{
+	}
+
+	constexpr referenced_object_persistable& operator=(const referenced_object_persistable& other){
+		return *this;
+	}
+
+	constexpr referenced_object_persistable(referenced_object_persistable&& other) noexcept
+		: reference_count_{std::exchange(other.reference_count_, {})}{
+	}
+
+	constexpr referenced_object_persistable& operator=(referenced_object_persistable&& other) noexcept{
+		if(this == &other) return *this;
+		std::swap(reference_count_, other.reference_count_);
+		return *this;
+	}
+
+protected:
+
+	[[nodiscard]] constexpr std::size_t ref_count() const noexcept{
+		return reference_count_;
+	}
+
+	[[nodiscard]] constexpr bool droppable() const noexcept{
+		return reference_count_ == 0;
+	}
+
+	/**
+	 * @brief take reference
+	 */
+	constexpr void ref_incr() const noexcept{
+		if(is_persistent())return;
+		++reference_count_;
+		assert(reference_count_ != persistent_spec && "yes i know this should be impossible, just in case");
+	}
+
+	/**
+	 * @brief drop referebce
+	 * @return true if should be destructed
+	 */
+	constexpr bool ref_decr() const noexcept{
+		if(is_persistent())return false;
+		--reference_count_;
+		return reference_count_ == 0;
+	}
+
+	[[nodiscard]] constexpr bool is_persistent() const noexcept{
+		return reference_count_ == persistent_spec;
+	}
+
+	template <typename T, typename D>
+	friend struct referenced_ptr;
+};
+
+template <typename T, typename D>
+void referenced_ptr<T, D>::decr() noexcept{
+	if constexpr(!no_delete_on_drop<D>){
+		if(object->ref_decr()){
+			this->delete_elem(object);
+		}
+	} else{
+		assert(object->ref_count() > 0);
+		object->ref_decr();
+	}
+}
+
+template <typename T, typename D>
+void referenced_ptr<T, D>::incr() noexcept{
+	object->ref_incr();
+}
+}
+

@@ -39,18 +39,7 @@ using namespace mo_yanxi;
 using namespace mo_yanxi::game::meta::turret;
 
 export
-void build_main_ui(gui::scene& scene, gui::loose_group& root){
-	auto e = scene.create<gui::manual_table>();
-	e->set_fill_parent({true, true});
-	auto& r = static_cast<gui::manual_table&>(root.insert(0, std::move(e)));
-
-	{
-		auto hdl = r.emplace_back<gui::elem>();
-		hdl.cell().region_scale = {.1f, .1f, .3f, .3f};
-		hdl.cell().align = gui::align::pos::bottom_left;
-	}
-
-}
+void build_main_ui(gui::scene& scene, gui::loose_group& root);
 
 export turret_drawer drawer;
 

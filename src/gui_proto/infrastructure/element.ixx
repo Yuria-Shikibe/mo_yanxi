@@ -1,6 +1,6 @@
-//
-// Created by Matrix on 2025/10/29.
-//
+module;
+
+#include <cassert>
 
 export module mo_yanxi.gui.infrastructure:element;
 
@@ -12,12 +12,13 @@ export import mo_yanxi.gui.layout.policies;
 export import mo_yanxi.gui.flags;
 export import mo_yanxi.gui.util;
 
-export import align;
+export import mo_yanxi.gui.style.interface;
+
+import align;
 
 import :events;
 import :scene;
 export import :elem_ptr;
-#include <assert.h>
 
 
 namespace mo_yanxi::gui{
@@ -25,6 +26,32 @@ export using boarder = align::spacing;
 export using ui::clamped_fsize;
 
 export constexpr inline boarder default_boarder{8, 8, 8, 8};
+
+export struct debug_elem_drawer final : style_drawer<elem>{
+	[[nodiscard]] constexpr debug_elem_drawer() : style_drawer(tags::persistent){}
+
+	void draw(const elem& element, rect region, float opacityScl) const override;
+};
+
+export struct empty_drawer final : style_drawer<elem>{
+	[[nodiscard]] constexpr empty_drawer() : style_drawer(tags::persistent){}
+
+	void draw(const elem& element, rect region, float opacityScl) const override{
+	}
+};
+
+namespace style{
+using elem_style_ptr = style_ptr<elem>;
+export constexpr inline debug_elem_drawer debug_style;
+export constexpr inline empty_drawer empty_style;
+
+export inline const style_drawer<elem>* global_default_style_drawer{};
+
+export const style_drawer<elem>* get_default_style_drawer() noexcept{
+	return global_default_style_drawer == nullptr ? &debug_style : global_default_style_drawer;
+}
+
+}
 
 export
 [[nodiscard]] layout::stated_extent clip_boarder_from(layout::stated_extent extent, const boarder boarder) noexcept{
@@ -55,6 +82,7 @@ struct cursor_states{
 	float time_inbound{};
 	float time_focus{};
 	float time_stagnate{};
+	float time_pressed{};
 
 	float time_tooltip{};
 
@@ -66,11 +94,17 @@ struct cursor_states{
 		focused = pressed = false;
 	}
 
-	void update(const float delta_in_ticks){
+	void update(const float delta_in_ticks) noexcept {
+		if(pressed){
+			math::approach_inplace(time_pressed, maximum_duration, delta_in_ticks);
+		} else{
+			math::lerp_inplace(time_pressed, 0.f, delta_in_ticks* .075f);
+		}
+
 		if(inbound){
 			math::approach_inplace(time_inbound, maximum_duration, delta_in_ticks);
 		} else{
-			math::approach_inplace(time_inbound, 0, delta_in_ticks);
+			math::lerp_inplace(time_inbound, 0.f, delta_in_ticks * .075f);
 		}
 
 		if(focused){
@@ -78,9 +112,13 @@ struct cursor_states{
 			math::approach_inplace(time_stagnate, maximum_duration, delta_in_ticks);
 			time_tooltip += delta_in_ticks;
 		} else{
-			math::approach_inplace(time_focus, 0, delta_in_ticks);
+			math::lerp_inplace(time_focus, 0.f, delta_in_ticks * .075f);
 			time_tooltip = time_stagnate = 0.f;
 		}
+	}
+
+	[[nodiscard]] float get_factor_of(float cursor_states::* mptr) const noexcept{
+		return this->*mptr / maximum_duration;
 	}
 };
 
@@ -94,6 +132,7 @@ private:
 	elem* parent_{};
 
 	clamped_fsize size_{};
+	math::vec2 preferred_size_{};
 	math::vec2 relative_pos_{};
 	math::vec2 absolute_pos_{};
 	boarder boarder_{default_boarder};
@@ -128,7 +167,13 @@ public:
 	layout_state layout_state{};
 	interactivity_flag interactivity{};
 
+	style::elem_style_ptr style{style::get_default_style_drawer()};
 
+private:
+	float context_opacity_{1.f};
+	float inherent_opacity_{1.f};
+
+public:
 	virtual ~elem(){
 		clear_scene_references();
 	}
@@ -150,7 +195,7 @@ public:
 
 	virtual void on_focus_changed(bool is_focused){
 		cursor_states_.focused = is_focused;
-		if(!is_focused)cursor_states_.pressed = false;
+		if(!is_focused && !is_focus_extended_by_mouse())cursor_states_.pressed = false;
 	}
 
 	virtual events::op_afterwards on_key_input(const input_handle::key_set key){
@@ -161,7 +206,7 @@ public:
 		return events::op_afterwards::fall_through;
 	}
 
-	virtual events::op_afterwards on_click(const events::click event, std::span<elem*> aboves){
+	virtual events::op_afterwards on_click(const events::click event, std::span<elem* const> aboves){
 		if(!is_interactable()){
 			return events::op_afterwards::fall_through;
 		}
@@ -192,7 +237,7 @@ public:
 		// }
 	}
 
-	virtual events::op_afterwards on_scroll(const events::scroll event){
+	virtual events::op_afterwards on_scroll(const events::scroll event, std::span<elem* const> aboves){
 		return events::op_afterwards::fall_through;
 	}
 
@@ -206,7 +251,7 @@ public:
 public:
 	void try_draw(const rect clipSpace) const{
 		if(invisible) return;
-		if(!clipSpace.overlap_inclusive(abs_bound())) return;
+		if(!clipSpace.overlap_inclusive(bound_abs())) return;
 		draw(clipSpace);
 	}
 
@@ -242,7 +287,7 @@ protected:
 	 * *recommended* to be const
 	 *
 	 * @param extent : any tag of the length should be within {mastering, external}
-	 * @return expected size, or nullopt
+	 * @return expected CONTENT size, or nullopt
 	 */
 	virtual std::optional<math::vec2> pre_acquire_size_impl(layout::optional_mastering_extent extent){
 		return std::nullopt;
@@ -269,7 +314,8 @@ protected:
 
 public:
 	bool resize(const math::vec2 size, propagate_mask temp_mask){
-		const auto last = std::exchange(layout_state.inherent_broadcast_mask, temp_mask);
+		const auto last = layout_state.inherent_broadcast_mask;
+		layout_state.inherent_broadcast_mask &= temp_mask;
 		const auto rst = resize_impl(size);
 		layout_state.inherent_broadcast_mask = last;
 		return rst;
@@ -322,20 +368,19 @@ public:
 	}
 
 
+	virtual bool update_abs_src(math::vec2 parent_content_src) noexcept;
 #pragma endregion
 
 #pragma region Bound
-
+public:
 
 [[nodiscard]] bool contains(math::vec2 absPos) const noexcept;
 
+protected:
 [[nodiscard]] bool contains_self(math::vec2 absPos, float margin) const noexcept;
 
 [[nodiscard]] virtual bool parent_contain_constrain(math::vec2 cursorPos) const noexcept;
-
-	virtual bool update_abs_src(math::vec2 parent_content_src) noexcept{
-		return util::try_modify(absolute_pos_, parent_content_src + relative_pos_);
-	}
+public:
 
 #pragma endregion
 
@@ -357,6 +402,10 @@ public:
 
 #pragma region Trivial_Getter_Setters
 public:
+	[[nodiscard]] const cursor_states& cursor_state() const noexcept{
+		return cursor_states_;
+	}
+
 	[[nodiscard]] math::vec2 get_scaling() const noexcept{
 		return context_scaling_ * inherent_scaling_;
 	}
@@ -365,8 +414,9 @@ public:
 		return fill_parent_;
 	}
 
-	void set_fill_parent(math::bool2 f) noexcept{
+	void set_fill_parent(math::bool2 f, propagate_mask notify = propagate_mask::force_upper) noexcept{
 		fill_parent_ = f;
+		notify_layout_changed(notify);
 	}
 
 	[[nodiscard]] constexpr bool is_toggled() const noexcept{ return toggled; }
@@ -417,44 +467,64 @@ public:
 		return {std::fdim(w, bw), std::fdim(h, bh)};
 	}
 
+	[[nodiscard]] float content_width() const noexcept{
+		const auto w = size_.get_width();
+		const auto bw = boarder_.width();
+		return std::fdim(w, bw);
+	}
+
+	[[nodiscard]] float content_height() const noexcept{
+		const auto v = size_.get_height();
+		const auto bv = boarder_.height();
+		return std::fdim(v, bv);
+	}
+
 	[[nodiscard]] vec2 extent() const noexcept{
 		return size_.get_size();
 	}
 
-	[[nodiscard]] rect abs_bound() const noexcept{
-		return rect{tags::unchecked, tags::from_extent, abs_pos(), extent()};
+	[[nodiscard]] rect bound_abs() const noexcept{
+		return rect{tags::unchecked, tags::from_extent, pos_abs(), extent()};
 	}
 
-	[[nodiscard]] rect rel_bound() const noexcept{
-		return rect{tags::unchecked, tags::from_extent, rel_pos(), extent()};
+	[[nodiscard]] rect bound_rel() const noexcept{
+		return rect{tags::unchecked, tags::from_extent, pos_rel(), extent()};
 	}
 
-	[[nodiscard]] math::vec2 abs_pos() const noexcept{
+	[[nodiscard]] math::vec2 pos_abs() const noexcept{
 		return absolute_pos_;
 	}
 
-	[[nodiscard]] math::vec2 rel_pos() const noexcept{
+	[[nodiscard]] math::vec2 pos_rel() const noexcept{
 		return relative_pos_;
+	}
+
+	[[nodiscard]] constexpr align::spacing boarder() const noexcept{
+		return boarder_;
 	}
 
 	[[nodiscard]] constexpr math::vec2 content_src_offset() const noexcept{
 		return boarder_.top_lft();
 	}
 
-	[[nodiscard]] rect abs_content_bound() const noexcept{
-		return rect{tags::unchecked, tags::from_extent, abs_pos() + content_src_offset(), content_extent()};
+	[[nodiscard]] rect clip_to_content_bound(rect region) const noexcept{
+		return rect{tags::unchecked, tags::from_extent, region.src + content_src_offset(), region.extent().fdim(boarder_.extent())};
 	}
 
-	[[nodiscard]] rect rel_content_bound() const noexcept{
-		return rect{tags::unchecked, tags::from_extent, rel_pos() + content_src_offset(), content_extent()};
+	[[nodiscard]] rect content_bound_abs() const noexcept{
+		return clip_to_content_bound(bound_abs());
 	}
 
-	[[nodiscard]] constexpr math::vec2 abs_content_src_pos() const noexcept{
-		return abs_pos() + content_src_offset();
+	[[nodiscard]] rect content_bound_rel() const noexcept{
+		return clip_to_content_bound(bound_rel());
 	}
 
-	[[nodiscard]] constexpr math::vec2 rel_content_src_pos() const noexcept{
-		return rel_pos() + content_src_offset();
+	[[nodiscard]] constexpr math::vec2 content_src_pos_abs() const noexcept{
+		return pos_abs() + content_src_offset();
+	}
+
+	[[nodiscard]] constexpr math::vec2 content_src_pos_rel() const noexcept{
+		return pos_rel() + content_src_offset();
 	}
 
 	constexpr void set_rel_pos(math::vec2 p) noexcept{
@@ -490,13 +560,37 @@ public:
 	[[nodiscard]] constexpr bool touch_blocked() const noexcept{
 		return interactivity == interactivity_flag::disabled || interactivity == interactivity_flag::intercept;
 	}
-	// void update_opacity(const float val) noexcept{
-	// 	if(util::try_modify(property.graphic_data.context_opacity, val)){
-	// 		for(const auto& element : get_children()){
-	// 			element->update_opacity(gprop().get_opacity());
-	// 		}
-	// 	}
-	// }
+
+	[[nodiscard]] float get_draw_opacity() const noexcept{
+		return context_opacity_ * inherent_opacity_;
+	}
+
+	void update_opacity(const float val) noexcept{
+		if(util::try_modify(context_opacity_, val)){
+			for(const auto& element : children()){
+				element->update_opacity(get_draw_opacity());
+			}
+		}
+	}
+
+	void set_opacity(const float val) noexcept{
+		if(util::try_modify(inherent_opacity_, val)){
+			for(const auto& element : children()){
+				element->update_opacity(get_draw_opacity());
+			}
+		}
+	}
+
+	bool set_prefer_extent(math::vec2 extent) noexcept{
+		return util::try_modify(preferred_size_, size_.clamp(extent));
+	}
+	bool set_prefer_extent_to_current() noexcept{
+		return util::try_modify(preferred_size_, extent());
+	}
+
+	vec2 get_prefer_extent() noexcept{
+		return preferred_size_;
+	}
 
 #pragma endregion
 
@@ -504,6 +598,10 @@ protected:
 	template <typename T>
 	std::pmr::polymorphic_allocator<T> get_allocator(){
 		return scene_->get_allocator<T>();
+	}
+
+	[[nodiscard]] std::pmr::memory_resource* get_memory_resource(){
+		return scene_->get_memory_resource();
 	}
 
 private:
@@ -546,6 +644,43 @@ std::vector<elem*, std::remove_cvref_t<Alloc>> dfs_find_deepest_element(elem* ro
 	util::iterateAll_DFSImpl(cursorPos, rst, root);
 
 	return rst;
+}
+
+
+export
+bool set_fill_parent(
+	elem& item,
+	const math::vec2 boundSize,
+	const math::bool2 mask = {true, true},
+	const math::bool2 expansion_mask = {false, false},
+	const propagate_mask direction_mask = propagate_mask::lower){
+	const auto [fx, fy] = item.get_fill_parent() && mask;
+	if(!fx && !fy) return false;
+
+	const auto [ox, oy] = item.extent();
+
+	if(fx) item.restriction_extent.set_width(boundSize.x);
+	else{
+		if(expansion_mask.x){
+			item.restriction_extent.set_width_dependent();
+		} else{
+			item.restriction_extent.set_width(boundSize.x);
+		}
+	}
+
+	if(fy) item.restriction_extent.set_height(boundSize.y);
+	else{
+		if(expansion_mask.y){
+			item.restriction_extent.set_height_dependent();
+		} else{
+			item.restriction_extent.set_height(boundSize.y);
+		}
+	}
+
+	return item.resize({
+						   fx ? boundSize.x : ox,
+						   fy ? boundSize.y : oy
+					   }, direction_mask);
 }
 
 }
