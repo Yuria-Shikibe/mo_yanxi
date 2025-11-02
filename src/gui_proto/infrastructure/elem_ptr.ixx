@@ -29,6 +29,10 @@ struct elem_init_func_trait : protected func_initializer_trait<std::remove_cvref
 };
 
 export
+template <typename InitFunc>
+using elem_init_func_create_t = typename elem_init_func_trait<InitFunc>::elem_type;
+
+export
 struct elem_ptr{
 	[[nodiscard]] elem_ptr() = default;
 

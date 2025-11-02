@@ -23,7 +23,7 @@ namespace mo_yanxi::gui{
 	for (auto && cell : cells){
 		masterings_capture += cell.cell.pad.length();
 		switch(cell.cell.stated_size.type){
-		case layout::size_category::dependent:{
+		case layout::size_category::pending:{
 			math::vec2 vec;
 			vec.*majorTarget = layout_major_size;
 			vec.*minorTarget = std::numeric_limits<float>::infinity();
@@ -66,11 +66,11 @@ namespace mo_yanxi::gui{
 std::optional<math::vec2> seq_list::pre_acquire_size_impl(layout::optional_mastering_extent extent){
 	switch(policy_){
 	case layout::layout_policy::hori_major :{
-		if(extent.width_dependent()) return std::nullopt;
+		if(extent.width_pending()) return std::nullopt;
 		break;
 	}
 	case layout::layout_policy::vert_major :{
-		if(extent.height_dependent()) return std::nullopt;
+		if(extent.height_pending()) return std::nullopt;
 		break;
 	}
 	case layout::layout_policy::none :{
@@ -84,7 +84,7 @@ std::optional<math::vec2> seq_list::pre_acquire_size_impl(layout::optional_maste
 	if(lines == 0) return std::nullopt;
 
 	auto potential = extent.potential_extent();
-	const auto dep = extent.get_dependent();
+	const auto dep = extent.get_pending();
 
 
 	auto [majorTargetDep, minorTargetDep] = layout::get_vec_ptr<bool>(policy_);
@@ -104,7 +104,7 @@ std::optional<math::vec2> seq_list::pre_acquire_size_impl(layout::optional_maste
 	return potential;
 }
 
-void seq_list::layout(){
+void seq_list::layout_elem(){
 	if(cells_.empty()) return;
 	auto [majorTarget, minorTarget] = layout::get_vec_ptr(policy_);
 
@@ -149,7 +149,7 @@ void seq_list::layout(){
 		cell.cell.allocated_region = {tags::from_extent, currentOff, cell_sz};
 
 		cell_sz.*majorTarget = this->restriction_extent.potential_extent().*majorTarget;
-		if(cell.cell.stated_size.dependent())cell_sz.*minorTarget = std::numeric_limits<float>::infinity();
+		if(cell.cell.stated_size.pending())cell_sz.*minorTarget = std::numeric_limits<float>::infinity();
 
 		cell.apply(*this, cell_sz);
 		currentOff.*minorTarget += cell.cell.pad.post + minor;

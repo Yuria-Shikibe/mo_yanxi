@@ -157,8 +157,8 @@ public:
 		draw_children(space);
 	}
 
-	void layout() override{
-		elem::layout();
+	void layout_elem() override{
+		elem::layout_elem();
 		layout_children();
 	}
 

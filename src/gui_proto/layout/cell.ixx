@@ -63,11 +63,11 @@ namespace mo_yanxi::gui::layout{
 			elem.update_abs_src(group.content_src_pos_abs());
 			elem.resize(extent, propagate_mask::lower);
 
-			if(!cell_expected_restriction_extent.width_dependent()){
+			if(!cell_expected_restriction_extent.width_pending()){
 				cell_expected_restriction_extent.set_width(extent.x);
 			}
 
-			if(!cell_expected_restriction_extent.height_dependent()){
+			if(!cell_expected_restriction_extent.height_pending()){
 				cell_expected_restriction_extent.set_height(extent.y);
 			}
 
@@ -99,7 +99,7 @@ namespace mo_yanxi::gui::layout{
 		}
 
 		auto& set_external(){
-			this->stated_size = {size_category::dependent, 1};
+			this->stated_size = {size_category::pending, 1};
 			return *this;
 		}
 
@@ -193,12 +193,12 @@ namespace mo_yanxi::gui::layout{
 
 		constexpr auto& set_external_weight(vec2 weight) noexcept {
 			if(weight.x > 0){
-				stated_extent.width.type = size_category::dependent;
+				stated_extent.width.type = size_category::pending;
 				stated_extent.width.value = weight.x;
 			}
 
 			if(weight.y > 0){
-				stated_extent.height.type = size_category::dependent;
+				stated_extent.height.type = size_category::pending;
 				stated_extent.height.value = weight.y;
 			}
 
@@ -207,12 +207,12 @@ namespace mo_yanxi::gui::layout{
 
 		constexpr auto& set_external(math::vector2<bool> weight) noexcept {
 			if(weight.x){
-				stated_extent.width.type = size_category::dependent;
+				stated_extent.width.type = size_category::pending;
 				stated_extent.width.value = static_cast<float>(weight.x);
 			}
 
 			if(weight.y){
-				stated_extent.height.type = size_category::dependent;
+				stated_extent.height.type = size_category::pending;
 				stated_extent.height.value = static_cast<float>(weight.y);
 			}
 

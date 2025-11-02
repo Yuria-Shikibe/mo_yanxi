@@ -32,17 +32,18 @@ void debug_elem_drawer::draw(const elem& element, rect region, float opacityScl)
 	float f2 = element.cursor_state().get_factor_of(&cursor_states::time_pressed);
 	float f3 = element.cursor_state().get_factor_of(&cursor_states::time_focus);
 
+	region.shrink(1.f);
 	element.get_scene().renderer().draw(draw::instruction::rectangle_ortho_outline{
 			.v00 = region.vert_00(),
 			.v11 = region.vert_11(),
 			.stroke = 1,
-			.vert_color = {c, c.create_lerp(colors::ACID, f1), c.create_lerp(colors::ORANGE, f2), c.create_lerp(colors::CRIMSON, f3)}
+			.vert_color = {c.mul_a(opacityScl), c.create_lerp(colors::ACID, f1).mul_a(opacityScl), c.create_lerp(colors::ORANGE, f2).mul_a(opacityScl), c.create_lerp(colors::CRIMSON, f3).mul_a(opacityScl)}
 		});
 
 }
 
 void elem::draw_background() const{
-	if(style)style->draw(*this, bound_abs(), 1.f);
+	if(style)style->draw(*this, bound_abs(), get_draw_opacity());
 }
 
 void elem::update(float delta_in_ticks){
@@ -56,13 +57,13 @@ void elem::clear_scene_references() noexcept{
 
 std::optional<math::vec2> elem::pre_acquire_size_no_boarder_clip(const layout::optional_mastering_extent extent){
 	return pre_acquire_size_impl(extent).transform([&, this](const math::vec2 v){
-		return size_.clamp(v + boarder_.extent()).min(extent.potential_extent());
+		return size_.clamp(v + boarder_extent()).min(extent.potential_extent());
 	});
 }
 
 std::optional<math::vec2> elem::pre_acquire_size(const layout::optional_mastering_extent extent){
-	return pre_acquire_size_impl(clip_boarder_from(extent, boarder_)).transform([&, this](const math::vec2 v){
-		return size_.clamp(v + boarder_.extent()).min(extent.potential_extent());
+	return pre_acquire_size_impl(clip_boarder_from(extent, boarder_extent())).transform([&, this](const math::vec2 v){
+		return size_.clamp(v + boarder_extent()).min(extent.potential_extent());
 	});
 }
 

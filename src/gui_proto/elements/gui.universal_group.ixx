@@ -211,7 +211,7 @@ namespace mo_yanxi::gui{
 		}
 
 		template <invocable_elem_init_func Fn, std::derived_from<universal_group> G, typename ...Args>
-		create_handle<typename elem_init_func_trait<Fn>::elem_type, cell_type> create(
+		create_handle<elem_init_func_create_t<Fn>, cell_type> create(
 			this G& self,
 			std::size_t where, Fn&& init,
 			Args&& ...args
@@ -219,8 +219,8 @@ namespace mo_yanxi::gui{
 			elem_ptr eptr{self.get_scene(), &self, std::forward<Fn>(init), std::forward<Args>(args)...};
 			adaptor_type adaptor{eptr.get(), self.template_cell};
 
-			co_yield layout::cell_create_result{static_cast<typename elem_init_func_trait<Fn>::elem_type&>(*eptr), adaptor.cell};
-			cells_.insert(self.cells_.begin() + std::min<std::size_t>(where, self.cells_.size()), adaptor);
+			co_yield layout::cell_create_result{static_cast<elem_init_func_create_t<Fn>&>(*eptr), adaptor.cell};
+			self.cells_.insert(self.cells_.begin() + std::min<std::size_t>(where, self.cells_.size()), adaptor);
 			self.basic_group::insert(where, std::move(eptr));
 			static_cast<universal_group&>(self).on_element_add(adaptor);
 		}
@@ -232,8 +232,8 @@ namespace mo_yanxi::gui{
 		}
 
 		template <invocable_elem_init_func Fn, std::derived_from<universal_group> G, typename ...Args>
-		create_handle<typename elem_init_func_trait<Fn>::elem_type, cell_type> create_back(this G& self, Fn&& init, Args&& ...args){
-			return self.create(children_.size(), std::forward<Fn>(init), std::forward<Args>(args)...);
+		create_handle<elem_init_func_create_t<Fn>, cell_type> create_back(this G& self, Fn&& init, Args&& ...args){
+			return self.create(self.children_.size(), std::forward<Fn>(init), std::forward<Args>(args)...);
 		}
 
 		cell_type& get_last_cell() noexcept{

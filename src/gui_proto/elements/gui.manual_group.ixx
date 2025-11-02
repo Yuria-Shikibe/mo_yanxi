@@ -16,12 +16,12 @@ namespace mo_yanxi::gui{
 			layout_state.intercept_lower_to_isolated = true;
 		}
 
-		void layout() override{
+		void layout_elem() override{
 			for (adaptor_type& cell : cells_){
 				layout_cell(cell);
 			}
 
-			elem::layout();
+			elem::layout_elem();
 		}
 
 	protected:

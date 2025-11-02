@@ -17,6 +17,9 @@ scene& scene::operator=(scene&& other) noexcept{
 }
 
 void scene::update(float delta_in_tick){
+	if(request_cursor_update_){
+		on_cursor_pos_update();
+	}
 	root().update(delta_in_tick);
 }
 
@@ -80,7 +83,8 @@ void scene::on_scroll(const math::vec2 scroll) const{
 	}
 }
 
-void scene::on_cursor_pos_update(bool force_drop){
+void scene::on_cursor_pos_update(){
+	request_cursor_update_ = false;
 	std::pmr::vector<elem*> inbounds{get_allocator()};
 
 	//TODO tooltip & dialog window
@@ -113,7 +117,7 @@ void scene::on_cursor_pos_update(bool force_drop){
 
 	upt:
 
-	update_inbounds(std::move(inbounds), force_drop);
+	update_inbounds(std::move(inbounds));
 
 	if(!focus_cursor_) return;
 
@@ -154,7 +158,7 @@ void scene::layout(){
 	}
 }
 
-void scene::update_inbounds(std::pmr::vector<elem*>&& next, bool force_drop){
+void scene::update_inbounds(std::pmr::vector<elem*>&& next){
 	if(last_inbounds_.size() == next.size() && (last_inbounds_.empty() || last_inbounds_.back() == next.back()))return;
 
 	auto [i1, i2] = std::ranges::mismatch(last_inbounds_, next);
@@ -174,7 +178,7 @@ void scene::update_inbounds(std::pmr::vector<elem*>&& next, bool force_drop){
 
 	last_inbounds_ = std::move(next);
 
-	try_swap_focus(last_inbounds_.empty() ? nullptr : last_inbounds_.back(), force_drop);
+	try_swap_focus(last_inbounds_.empty() ? nullptr : last_inbounds_.back());
 }
 
 void scene::update_mouse_state(const input_handle::key_set k){
@@ -209,16 +213,16 @@ void scene::update_mouse_state(const input_handle::key_set k){
 	}
 
 	if(focus_cursor_ && focus_cursor_->is_focus_extended_by_mouse()){
-		on_cursor_pos_update(false);
+		on_cursor_pos_update();
 	}
 }
 
 
-void scene::try_swap_focus(elem* newFocus, bool force_drop){
+void scene::try_swap_focus(elem* newFocus){
 	if(newFocus == focus_cursor_) return;
 
 	if(focus_cursor_){
-		if(!force_drop && focus_cursor_->is_focus_extended_by_mouse()){
+		if(focus_cursor_->is_focus_extended_by_mouse()){
 			if(!is_mouse_pressed()){
 				swap_focus(newFocus);
 			} else return;

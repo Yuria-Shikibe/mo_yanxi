@@ -27,51 +27,63 @@ export using ui::clamped_fsize;
 
 export constexpr inline boarder default_boarder{8, 8, 8, 8};
 
-export struct debug_elem_drawer final : style_drawer<elem>{
-	[[nodiscard]] constexpr debug_elem_drawer() : style_drawer(tags::persistent){}
+export struct elem_style_drawer : style_drawer<elem>{
+	using style_drawer::style_drawer;
+
+	[[nodiscard]] virtual boarder get_boarder() const noexcept{
+		return {};
+	}
+
+};
+
+export struct debug_elem_drawer final : elem_style_drawer{
+	[[nodiscard]] constexpr debug_elem_drawer() : elem_style_drawer(tags::persistent){
+	}
+
+	boarder get_boarder() const noexcept override{
+		return default_boarder;
+	}
 
 	void draw(const elem& element, rect region, float opacityScl) const override;
 };
 
-export struct empty_drawer final : style_drawer<elem>{
-	[[nodiscard]] constexpr empty_drawer() : style_drawer(tags::persistent){}
+export struct empty_drawer final : elem_style_drawer{
+	[[nodiscard]] constexpr empty_drawer() : elem_style_drawer(tags::persistent){}
 
 	void draw(const elem& element, rect region, float opacityScl) const override{
 	}
 };
 
 namespace style{
-using elem_style_ptr = style_ptr<elem>;
+using elem_style_ptr = referenced_ptr<const elem_style_drawer>;
+
 export constexpr inline debug_elem_drawer debug_style;
 export constexpr inline empty_drawer empty_style;
 
-export inline const style_drawer<elem>* global_default_style_drawer{};
+export inline const elem_style_drawer* global_default_style_drawer{};
 
-export const style_drawer<elem>* get_default_style_drawer() noexcept{
+export const elem_style_drawer* get_default_style_drawer() noexcept{
 	return global_default_style_drawer == nullptr ? &debug_style : global_default_style_drawer;
 }
 
 }
 
 export
-[[nodiscard]] layout::stated_extent clip_boarder_from(layout::stated_extent extent, const boarder boarder) noexcept{
-	if(extent.width.mastering()){extent.width.value = std::fdim(extent.width.value, boarder.width());}
-	if(extent.height.mastering()){extent.height.value = std::fdim(extent.height.value, boarder.height());}
+[[nodiscard]] layout::stated_extent clip_boarder_from(layout::stated_extent extent, const math::vec2 boarder_extent) noexcept{
+	if(extent.width.mastering()){extent.width.value = std::fdim(extent.width.value, boarder_extent.x);}
+	if(extent.height.mastering()){extent.height.value = std::fdim(extent.height.value, boarder_extent.y);}
 
 	return extent;
 }
 
 export
-[[nodiscard]] layout::optional_mastering_extent clip_boarder_from(layout::optional_mastering_extent extent, const boarder boarder) noexcept{
+[[nodiscard]] layout::optional_mastering_extent clip_boarder_from(layout::optional_mastering_extent extent, const math::vec2 boarder_extent) noexcept{
 	auto [dx, dy] = extent.get_mastering();
-	if(dx)extent.set_width(std::fdim(extent.potential_width(), boarder.width()));
-	if(dy)extent.set_height(std::fdim(extent.potential_height(), boarder.height()));
+	if(dx)extent.set_width(std::fdim(extent.potential_width(), boarder_extent.x));
+	if(dy)extent.set_height(std::fdim(extent.potential_height(), boarder_extent.y));
 
 	return extent;
 }
-
-export struct elem_ptr;
-
 
 export
 struct cursor_states{
@@ -92,6 +104,15 @@ struct cursor_states{
 
 	void quit_focus() noexcept{
 		focused = pressed = false;
+	}
+
+	void update_press(const input_handle::key_set k) noexcept{
+		switch(k.action){
+		case input_handle::act::press :
+			pressed = true;
+			break;
+		default : pressed = false;
+		}
 	}
 
 	void update(const float delta_in_ticks) noexcept {
@@ -135,7 +156,8 @@ private:
 	math::vec2 preferred_size_{};
 	math::vec2 relative_pos_{};
 	math::vec2 absolute_pos_{};
-	boarder boarder_{default_boarder};
+	boarder boarder_{};
+	boarder style_boarder_cache_{style::get_default_style_drawer()->get_boarder()};
 
 public:
 	layout::optional_mastering_extent restriction_extent{};
@@ -209,15 +231,11 @@ public:
 	virtual events::op_afterwards on_click(const events::click event, std::span<elem* const> aboves){
 		if(!is_interactable()){
 			return events::op_afterwards::fall_through;
+		}else if(is_focused()){
+			cursor_states_.update_press(event.key);
 		}
 
-		switch(event.key.action){
-		case input_handle::act::press : cursor_states_.pressed = true;
-			break;
-		default : cursor_states_.pressed = false;
-		}
-
-		return events::op_afterwards::intercepted;
+		return events::op_afterwards::fall_through;
 	}
 
 	virtual events::op_afterwards on_drag(const events::drag event){
@@ -259,6 +277,16 @@ public:
 		draw_content(clipSpace);
 	}
 
+	void set_style(const elem_style_drawer& style) noexcept{
+		this->style = std::addressof(style);
+		style_boarder_cache_ = style.get_boarder();
+	}
+
+	void set_style() noexcept{
+		this->style = nullptr;
+		style_boarder_cache_ = {};
+	}
+
 protected:
 	void draw_background() const;
 
@@ -275,6 +303,10 @@ public:
 	virtual void update(float delta_in_ticks);
 
 	void clear_scene_references() noexcept;
+
+	void require_scene_cursor_update() const noexcept{
+		get_scene().request_cursor_update();
+	}
 
 #pragma endregion
 
@@ -300,11 +332,29 @@ public:
 
 	void notify_layout_changed(propagate_mask propagation) noexcept;
 
-	//TODO
 	void notify_isolated_layout_changed();
 
 protected:
+	virtual std::optional<layout::layout_policy> search_layout_policy_getter_impl() const noexcept{
+		return std::nullopt;
+	}
+
+public:
+
+	[[nodiscard]] std::optional<layout::layout_policy> search_parent_layout_policy(bool allowNone) const noexcept{
+		auto ptr = parent();
+		while(ptr != nullptr){
+			if(auto p = ptr->search_layout_policy_getter_impl()){
+				if(allowNone || p.value() != layout::layout_policy::none)return p;
+			}
+			ptr = ptr->parent();
+		}
+		return std::nullopt;
+	}
+
+protected:
 	virtual bool resize_impl(const math::vec2 size){
+
 		if(size_.set_size(size)){
 			notify_layout_changed(propagate_mask::all);
 			return true;
@@ -325,13 +375,13 @@ public:
 		return resize_impl(size);
 	}
 
-	virtual void layout(){
+	virtual void layout_elem(){
 		layout_state.clear();
 	}
 
 	bool try_layout(){
 		if(layout_state.any_lower_changed()){
-			layout();
+			layout_elem();
 			return true;
 		}
 		return false;
@@ -463,19 +513,19 @@ public:
 
 	[[nodiscard]] vec2 content_extent() const noexcept{
 		const auto [w, h] = size_.get_size();
-		const auto [bw, bh] = boarder_.extent();
+		const auto [bw, bh] = boarder_extent();
 		return {std::fdim(w, bw), std::fdim(h, bh)};
 	}
 
 	[[nodiscard]] float content_width() const noexcept{
 		const auto w = size_.get_width();
-		const auto bw = boarder_.width();
+		const auto bw = boarder_.width() + style_boarder_cache_.width();
 		return std::fdim(w, bw);
 	}
 
 	[[nodiscard]] float content_height() const noexcept{
 		const auto v = size_.get_height();
-		const auto bv = boarder_.height();
+		const auto bv = boarder_.height() + style_boarder_cache_.height();
 		return std::fdim(v, bv);
 	}
 
@@ -500,15 +550,19 @@ public:
 	}
 
 	[[nodiscard]] constexpr align::spacing boarder() const noexcept{
-		return boarder_;
+		return boarder_ + style_boarder_cache_;
+	}
+
+	[[nodiscard]] constexpr vec2 boarder_extent() const noexcept{
+		return boarder_.extent() + style_boarder_cache_.extent();
 	}
 
 	[[nodiscard]] constexpr math::vec2 content_src_offset() const noexcept{
-		return boarder_.top_lft();
+		return boarder_.top_lft() + style_boarder_cache_.top_lft();
 	}
 
 	[[nodiscard]] rect clip_to_content_bound(rect region) const noexcept{
-		return rect{tags::unchecked, tags::from_extent, region.src + content_src_offset(), region.extent().fdim(boarder_.extent())};
+		return rect{tags::unchecked, tags::from_extent, region.src + content_src_offset(), region.extent().fdim(boarder_extent())};
 	}
 
 	[[nodiscard]] rect content_bound_abs() const noexcept{
@@ -662,7 +716,7 @@ bool set_fill_parent(
 	if(fx) item.restriction_extent.set_width(boundSize.x);
 	else{
 		if(expansion_mask.x){
-			item.restriction_extent.set_width_dependent();
+			item.restriction_extent.set_width_pending();
 		} else{
 			item.restriction_extent.set_width(boundSize.x);
 		}
@@ -671,7 +725,7 @@ bool set_fill_parent(
 	if(fy) item.restriction_extent.set_height(boundSize.y);
 	else{
 		if(expansion_mask.y){
-			item.restriction_extent.set_height_dependent();
+			item.restriction_extent.set_height_pending();
 		} else{
 			item.restriction_extent.set_height(boundSize.y);
 		}

@@ -50,6 +50,16 @@ namespace mo_yanxi::gui{
 			}
 		}
 
+		[[nodiscard]] layout::layout_policy get_layout_policy() const noexcept{
+			return layout_policy_;
+		}
+
+	private:
+		[[nodiscard]] std::optional<layout::layout_policy> search_layout_policy_getter_impl() const noexcept override{
+			return get_layout_policy();
+		}
+
+	public:
 		[[nodiscard]] float get_scroll_bar_stroke() const noexcept{
 			return scroll_bar_stroke_;
 		}
@@ -82,8 +92,8 @@ namespace mo_yanxi::gui{
 
 		void draw_content(const rect clipSpace) const override;
 
-		void layout() override{
-			elem::layout();
+		void layout_elem() override{
+			elem::layout_elem();
 			update_item_layout();
 		}
 
@@ -98,14 +108,14 @@ namespace mo_yanxi::gui{
 	public:
 		template <elem_init_func Fn, typename ...Args>
 		auto& create(Fn&& init, Args&& ...args){
-			this->item = elem_ptr{get_scene(), this, [&, this](typename elem_init_func_trait<Fn>::elem_type& e){
+			this->item = elem_ptr{get_scene(), this, [&, this](elem_init_func_create_t<Fn>& e){
 				scroll_pane::deduced_set_child_fill_parent(e);
 				init(e);
 			}, std::forward<Args>()...};
 			updateChildrenAbsSrc();
 			notify_isolated_layout_changed();
 
-			return static_cast<typename elem_init_func_trait<Fn>::elem_type&>(*this->item);
+			return static_cast<elem_init_func_create_t<Fn>&>(*this->item);
 		}
 
 		template <std::derived_from<elem> E, typename ...Args>
@@ -184,6 +194,7 @@ namespace mo_yanxi::gui{
 			assert(item != nullptr);
 			item->set_rel_pos(-scroll.temp);
 			item->update_abs_src(content_src_pos_abs());
+			require_scene_cursor_update();
 		}
 
 	public:

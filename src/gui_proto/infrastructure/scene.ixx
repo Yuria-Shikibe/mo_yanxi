@@ -61,6 +61,12 @@ protected:
 	elem* focus_cursor_{nullptr};
 	elem* focus_key_{nullptr};
 
+	/**
+	 * @brief Request to update cursor pos, even it never moves
+	 * Used for nested scene or scroll panes and other elements that change the element position
+	 */
+	bool request_cursor_update_{};
+
 	std::pmr::vector<elem*> last_inbounds_{resource_.get()};
 	std::pmr::unordered_set<elem*> independent_layouts_{resource_.get()};
 
@@ -167,7 +173,7 @@ private:
 
 	void inform_cursor_move(math::vec2 pos){
 		inputs_.cursor_move_inform(pos);
-		on_cursor_pos_update(false);
+		on_cursor_pos_update();
 	}
 
 	void input_key(const input_handle::key_set key);
@@ -181,15 +187,18 @@ private:
 
 	void on_scroll(const math::vec2 scroll) const;
 
-	void on_cursor_pos_update(bool force_drop);
+	void on_cursor_pos_update();
 #pragma endregion
 
 	void layout();
 
+	void request_cursor_update() noexcept{
+		request_cursor_update_ = true;
+	}
 
-	void update_inbounds(std::pmr::vector<elem*>&& next, bool force_drop);
+	void update_inbounds(std::pmr::vector<elem*>&& next);
 
-	void try_swap_focus(elem* newFocus, bool force_drop);
+	void try_swap_focus(elem* newFocus);
 
 	void swap_focus(elem* newFocus);
 

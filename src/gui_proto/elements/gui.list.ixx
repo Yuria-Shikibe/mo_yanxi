@@ -13,7 +13,7 @@ namespace mo_yanxi::gui{
 	export
 	struct seq_list : celled_group<cell_adaptor<layout::partial_mastering_cell>>{
 	private:
-		layout::layout_policy policy_{layout::layout_policy::hori_major};
+		layout::layout_policy policy_{search_parent_layout_policy(false).value_or(layout::layout_policy::hori_major)};
 		bool align_to_tail_{false};
 		layout::expand_policy expand_policy_{};
 
@@ -64,6 +64,11 @@ namespace mo_yanxi::gui{
 			return expand_policy_;
 		}
 
-		void layout() override;
+		void layout_elem() override;
+
+	protected:
+		[[nodiscard]] std::optional<layout::layout_policy> search_layout_policy_getter_impl() const noexcept override{
+			return get_layout_policy();
+		}
 	};
 }

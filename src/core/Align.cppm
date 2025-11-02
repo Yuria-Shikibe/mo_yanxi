@@ -75,6 +75,30 @@ namespace mo_yanxi{
 
 			[[nodiscard]] friend constexpr bool operator==(const padding2d& lhs, const padding2d& rhs) noexcept = default;
 
+			constexpr padding2d& operator+=(const padding2d& other) noexcept {
+				left += other.left;
+				right += other.right;
+				bottom += other.bottom;
+				top += other.top;
+				return *this;
+			}
+
+			constexpr padding2d& operator-=(const padding2d& other) noexcept {
+				left -= other.left;
+				right -= other.right;
+				bottom -= other.bottom;
+				top -= other.top;
+				return *this;
+			}
+
+			constexpr friend padding2d operator+(padding2d lhs, const padding2d& rhs) noexcept {
+				return lhs += rhs;
+			}
+
+			constexpr friend padding2d operator-(padding2d lhs, const padding2d& rhs) noexcept {
+				return lhs -= rhs;
+			}
+
 			constexpr padding2d& expand(T x, T y) noexcept{
 				x = align::floating_mul(x, 0.5f);
 				y = align::floating_mul(y, 0.5f);

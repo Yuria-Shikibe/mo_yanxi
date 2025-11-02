@@ -107,7 +107,7 @@ void scroll_pane::update_item_layout(){
 					need_elem_relayout = true;
 				}
 
-				if(restriction_extent.width_dependent() && sz->x > content_width()){
+				if(restriction_extent.width_pending() && sz->x > content_width()){
 					need_self_relayout = true;
 				}
 
@@ -119,7 +119,7 @@ void scroll_pane::update_item_layout(){
 					need_elem_relayout = true;
 				}
 
-				if(restriction_extent.height_dependent() && sz->y > content_height()){
+				if(restriction_extent.height_pending() && sz->y > content_height()){
 					need_self_relayout = true;
 				}
 				break;
@@ -163,7 +163,7 @@ void scroll_pane::update_item_layout(){
 		}
 	}
 
-	item->layout();
+	item->layout_elem();
 }
 
 void scroll_pane::deduced_set_child_fill_parent(elem& element) const noexcept{
