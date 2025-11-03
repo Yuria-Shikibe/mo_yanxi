@@ -11,14 +11,14 @@ namespace mo_yanxi::gui{
 	};
 
 	export
-	struct seq_list : celled_group<cell_adaptor<layout::partial_mastering_cell>>{
+	struct sequence : celled_group<cell_adaptor<layout::partial_mastering_cell>>{
 	private:
 		layout::layout_policy policy_{search_parent_layout_policy(false).value_or(layout::layout_policy::hori_major)};
 		bool align_to_tail_{false};
 		layout::expand_policy expand_policy_{};
 
 	public:
-		[[nodiscard]] seq_list(scene& scene, elem* parent)
+		[[nodiscard]] sequence(scene& scene, elem* parent)
 			: universal_group<layout::partial_mastering_cell>(scene, parent){
 		}
 

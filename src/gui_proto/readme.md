@@ -21,3 +21,7 @@
 # GUI复合组件
 * Menu
 * Collapser
+
+
+# 待决
+scaling是否控制margin，boarder和padding?

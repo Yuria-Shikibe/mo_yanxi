@@ -153,7 +153,7 @@ private:
 	elem* parent_{};
 
 	clamped_fsize size_{};
-	math::vec2 preferred_size_{};
+	std::optional<math::vec2> preferred_size_{};
 	math::vec2 relative_pos_{};
 	math::vec2 absolute_pos_{};
 	boarder boarder_{};
@@ -638,11 +638,12 @@ public:
 	bool set_prefer_extent(math::vec2 extent) noexcept{
 		return util::try_modify(preferred_size_, size_.clamp(extent));
 	}
+
 	bool set_prefer_extent_to_current() noexcept{
 		return util::try_modify(preferred_size_, extent());
 	}
 
-	vec2 get_prefer_extent() noexcept{
+	[[nodiscard]] std::optional<vec2> get_prefer_extent() const noexcept{
 		return preferred_size_;
 	}
 

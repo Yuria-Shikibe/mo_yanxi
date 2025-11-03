@@ -7,7 +7,7 @@ module mo_yanxi.gui.elem.sequence;
 namespace mo_yanxi::gui{
 
 [[nodiscard]] sequence_pre_layout_result get_list_layout_minor_mastering_length(
-	const seq_list& list,
+	const sequence& list,
 	float layout_major_size,
 	gch::small_vector<float, 16, std::pmr::polymorphic_allocator<float>>* cache = nullptr
 	) {
@@ -45,7 +45,7 @@ namespace mo_yanxi::gui{
 			break;
 		}
 		case layout::size_category::scaling:{
-			float value = cell.cell.stated_size.value * layout_major_size * minorScaling;
+			float value = cell.cell.stated_size.value * layout_major_size;
 
 			if(cache)cache->push_back(value);
 			masterings_capture += value;
@@ -63,7 +63,7 @@ namespace mo_yanxi::gui{
 }
 
 
-std::optional<math::vec2> seq_list::pre_acquire_size_impl(layout::optional_mastering_extent extent){
+std::optional<math::vec2> sequence::pre_acquire_size_impl(layout::optional_mastering_extent extent){
 	switch(policy_){
 	case layout::layout_policy::hori_major :{
 		if(extent.width_pending()) return std::nullopt;
@@ -104,7 +104,7 @@ std::optional<math::vec2> seq_list::pre_acquire_size_impl(layout::optional_maste
 	return potential;
 }
 
-void seq_list::layout_elem(){
+void sequence::layout_elem(){
 	if(cells_.empty()) return;
 	auto [majorTarget, minorTarget] = layout::get_vec_ptr(policy_);
 
@@ -121,7 +121,7 @@ void seq_list::layout_elem(){
 		size += boarder().extent();
 
 		if(expand_policy_ == layout::expand_policy::prefer){
-			size.max(get_prefer_extent());
+			size.max(get_prefer_extent().value_or({}));
 		}
 
 		size.min(restriction_extent.potential_extent());

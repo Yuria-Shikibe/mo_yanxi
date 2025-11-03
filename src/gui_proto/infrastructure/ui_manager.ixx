@@ -1,6 +1,6 @@
-//
-// Created by Matrix on 2025/11/1.
-//
+module;
+
+#include <cassert>
 
 export module mo_yanxi.gui.infrastructure:ui_manager;
 
@@ -41,6 +41,7 @@ public:
 	}
 
 	scene& get_current_focus() const noexcept{
+		assert(focus);
 		return *focus;
 	}
 

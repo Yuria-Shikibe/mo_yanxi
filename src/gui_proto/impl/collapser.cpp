@@ -57,7 +57,7 @@ void collapser::update_collapse(float delta) noexcept{
 	}
 	case collapser_state::expanding:{
 		expand_reload_ += settings.expand_speed * delta;
-		notify_layout_changed(propagate_mask::local | propagate_mask::force_upper);
+		notify_layout_changed(propagate_mask::force_upper);
 		require_scene_cursor_update();
 
 		if(expand_reload_ >= 1){
@@ -88,7 +88,7 @@ void collapser::update_collapse(float delta) noexcept{
 	}
 	case collapser_state::exit_expanding:{
 		expand_reload_ = std::fdim(expand_reload_, settings.expand_speed * delta);
-		notify_layout_changed(propagate_mask::local | propagate_mask::force_upper);
+		notify_layout_changed(propagate_mask::force_upper);
 		require_scene_cursor_update();
 
 		if(expand_reload_ == 0.f){

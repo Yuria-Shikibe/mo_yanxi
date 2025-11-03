@@ -50,6 +50,10 @@ export struct stated_size{
 		return type == size_category::mastering;
 	}
 
+	[[nodiscard]] constexpr float master_or(const float v) const noexcept{
+		return type == size_category::mastering ? value : v;
+	}
+
 	[[nodiscard]] constexpr bool pending() const noexcept{
 		return type == size_category::pending;
 	}
@@ -157,6 +161,15 @@ export struct stated_extent{
 			return {{size_category::mastering, width.value * height.value}, height};
 		}
 		return *this;
+	}
+
+	constexpr void try_scl(math::vec2 scl) noexcept{
+		if(width.mastering()){
+			width.value *= scl.x;
+		}
+		if(height.mastering()){
+			height.value *= scl.y;
+		}
 	}
 
 	[[nodiscard]] math::vec2 potential_max_size() const noexcept{

@@ -35,13 +35,11 @@ namespace mo_yanxi::gui::layout{
 
 	export
 	struct basic_cell{
-		align::pos align{align::pos::center};
-
-		math::section<vec2> extent_span{{}, math::vectors::constant2<float>::inf_positive_vec2};
-
 		rect allocated_region{};
-		vec2 scaling{1.f, 1.f};
 
+		align::pos align{align::pos::center};
+		math::section<vec2> extent_span{{}, math::vectors::constant2<float>::inf_positive_vec2};
+		vec2 scaling{1.f, 1.f};
 		align::spacing margin{};
 
 		[[nodiscard]] constexpr vec2 clamp_size(vec2 sz) const noexcept{

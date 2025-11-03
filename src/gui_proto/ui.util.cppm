@@ -118,4 +118,20 @@ constexpr bool try_modify(
 	}
 	return false;
 }
+
+export
+/**
+ * @brief
+ * @return true if modification happens
+ */
+template <typename Lhs, typename Rhs>
+	requires (std::equality_comparable_with<Lhs, Rhs> && std::assignable_from<Lhs&, Rhs&&>)
+constexpr bool try_modify(
+	Lhs& target, Rhs&& value) noexcept(noexcept(target != value) && std::is_nothrow_assignable_v<Lhs&, Rhs&&>){
+	if(target != value){
+		target = std::forward<Rhs>(value);
+		return true;
+	}
+	return false;
+}
 }

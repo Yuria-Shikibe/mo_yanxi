@@ -106,7 +106,7 @@ namespace mo_yanxi::gui{
 	};
 
 	export
-	template <std::derived_from<layout::basic_cell> T>
+	template <typename T>
 	struct cell_adaptor{
 		using cell_type = T;
 		elem* element{};
@@ -118,7 +118,7 @@ namespace mo_yanxi::gui{
 			: element{element},
 			  cell{cell}{}
 
-		void apply(elem& group, layout::optional_mastering_extent extent = {math::vectors::constant2<float>::inf_positive_vec2}) const{
+		void apply(elem& group, layout::optional_mastering_extent extent = {math::vectors::constant2<float>::inf_positive_vec2}) const requires(std::derived_from<T, layout::basic_cell>){
 			cell.apply_to(group, *element, extent);
 		}
 
@@ -132,7 +132,7 @@ namespace mo_yanxi::gui{
 	};
 
 	export
-	template <std::derived_from<layout::basic_cell> CellTy, typename Adaptor = cell_adaptor<CellTy>>
+	template <typename CellTy, typename Adaptor = cell_adaptor<CellTy>>
 	struct universal_group : public basic_group{
 		using cell_type = CellTy;
 		using adaptor_type = Adaptor;

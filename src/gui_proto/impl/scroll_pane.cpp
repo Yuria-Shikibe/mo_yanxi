@@ -95,6 +95,8 @@ void scroll_pane::update_item_layout(){
 	auto bound = item->restriction_extent;
 
 	using namespace layout;
+
+	item->set_prefer_extent(get_viewport_extent());
 	if(auto sz = item->pre_acquire_size(bound)){
 		bool need_self_relayout = false;
 
