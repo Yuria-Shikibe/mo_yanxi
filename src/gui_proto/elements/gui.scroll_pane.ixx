@@ -111,7 +111,7 @@ namespace mo_yanxi::gui{
 			this->item = elem_ptr{get_scene(), this, [&, this](elem_init_func_create_t<Fn>& e){
 				scroll_pane::deduced_set_child_fill_parent(e);
 				init(e);
-			}, std::forward<Args>()...};
+			}, std::forward<Args>(args)...};
 			updateChildrenAbsSrc();
 			notify_isolated_layout_changed();
 
@@ -226,11 +226,23 @@ namespace mo_yanxi::gui{
 		[[nodiscard]] math::vec2 get_bar_extent() const noexcept{
 			math::vec2 rst{};
 
-			if(is_hori_scroll_enabled())rst.y += scroll_bar_stroke_;
-			if(is_vert_scroll_enabled())rst.x += scroll_bar_stroke_;
+			if(is_hori_scroll_enabled())rst.y = scroll_bar_stroke_;
+			if(is_vert_scroll_enabled())rst.x = scroll_bar_stroke_;
 
 			return rst;
 		}
+
+	private:
+		[[nodiscard]] math::vec2 get_bar_extent_at(math::vec2 temp_item_size) const noexcept{
+			math::vec2 rst{};
+
+			if(temp_item_size.x > content_width())rst.y = scroll_bar_stroke_;
+			if(temp_item_size.y > content_height())rst.x = scroll_bar_stroke_;
+
+			return rst;
+		}
+
+	public:
 
 		[[nodiscard]] float bar_hori_length() const {
 			const auto w = get_viewport_extent().x;
@@ -243,7 +255,7 @@ namespace mo_yanxi::gui{
 		}
 
 		[[nodiscard]] vec2 get_viewport_extent() const noexcept{
-			return content_extent() - get_bar_extent();
+			return content_extent().fdim(get_bar_extent());
 		}
 
 		[[nodiscard]] rect get_viewport() const noexcept{

@@ -17,8 +17,8 @@ namespace mo_yanxi::gui{
 export
 struct basic_group : public elem{
 protected:
-	std::pmr::vector<elem_ptr> expired_{get_allocator<elem_ptr>()};
-	std::pmr::vector<elem_ptr> children_{get_allocator<elem_ptr>()};
+	mr::heap_vector<elem_ptr> expired_{get_heap_allocator<elem_ptr>()};
+	mr::heap_vector<elem_ptr> children_{get_heap_allocator<elem_ptr>()};
 
 	void update_children(const float delta_in_ticks) const{
 		for(const auto& element : children_){

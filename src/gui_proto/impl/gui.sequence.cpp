@@ -9,7 +9,7 @@ namespace mo_yanxi::gui{
 [[nodiscard]] sequence_pre_layout_result get_list_layout_minor_mastering_length(
 	const sequence& list,
 	float layout_major_size,
-	gch::small_vector<float, 16, std::pmr::polymorphic_allocator<float>>* cache = nullptr
+	gch::small_vector<float, 16, mr::unvs_allocator<float>>* cache = nullptr
 	) {
 	auto [majorTarget, minorTarget] = layout::get_vec_ptr(list.get_layout_policy());
 
@@ -108,7 +108,7 @@ void sequence::layout_elem(){
 	if(cells_.empty()) return;
 	auto [majorTarget, minorTarget] = layout::get_vec_ptr(policy_);
 
-	gch::small_vector<float, 16, std::pmr::polymorphic_allocator<float>> sizes(get_allocator<float>());
+	gch::small_vector<float, 16, mr::unvs_allocator<float>> sizes{};
 	sizes.reserve(cells_.size());
 
 	auto content_sz = content_extent();

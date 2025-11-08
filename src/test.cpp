@@ -9,6 +9,7 @@ import mo_yanxi.gui.elem.sequence;
 import mo_yanxi.gui.elem.scroll_pane;
 import mo_yanxi.gui.elem.collapser;
 import mo_yanxi.gui.elem.table;
+import mo_yanxi.gui.elem.grid;
 
 void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 	auto e = scene.create<gui::manual_table>();
@@ -50,7 +51,7 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 		hdl.cell().region_scale = {.0f, .0f, .4f, 1.f};
 		hdl.cell().align = gui::align::pos::bottom_right;
 
-		hdl->create([](mo_yanxi::gui::table& table){
+		hdl->create([](gui::table& table){
 			table.set_expand_policy(gui::layout::expand_policy::prefer);
 			table.set_entire_align(align::pos::center);
 			for(int i = 0; i < 4; ++i){
@@ -58,7 +59,8 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 				table.emplace_back<gui::elem>();
 				table.end_line();
 			}
-			table.emplace_back<gui::elem>().cell().set_height(40).set_width_passive(.85f).saturate = true;//.align = align::pos::center;
+			table.emplace_back<gui::elem>().cell().set_height(40).set_width_passive(.85f).saturate = true;
+			//.align = align::pos::center;
 			// table.emplace_back<gui::elem>();
 			table.end_line();
 
@@ -70,6 +72,51 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 		});
 
 	}
+	/*{
+		auto hdl = mroot.emplace_back<mo_yanxi::gui::scroll_pane>();
+		hdl.cell().region_scale = {.0f, .0f, .6f, 1.f};
+		hdl.cell().align = gui::align::pos::bottom_right;
+		hdl->set_layout_policy(gui::layout::layout_policy::vert_major);
+
+
+
+		hdl->create([](mo_yanxi::gui::grid& table){
+			table.set_expand_policy(gui::layout::expand_policy::prefer);
+			table.emplace_back<gui::elem>().cell().extent = {
+					{.type = gui::grid_extent_type::src_extent, .desc = {0, 2},},
+					{.type = gui::grid_extent_type::src_extent, .desc = {0, 1},},
+				};
+			table.emplace_back<gui::elem>().cell().extent = {
+					{.type = gui::grid_extent_type::src_extent, .desc = {1, 2},},
+					{.type = gui::grid_extent_type::src_extent, .desc = {1, 1},},
+				};
+			table.emplace_back<gui::elem>().cell().extent = {
+					{.type = gui::grid_extent_type::src_extent, .desc = {2, 2},},
+					{.type = gui::grid_extent_type::src_extent, .desc = {2, 1},},
+				};
+			table.emplace_back<gui::elem>().cell().extent = {
+					{.type = gui::grid_extent_type::src_extent, .desc = {0, 4},},
+					{.type = gui::grid_extent_type::src_extent, .desc = {2, 2},},
+				};
+			table.emplace_back<gui::elem>().cell().extent = {
+					{.type = gui::grid_extent_type::margin, .desc = {1, 1},},
+					{.type = gui::grid_extent_type::src_extent, .desc = {5, 1},},
+				};
+			table.emplace_back<gui::elem>().cell().extent = {
+					{.type = gui::grid_extent_type::margin, .desc = {4, 1},},
+					{.type = gui::grid_extent_type::src_extent, .desc = {7, 1},},
+				};
+			table.emplace_back<gui::elem>().cell().extent = {
+					{.type = gui::grid_extent_type::src_extent, .desc = {0, 5},},
+					{.type = gui::grid_extent_type::margin, .desc = {0, 0},},
+				};
+		}, math::vector2<mo_yanxi::gui::grid_dim_spec>{
+			mo_yanxi::gui::grid_uniformed_mastering{6, 300.f, {4, 4}},
+			mo_yanxi::gui::grid_uniformed_passive{8, {4, 4}}
+		});
+
+	}*/
 
 
 }
+

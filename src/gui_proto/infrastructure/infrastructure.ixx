@@ -1,4 +1,4 @@
-
+module;
 
 export module mo_yanxi.gui.infrastructure;
 
@@ -9,8 +9,10 @@ export import :scene;
 export import :ui_manager;
 
 export import mo_yanxi.input_handle;
+export import mo_yanxi.gui.alloc;
 export import align;
 
 namespace mo_yanxi::gui{
 export namespace align = ::mo_yanxi::align;
+
 }

@@ -5,6 +5,7 @@ module;
 export module mo_yanxi.gui.infrastructure:ui_manager;
 
 import mo_yanxi.heterogeneous;
+import mo_yanxi.gui.alloc;
 import :scene;
 
 namespace mo_yanxi::gui{
@@ -22,13 +23,20 @@ struct scene_add_result{
 
 export
 struct ui_manager{
-	[[nodiscard]] ui_manager() = default;
+	[[nodiscard]]  ui_manager() : ui_manager(128){
 
-	[[nodiscard]] explicit ui_manager(std::string name, scene&& scene){
+	}
+
+	[[nodiscard]] explicit ui_manager(const std::size_t PoolSize_MB) : pool_(mr::make_memory_pool(PoolSize_MB)){
+
+	}
+
+	[[nodiscard]] explicit ui_manager(const std::size_t PoolSize_MB, std::string name, scene&& scene) : ui_manager(PoolSize_MB){
 		focus = &scenes.insert_or_assign(std::move(name), std::move(scene)).first->second;
 	}
 
 private:
+	mr::raw_memory_pool pool_{};
 	string_hash_map<scene> scenes{};
 	scene* focus{};
 
@@ -40,11 +48,12 @@ public:
 		return nullptr;
 	}
 
-	scene& get_current_focus() const noexcept{
+	[[nodiscard]] scene& get_current_focus() const noexcept{
 		assert(focus);
 		return *focus;
 	}
 
+private:
 	scene& add_scene(std::string_view name, scene&& scene, bool focusIt = false){
 		auto itr = scenes.insert_or_assign(name, std::move(scene));
 		if(focusIt){
@@ -53,6 +62,7 @@ public:
 
 		return itr.first->second;
 	}
+public:
 
 	template <std::derived_from<elem> T, typename... Args>
 		requires (std::constructible_from<T, scene&, elem*, Args&&...>)
@@ -64,6 +74,7 @@ public:
 		auto& scene_ = this->add_scene(
 			name,
 			scene{
+				this->pool_.get_arena_id(),
 				renderer_ui, std::in_place_type<T>,
 				std::forward<Args>(args)...
 			}, focus_it);

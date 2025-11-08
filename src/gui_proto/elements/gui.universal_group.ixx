@@ -140,7 +140,7 @@ namespace mo_yanxi::gui{
 		cell_type template_cell{};
 
 	protected:
-		std::pmr::vector<adaptor_type> cells_{get_scene().get_allocator()};
+		mr::heap_vector<adaptor_type> cells_{get_heap_allocator<adaptor_type>()};
 
 	public:
 		using basic_group::basic_group;

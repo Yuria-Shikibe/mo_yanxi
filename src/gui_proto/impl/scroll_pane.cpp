@@ -130,13 +130,14 @@ void scroll_pane::update_item_layout(){
 			}
 
 			if(need_elem_relayout){
-				auto s = item->pre_acquire_size(bound);
-				if(s) sz = s;
+				auto b = bound;
+				b.apply(content_extent());
+				item->set_prefer_extent(b.potential_extent());
+				if(auto s = item->pre_acquire_size(bound)) sz = s;
 			}
 		}
 
 		item->resize(*sz, propagate_mask::local | propagate_mask::child);
-		item->set_prefer_extent(get_viewport_extent());
 
 		if(need_self_relayout){
 			auto elemSz = item->extent();

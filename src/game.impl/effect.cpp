@@ -60,10 +60,10 @@ namespace mo_yanxi::game{
 		const auto color_inner = palette.in[prog];
 		const auto color_edge = palette.out[prog];
 		const auto stroke_base = stroke.base[prog];
-		const auto stroke_append = stroke.append[prog];
+		const auto stroke_append = stroke.extent[prog];
 
 		const auto len_base = length.base[prog];
-		const auto len_append_prog = length.append.interp(prog);
+		const auto len_append_prog = length.extent.interp(prog);
 
 		splash_vec(
 			e.id(),
@@ -79,7 +79,7 @@ namespace mo_yanxi::game{
 				draw::line::line_angle(
 					acquirer.get(4),
 					{e.trans.vec + trans.vec, trans.rot - math::pi},
-					len_base + rand.random(length.append.src, length.append.dst) * len_append_prog,
+					len_base + rand.random(length.extent.src, length.extent.dst) * len_append_prog,
 					stroke_base + rand.random(stroke_append),
 					color_edge, color_inner
 				);

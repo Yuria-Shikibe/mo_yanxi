@@ -1284,18 +1284,18 @@ export
 template <typename T>
 struct based_section{
 	T base;
-	T append;
+	T extent;
 
 	MATH_ATTR constexpr T length() const noexcept{
-		return math::abs(append);
+		return math::abs(extent);
 	}
 
 	MATH_ATTR constexpr T operator[](std::floating_point auto fp) const noexcept{
-		return math::fma(fp, append, base);
+		return math::fma(fp, extent, base);
 	}
 
 	operator section<T>(){
-		return section<T>{base, base + append};
+		return section<T>{base, base + extent};
 	}
 };
 

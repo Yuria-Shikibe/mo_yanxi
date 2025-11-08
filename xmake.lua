@@ -20,10 +20,6 @@ else
     add_requireconfs("spirv-cross", {configs = {runtimes = "MD", debug = false}})
 end
 
---[[ , {configs = {
-                             toolchains = "clang-cl"
-                         }}) ]]
-
 add_requires("msdfgen", {
     configs = {
         openmp = true,
@@ -33,6 +29,7 @@ add_requires("msdfgen", {
  })
 add_requires("freetype")
 add_requires("nanosvg")
+add_requires("mimalloc v2.2.4")
 add_requires("protobuf-cpp", {
     configs = {
 --         toolchains = "clang-cl",
@@ -92,7 +89,7 @@ target("mo_yanxi")
     add_packages("spirv-cross")
     add_packages("msdfgen")
     add_packages("freetype")
-
+    add_packages("mimalloc")
     add_packages("nanosvg")
 
     add_includedirs("generate")

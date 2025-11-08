@@ -70,7 +70,7 @@ export struct stated_size{
 		}
 	}
 
-	constexpr void promote(float mastering_size) noexcept{
+	constexpr void try_promote_by(float mastering_size) noexcept{
 		if(mastering()){
 			value = std::max(mastering_size, value);
 		} else{

@@ -12,6 +12,7 @@ import mo_yanxi.math.rect_ortho;
 
 import mo_yanxi.gui.util;
 export import mo_yanxi.input_handle;
+export import mo_yanxi.gui.alloc;
 
 
 namespace mo_yanxi::gui{
@@ -47,12 +48,11 @@ struct scene_base{
 	friend ui_manager;
 
 private:
-	std::unique_ptr<std::pmr::unsynchronized_pool_resource> resource_{};
+	mr::heap resource_{};
 	exclusive_handle_member<renderer*> renderer_{};
 
 protected:
-	rect region_;
-
+	rect region_{};
 
 	std::array<mouse_state, std::to_underlying(input_handle::mouse::Count)> mouse_states_{};
 	input_handle::input_manager<scene&> inputs_{};
@@ -67,8 +67,8 @@ protected:
 	 */
 	bool request_cursor_update_{};
 
-	std::pmr::vector<elem*> last_inbounds_{resource_.get()};
-	std::pmr::unordered_set<elem*> independent_layouts_{resource_.get()};
+	mr::heap_vector<elem*> last_inbounds_{mr::heap_allocator<elem*>{resource_.get()}};
+	mr::heap_uset<elem*> independent_layouts_{mr::heap_allocator<elem*>{resource_.get()}};
 
 	//must be the first to destruct
 	elem_ptr root_{};
@@ -77,6 +77,7 @@ protected:
 
 	template <std::derived_from<elem> T, typename ...Args>
 	[[nodiscard]] explicit(false) scene_base(
+		mr::arena_id_t arena_id,
 		renderer& renderer,
 		std::in_place_type_t<T>,
 		Args&& ...args
@@ -89,11 +90,11 @@ public:
 	}
 
 	template <typename T = std::byte>
-	[[nodiscard]] std::pmr::polymorphic_allocator<T> get_allocator() const noexcept {
-		return std::pmr::polymorphic_allocator<T>{resource_.get()};
+	[[nodiscard]] mr::heap_allocator<T> get_heap_allocator() const noexcept {
+		return mr::heap_allocator<T>{resource_.get()};
 	}
 
-	[[nodiscard]] std::pmr::memory_resource* get_memory_resource() const noexcept {
+	[[nodiscard]] auto* get_memory_resource() const noexcept {
 		return resource_.get();
 	}
 
@@ -196,7 +197,7 @@ private:
 		request_cursor_update_ = true;
 	}
 
-	void update_inbounds(std::pmr::vector<elem*>&& next);
+	void update_inbounds(mr::heap_vector<elem*>&& next);
 
 	void try_swap_focus(elem* newFocus);
 
@@ -211,8 +212,10 @@ private:
 };
 
 template <std::derived_from<elem> T, typename ... Args>
-scene_base::scene_base(gui::renderer& renderer, std::in_place_type_t<T>, Args&&... args):
-	resource_(std::make_unique<std::pmr::unsynchronized_pool_resource>()),
+scene_base::scene_base(
+	mr::arena_id_t arena_id,
+	gui::renderer& renderer, std::in_place_type_t<T>, Args&&... args):
+	resource_(arena_id),
 	renderer_(std::addressof(renderer)), root_(static_cast<scene&>(*this), nullptr, std::in_place_type<T>, std::forward<Args>(args)...){
 	inputs_.main_binds.set_context(std::ref(static_cast<scene&>(*this)));
 }

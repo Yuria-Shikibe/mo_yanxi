@@ -54,6 +54,11 @@ private:
 	void incr() noexcept;
 
 public:
+	template <typename L>
+		requires (std::derived_from<T, L>)
+	explicit(false) operator referenced_ptr<L>() const noexcept requires(std::same_as<D, std::default_delete<T>> && std::has_virtual_destructor_v<L>){
+		return referenced_ptr<L>{object};
+	}
 
 	explicit constexpr operator bool() const noexcept{
 		return object != nullptr;
@@ -116,6 +121,14 @@ public:
 	}
 
 	constexpr bool operator==(const referenced_ptr&) const noexcept = default;
+
+	constexpr friend bool operator==(const T* p, const referenced_ptr& self) noexcept{
+		return p == self.get();
+	}
+
+	constexpr friend bool operator==(const referenced_ptr& self, const T* p) noexcept{
+		return self.get() == p;
+	}
 
 
 private:

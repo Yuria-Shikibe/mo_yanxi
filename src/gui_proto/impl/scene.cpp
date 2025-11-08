@@ -1,5 +1,7 @@
 module;
 
+#include "mimalloc.h"
+
 module mo_yanxi.gui.infrastructure;
 
 namespace mo_yanxi::gui{
@@ -85,7 +87,7 @@ void scene::on_scroll(const math::vec2 scroll) const{
 
 void scene::on_cursor_pos_update(){
 	request_cursor_update_ = false;
-	std::pmr::vector<elem*> inbounds{get_allocator()};
+	mr::heap_vector<elem*> inbounds{get_heap_allocator()};
 
 	//TODO tooltip & dialog window
 	// for (auto && activeTooltip : tooltip_manager.get_active_tooltips() | std::views::reverse){
@@ -112,7 +114,7 @@ void scene::on_cursor_pos_update(){
 	// 	}
 	// }
 	if(inbounds.empty()){
-		inbounds = util::dfs_find_deepest_element(&root(), get_cursor_pos(), get_allocator<elem*>());
+		inbounds = util::dfs_find_deepest_element(&root(), get_cursor_pos(), get_heap_allocator<elem*>());
 	}
 
 	upt:
@@ -158,7 +160,7 @@ void scene::layout(){
 	}
 }
 
-void scene::update_inbounds(std::pmr::vector<elem*>&& next){
+void scene::update_inbounds(mr::heap_vector<elem*>&& next){
 	if(last_inbounds_.size() == next.size() && (last_inbounds_.empty() || last_inbounds_.back() == next.back()))return;
 
 	auto [i1, i2] = std::ranges::mismatch(last_inbounds_, next);

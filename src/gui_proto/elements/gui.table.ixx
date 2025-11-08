@@ -186,7 +186,7 @@ export struct table : universal_group<table_cell_adaptor::cell_type, table_cell_
 	}
 
 	void set_layout_policy(layout::layout_policy policy){
-		assert(policy != layout::layout_policy::none, "Not implemented yet");
+		assert(policy != layout::layout_policy::none && "Not implemented yet");
 		if(policy != layout_policy_){
 			notify_isolated_layout_changed();
 			layout_policy_ = policy;

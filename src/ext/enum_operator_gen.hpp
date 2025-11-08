@@ -5,6 +5,20 @@
 #ifndef ENUM_OPERATOR_GEN_HPP
 #define ENUM_OPERATOR_GEN_HPP
 
+#define ENUM_COMPARISON_OPERATORS(EnumType, ...) \
+__VA_ARGS__ constexpr bool operator<(EnumType lhs, EnumType rhs) noexcept { \
+return std::to_underlying(lhs) < std::to_underlying(rhs); \
+} \
+__VA_ARGS__ constexpr bool operator>(EnumType lhs, EnumType rhs) noexcept { \
+return std::to_underlying(lhs) > std::to_underlying(rhs); \
+} \
+__VA_ARGS__ constexpr bool operator<=(EnumType lhs, EnumType rhs) noexcept { \
+return std::to_underlying(lhs) <= std::to_underlying(rhs); \
+} \
+__VA_ARGS__ constexpr bool operator>=(EnumType lhs, EnumType rhs) noexcept { \
+return std::to_underlying(lhs) >= std::to_underlying(rhs); \
+}
+
 #define BITMASK_OPS_BASE(EXPORT_FLAG, BITMASK)\
 EXPORT_FLAG [[nodiscard]] constexpr BITMASK operator|(BITMASK lhs, BITMASK rhs) noexcept {\
 return static_cast<BITMASK>(std::to_underlying(lhs) | std::to_underlying(rhs));       \

@@ -647,15 +647,21 @@ public:
 		return preferred_size_;
 	}
 
+	[[nodiscard]] std::optional<vec2> get_prefer_content_extent() const noexcept{
+		return preferred_size_.transform([this](math::vec2 extent){
+			return extent.fdim(boarder_extent());
+		});
+	}
+
 #pragma endregion
 
 protected:
 	template <typename T>
-	std::pmr::polymorphic_allocator<T> get_allocator(){
-		return scene_->get_allocator<T>();
+	auto get_heap_allocator() const noexcept{
+		return scene_->get_heap_allocator<T>();
 	}
 
-	[[nodiscard]] std::pmr::memory_resource* get_memory_resource(){
+	[[nodiscard]] auto* get_memory_resource() const noexcept{
 		return scene_->get_memory_resource();
 	}
 
@@ -760,12 +766,12 @@ const D& elem_cast(const B& b) noexcept(unchecked || std::same_as<D, elem>){
 	}
 }
 
-std::pmr::polymorphic_allocator<> elem_ptr::alloc_of(const scene& s) noexcept{
-	return s.get_allocator();
+mr::heap_allocator<elem> elem_ptr::alloc_of(const scene& s) noexcept{
+	return s.get_heap_allocator<elem>();
 }
 
-std::pmr::polymorphic_allocator<> elem_ptr::alloc_of(const elem* ptr) noexcept{
-	return ptr->get_scene().get_allocator();
+mr::heap_allocator<elem> elem_ptr::alloc_of(const elem* ptr) noexcept{
+	return alloc_of(ptr->get_scene());
 }
 
 void elem_ptr::set_deleter(elem* element, void(* p)(elem*) noexcept) noexcept{

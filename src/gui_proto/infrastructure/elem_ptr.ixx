@@ -5,6 +5,7 @@ module;
 export module mo_yanxi.gui.infrastructure:elem_ptr;
 
 
+import mo_yanxi.gui.alloc;
 import mo_yanxi.func_initialzer;
 import mo_yanxi.concepts;
 import std;
@@ -44,10 +45,10 @@ struct elem_ptr{
 		requires (!spec_of<InitFunc, std::in_place_type_t> && invocable_elem_init_func<InitFunc>)
 	[[nodiscard]] elem_ptr(scene& scene, elem* parent, InitFunc&& initFunc, Args&& ...args)
 		: elem_ptr{
-			scene, parent, std::in_place_type<typename elem_init_func_trait<InitFunc>::elem_type>, std::forward<Args>(args)...
+			scene, parent, std::in_place_type<elem_init_func_create_t<InitFunc>>, std::forward<Args>(args)...
 		}{
 		std::invoke(initFunc,
-		            static_cast<std::add_lvalue_reference_t<typename elem_init_func_trait<InitFunc>::elem_type>>(*
+		            static_cast<std::add_lvalue_reference_t<elem_init_func_create_t<InitFunc>>>(*
 			            element));
 	}
 
@@ -114,16 +115,21 @@ private:
 
 	template <typename T, typename... Args>
 	static T* new_elem(scene& scene, elem* parent, Args&&... args){
-		T* p = alloc_of(scene).new_object<T>(scene, parent, std::forward<Args>(args)...);
+		using Alloc = mr::heap_allocator<T>;
+		Alloc alloc{alloc_of(scene)};
+		T* p = std::allocator_traits<Alloc>::allocate(alloc, 1);
+		std::construct_at(p, scene, parent, std::forward<Args>(args)...);
 		elem_ptr::set_deleter(p, +[](elem* e) noexcept {
-			alloc_of(e).delete_object(static_cast<T*>(e));
+			Alloc a{alloc_of(e)};
+			std::destroy_at(static_cast<T*>(e));
+			std::allocator_traits<Alloc>::deallocate(a, static_cast<T*>(e), 1);
 		});
 		return p;
 	}
 
-	static std::pmr::polymorphic_allocator<> alloc_of(const scene& s) noexcept;
+	static mr::heap_allocator<elem> alloc_of(const scene& s) noexcept;
 
-	static std::pmr::polymorphic_allocator<> alloc_of(const elem* ptr) noexcept;
+	static mr::heap_allocator<elem> alloc_of(const elem* ptr) noexcept;
 
 	static void set_deleter(elem* element, void(*p)(elem*) noexcept) noexcept;
 

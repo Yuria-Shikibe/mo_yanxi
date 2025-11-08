@@ -1,0 +1,503 @@
+module;
+
+#include <cassert>
+
+export module mo_yanxi.data_flow:nodes;
+
+import :manager;
+import :node_interface;
+
+import std;
+
+namespace mo_yanxi::data_flow{
+export
+template <typename T>
+struct provider_cached : provider_general{
+	static constexpr data_type_index node_data_type_index = unstable_type_identity_of<T>();
+
+	using value_type = T;
+	static_assert(std::is_object_v<value_type>);
+
+private:
+	T data_;
+	bool lazy_;
+
+public:
+	[[nodiscard]] provider_cached() = default;
+
+	[[nodiscard]] explicit provider_cached(manager& manager, bool is_lazy = false)
+	: provider_general(manager),
+	lazy_(is_lazy){
+	}
+
+	[[nodiscard]] bool is_lazy() const noexcept{
+		return lazy_;
+	}
+
+	void set_lazy(const bool lazy) noexcept{
+		lazy_ = lazy;
+		//TODO update when set to false?
+	}
+
+	[[nodiscard]] std::span<const data_type_index> get_in_socket_type_index() const noexcept override{
+		return std::span{&node_data_type_index, 1};
+	}
+
+	[[nodiscard]] data_type_index get_out_socket_type_index() const noexcept override{
+		return node_data_type_index;
+	}
+
+	[[nodiscard]] data_state get_data_state() const noexcept override{
+		return data_state::fresh;
+	}
+
+protected:
+
+	void update(void* in_data_pass_by_move) override{
+		T& target = *static_cast<T*>(in_data_pass_by_move);
+
+		data_ = std::move(target);
+		on_update();
+	}
+
+	void update(manager& manager, std::size_t, const void* in_data_pass_by_copy) override{
+		const T& target = *static_cast<const T*>(in_data_pass_by_copy);
+
+		data_ = target;
+		on_update();
+	}
+
+	void mark_updated(std::size_t) noexcept override {
+		//TODO does provider really need it?
+		for(const successor_entry& successor : this->successors){
+			successor.mark_updated();
+		}
+	}
+
+	request_pass_handle request_impl(bool allow_expired) override{
+		//source is always fresh
+		return data_flow::make_request_handle_expected_ref(data_);
+	}
+
+
+private:
+	void on_update(){
+		for(const successor_entry& successor : this->successors){
+			if(lazy_){
+				successor.mark_updated();
+			} else{
+				assert(manager_ != nullptr);
+				successor.update(*manager_, data_);
+			}
+		}
+	}
+};
+
+
+template <typename T, typename ...Args>
+struct modifier_async_task;
+
+template <typename Ret, typename... Args>
+struct modifier_base : asyncable_modifier{
+	static_assert((std::is_object_v<Args> && ...) && std::is_object_v<Ret>);
+
+	static constexpr std::size_t arg_count = sizeof...(Args);
+	static constexpr std::array<data_type_index, arg_count> in_type_indices{
+			unstable_type_identity_of<Args>()...
+		};
+	using arg_type = std::tuple<std::remove_const_t<Args>...>;
+
+protected:
+	std::array<referenced_ptr<node>, arg_count> parents{};
+	std::vector<successor_entry> successors{};
+public:
+	using asyncable_modifier::asyncable_modifier;
+
+	[[nodiscard]] data_state get_data_state() const noexcept override{
+		data_state states{};
+
+		for(const referenced_ptr<node>& p : parents){
+			update_state_enum(states, p->get_data_state());
+		}
+
+		return states;
+	}
+
+	[[nodiscard]] data_type_index get_out_socket_type_index() const noexcept final{
+		return unstable_type_identity_of<Ret>();
+	}
+
+	[[nodiscard]] std::span<const data_type_index> get_in_socket_type_index() const noexcept final{
+		return std::span{in_type_indices};
+	}
+
+	void async_resume(manager& manager, const void* data) final{
+		asyncable_modifier::async_resume(manager, data);
+		this->update_children(manager, *static_cast<const Ret*>(data));
+	}
+
+private:
+	bool connect_successors_impl(std::size_t slot, node& post) final{
+		return try_insert(successors, slot, post);
+	}
+
+	bool erase_successors_impl(std::size_t slot, node& post) final{
+		return try_erase(successors, slot, post);
+	}
+
+	void connect_predecessor_impl(std::size_t slot, node& prev) final{
+		parents[slot] = std::addressof(prev);
+	}
+
+	void erase_predecessor_impl(std::size_t slot, node& prev) final{
+		if(parents[slot] == &prev){
+			parents[slot] = {};
+		}
+	}
+
+protected:
+	void mark_updated(std::size_t from) noexcept override{
+		for(const successor_entry& successor : this->successors){
+			successor.mark_updated();
+		}
+	}
+
+	void update_children(manager& manager, const Ret& val) const{
+		for(const successor_entry& successor : this->successors){
+			successor.update(manager, val);
+		}
+	}
+
+private:
+	void async_launch_impl(manager& manager) final;
+protected:
+
+	std::optional<Ret> apply( const std::stop_token& stop_token, const arg_type& arguments){
+		return [&, this]<std::size_t... Idx>(std::index_sequence<Idx...>) -> std::optional<Ret>{
+			return this->operator()(stop_token, std::get<Idx>(arguments) ...);
+		}(std::index_sequence_for<Args...>());
+	}
+
+	virtual std::optional<Ret> operator()(const std::stop_token& stop_token, const Args&... args) const = 0;
+
+	virtual bool load_argument_to(arg_type& arguments, bool allow_expired){
+		return [&, this]<std::size_t ... Idx>(std::index_sequence<Idx...>){
+			return ([&, this]<std::size_t I>(){
+				node& n = *parents[I];
+				using Ty = std::tuple_element_t<I, arg_type>;
+				if(auto rst = n.request<Ty>(allow_expired)){
+					std::get<I>(arguments) = std::move(rst).value();
+					return true;
+				}
+				return false;
+			}.template operator()<Idx>() && ...);
+		}(std::index_sequence_for<Args...>{});
+	}
+
+
+	friend modifier_async_task<Ret, Args...>;
+};
+
+template <typename T, typename ...Args>
+struct modifier_async_task final : async_task_base{
+private:
+	using ref_ptr_t = referenced_ptr<modifier_base<T, Args...>>;
+	ref_ptr_t modifier_{};
+	std::stop_token stop_token_{};
+
+	std::tuple<Args...> arguments_{};
+	std::optional<T> rst_cache_{};
+
+public:
+	[[nodiscard]] explicit modifier_async_task(modifier_base<T, Args...>& modifier, std::tuple<Args...>&& args) :
+	modifier_(ref_ptr_t{std::addressof(modifier)}),
+	stop_token_(static_cast<const asyncable_modifier&>(modifier).get_stop_token()), arguments_{std::move(args)}{
+	}
+
+	void on_finish(manager& manager) override{
+		if(rst_cache_){
+			static_cast<asyncable_modifier&>(*modifier_).async_resume(manager, std::addressof(rst_cache_.value()));
+		}else{
+			static_cast<asyncable_modifier&>(*modifier_).asyncable_modifier::async_resume(manager, nullptr);
+		}
+	}
+
+private:
+	void execute() override{
+		rst_cache_ = modifier_->apply(stop_token_, arguments_);
+	}
+};
+
+
+template <typename Ret, typename ... Args>
+void modifier_base<Ret, Args...>::async_launch_impl(manager& manager){
+	arg_type arguments{};
+	if(this->load_argument_to(arguments, true)){
+		manager.push_task(std::make_unique<modifier_async_task<Ret, Args...>>(*this, std::move(arguments)));
+	}
+}
+
+export
+template <typename Ret, typename... Args>
+struct modifier_transient : modifier_base<Ret, Args...>{
+	using base = modifier_base<Ret, Args...>;
+
+	using base::modifier_base;
+
+	request_pass_handle request_impl(bool allow_expired) override{
+		if(this->get_async_type() != async_type::none){
+			if(this->get_dispatched() > 0){
+				return make_request_handle_unexpected(data_state::awaiting);
+			}else{
+				return make_request_handle_unexpected(data_state::failed);
+			}
+		}
+
+		typename base::arg_type arguments;
+		if(this->load_argument_to(arguments, allow_expired)){
+			if(auto return_value = this->apply({}, arguments)){
+				return data_flow::make_request_handle_expected(std::move(return_value).value());
+			}else{
+				return make_request_handle_unexpected(data_state::failed);
+			}
+		}
+
+		return make_request_handle_unexpected(data_state::expired);
+	}
+
+protected:
+	void update(manager& manager, std::size_t target_index, const void* in_data_pass_by_copy) override{
+		typename base::arg_type arguments{};
+
+		bool any_failed{false};
+		[&, this]<std::size_t ... Idx>(std::index_sequence<Idx...>){
+			([&, this]<std::size_t I>(){
+				using Ty = std::tuple_element_t<I, typename base::arg_type>;
+				if(I == target_index){
+					std::get<I>(arguments) = *static_cast<const Ty*>(in_data_pass_by_copy);
+				}else{
+					auto& n = *static_cast<referenced_ptr<node>&>(this->parents[I]);
+					if(auto rst = n.request<Ty>(true)){
+						std::get<I>(arguments) = std::move(rst).value();
+					}else{
+						any_failed = true;
+					}
+
+				}
+			}.template operator()<Idx>(), ...);
+		}(std::index_sequence_for<Args...>{});
+
+		if(any_failed){
+			this->mark_updated(-1);
+		}else if(this->get_async_type() == async_type::none){
+			if(auto cur = this->apply({}, arguments)){
+				this->base::update_children(manager, *cur);
+			}
+		}else{
+			this->async_launch(manager);
+		}
+
+	}
+};
+
+export
+template <typename Ret, typename... Args>
+struct modifier_argument_cached : modifier_base<Ret, Args...>{
+	using base = modifier_base<Ret, Args...>;
+
+private:
+	bool lazy_{};
+	std::bitset<base::arg_count> dirty{}; //only lazy nodes can be set dirty
+	base::arg_type arguments{};
+public:
+	[[nodiscard]] modifier_argument_cached() = default;
+
+	[[nodiscard]] explicit modifier_argument_cached(async_type async_type, bool is_lazy = false)
+	: modifier_base<Ret, Args...>(async_type), lazy_(is_lazy){
+	}
+
+	[[nodiscard]] bool is_lazy() const noexcept{
+		return lazy_;
+	}
+
+	void set_lazy(const bool lazy) noexcept{
+		lazy_ = lazy;
+	}
+
+	[[nodiscard]] data_state get_data_state() const noexcept override{
+		if(dirty.any()){
+			return data_state::expired;
+		}else{
+			return data_state::fresh;
+		}
+	}
+
+	request_pass_handle request_impl(bool allow_expired) override{
+		if(this->get_async_type() != async_type::none){
+			if(this->get_dispatched() > 0){
+				return make_request_handle_unexpected(data_state::awaiting);
+			}else{
+				return make_request_handle_unexpected(data_state::failed);
+			}
+		}
+
+		auto expired = update_arguments();
+
+		if(!expired || allow_expired){
+			if(auto return_value = this->apply({}, arguments)){
+				return data_flow::make_request_handle_expected(std::move(return_value).value());
+			}else{
+				return make_request_handle_unexpected(data_state::failed);
+			}
+
+		}
+
+		return make_request_handle_unexpected(data_state::expired);
+	}
+
+protected:
+	void update(manager& manager, std::size_t slot, const void* in_data_pass_by_copy) override{
+		assert(slot < base::arg_count);
+		update_data(slot, in_data_pass_by_copy);
+
+		if(lazy_){
+			base::mark_updated(-1);
+		} else{
+			if(this->get_async_type() == async_type::none){
+				if(auto cur = this->apply({}, arguments)){
+					this->base::update_children(manager, *cur);
+				}
+			}else{
+				this->async_launch(manager);
+			}
+		}
+	}
+
+	void mark_updated(std::size_t from) noexcept override{
+		dirty.set(from, true);
+		base::mark_updated(from);
+	}
+
+	bool load_argument_to(modifier_base<Ret, Args...>::arg_type& arguments, bool allow_expired) final{
+		auto is_expired = update_arguments();
+
+		if(!is_expired || allow_expired){
+			arguments = this->arguments;
+			return true;
+		}
+
+		return false;
+	}
+
+private:
+
+	bool update_arguments(){
+		if(!dirty.any())return false;
+		bool any_expired{};
+		[&, this]<std::size_t ... Idx>(std::index_sequence<Idx...>){
+			([&, this]<std::size_t I>(){
+				if(!dirty[I])return;
+
+				node& n = *static_cast<referenced_ptr<node>&>(this->parents[Idx]);
+				if(auto rst = n.request<std::tuple_element_t<Idx, typename base::arg_type>>(false)){
+					dirty.set(I, false);
+					std::get<Idx>(arguments) = std::move(rst).value();
+				}else{
+					any_expired = true;
+				}
+			}.template operator()<Idx>(), ...);
+		}(std::index_sequence_for<Args...>{});
+		return any_expired;
+	}
+
+	void update_data(std::size_t slot, const void* in_data_pass_by_copy){
+		dirty.set(slot, false);
+
+		[&, this]<std::size_t ... Idx>(std::index_sequence<Idx...>){
+			(void)((Idx == slot && (std::get<Idx>(arguments) = *static_cast<const std::tuple_element_t<Idx, typename
+				base::arg_type>*>(in_data_pass_by_copy), true)) || ...);
+		}(std::index_sequence_for<Args...>{});
+	}
+};
+
+export
+template <typename T>
+struct intermediate_cache : node{
+private:
+	T cache_{};
+	bool is_expired_{};
+	bool is_lazy{};
+
+	referenced_ptr<node> parent{};
+	std::vector<successor_entry> successors{};
+
+public:
+	static constexpr data_type_index node_data_type_index = unstable_type_identity_of<T>();
+
+	request_pass_handle request_impl(bool allow_expired) override{
+		if(is_expired_){
+			if(auto rst = parent->request<T>(allow_expired)){
+				is_expired_ = false;
+				cache_ = std::move(rst).value();
+			}
+		}
+
+		if(!is_expired_ || allow_expired){
+			return data_flow::make_request_handle_expected_ref(cache_);
+		}
+
+		return data_flow::make_request_handle_unexpected(data_state::expired);
+	}
+
+protected:
+	void mark_updated(std::size_t from_index) noexcept override{
+		is_expired_ = true;
+		std::ranges::for_each(successors, &successor_entry::mark_updated);
+	}
+
+	void update(manager& manager, std::size_t from_index, const void* in_data_pass_by_copy) override{
+		cache_ = static_cast<T*>(in_data_pass_by_copy);
+		is_expired_ = false;
+
+		if(is_lazy){
+			for(const successor_entry& successor : successors){
+				successor.update(manager, std::addressof(cache_));
+			}
+		} else{
+			std::ranges::for_each(successors, &successor_entry::mark_updated);
+		}
+	}
+
+	bool connect_successors_impl(std::size_t slot, node& post) final{
+		return try_insert(successors, slot, post);
+	}
+
+	bool erase_successors_impl(std::size_t slot, node& post) final{
+		return try_erase(successors, slot, post);
+	}
+
+	void connect_predecessor_impl(std::size_t slot, node& prev) final{
+		assert(slot == 0);
+		parent = std::addressof(prev);
+	}
+
+	void erase_predecessor_impl(std::size_t slot, node& prev) final{
+		assert(slot == 0);
+		if(parent == &prev)parent = {};
+	}
+
+public:
+	[[nodiscard]] data_state get_data_state() const noexcept override{
+		return is_expired_ ? data_state::expired : data_state::fresh;
+	}
+
+	[[nodiscard]] std::span<const data_type_index> get_in_socket_type_index() const noexcept override{
+		return std::span{&node_data_type_index, 1};
+	}
+
+	[[nodiscard]] data_type_index get_out_socket_type_index() const noexcept override{
+		return node_data_type_index;
+	}
+};
+
+}
