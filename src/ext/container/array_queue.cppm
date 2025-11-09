@@ -7,10 +7,8 @@ export namespace mo_yanxi {
         requires (std::is_default_constructible_v<T>)
     class array_queue {
     public:
-        // --- 成员函数 ---
         [[nodiscard]] constexpr array_queue() = default;
 
-        // --- 容量 ---
         [[nodiscard]] constexpr bool empty() const noexcept {
             return count == 0;
         }
@@ -27,7 +25,6 @@ export namespace mo_yanxi {
             return capacity;
         }
 
-        // --- 元素访问 ---
         [[nodiscard]] constexpr T& front() {
             if (empty()) {
                 throw std::underflow_error("Queue is empty");
@@ -64,7 +61,6 @@ export namespace mo_yanxi {
             return data[(frontIndex + index) % capacity];
         }
 
-        // --- 修改器 ---
         constexpr void push_back(const T& item) noexcept(!DEBUG_CHECK && std::is_nothrow_copy_assignable_v<T>)
             requires (std::is_copy_assignable_v<T>)
         {
@@ -162,8 +158,6 @@ export namespace mo_yanxi {
             backIndex = (backIndex == 0) ? capacity - 1 : backIndex - 1;
             --count;
         }
-
-        // --- 附加的非标准接口 ---
 
         constexpr void push_back_and_replace(const T& element) noexcept(!DEBUG_CHECK && std::is_nothrow_copy_assignable_v<T>) {
             if (full()) {

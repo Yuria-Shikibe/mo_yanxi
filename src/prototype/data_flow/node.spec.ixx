@@ -2,19 +2,17 @@ module;
 
 #include <cassert>
 
-export module mo_yanxi.data_flow:nodes;
+export module mo_yanxi.react_flow:nodes;
 
 import :manager;
 import :node_interface;
 
 import std;
 
-namespace mo_yanxi::data_flow{
+namespace mo_yanxi::react_flow{
 export
 template <typename T>
-struct provider_cached : provider_general{
-	static constexpr data_type_index node_data_type_index = unstable_type_identity_of<T>();
-
+struct provider_cached : provider_general<T>{
 	using value_type = T;
 	static_assert(std::is_object_v<value_type>);
 
@@ -26,8 +24,7 @@ public:
 	[[nodiscard]] provider_cached() = default;
 
 	[[nodiscard]] explicit provider_cached(manager& manager, bool is_lazy = false)
-	: provider_general(manager),
-	lazy_(is_lazy){
+	: provider_general<T>(manager), lazy_(is_lazy){
 	}
 
 	[[nodiscard]] bool is_lazy() const noexcept{
@@ -39,17 +36,15 @@ public:
 		//TODO update when set to false?
 	}
 
-	[[nodiscard]] std::span<const data_type_index> get_in_socket_type_index() const noexcept override{
-		return std::span{&node_data_type_index, 1};
-	}
-
-	[[nodiscard]] data_type_index get_out_socket_type_index() const noexcept override{
-		return node_data_type_index;
-	}
-
 	[[nodiscard]] data_state get_data_state() const noexcept override{
 		return data_state::fresh;
 	}
+
+	request_pass_handle<T> request_raw(bool allow_expired) override{
+		//source is always fresh
+		return react_flow::make_request_handle_expected_ref(data_);
+	}
+
 
 protected:
 
@@ -74,31 +69,28 @@ protected:
 		}
 	}
 
-	request_pass_handle request_impl(bool allow_expired) override{
-		//source is always fresh
-		return data_flow::make_request_handle_expected_ref(data_);
-	}
-
-
 private:
 	void on_update(){
 		for(const successor_entry& successor : this->successors){
 			if(lazy_){
 				successor.mark_updated();
 			} else{
-				assert(manager_ != nullptr);
-				successor.update(*manager_, data_);
+				assert(this->manager_ != nullptr);
+				successor.update(*this->manager_, data_);
 			}
 		}
 	}
 };
 
+//TODO provider transient?
 
 template <typename T, typename ...Args>
 struct modifier_async_task;
 
+
+
 template <typename Ret, typename... Args>
-struct modifier_base : asyncable_modifier{
+struct modifier_base : type_aware_node<Ret>{
 	static_assert((std::is_object_v<Args> && ...) && std::is_object_v<Ret>);
 
 	static constexpr std::size_t arg_count = sizeof...(Args);
@@ -107,11 +99,46 @@ struct modifier_base : asyncable_modifier{
 		};
 	using arg_type = std::tuple<std::remove_const_t<Args>...>;
 
-protected:
+private:
 	std::array<referenced_ptr<node>, arg_count> parents{};
 	std::vector<successor_entry> successors{};
+
+	async_type async_type_{};
+	std::size_t dispatched_count_{};
+	std::stop_source stop_source_{std::nostopstate};
+
 public:
-	using asyncable_modifier::asyncable_modifier;
+	[[nodiscard]] modifier_base() = default;
+
+	[[nodiscard]] explicit modifier_base(async_type async_type)
+		: async_type_(async_type){
+	}
+
+	[[nodiscard]] std::size_t get_dispatched() const noexcept{
+		return dispatched_count_;
+	}
+
+	[[nodiscard]] async_type get_async_type() const noexcept{
+		return async_type_;
+	}
+
+	void set_async_type(const async_type async_type) noexcept{
+		async_type_ = async_type;
+	}
+
+	[[nodiscard]] std::stop_token get_stop_token() const noexcept{
+		assert(stop_source_.stop_possible());
+		return stop_source_.get_token();
+	}
+
+	bool async_cancel() noexcept{
+		if(async_type_ == async_type::none) return false;
+		if(dispatched_count_ == 0) return false;
+		if(!stop_source_.stop_possible()) return false;
+		stop_source_.request_stop();
+		stop_source_ = std::stop_source{std::nostopstate};
+		return true;
+	}
 
 	[[nodiscard]] data_state get_data_state() const noexcept override{
 		data_state states{};
@@ -123,25 +150,41 @@ public:
 		return states;
 	}
 
-	[[nodiscard]] data_type_index get_out_socket_type_index() const noexcept final{
-		return unstable_type_identity_of<Ret>();
-	}
-
 	[[nodiscard]] std::span<const data_type_index> get_in_socket_type_index() const noexcept final{
 		return std::span{in_type_indices};
 	}
 
-	void async_resume(manager& manager, const void* data) final{
-		asyncable_modifier::async_resume(manager, data);
-		this->update_children(manager, *static_cast<const Ret*>(data));
+	void erase_self_from_context() noexcept final{
+		for(std::size_t i = 0; i < parents.size(); ++i){
+			if(auto& ptr = parents[i]){
+				static_cast<node&>(*ptr).erase_successors_impl(i, *this);
+				ptr.reset();
+			}
+		}
+		for (const auto & successor : successors){
+			successor.entity->erase_predecessor_impl(successor.index, *this);
+		}
+		successors.clear();
+	}
+
+	[[nodiscard]] std::span<const referenced_ptr<node>> get_inputs() const noexcept final{
+		return parents;
+	}
+
+	[[nodiscard]] std::span<const successor_entry> get_outputs() const noexcept final{
+		return successors;
 	}
 
 private:
+	void async_resume(manager& manager, const void* data) const{
+		this->update_children(manager, *static_cast<const Ret*>(data));
+	}
+
 	bool connect_successors_impl(std::size_t slot, node& post) final{
 		return try_insert(successors, slot, post);
 	}
 
-	bool erase_successors_impl(std::size_t slot, node& post) final{
+	bool erase_successors_impl(std::size_t slot, node& post) noexcept final{
 		return try_erase(successors, slot, post);
 	}
 
@@ -149,13 +192,37 @@ private:
 		parents[slot] = std::addressof(prev);
 	}
 
-	void erase_predecessor_impl(std::size_t slot, node& prev) final{
+	void erase_predecessor_impl(std::size_t slot, node& prev) noexcept final{
 		if(parents[slot] == &prev){
 			parents[slot] = {};
 		}
 	}
 
 protected:
+	void async_launch(manager& manager){
+		if(async_type_ == async_type::none){
+			throw std::logic_error("async_launch on a synchronized object");
+		}
+
+		if(stop_source_.stop_possible()){
+			if(async_type_ == async_type::async_latest){
+				if(async_cancel()){
+					//only reset when really requested stop
+					stop_source_ = {};
+				}
+			}
+		} else if(!stop_source_.stop_requested()){
+			//stop source empty
+			stop_source_ = {};
+		}
+
+		++dispatched_count_;
+
+		if(arg_type arguments{}; this->load_argument_to(arguments, true)){
+			manager.push_task(std::make_unique<modifier_async_task<Ret, Args...>>(*this, std::move(arguments)));
+		}
+	}
+
 	void mark_updated(std::size_t from) noexcept override{
 		for(const successor_entry& successor : this->successors){
 			successor.mark_updated();
@@ -168,14 +235,20 @@ protected:
 		}
 	}
 
-private:
-	void async_launch_impl(manager& manager) final;
-protected:
+	std::optional<Ret> apply( const std::stop_token& stop_token, arg_type&& arguments){
+		return [&, this]<std::size_t... Idx>(std::index_sequence<Idx...>) -> std::optional<Ret>{
+			return this->operator()(stop_token, std::move(std::get<Idx>(arguments)) ...);
+		}(std::index_sequence_for<Args...>());
+	}
 
 	std::optional<Ret> apply( const std::stop_token& stop_token, const arg_type& arguments){
 		return [&, this]<std::size_t... Idx>(std::index_sequence<Idx...>) -> std::optional<Ret>{
 			return this->operator()(stop_token, std::get<Idx>(arguments) ...);
 		}(std::index_sequence_for<Args...>());
+	}
+
+	virtual std::optional<Ret> operator()(const std::stop_token& stop_token, Args&&... args) const{
+		return this->operator()(stop_token, std::as_const(args)...);
 	}
 
 	virtual std::optional<Ret> operator()(const std::stop_token& stop_token, const Args&... args) const = 0;
@@ -185,7 +258,7 @@ protected:
 			return ([&, this]<std::size_t I>(){
 				node& n = *parents[I];
 				using Ty = std::tuple_element_t<I, arg_type>;
-				if(auto rst = n.request<Ty>(allow_expired)){
+				if(auto rst = node_type_cast<Ty>(n).request(allow_expired)){
 					std::get<I>(arguments) = std::move(rst).value();
 					return true;
 				}
@@ -201,7 +274,8 @@ protected:
 template <typename T, typename ...Args>
 struct modifier_async_task final : async_task_base{
 private:
-	using ref_ptr_t = referenced_ptr<modifier_base<T, Args...>>;
+	using type = modifier_base<T, Args...>;
+	using ref_ptr_t = referenced_ptr<type>;
 	ref_ptr_t modifier_{};
 	std::stop_token stop_token_{};
 
@@ -209,33 +283,24 @@ private:
 	std::optional<T> rst_cache_{};
 
 public:
-	[[nodiscard]] explicit modifier_async_task(modifier_base<T, Args...>& modifier, std::tuple<Args...>&& args) :
+	[[nodiscard]] explicit modifier_async_task(type& modifier, std::tuple<Args...>&& args) :
 	modifier_(ref_ptr_t{std::addressof(modifier)}),
-	stop_token_(static_cast<const asyncable_modifier&>(modifier).get_stop_token()), arguments_{std::move(args)}{
+	stop_token_(modifier.get_stop_token()), arguments_{std::move(args)}{
 	}
 
 	void on_finish(manager& manager) override{
+		--modifier_->dispatched_count_;
+
 		if(rst_cache_){
-			static_cast<asyncable_modifier&>(*modifier_).async_resume(manager, std::addressof(rst_cache_.value()));
-		}else{
-			static_cast<asyncable_modifier&>(*modifier_).asyncable_modifier::async_resume(manager, nullptr);
+			modifier_->async_resume(manager, std::addressof(rst_cache_.value()));
 		}
 	}
 
 private:
 	void execute() override{
-		rst_cache_ = modifier_->apply(stop_token_, arguments_);
+		rst_cache_ = modifier_->apply(stop_token_, std::move(arguments_));
 	}
 };
-
-
-template <typename Ret, typename ... Args>
-void modifier_base<Ret, Args...>::async_launch_impl(manager& manager){
-	arg_type arguments{};
-	if(this->load_argument_to(arguments, true)){
-		manager.push_task(std::make_unique<modifier_async_task<Ret, Args...>>(*this, std::move(arguments)));
-	}
-}
 
 export
 template <typename Ret, typename... Args>
@@ -244,25 +309,25 @@ struct modifier_transient : modifier_base<Ret, Args...>{
 
 	using base::modifier_base;
 
-	request_pass_handle request_impl(bool allow_expired) override{
+	request_pass_handle<Ret> request_raw(bool allow_expired) override{
 		if(this->get_async_type() != async_type::none){
 			if(this->get_dispatched() > 0){
-				return make_request_handle_unexpected(data_state::awaiting);
+				return make_request_handle_unexpected<Ret>(data_state::awaiting);
 			}else{
-				return make_request_handle_unexpected(data_state::failed);
+				return make_request_handle_unexpected<Ret>(data_state::failed);
 			}
 		}
 
 		typename base::arg_type arguments;
 		if(this->load_argument_to(arguments, allow_expired)){
-			if(auto return_value = this->apply({}, arguments)){
-				return data_flow::make_request_handle_expected(std::move(return_value).value());
+			if(auto return_value = this->apply({}, std::move(arguments))){
+				return react_flow::make_request_handle_expected(std::move(return_value).value());
 			}else{
-				return make_request_handle_unexpected(data_state::failed);
+				return make_request_handle_unexpected<Ret>(data_state::failed);
 			}
 		}
 
-		return make_request_handle_unexpected(data_state::expired);
+		return make_request_handle_unexpected<Ret>(data_state::expired);
 	}
 
 protected:
@@ -276,8 +341,8 @@ protected:
 				if(I == target_index){
 					std::get<I>(arguments) = *static_cast<const Ty*>(in_data_pass_by_copy);
 				}else{
-					auto& n = *static_cast<referenced_ptr<node>&>(this->parents[I]);
-					if(auto rst = n.request<Ty>(true)){
+					auto& n = *static_cast<const referenced_ptr<node>&>(this->get_inputs()[I]);
+					if(auto rst = node_type_cast<Ty>(n).request(true)){
 						std::get<I>(arguments) = std::move(rst).value();
 					}else{
 						any_failed = true;
@@ -290,7 +355,7 @@ protected:
 		if(any_failed){
 			this->mark_updated(-1);
 		}else if(this->get_async_type() == async_type::none){
-			if(auto cur = this->apply({}, arguments)){
+			if(auto cur = this->apply({}, std::move(arguments))){
 				this->base::update_children(manager, *cur);
 			}
 		}else{
@@ -332,12 +397,12 @@ public:
 		}
 	}
 
-	request_pass_handle request_impl(bool allow_expired) override{
+	request_pass_handle<Ret> request_raw(bool allow_expired) override{
 		if(this->get_async_type() != async_type::none){
 			if(this->get_dispatched() > 0){
-				return make_request_handle_unexpected(data_state::awaiting);
+				return make_request_handle_unexpected<Ret>(data_state::awaiting);
 			}else{
-				return make_request_handle_unexpected(data_state::failed);
+				return make_request_handle_unexpected<Ret>(data_state::failed);
 			}
 		}
 
@@ -345,14 +410,14 @@ public:
 
 		if(!expired || allow_expired){
 			if(auto return_value = this->apply({}, arguments)){
-				return data_flow::make_request_handle_expected(std::move(return_value).value());
+				return react_flow::make_request_handle_expected(std::move(return_value).value());
 			}else{
-				return make_request_handle_unexpected(data_state::failed);
+				return make_request_handle_unexpected<Ret>(data_state::failed);
 			}
 
 		}
 
-		return make_request_handle_unexpected(data_state::expired);
+		return make_request_handle_unexpected<Ret>(data_state::expired);
 	}
 
 protected:
@@ -398,8 +463,8 @@ private:
 			([&, this]<std::size_t I>(){
 				if(!dirty[I])return;
 
-				node& n = *static_cast<referenced_ptr<node>&>(this->parents[Idx]);
-				if(auto rst = n.request<std::tuple_element_t<Idx, typename base::arg_type>>(false)){
+				node& n = *static_cast<const referenced_ptr<node>&>(this->get_inputs()[Idx]);
+				if(auto rst = node_type_cast<std::tuple_element_t<Idx, typename base::arg_type>>(n).request(false)){
 					dirty.set(I, false);
 					std::get<Idx>(arguments) = std::move(rst).value();
 				}else{
@@ -420,13 +485,12 @@ private:
 	}
 };
 
-export
 template <typename T>
-struct intermediate_cache : node{
+struct intermediate_cache : type_aware_node<T>{
 private:
 	T cache_{};
 	bool is_expired_{};
-	bool is_lazy{};
+	bool is_lazy_{};
 
 	referenced_ptr<node> parent{};
 	std::vector<successor_entry> successors{};
@@ -434,22 +498,22 @@ private:
 public:
 	static constexpr data_type_index node_data_type_index = unstable_type_identity_of<T>();
 
-	request_pass_handle request_impl(bool allow_expired) override{
+	request_pass_handle<T> request_raw(bool allow_expired) override{
 		if(is_expired_){
-			if(auto rst = parent->request<T>(allow_expired)){
+			if(auto rst = node_type_cast<T>(*parent).request(allow_expired)){
 				is_expired_ = false;
 				cache_ = std::move(rst).value();
 			}
 		}
 
 		if(!is_expired_ || allow_expired){
-			return data_flow::make_request_handle_expected_ref(cache_);
+			return react_flow::make_request_handle_expected_ref(cache_);
 		}
 
-		return data_flow::make_request_handle_unexpected(data_state::expired);
+		return react_flow::make_request_handle_unexpected<T>(data_state::expired);
 	}
-
 protected:
+
 	void mark_updated(std::size_t from_index) noexcept override{
 		is_expired_ = true;
 		std::ranges::for_each(successors, &successor_entry::mark_updated);
@@ -459,7 +523,7 @@ protected:
 		cache_ = static_cast<T*>(in_data_pass_by_copy);
 		is_expired_ = false;
 
-		if(is_lazy){
+		if(is_lazy_){
 			for(const successor_entry& successor : successors){
 				successor.update(manager, std::addressof(cache_));
 			}
@@ -468,11 +532,30 @@ protected:
 		}
 	}
 
+	void erase_self_from_context() noexcept final{
+		for (const auto & successor : successors){
+			successor.entity->erase_predecessor_impl(successor.index, *this);
+		}
+		successors.clear();
+		parent->erase_successors_impl(0, *this);
+		parent.reset();
+	}
+
+
+	[[nodiscard]] std::span<const referenced_ptr<node>> get_inputs() const noexcept final{
+		return {&parent, 1};
+	}
+
+	[[nodiscard]] std::span<const successor_entry> get_outputs() const noexcept final{
+		return successors;
+	}
+
+private:
 	bool connect_successors_impl(std::size_t slot, node& post) final{
 		return try_insert(successors, slot, post);
 	}
 
-	bool erase_successors_impl(std::size_t slot, node& post) final{
+	bool erase_successors_impl(std::size_t slot, node& post) noexcept final{
 		return try_erase(successors, slot, post);
 	}
 
@@ -481,22 +564,25 @@ protected:
 		parent = std::addressof(prev);
 	}
 
-	void erase_predecessor_impl(std::size_t slot, node& prev) final{
+	void erase_predecessor_impl(std::size_t slot, node& prev) noexcept final{
 		assert(slot == 0);
 		if(parent == &prev)parent = {};
 	}
 
+
 public:
+	[[nodiscard]] intermediate_cache() = default;
+
+	[[nodiscard]] explicit intermediate_cache(bool is_lazy)
+	: is_lazy_(is_lazy){
+	}
+
 	[[nodiscard]] data_state get_data_state() const noexcept override{
 		return is_expired_ ? data_state::expired : data_state::fresh;
 	}
 
 	[[nodiscard]] std::span<const data_type_index> get_in_socket_type_index() const noexcept override{
 		return std::span{&node_data_type_index, 1};
-	}
-
-	[[nodiscard]] data_type_index get_out_socket_type_index() const noexcept override{
-		return node_data_type_index;
 	}
 };
 

@@ -2,6 +2,7 @@ module;
 
 #include <vulkan/vulkan.h>
 #include <cassert>
+#include <vk_mem_alloc.h>
 
 export module mo_yanxi.graphic.image_manage;
 
@@ -15,6 +16,7 @@ import mo_yanxi.handle_wrapper;
 import mo_yanxi.allocator_2D;
 
 import mo_yanxi.vk;
+import mo_yanxi.vk.util;
 import mo_yanxi.vk.cmd;
 
 import mo_yanxi.heterogeneous;
@@ -263,6 +265,7 @@ namespace mo_yanxi::graphic{
 		vk::command_pool command_pool_{};
 
 		vk::command_buffer running_command_buffer_{};
+		vk::allocator async_allocator_{};
 		vk::buffer using_buffer_{};
 
 		std::multimap<VkDeviceSize, vk::buffer> stagings{};
@@ -308,11 +311,12 @@ namespace mo_yanxi::graphic{
 		[[nodiscard]] explicit async_image_loader(vk::context& context)
 			:
 		context_(&context),
-		fence_(context_->get_device(), true),
-		command_pool_(context_->get_device(), context_->graphic_family(), VK_COMMAND_POOL_CREATE_TRANSIENT_BIT),
+		fence_(context.get_device(), true),
+		command_pool_(context.get_device(), context.graphic_family(), VK_COMMAND_POOL_CREATE_TRANSIENT_BIT),
+		async_allocator_(context.create_allocator(VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT)),
 		working_thread([](std::stop_token stop_token, async_image_loader& self){
-				work_func(std::move(stop_token), self);
-			}, std::ref(*this)){
+			work_func(std::move(stop_token), self);
+		}, std::ref(*this)){
 		}
 
 		void push(allocated_image_load_description&& desc){

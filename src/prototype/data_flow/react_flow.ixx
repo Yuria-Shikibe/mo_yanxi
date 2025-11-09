@@ -1,31 +1,30 @@
-//
-// Created by Matrix on 2025/11/7.
-//
-
-export module mo_yanxi.data_flow;
+export module mo_yanxi.react_flow;
 
 export import :node_interface;
 export import :manager;
 export import :nodes;
 
-//TODO add ring check
 //TODO support multi async consumer and better scheduler?
 
-namespace mo_yanxi::data_flow{
+namespace mo_yanxi::react_flow{
 
 export
 template <std::ranges::input_range Rng = std::initializer_list<node*>>
 void connect_chain(const Rng& chain){
-	for (auto && [l, r] : chain | std::views::adjacent<2>){
-		if constexpr (std::same_as<decltype(l), node&>){
-			l.connect_successors(r);
-		}else if(std::same_as<decltype(*l), node&>){
-			(*l).connect_successors(*r);
+	if constexpr (std::ranges::range<std::ranges::range_const_reference_t<Rng>>){
+		std::ranges::for_each(chain, connect_chain<std::ranges::range_const_reference_t<Rng>>);
+	}else{
+		for (auto && [l, r] : chain | std::views::adjacent<2>){
+			if constexpr (std::same_as<decltype(l), node&>){
+				l.connect_successors(r);
+			}else if(std::same_as<decltype(*l), node&>){
+				(*l).connect_successors(*r);
+			}
+
 		}
-
 	}
-}
 
+}
 
 void example(){
 	manager manager{};
@@ -36,7 +35,7 @@ void example(){
 		std::optional<int> operator()(const std::stop_token& stop_token, const std::string& arg) const override{
 			int val{};
 
-			for(int i = 0; i < 50; ++i){
+			for(int i = 0; i < 4; ++i){
 				if(stop_token.stop_requested()){
 					return std::nullopt;
 				}
@@ -59,8 +58,7 @@ void example(){
 		}
 	};
 
-
-	struct printer : terminal_typed<int>{
+	struct printer : terminal<int>{
 		std::string prefix;
 
 		[[nodiscard]] explicit printer(const std::string& prefix)
@@ -68,21 +66,25 @@ void example(){
 		}
 
 		void on_update(const int& data) override{
-			terminal_typed::on_update(data);
+			terminal::on_update(data);
 
 			std::println(std::cout, "{}: {}", prefix, data);
 			std::cout.flush();
 		}
 	};
 
-	auto& p  = manager.add_provider<provider_cached<std::string>>();
-	auto& m0 = manager.add_modifier<modifier_str_to_num>(async_type::async_latest);
-	auto& m1 = manager.add_modifier<modifier_num_to_num>(async_type::none, true);
-	auto& t0 = manager.add_terminal<printer>("Str To Num(delay 5s)");
-	auto& t1 = manager.add_terminal<printer>("Negate of Num");
+	auto& p  = manager.add_node<provider_cached<std::string>>();
+	auto& m0 = manager.add_node<modifier_str_to_num>(async_type::async_latest);
+	auto& m1 = manager.add_node<modifier_num_to_num>(async_type::none, true);
+	auto& t0 = manager.add_node<printer>("Str To Num(delay 5s)");
+	auto& t1 = manager.add_node<printer>("Negate of Num");
 
-	data_flow::connect_chain({&p, &m0, &t0});
-	data_flow::connect_chain({&m0, &m1, &t1});
+	connect_chain(std::initializer_list<std::initializer_list<node*>>{
+		{&p, &m0, &t0},
+		{&m0, &m1, &t1}
+	});
+
+	std::atomic_flag exit_flag{};
 
 	auto thd = std::jthread([&](std::stop_token t){
 		while(!t.stop_requested()){
@@ -90,6 +92,7 @@ void example(){
 			std::cin >> str;
 
 			if(str == "/exit"){
+				exit_flag.test_and_set(std::memory_order::relaxed);
 				break;
 			}
 
@@ -99,7 +102,7 @@ void example(){
 		}
 	});
 
-	while(true){
+	while(!exit_flag.test(std::memory_order::relaxed)){
 		manager.update();
 
 		if(t1.is_expired()){

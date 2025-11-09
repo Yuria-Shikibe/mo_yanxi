@@ -1,6 +1,3 @@
-//
-// Created by Matrix on 2025/11/7.
-//
 
 export module mo_yanxi.spsc_queue;
 
@@ -66,11 +63,15 @@ public:
 		return value;
 	}
 
-	template <std::predicate<> Pred>
-	[[nodiscard]] std::optional<value_type> consume(Pred append_or_pred) noexcept(std::is_nothrow_move_constructible_v<value_type>){
+	void notify() noexcept{
+		m_cond.notify_one();
+	}
+
+	template <std::predicate<> ExitPred>
+	[[nodiscard]] std::optional<value_type> consume(ExitPred exit_pred) noexcept(std::is_nothrow_move_constructible_v<value_type>){
 		std::unique_lock lock(m_mutex);
 		m_cond.wait(lock, [&, this]{
-			return !m_queue.empty() || append_or_pred();
+			return !m_queue.empty() || exit_pred();
 		});
 
 		if(m_queue.empty()){

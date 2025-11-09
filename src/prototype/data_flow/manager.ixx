@@ -1,12 +1,12 @@
 module;
 
-export module mo_yanxi.data_flow:manager;
+export module mo_yanxi.react_flow:manager;
 
 import :node_interface;
 import mo_yanxi.referenced_ptr;
 import mo_yanxi.spsc_queue;
 
-namespace mo_yanxi::data_flow{
+namespace mo_yanxi::react_flow{
 
 export struct manager;
 
@@ -19,6 +19,7 @@ public:
 	virtual ~async_task_base() = default;
 
 	virtual void execute(){
+
 	}
 
 	virtual void on_finish(manager& manager){
@@ -28,26 +29,27 @@ public:
 
 //TODO allocator?
 
+export struct manager_no_async_t{
+};
+
+export constexpr inline manager_no_async_t manager_no_async{};
+
 export struct manager{
 private:
-	std::vector<referenced_ptr<provider_general>> providers{};
-	std::vector<referenced_ptr<node>> modifiers{};
-	std::vector<referenced_ptr<terminal>> terminals{};
+	std::vector<referenced_ptr<node>> nodes_anonymous_{};
 
-	//TODO named nodes?
 	using async_task_queue = mpsc_queue<std::move_only_function<void()>>;
-	async_task_queue pending_received_updates{};
+	async_task_queue pending_received_updates_{};
 	async_task_queue::container_type recycled_queue_container_{};
+
 
 	mpsc_queue<std::unique_ptr<async_task_base>> pending_async_modifiers_{};
 	std::mutex done_mutex_{};
 	std::vector<std::unique_ptr<async_task_base>> done_[2]{};
 
-	std::jthread async_thread_{[](std::stop_token stop_token, manager& manager){
-		execute_async_tasks(std::move(stop_token), manager);
-	}, std::ref(*this)};
+	std::jthread async_thread_{};
 
-private:
+
 	template <typename T, typename ...Args>
 	referenced_ptr<T> make_node(Args&& ...args){
 		if constexpr (std::constructible_from<T, manager&, Args&&...>){
@@ -58,24 +60,30 @@ private:
 	}
 
 public:
-	[[nodiscard]] manager() = default;
+	[[nodiscard]] manager() : async_thread_([](std::stop_token stop_token, manager& manager){
+		execute_async_tasks(std::move(stop_token), manager);
+	}, std::ref(*this)) {}
 
-	template <std::derived_from<provider_general> T, typename ...Args>
-	T& add_provider(Args&& ...args){
-		auto& ptr = providers.emplace_back(this->make_node<T>(std::forward<Args>(args)...));
-		return static_cast<T&>(*ptr);
-	}
+	[[nodiscard]] explicit manager(manager_no_async_t){}
 
 	template <std::derived_from<node> T, typename ...Args>
-	T& add_modifier(Args&& ...args){
-		auto& ptr = modifiers.emplace_back(this->make_node<T>(std::forward<Args>(args)...));
+	T& add_node(Args&& ...args){
+		auto& ptr = nodes_anonymous_.emplace_back(this->make_node<T>(std::forward<Args>(args)...));
 		return static_cast<T&>(*ptr);
 	}
 
-	template <std::derived_from<terminal> T, typename ...Args>
-	T& add_terminal(Args&& ...args){
-		auto& ptr = terminals.emplace_back(this->make_node<T>(std::forward<Args>(args)...));
-		return static_cast<T&>(*ptr);
+	bool erase_node(node& n, bool disconnect_it) noexcept {
+		if(auto itr = std::ranges::find(nodes_anonymous_, &n, &referenced_ptr<node>::get); itr != nodes_anonymous_.end()){
+			if(disconnect_it){
+				(*itr)->erase_self_from_context();
+			}
+
+			*itr = std::move(nodes_anonymous_.back());
+			nodes_anonymous_.pop_back();
+
+			return true;
+		}
+		return false;
 	}
 
 
@@ -85,15 +93,20 @@ public:
 	template <std::invocable<> Fn>
 		requires (std::move_constructible<std::remove_cvref_t<Fn>>)
 	void push_posted_act(Fn&& fn){
-		pending_received_updates.emplace(std::forward<Fn>(fn));
+		pending_received_updates_.emplace(std::forward<Fn>(fn));
 	}
 
 	void push_task(std::unique_ptr<async_task_base> task){
-		pending_async_modifiers_.push(std::move(task));
+		if(async_thread_.joinable()){
+			pending_async_modifiers_.push(std::move(task));
+		}else{
+			task->execute();
+			done_[1].push_back(std::move(task));
+		}
 	}
 
 	void update(){
-		if(pending_received_updates.swap(recycled_queue_container_)){
+		if(pending_received_updates_.swap(recycled_queue_container_)){
 			for (auto&& move_only_function : recycled_queue_container_){
 				move_only_function();
 			}
@@ -120,6 +133,14 @@ public:
 		}
 	}
 
+	~manager(){
+		if(async_thread_.joinable()){
+			async_thread_.request_stop();
+			pending_async_modifiers_.notify();
+			async_thread_.join();
+		}
+	}
+
 private:
 	static void execute_async_tasks(std::stop_token stop_token, manager& manager){
 		while(!stop_token.stop_requested()){
@@ -127,12 +148,12 @@ private:
 				return stop_token.stop_requested();
 			});
 
-			if(stop_token.stop_requested())return;
-
 			if(task){
 				task.value()->execute();
 				std::lock_guard lg{manager.done_mutex_};
 				manager.done_[1].push_back(std::move(task.value()));
+			}else{
+				return;
 			}
 		}
 	}

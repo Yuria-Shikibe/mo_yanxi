@@ -1,6 +1,7 @@
 module;
 
 #include <vulkan/vulkan.h>
+#include <vk_mem_alloc.h>
 
 export module mo_yanxi.vk:context;
 
@@ -242,6 +243,10 @@ namespace mo_yanxi::vk{
 			append_disposers.push_back(fn);
 		}
 
+		[[nodiscard]] allocator create_allocator(VmaAllocatorCreateFlags append_flags = 0) const{
+			return vk::allocator{instance, physical_device, device, append_flags};
+		}
+
 	private:
 		static void waitOnQueue(VkQueue queue){
 			if(const auto rst = vkQueueWaitIdle(queue)){
@@ -270,7 +275,7 @@ namespace mo_yanxi::vk{
 				frame_data.fetch_semaphore = semaphore{device};
 			}
 
-			allocator_ = vk::allocator{instance, physical_device, device};
+			allocator_ = vk::allocator{instance, physical_device, device, VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT};
 
 			createSwapChain();
 		}

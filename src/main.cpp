@@ -126,7 +126,7 @@ import mo_yanxi.gui.infrastructure.group;
 import mo_yanxi.gui.alloc;
 import mo_yanxi.gui.global;
 
-import mo_yanxi.data_flow;
+import mo_yanxi.react_flow;
 import mo_yanxi.spsc_queue;
 
 import test;
@@ -853,92 +853,6 @@ void main_loop(){
 #pragma endregion
 
 
-int main(){
-	using namespace mo_yanxi;
-	using namespace data_flow;
-
-	manager manager{};
-
-	struct modifier_str_to_num : modifier_transient<int, std::string>{
-		using modifier_transient::modifier_transient;
-	protected:
-		std::optional<int> operator()(const std::stop_token& stop_token, const std::string& arg) const override{
-			int val{};
-
-			for(int i = 0; i < 4; ++i){
-				if(stop_token.stop_requested()){
-					return std::nullopt;
-				}
-				std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			}
-
-			auto [ptr, ec] = std::from_chars(arg.data(), arg.data() + arg.size(), val);
-			if(ec == std::errc{}){
-				return val * 10;
-			}
-			return std::nullopt;
-		}
-	};
-
-	struct modifier_num_to_num : modifier_argument_cached<int, int>{
-		using modifier_argument_cached::modifier_argument_cached;
-	protected:
-		std::optional<int> operator()(const std::stop_token& stop_token, const int& arg) const override{
-			return -arg;
-		}
-	};
-
-
-	struct printer : terminal_typed<int>{
-		std::string prefix;
-
-		[[nodiscard]] explicit printer(const std::string& prefix)
-		: prefix(prefix){
-		}
-
-		void on_update(const int& data) override{
-			terminal_typed::on_update(data);
-
-			std::println(std::cout, "{}: {}", prefix, data);
-			std::cout.flush();
-		}
-	};
-
-	auto& p  = manager.add_provider<provider_cached<std::string>>();
-	auto& m0 = manager.add_modifier<modifier_str_to_num>(async_type::async_latest);
-	auto& m1 = manager.add_modifier<modifier_num_to_num>(async_type::none, true);
-	auto& t0 = manager.add_terminal<printer>("Str To Num(delay 5s)");
-	auto& t1 = manager.add_terminal<printer>("Negate of Num");
-
-	data_flow::connect_chain({&p, &m0, &t0});
-	data_flow::connect_chain({&m0, &m1, &t1});
-
-	auto thd = std::jthread([&](std::stop_token t){
-		while(!t.stop_requested()){
-			std::string str;
-			std::cin >> str;
-
-			if(str == "/exit"){
-				break;
-			}
-
-			manager.push_posted_act([&, s = std::move(str)] mutable {
-				p.update_value(std::move(s));
-			});
-		}
-	});
-
-	while(true){
-		manager.update();
-
-		if(t1.is_expired()){
-			std::this_thread::sleep_for(std::chrono::milliseconds(500));
-			t1.on_update(t1.request(true).value());
-		}
-	}
-
-}
-
 
 void draw_main(){
 	test::check_validation_layer_activation();
@@ -981,7 +895,7 @@ void draw_main(){
 	core::glfw::terminate();
 }
 
-void main_(){
+int main(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
 	using namespace mo_yanxi::graphic;

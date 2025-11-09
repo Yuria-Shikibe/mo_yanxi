@@ -28,9 +28,14 @@ namespace mo_yanxi::vk{
 		}
 
 		[[nodiscard]] explicit(false)
-		allocator(VkInstance instance, VkPhysicalDevice physical_device, VkDevice device) : allocator(
+		allocator(
+			VkInstance instance,
+			VkPhysicalDevice physical_device,
+			VkDevice device,
+			VmaAllocatorCreateFlags append_flags = 0
+			) : allocator(
 			{
-				.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+				.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT | append_flags,
 				.physicalDevice = physical_device,
 				.device = device,
 				.instance = instance,

@@ -3,14 +3,22 @@ module;
 #include <cassert>
 #include "ext/enum_operator_gen.hpp"
 
-export module mo_yanxi.data_flow:node_interface;
+#ifndef MO_YANXI_DATA_FLOW_ENABLE_TYPE_CHECK
+#define MO_YANXI_DATA_FLOW_ENABLE_TYPE_CHECK 1
+#endif
+
+#ifndef MO_YANXI_DATA_FLOW_ENABLE_RING_CHECK
+#define MO_YANXI_DATA_FLOW_ENABLE_RING_CHECK 1
+#endif
+
+export module mo_yanxi.react_flow:node_interface;
 import std;
 
 import mo_yanxi.type_register;
 import mo_yanxi.referenced_ptr;
 import mo_yanxi.data_storage;
 
-namespace mo_yanxi::data_flow{
+namespace mo_yanxi::react_flow{
 using data_type_index = type_identity_index;
 
 export struct manager;
@@ -20,16 +28,15 @@ export struct socket_type_pair{
 	data_type_index output;
 };
 
-struct invalid_node_type : std::invalid_argument{
-	[[nodiscard]] explicit invalid_node_type(const std::string& msg)
+struct invalid_node : std::invalid_argument{
+	[[nodiscard]] explicit invalid_node(const std::string& msg)
 	: invalid_argument(msg){
 	}
 
-	[[nodiscard]] explicit invalid_node_type(const char* msg)
+	[[nodiscard]] explicit invalid_node(const char* msg)
 	: invalid_argument(msg){
 	}
 };
-
 
 export enum struct data_state{
 	fresh,
@@ -38,28 +45,25 @@ export enum struct data_state{
 	failed
 };
 
-using request_pass_handle = std::expected<data_storage<>, data_state>;
-
-[[nodiscard]] request_pass_handle make_request_handle_unexpected(data_state error) noexcept {
-	return request_pass_handle{std::unexpect, error};
-}
-
-template <typename T>
-[[nodiscard]] request_pass_handle make_request_handle_expected(T&& data) noexcept {
-	return request_pass_handle(std::in_place, std::in_place_type<std::remove_cvref_t<T>>, std::forward<T>(data));
-}
-
-template <typename T>
-[[nodiscard]] request_pass_handle make_request_handle_expected_ref(const T& data) noexcept {
-	return request_pass_handle(std::in_place, data);
-}
-
 ENUM_COMPARISON_OPERATORS(data_state, export)
 
-export enum struct async_state{
-	no_task,
-	running,
-};
+template <typename T>
+using request_pass_handle = std::expected<data_package_optimal<T>, data_state>;
+
+template <typename T>
+[[nodiscard]] request_pass_handle<T> make_request_handle_unexpected(data_state error) noexcept{
+	return request_pass_handle<T>{std::unexpect, error};
+}
+
+template <typename T>
+[[nodiscard]] request_pass_handle<T> make_request_handle_expected(T&& data) noexcept{
+	return request_pass_handle<T>(std::in_place, std::in_place, std::forward<T>(data));
+}
+
+template <typename T>
+[[nodiscard]] request_pass_handle<T> make_request_handle_expected_ref(const T& data) noexcept{
+	return request_pass_handle<T>(std::in_place, data);
+}
 
 export enum struct async_type{
 	/**
@@ -83,23 +87,54 @@ export enum struct async_type{
 
 template <std::ranges::input_range Rng>
 	requires (std::is_scoped_enum_v<std::ranges::range_value_t<Rng>>)
-std::ranges::range_value_t<Rng> merge_data_state(const Rng& states) noexcept {
+std::ranges::range_value_t<Rng> merge_data_state(const Rng& states) noexcept{
 	return std::ranges::max(states, std::ranges::less{}, [](const auto v){
 		return std::to_underlying(v);
 	});
 }
 
 template <typename T>
-void update_state_enum(T& state, T other) noexcept {
+void update_state_enum(T& state, T other) noexcept{
 	state = T{std::max(std::to_underlying(state), std::to_underlying(other))};
 }
 
-export struct successor_entry;
-export struct terminal;
 
-export struct node : referenced_object{
+export struct successor_entry;
+
+export
+template <typename T>
+struct terminal;
+
+template <typename Ret, typename... Args>
+struct modifier_base;
+
+export
+template <typename T>
+struct intermediate_cache;
+
+export struct node;
+
+
+/**
+ * @brief 判断在 n0 的 output 中加入 n1 后是否会形成环
+ *
+ * @param self 边的起始节点
+ * @param successors 边的目标节点
+ * @return 如果会形成环，返回 true, 否则返回 false
+ */
+bool is_ring_bridge(const node* self, const node* successors);
+
+struct node : referenced_object{
 	friend successor_entry;
-	friend terminal;
+
+	template <typename T>
+	friend struct terminal;
+
+	template <typename Ret, typename... Args>
+	friend struct modifier_base;
+
+	template <typename T>
+	friend struct intermediate_cache;
 
 	[[nodiscard]] node() = default;
 
@@ -108,13 +143,21 @@ export struct node : referenced_object{
 	[[nodiscard]] virtual data_type_index get_out_socket_type_index() const noexcept{
 		return nullptr;
 	}
-	
+
 	[[nodiscard]] virtual std::span<const data_type_index> get_in_socket_type_index() const noexcept{
 		return {};
 	}
 
 	[[nodiscard]] virtual data_state get_data_state() const noexcept{
 		return data_state::failed;
+	}
+
+	[[nodiscard]] virtual std::span<const referenced_ptr<node>> get_inputs() const noexcept{
+		return {};
+	}
+
+	[[nodiscard]] virtual std::span<const successor_entry> get_outputs() const noexcept{
+		return {};
 	}
 
 	bool connect_successors_unchecked(const std::size_t slot_of_successor, node& post){
@@ -130,8 +173,15 @@ export struct node : referenced_object{
 	}
 
 	bool connect_successors(const std::size_t slot, node& post){
+#if MO_YANXI_DATA_FLOW_ENABLE_RING_CHECK
+		if(is_ring_bridge(this, &post)){
+			throw invalid_node{"ring detected"};
+		}
+#endif
+
+
 		if(!std::ranges::contains(post.get_in_socket_type_index(), get_out_socket_type_index())){
-			throw invalid_node_type{"Node type NOT match"};
+			throw invalid_node{"Node type NOT match"};
 		}
 
 		return connect_successors_unchecked(slot, post);
@@ -142,11 +192,17 @@ export struct node : referenced_object{
 	}
 
 	bool connect_successors(node& post){
+#if MO_YANXI_DATA_FLOW_ENABLE_RING_CHECK
+		if(is_ring_bridge(this, &post)){
+			throw invalid_node{"ring detected"};
+		}
+#endif
+
 		const auto rng = post.get_in_socket_type_index();
 		if(auto itr = std::ranges::find(rng, get_out_socket_type_index()); itr != rng.end()){
 			return connect_successors_unchecked(std::ranges::distance(rng.begin(), itr), post);
-		}else{
-			throw invalid_node_type{"Failed To Find Slot"};
+		} else{
+			throw invalid_node{"Failed To Find Slot"};
 		}
 	}
 
@@ -154,7 +210,7 @@ export struct node : referenced_object{
 		return prev.connect_successors(*this);
 	}
 
-	bool disconnect_successors(const std::size_t slot, node& post){
+	bool disconnect_successors(const std::size_t slot, node& post) noexcept{
 		if(erase_successors_impl(slot, post)){
 			post.erase_predecessor_impl(slot, *this);
 			return true;
@@ -162,7 +218,7 @@ export struct node : referenced_object{
 		return false;
 	}
 
-	bool disconnect_predecessor(const std::size_t slot, node& prev){
+	bool disconnect_predecessor(const std::size_t slot, node& prev) noexcept{
 		return prev.disconnect_successors(slot, *this);
 	}
 
@@ -175,8 +231,8 @@ export struct node : referenced_object{
 				post.erase_predecessor_impl(slot, *this);
 				return true;
 			}
-		}else{
-			throw invalid_node_type{"Failed To Find Slot"};
+		} else{
+			throw invalid_node{"Failed To Find Slot"};
 		}
 
 		return false;
@@ -186,62 +242,24 @@ export struct node : referenced_object{
 		return prev.disconnect_successors(*this);
 	}
 
-	template <typename T, typename S>
-	std::optional<T> request(this S& self, bool allow_expired){
-		if(unstable_type_identity_of<T>() != self.get_out_socket_type_index()){
-			throw invalid_node_type{"Node type NOT match"};
-		}
-
-		if(auto rst = static_cast<node&>(self).request_impl(allow_expired)){
-			return data_storage_view<T>{rst.value()}.fetch();
-		}else{
-			return std::nullopt;
-		}
-	}
-
-	template <typename T, typename S>
-	std::expected<T, data_state> request_stated(this S& self, bool allow_expired){
-		if(unstable_type_identity_of<T>() != self.get_out_socket_type_index()){
-			throw invalid_node_type{"Node type NOT match"};
-		}
-
-		if(auto rst = static_cast<node&>(self).request_impl(allow_expired)){
-			if(auto optal = data_storage_view<T>{rst.value()}.fetch()){
-				return std::expected<T, data_state>{optal.value()};
-			}
-			return std::unexpected{data_state::failed};
-		}else{
-			return std::unexpected{rst.error()};
-		}
+	virtual void erase_self_from_context() noexcept{
 	}
 
 protected:
-
-	/**
-	 * @brief Pull data from parent node
-	 *
-	 * The data flow is from terminal to source (pull)
-	 *
-	 * @param allow_expired
-	 */
-	virtual request_pass_handle request_impl(bool allow_expired) = 0;
-
-
 	virtual bool connect_successors_impl(std::size_t slot, node& post){
 		return false;
 	}
 
 	virtual void connect_predecessor_impl(std::size_t slot, node& prev){
-
 	}
 
-	virtual bool erase_successors_impl(std::size_t slot, node& post){
+	virtual bool erase_successors_impl(std::size_t slot, node& post) noexcept{
 		return false;
 	}
 
-	virtual void erase_predecessor_impl(std::size_t slot, node& prev){
-
+	virtual void erase_predecessor_impl(std::size_t slot, node& prev) noexcept{
 	}
+
 
 	/**
 	 * @brief update the node
@@ -252,7 +270,6 @@ protected:
 	 * @param in_data_pass_by_copy ptr to const data, provided by parent
 	 */
 	virtual void update(manager& manager, std::size_t from_index, const void* in_data_pass_by_copy){
-
 	}
 
 	/**
@@ -261,12 +278,82 @@ protected:
 	 *
 	 */
 	virtual void mark_updated(std::size_t from_index) noexcept{
-
 	}
-
 };
 
-export struct successor_entry{
+export
+template <typename T>
+struct type_aware_node : node{
+	[[nodiscard]] data_type_index get_out_socket_type_index() const noexcept final{
+		return unstable_type_identity_of<T>();
+	}
+
+	template <typename S>
+	std::optional<T> request(this S& self, bool allow_expired){
+		if(auto rst = self.request_raw(allow_expired)){
+			return rst.value().fetch();
+		} else{
+			return std::nullopt;
+		}
+	}
+
+	template <typename S>
+	std::expected<T, data_state> request_stated(this S& self, bool allow_expired){
+		if(auto rst = self.request_raw(allow_expired)){
+			if(auto optal = rst.value().fetch()){
+				return std::expected<T, data_state>{optal.value()};
+			}
+			return std::unexpected{data_state::failed};
+		} else{
+			return std::unexpected{rst.error()};
+		}
+	}
+
+	template <typename S>
+	std::optional<T> nothrow_request(this S& self, bool allow_expired) noexcept try{
+		if(auto rst = self.request_raw(allow_expired)){
+			return rst.value().fetch();
+		}
+		return std::nullopt;
+	} catch(...){
+		return std::nullopt;
+	}
+
+	template <typename S>
+	std::expected<T, data_state> nothrow_request_stated(this S& self, bool allow_expired) noexcept try{
+		if(auto rst = self.request_raw(allow_expired)){
+			if(auto optal = rst.value().fetch()){
+				return std::expected<T, data_state>{optal.value()};
+			}
+		}
+		return std::unexpected{data_state::failed};
+	} catch(...){
+		return std::unexpected{data_state::failed};
+	}
+
+	/**
+	 * @brief Pull data from parent node
+	 *
+	 * The data flow is from terminal to source (pull)
+	 *
+	 * This member function is not const as it may update the internal cache
+	 *
+	 * @param allow_expired
+	 */
+	virtual request_pass_handle<T> request_raw(bool allow_expired) = 0;
+};
+
+template <typename T>
+type_aware_node<T>& node_type_cast(node& node) noexcept(!MO_YANXI_DATA_FLOW_ENABLE_TYPE_CHECK){
+#if MO_YANXI_DATA_FLOW_ENABLE_TYPE_CHECK
+	if(node.get_out_socket_type_index() != unstable_type_identity_of<T>()){
+		throw invalid_node{"Node type NOT match"};
+	}
+#endif
+	return static_cast<type_aware_node<T>&>(node);
+}
+
+struct successor_entry{
 	std::size_t index;
 	referenced_ptr<node> entity;
 
@@ -299,185 +386,87 @@ bool try_insert(std::vector<successor_entry>& successors, std::size_t slot, node
 	return true;
 }
 
-bool try_erase(std::vector<successor_entry>& successors, const std::size_t slot, const node& next){
+bool try_erase(std::vector<successor_entry>& successors, const std::size_t slot, const node& next) noexcept{
 	return std::erase_if(successors, [&](const successor_entry& e){
 		return e.index == slot && e.entity.get() == &next;
 	});
 }
 
+export
+template <typename T>
+struct provider_general : type_aware_node<T>{
+	static constexpr data_type_index node_data_type_index = unstable_type_identity_of<T>();
+	friend manager;
 
-export struct provider_general : node{
 	[[nodiscard]] provider_general() = default;
 
 	[[nodiscard]] explicit provider_general(manager& manager)
 	: manager_(std::addressof(manager)){
 	}
 
-
-	template <typename T>
 	void update_value(T&& value){
-		if(unstable_type_identity_of<T>() != get_out_socket_type_index()){
-			throw invalid_node_type{"Failed To Find Slot"};
-		}
-
 		this->update_value_unchecked(std::move(value));
 	}
 
-	template <typename T>
 	void update_value(const T& value){
-		if(unstable_type_identity_of<T>() != get_out_socket_type_index()){
-			throw invalid_node_type{"Failed To Find Slot"};
-		}
-
 		this->update_value_unchecked(T{value});
 	}
 
-	template <typename T>
+	[[nodiscard]] std::span<const data_type_index> get_in_socket_type_index() const noexcept final{
+		return std::span{&node_data_type_index, 1};
+	}
+
+
+	void erase_self_from_context() noexcept final{
+		for(const auto& successor : successors){
+			successor.entity->disconnect_predecessor(successor.index, *this);
+		}
+		successors.clear();
+	}
+
+	[[nodiscard]] std::span<const successor_entry> get_outputs() const noexcept final{
+		return successors;
+	}
+
+private:
 	void update_value_unchecked(T&& value){
 		this->update(std::addressof(value));
 	}
 
+	bool connect_successors_impl(const std::size_t slot, node& post) final{
+		return try_insert(successors, slot, post);
+	}
 
-private:
-	friend manager;
-
+	bool erase_successors_impl(std::size_t slot, node& post) noexcept final{
+		return try_erase(successors, slot, post);
+	}
 
 protected:
 	manager* manager_{};
 	std::vector<successor_entry> successors{};
 
-	virtual void update(void* in_data_pass_by_move);
-
-	bool connect_successors_impl(const std::size_t slot, node& post) override{
-		return try_insert(successors, slot, post);
-	}
-
-	bool erase_successors_impl(std::size_t slot, node& post) override{
-		return try_erase(successors, slot, post);
+	virtual void update(void* in_data_pass_by_move){
 	}
 };
 
-void provider_general::update(void* in_data_pass_by_move){
-}
+export
+template <typename T>
+struct terminal_cached;
 
-/**
- * @brief all these member functions should be called on the same thread
- */
-export struct asyncable_modifier : node{
-
-
+template <typename T>
+struct terminal : type_aware_node<T>{
 private:
-	async_type async_type_{};
-	std::size_t dispatched_count_{};
-	std::stop_source stop_source_{std::nostopstate};
-
-
-public:
-	[[nodiscard]] asyncable_modifier() = default;
-
-	[[nodiscard]] explicit asyncable_modifier(const async_type async_type)
-	: async_type_(async_type){
-	}
-
-	[[nodiscard]] std::size_t get_dispatched() const noexcept{
-		return dispatched_count_;
-	}
-
-	[[nodiscard]] data_flow::async_type get_async_type() const noexcept{
-		return async_type_;
-	}
-
-	void set_async_type(const data_flow::async_type async_type) noexcept {
-		this->async_type_ = async_type;
-	}
-
-	[[nodiscard]] std::stop_token get_stop_token() const noexcept{
-		assert(stop_source_.stop_possible());
-		return stop_source_.get_token();
-	}
-
-	virtual void async_resume(manager& manager, const void* data){
-		--dispatched_count_;
-	}
-
-	/*virtual*/ bool async_cancel() noexcept{
-		if(async_type_ == async_type::none)return false;
-		if(dispatched_count_ == 0)return false;
-		if(!stop_source_.stop_possible())return false;
-		stop_source_.request_stop();
-		stop_source_ = std::stop_source{std::nostopstate};
-		return true;
-	}
-
-protected:
-	virtual void async_launch_impl(manager& manager) = 0;
-
-public:
-	void async_launch(manager& manager){
-		if(async_type_ == async_type::none){
-			throw std::logic_error("async_launch on a synchronized object");
-		}
-
-		if(stop_source_.stop_possible()){
-			if(async_type_ == async_type::async_latest){
-				if(async_cancel()){
-					//only reset when really requested stop
-					stop_source_ = {};
-				}
-			}
-		}else if(!stop_source_.stop_requested()){
-			//stop source empty
-			stop_source_ = {};
-		}
-
-		++dispatched_count_;
-		async_launch_impl(manager);
-	}
-};
-
-export struct terminal : node{
-protected:
 	referenced_ptr<node> parent{};
 
-	void connect_predecessor_impl(const std::size_t slot, node& prev) override{
-		assert(slot == 0);
-		parent = std::addressof(prev);
-	}
-
-	void erase_predecessor_impl(std::size_t slot, node& prev) override{
-		assert(slot == 0);
-		if(parent == &prev)parent = {};
-	}
-
-	request_pass_handle request_impl(const bool allow_expired) override{
-		assert(parent != nullptr);
-		return parent->request_impl(allow_expired);
-	}
-};
-
-export
-template <typename T>
-struct terminal_typed_cached;
-
-export
-template <typename T>
-struct terminal_typed : terminal{
 public:
 	static constexpr data_type_index node_data_type_index = unstable_type_identity_of<T>();
 
-	template <typename Ty>
-	std::optional<Ty> request(bool allowExpired) = delete;
-
-	std::optional<T> request(bool allowExpired){
-		return terminal::request<T>(allowExpired);
+	[[nodiscard]] std::span<const referenced_ptr<node>> get_inputs() const noexcept final{
+		return {&parent, 1};
 	}
 
 	[[nodiscard]] std::span<const data_type_index> get_in_socket_type_index() const noexcept override{
 		return std::span{&node_data_type_index, 1};
-	}
-
-	[[nodiscard]] data_type_index get_out_socket_type_index() const noexcept override{
-		return node_data_type_index;
 	}
 
 	[[nodiscard]] bool is_expired() const noexcept{
@@ -489,14 +478,35 @@ public:
 	}
 
 	void check_expired_and_update(bool allow_expired){
-		if(!is_expired())return;
+		if(!is_expired()) return;
 
-		if(auto rst = request<T>(allow_expired)){
+		if(auto rst = this->request(allow_expired)){
 			this->on_update(rst.value().fetch());
 		}
 	}
 
+	void erase_self_from_context() noexcept final{
+		parent->erase_successors_impl(0, *this);
+		parent.reset();
+	}
+
+	request_pass_handle<T> request_raw(const bool allow_expired) override{
+		assert(parent != nullptr);
+		return node_type_cast<T>(*parent).request_raw(allow_expired);
+	}
+
 protected:
+	void connect_predecessor_impl(const std::size_t slot, node& prev) final{
+		assert(slot == 0);
+		parent = std::addressof(prev);
+	}
+
+	void erase_predecessor_impl(std::size_t slot, node& prev) noexcept final{
+		assert(slot == 0);
+		if(parent == std::addressof(prev)) parent = {};
+	}
+
+
 	virtual void on_update(const T& data){
 		this->is_expired_ = false;
 	}
@@ -507,64 +517,47 @@ protected:
 	}
 
 private:
-	friend terminal_typed_cached<T>;
+	friend terminal_cached<T>;
 	bool is_expired_{};
 
 	void update(manager& manager, const std::size_t from_index, const void* in_data_pass_by_copy) final{
 		assert(from_index == 0);
 		this->on_update(*static_cast<const T*>(in_data_pass_by_copy));
 	}
-
 };
 
 
 export
 template <typename T>
-struct terminal_typed_cached : terminal_typed<T>{
-public:
-	template <typename Ty>
-	std::optional<Ty> request(bool allowExpired) = delete;
-
-	std::optional<T> request(bool allowExpired){
-		if(!allowExpired){
-			update_cache();
-		}
-
-		if(!this->is_expired() || allowExpired){
-			return cache_;
-		}else{
-			return std::nullopt;
-		}
-	}
-
-	[[nodiscard]] const T& acquire_cache(){
+struct terminal_cached : terminal<T>{
+	[[nodiscard]] const T& request_cache(){
 		update_cache();
 		return cache_;
 	}
 
 	[[nodiscard]] data_state get_data_state() const noexcept override{
-		if(this->is_expired())return data_state::expired;
+		if(this->is_expired()) return data_state::expired;
 		return data_state::fresh;
 	}
 
 protected:
 	void on_update(const T& data) override{
 		cache_ = data;
-		terminal_typed<T>::on_update(data);
+		terminal<T>::on_update(data);
+	}
+
+	request_pass_handle<T> request_raw(const bool allow_expired) final{
+		update_cache();
+
+		if(!this->is_expired() || allow_expired){
+			return react_flow::make_request_handle_expected_ref(cache_);
+		} else{
+			return react_flow::make_request_handle_unexpected<T>(data_state::expired);
+		}
 	}
 
 private:
 	T cache_{};
-
-	request_pass_handle request_impl(const bool allow_expired) final{
-		update_cache();
-
-		if(!this->is_expired() || allow_expired){
-			return data_flow::make_request_handle_expected_ref(cache_);
-		}else{
-			return data_flow::make_request_handle_unexpected(data_state::expired);
-		}
-	}
 
 	void update_cache(){
 		if(this->is_expired()){
@@ -575,5 +568,34 @@ private:
 		}
 	}
 };
+
+
+bool is_reachable(const node* start_node, const node* target_node, std::unordered_set<const node*>& visited) {
+	if (start_node == target_node) {
+		return true;
+	}
+
+	visited.insert(start_node);
+
+	for (auto& neighbor : start_node->get_inputs()) {
+		if (!visited.contains(neighbor.get())) {
+			if (is_reachable(neighbor.get(), target_node, visited)) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+export
+bool is_ring_bridge(const node* self, const node* successors) {
+	if (self == successors) {
+		return true;
+	}
+
+	std::unordered_set<const node*> visited;
+	return is_reachable(self, successors, visited);
+}
 
 }

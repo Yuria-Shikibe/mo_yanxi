@@ -8,51 +8,6 @@ import std;
 import mo_yanxi.meta_programming;
 
 export namespace mo_yanxi::transparent{
-	/*template <typename T, typename Proj, typename Comp = std::less<std::invoke_result_t<Proj, const T&>>>
-		requires requires(T a, T b, Proj proj, Comp comp){
-			{ std::invoke(comp, std::invoke(proj, a), std::invoke(proj, b)) } -> std::convertible_to<bool>;
-		}
-	struct projection_comp{
-		using proj_value_type = std::invoke_result_t<Proj, const T&>;
-		using is_transparent = void;
-
-		[[no_unique_address]] Proj proj{};
-		[[no_unique_address]] Comp comp{};
-
-		[[nodiscard]] constexpr projection_comp() = default;
-
-		template <typename P>
-			requires std::constructible_from<Proj, P>
-		[[nodiscard]] constexpr projection_comp(P&& proj, Comp&& comp = {})
-			: proj{std::forward<P>(proj)},
-			  comp{std::move(comp)}{}
-
-		constexpr bool operator()(const proj_value_type& a, const proj_value_type& b) const noexcept {
-			return std::invoke(comp, a, b);
-		}
-
-		constexpr bool operator()(const T& a, const T& b) const noexcept {
-			return std::invoke(comp, std::invoke(proj, a), std::invoke(proj, b));
-		}
-
-		constexpr bool operator()(const proj_value_type& a, const T& b) const noexcept {
-			return this->operator()(std::invoke(proj, a), b);
-		}
-
-		constexpr bool operator()(const T& a, const proj_value_type& b) const noexcept {
-			return this->operator()(a, std::invoke(proj, b));
-		}
-	};
-
-	template <typename T, typename Comp>
-		requires (std::is_member_pointer_v<T> || std::is_member_pointer_v<T>)
-	projection_comp(T, Comp&&) -> projection_comp<typename mptr_info<T>::class_type, T, std::decay_t<Comp>>;
-
-	template <typename T>
-		requires (std::is_member_pointer_v<T> || std::is_member_pointer_v<T>)
-	projection_comp(T) -> projection_comp<typename mptr_info<T>::class_type, T, std::less<typename mptr_info<T>::value_type>>;
-	*/
-
 	struct string_equal_to{
 		using is_transparent = void;
 
@@ -167,15 +122,6 @@ export namespace mo_yanxi::transparent{
 
 namespace mo_yanxi{
 
-	/*
-	export
-	template <typename T, typename Cont = std::vector<typename mptr_info<T>::class_type>, typename Comp = std::less<>>
-		requires (std::is_member_pointer_v<T> || std::is_member_pointer_v<T>)
-	using projection_priority_queue =
-		std::priority_queue<typename mptr_info<T>::class_type, Cont, transparent::projection_comp<typename mptr_info<T>::class_type, T, Comp>>;
-		*/
-
-
 	template <typename T, auto T::* ptr>
 		requires (mo_yanxi::default_hashable<typename mptr_info<decltype(ptr)>::value_type>)
 	struct projection_hash{
@@ -228,15 +174,6 @@ namespace mo_yanxi{
 		}
 	};
 
-	export
-	template <template<typename > typename Comp = std::less, typename Alloc = std::allocator<std::string>>
-	using StringSet = std::set<std::string, transparent::string_comparator_of<Comp>, Alloc>;
-
-	export
-	template <typename V, template<typename > typename Comp = std::less, typename Alloc = std::allocator<std::pair<const std::string, V>>>
-	using StringMap = std::map<std::string, V, transparent::string_comparator_of<Comp>, Alloc>;
-
-	//TODO allocator tparam
 	export
 	template <typename V, typename Alloc = std::allocator<std::pair<const std::string, V>>>
 	class string_hash_map : public std::unordered_map<std::string, V, transparent::string_hasher, transparent::string_equal_to, Alloc>{
@@ -316,17 +253,4 @@ namespace mo_yanxi{
 			return operator[](std::string_view(key));
 		}
 	};
-
-	template <typename T, typename Deleter = std::default_delete<T>>
-	using UniquePtrHashMap = std::unordered_map<std::unique_ptr<T, Deleter>, transparent::ptr_hasher<T>, transparent::ptr_equal_to<T>>;
-
-	export
-	template <typename T, typename Deleter = std::default_delete<T>>
-	using unique_ptr_hash_set = std::unordered_set<std::unique_ptr<T, Deleter>, transparent::ptr_hasher<T>, transparent::ptr_equal_to<T>>;
-
-	template <typename V>
-	using StringMultiMap = std::unordered_multimap<std::string, V, transparent::string_hasher, transparent::string_equal_to>;
-	//
-	// template <typename T, auto T::* ptr>
-	// using HashSet_ByMember = std::unordered_set<T, MemberHasher<T, ptr>, MemberEqualTo<T, ptr>>;
 }

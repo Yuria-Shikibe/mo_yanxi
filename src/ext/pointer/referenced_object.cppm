@@ -5,7 +5,6 @@ module;
 
 export module mo_yanxi.referenced_ptr;
 
-import ext.cond_atomic;
 import std;
 
 namespace mo_yanxi{
@@ -77,13 +76,21 @@ public:
 		return object;
 	}
 
-	constexpr void reset(T* ptr = nullptr) noexcept{
+	constexpr void reset(T* ptr) noexcept{
 		if(object){
 			decr();
 		}
 
 		object = ptr;
 		if(object) incr();
+	}
+
+	constexpr void reset(std::nullptr_t = nullptr) noexcept{
+		if(object){
+			decr();
+		}
+
+		object = nullptr;
 	}
 
 	constexpr ~referenced_ptr() noexcept{
@@ -122,14 +129,6 @@ public:
 
 	constexpr bool operator==(const referenced_ptr&) const noexcept = default;
 
-	constexpr friend bool operator==(const T* p, const referenced_ptr& self) noexcept{
-		return p == self.get();
-	}
-
-	constexpr friend bool operator==(const referenced_ptr& self, const T* p) noexcept{
-		return self.get() == p;
-	}
-
 
 private:
 	T* object{};
@@ -137,6 +136,17 @@ private:
 };
 
 
+export
+template <typename T, typename D>
+constexpr bool operator==(const T* p, const referenced_ptr<T, D>& self) noexcept{
+	return p == self.get();
+}
+
+export
+template <typename T, typename D>
+constexpr bool operator==(const referenced_ptr<T, D>& self, const T* p) noexcept{
+	return self.get() == p;
+}
 
 /**
  * @brief Specify that lifetime of a style is NOT automatically managed by reference count.

@@ -193,24 +193,24 @@ namespace mo_yanxi{
 			}
 		}
 
-		constexpr void moveTo(value_type* dest, const size_type dest_Cap) const noexcept{
-			if(isReversed()){
-				auto off1 = (capacity_ - head);
-				std::ranges::uninitialized_move(data_ + head, data_ + capacity_, dest, dest + off1);
-				std::ranges::uninitialized_move(data_, data_ + tail, dest + off1, dest + dest_Cap);
-			} else{
-				std::ranges::uninitialized_move(data_ + head, data_ + tail, dest, dest + dest_Cap);
+		constexpr void moveTo(value_type* dest, const size_type dest_Cap) const noexcept(std::is_nothrow_move_constructible_v<value_type>){
+			size_type first_part_len = std::min(size_, capacity_ - head);
+			std::ranges::uninitialized_move(data_ + head, data_ + head + first_part_len, dest, dest + dest_Cap);
+
+			size_type second_part_len = size_ - first_part_len;
+			if (second_part_len > 0) {
+				std::ranges::uninitialized_move(data_, data_ + second_part_len, dest + first_part_len, dest + dest_Cap);
 			}
 		}
 
 
-		constexpr void copyTo(value_type* dest, const size_type dest_Cap) const{
-			if(isReversed()){
-				auto off1 = (capacity_ - head);
-				std::ranges::uninitialized_copy(data_ + head, data_ + capacity_, dest, dest + off1);
-				std::ranges::uninitialized_copy(data_, data_ + tail, dest + off1, dest + dest_Cap);
-			} else{
-				std::ranges::uninitialized_copy(data_ + head, data_ + tail, dest, dest + dest_Cap);
+		constexpr void copyTo(value_type* dest, const size_type dest_Cap) const noexcept(std::is_nothrow_copy_constructible_v<value_type>){
+			size_type first_part_len = std::min(size_, capacity_ - head);
+			std::ranges::uninitialized_copy(data_ + head, data_ + head + first_part_len, dest, dest + dest_Cap);
+
+			size_type second_part_len = size_ - first_part_len;
+			if (second_part_len > 0) {
+				std::ranges::uninitialized_copy(data_, data_ + second_part_len, dest + first_part_len, dest + dest_Cap);
 			}
 		}
 

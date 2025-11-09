@@ -1,6 +1,7 @@
 module;
 
 #include <vulkan/vulkan.h>
+#include <vk_mem_alloc.h>
 #include <cassert>
 
 module mo_yanxi.graphic.image_manage;
@@ -27,7 +28,16 @@ namespace mo_yanxi::graphic{
 			if(ceil > 2048 * 2048 * cahnnel_size){
 				ceil = chunk_size * (maximumsize / chunk_size + (maximumsize % chunk_size != 0));
 			}
-			buffer = vk::templates::create_staging_buffer(context_->get_allocator(), ceil);
+			buffer = vk:: buffer{
+				async_allocator_,
+				{
+					.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+					.size = ceil,
+					.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+				}, {
+					.usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+				}
+			};
 		}
 
 		vk::command_buffer command_buffer{command_pool_.obtain()};
