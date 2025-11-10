@@ -9,8 +9,6 @@ export module mo_yanxi.gui.elem.grid;
 import mo_yanxi.gui.celled_group;
 import std;
 
-import mo_yanxi.graphic.draw.instruction;
-
 
 namespace mo_yanxi::gui{
 export enum struct grid_extent_type : std::uint8_t{

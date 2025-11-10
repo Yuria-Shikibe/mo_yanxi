@@ -117,12 +117,12 @@ template <typename T>
 }
 
 export
-struct uniform_buffer_instr_info{
+struct user_data_indices{
 	std::uint32_t local_index;
 	std::uint32_t group_index;
 };
 
-static_assert(sizeof(uniform_buffer_instr_info) == 8);
+static_assert(sizeof(user_data_indices) == 8);
 
 export
 template <typename T>
@@ -130,7 +130,7 @@ template <typename T>
 union dispatch_info_payload{
 	T draw;
 
-	uniform_buffer_instr_info ubo;
+	user_data_indices ubo;
 };
 
 export
@@ -150,6 +150,74 @@ generic_instruction_head{
 		return size - sizeof(generic_instruction_head);
 	}
 };
+
+export
+struct batch_backend_interface{
+	using host_impl_ptr = void*;
+
+	using function_signature_buffer_acquire = void*(host_impl_ptr, std::size_t instruction_size);
+	using function_signature_consume_all = void(host_impl_ptr);
+	using function_signature_wait_idle = void(host_impl_ptr);
+
+private:
+	host_impl_ptr host;
+	std::add_pointer_t<function_signature_buffer_acquire> fptr_acquire;
+	std::add_pointer_t<function_signature_consume_all> fptr_consume;
+	std::add_pointer_t<function_signature_wait_idle> fptr_wait_idle;
+
+public:
+	[[nodiscard]] constexpr batch_backend_interface() = default;
+
+	template <typename HostT, std::invocable<HostT&, std::size_t> AcqFn, std::invocable<HostT&> ConsumeFn, std::invocable<HostT&> WaitIdleFn>
+		requires (std::convertible_to<std::invoke_result_t<AcqFn, HostT&, std::size_t>, void*>)
+	[[nodiscard]] constexpr batch_backend_interface(
+		HostT& host,
+		AcqFn,
+		ConsumeFn,
+		WaitIdleFn
+	) noexcept : host(std::addressof(host)), fptr_acquire(+[](host_impl_ptr host, std::size_t instruction_size) static -> void* {
+		return AcqFn::operator()(*static_cast<HostT*>(host), instruction_size);
+	}), fptr_consume(+[](host_impl_ptr host) static {
+		ConsumeFn::operator()(*static_cast<HostT*>(host));
+	}), fptr_wait_idle(+[](host_impl_ptr host) static {
+		WaitIdleFn::operator()(*static_cast<HostT*>(host));
+	}){
+
+	}
+
+	explicit operator bool() const noexcept{
+		return host;
+	}
+
+	template <typename HostTy>
+	HostTy& get_host() const noexcept{
+		CHECKED_ASSUME(host != nullptr);
+		return *static_cast<HostTy*>(host);
+	}
+
+	template <typename T = std::byte>
+	T* acquire(std::size_t instruction_size) const {
+		CHECKED_ASSUME(fptr_acquire != nullptr);
+		return static_cast<T*>(fptr_acquire(host, instruction_size));
+	}
+
+	void consume_all() const{
+		CHECKED_ASSUME(fptr_consume != nullptr);
+		fptr_consume(host);
+	}
+
+	void wait_idle() const{
+		CHECKED_ASSUME(fptr_wait_idle != nullptr);
+		fptr_wait_idle(host);
+	}
+
+	void flush() const{
+		consume_all();
+		wait_idle();
+	}
+};
+
+
 }
 
 
@@ -380,7 +448,6 @@ template <typename T, typename... Args>
 	requires (std::is_trivially_copyable_v<T> && valid_consequent_argument<T, Args...>)
 [[nodiscard]] FORCE_INLINE std::byte* place_instr_at_impl(
 	std::byte* const where,
-	const std::byte* const sentinel,
 	const instruction_head& head,
 	const T& payload,
 	const Args&... args
@@ -388,8 +455,6 @@ template <typename T, typename... Args>
 	static_assert(((sizeof(Args) % 16 == 0) && ...));
 
 	const auto total_size = instruction::get_instr_size<T, Args...>(args...);
-
-	if(sentinel - where < total_size + sizeof(instruction_head)) return nullptr;
 
 	auto pwhere = std::assume_aligned<16>(where);
 
@@ -430,12 +495,11 @@ template <known_instruction T, typename... Args>
 	requires (std::is_trivially_copyable_v<T> && valid_consequent_argument<T, Args...>)
 [[nodiscard]] FORCE_INLINE std::byte* place_instruction_at(
 	std::byte* const where,
-	const std::byte* const sentinel,
 	const T& payload,
 	const Args&... args
 ) noexcept{
 	return instruction::place_instr_at_impl(
-		where, sentinel, instruction::make_instruction_head(payload, args...), payload, args...);
+		where, instruction::make_instruction_head(payload, args...), payload, args...);
 }
 
 export
@@ -443,12 +507,11 @@ template <typename T>
 	requires (std::is_trivially_copyable_v<T>)
 [[nodiscard]] FORCE_INLINE std::byte* place_ubo_update_at(
 	std::byte* const where,
-	const std::byte* const sentinel,
 	const T& payload,
-	const uniform_buffer_instr_info info
+	const user_data_indices info
 ) noexcept{
 	return instruction::place_instr_at_impl(
-		where, sentinel, instruction_head{
+		where, instruction_head{
 			.type = instr_type::uniform_update,
 			.size = get_instr_size<T>(),
 			.payload = {.ubo = info}

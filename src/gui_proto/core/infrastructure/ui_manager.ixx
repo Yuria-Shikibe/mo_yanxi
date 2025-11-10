@@ -69,13 +69,13 @@ public:
 	scene_add_result<T> add_scene(
 		std::string_view name,
 		bool focus_it,
-		gui::renderer& renderer_ui,
+		renderer_frontend&& renderer_ui,
 		Args&&... args){
 		auto& scene_ = this->add_scene(
 			name,
 			scene{
 				this->pool_.get_arena_id(),
-				renderer_ui, std::in_place_type<T>,
+				std::move(renderer_ui), std::in_place_type<T>,
 				std::forward<Args>(args)...
 			}, focus_it);
 

@@ -11,7 +11,7 @@ void debug_elem_drawer::draw(const elem& element, rect region, float opacityScl)
 
 	auto cregion = element.clip_to_content_bound(region);
 
-	element.get_scene().renderer().draw(graphic::draw::instruction::rectangle_ortho_outline{
+	element.get_scene().renderer().push(graphic::draw::instruction::rectangle_ortho_outline{
 		.v00 = cregion.vert_00(),
 		.v11 = cregion.vert_11(),
 		.stroke = 1,
@@ -33,7 +33,7 @@ void debug_elem_drawer::draw(const elem& element, rect region, float opacityScl)
 	float f3 = element.cursor_state().get_factor_of(&cursor_states::time_focus);
 
 	region.shrink(1.f);
-	element.get_scene().renderer().draw(draw::instruction::rectangle_ortho_outline{
+	element.get_scene().renderer().push(draw::instruction::rectangle_ortho_outline{
 			.v00 = region.vert_00(),
 			.v11 = region.vert_11(),
 			.stroke = 1,

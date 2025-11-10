@@ -943,7 +943,7 @@ int main(){
 #pragma endregion
 
 		mo_yanxi::gui::renderer renderer{ctx, assets::graphic::samplers::texture_sampler, msh};
-		renderer.resize({0, 0, ctx.get_extent().width, ctx.get_extent().height});
+		renderer.resize(ctx.get_extent());
 		// renderer.get_top_viewport().push_scissor({{200, 200, 520, 420}});
 		auto& batch = renderer.batch;
 
@@ -1054,7 +1054,7 @@ int main(){
 					math::vector2{event.size.width, event.size.height}.as<float>()
 				});
 
-			renderer.resize({tags::from_extent, {}, event.size.width, event.size.height});
+			renderer.resize({event.size.width, event.size.height});
 			gui::global::manager.resize(math::rect_ortho{tags::from_extent, {}, event.size.width, event.size.height}.as<float>());
 			res.as_image().handle = renderer.get_base();
 			res.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -1081,7 +1081,7 @@ int main(){
 			math::vec2 window_extent = math::vector2{core::global::graphic::context.get_extent().width, core::global::graphic::context.get_extent().height}.as<float>();
 			camera.resize_screen(window_extent.x, window_extent.y);
 
-			auto rst = gui::global::manager.add_scene<gui::loose_group>("main", true, renderer);
+			auto rst = gui::global::manager.add_scene<gui::loose_group>("main", true, renderer.create_frontend());
 			rst.scene.resize({{}, window_extent});
 			test::build_main_ui(rst.scene, rst.root_group);
 
@@ -1154,10 +1154,10 @@ int main(){
 				(void)vk::buffer_mapper{general_proj_ubo}.load(proj);
 
 				// renderer.top_viewport().set_local_transform(camera.get_v2v_mat({}));
-				auto screenP = renderer.top_viewport().get_element_to_root_screen() * camera.get_viewport_center();
-				auto pos = renderer.get_screen_uniform_proj() * screenP;
-				// bloom_pass.meta.set_scale(camera.map_scale(0.9f, 1.5f));
-				renderer.notify_viewport_changed();
+				// auto screenP = renderer.top_viewport().get_element_to_root_screen() * camera.get_viewport_center();
+				// auto pos = renderer.get_screen_uniform_proj() * screenP;
+				// // bloom_pass.meta.set_scale(camera.map_scale(0.9f, 1.5f));
+				// renderer.notify_viewport_changed();
 
 			}
 

@@ -6,7 +6,7 @@ export module mo_yanxi.gui.infrastructure:scene;
 
 import :elem_ptr;
 import std;
-import prototype.renderer.ui;
+import mo_yanxi.gui.renderer.frontend;
 import mo_yanxi.handle_wrapper;
 import mo_yanxi.math.rect_ortho;
 
@@ -49,7 +49,7 @@ struct scene_base{
 
 private:
 	mr::heap resource_{};
-	exclusive_handle_member<renderer*> renderer_{};
+	renderer_frontend renderer_{};
 
 protected:
 	rect region_{};
@@ -78,15 +78,14 @@ protected:
 	template <std::derived_from<elem> T, typename ...Args>
 	[[nodiscard]] explicit(false) scene_base(
 		mr::arena_id_t arena_id,
-		renderer& renderer,
+		renderer_frontend&& renderer,
 		std::in_place_type_t<T>,
 		Args&& ...args
 		);
 
 public:
-	[[nodiscard]] renderer& renderer() const noexcept{
-		assert(renderer_);
-		return *renderer_;
+	[[nodiscard]] renderer_frontend& renderer() noexcept{
+		return renderer_;
 	}
 
 	template <typename T = std::byte>
@@ -163,9 +162,9 @@ public:
 private:
 	void update(float delta_in_tick);
 
-	void draw(rect clip) const;
+	void draw(rect clip);
 
-	void draw() const{
+	void draw(){
 		draw(region_);
 	}
 
@@ -214,9 +213,9 @@ private:
 template <std::derived_from<elem> T, typename ... Args>
 scene_base::scene_base(
 	mr::arena_id_t arena_id,
-	gui::renderer& renderer, std::in_place_type_t<T>, Args&&... args):
+	renderer_frontend&& renderer, std::in_place_type_t<T>, Args&&... args):
 	resource_(arena_id),
-	renderer_(std::addressof(renderer)), root_(static_cast<scene&>(*this), nullptr, std::in_place_type<T>, std::forward<Args>(args)...){
+	renderer_(std::move(renderer)), root_(static_cast<scene&>(*this), nullptr, std::in_place_type<T>, std::forward<Args>(args)...){
 	inputs_.main_binds.set_context(std::ref(static_cast<scene&>(*this)));
 }
 }

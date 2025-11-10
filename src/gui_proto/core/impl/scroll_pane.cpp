@@ -51,7 +51,7 @@ void scroll_pane::draw_content(const rect clipSpace) const{
 		auto rect = get_hori_bar_rect().shrink(2).move_y(boarder().bottom * .0 + shrink);
 		rect.add_height(-shrink);
 
-		r.draw(graphic::draw::instruction::rectangle_ortho{
+		r.push(graphic::draw::instruction::rectangle_ortho{
 			.v00 = rect.vert_00(),
 			.v11 = rect.vert_11(),
 			.vert_color = graphic::colors::gray
@@ -63,7 +63,7 @@ void scroll_pane::draw_content(const rect clipSpace) const{
 		auto rect = get_vert_bar_rect().shrink(2).move_x(boarder().right * .0 + shrink);
 		rect.add_width(-shrink);
 
-		r.draw(graphic::draw::instruction::rectangle_ortho{
+		r.push(graphic::draw::instruction::rectangle_ortho{
 			.v00 = rect.vert_00(),
 			.v11 = rect.vert_11(),
 			.vert_color = graphic::colors::gray

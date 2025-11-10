@@ -25,7 +25,7 @@ void scene::update(float delta_in_tick){
 	root().update(delta_in_tick);
 }
 
-void scene::draw(rect clip) const{
+void scene::draw(rect clip){
 	gui::viewport_guard _{renderer(), region_};
 	root_->draw(clip);
 }
@@ -138,6 +138,7 @@ void scene::on_cursor_pos_update(){
 
 void scene::resize(const math::frect region){
 	if(util::try_modify(region_, region)){
+		renderer().resize(region);
 		root_->resize(region.extent());
 	}
 }
