@@ -14,10 +14,12 @@ export import mo_yanxi.gui.util;
 
 export import mo_yanxi.gui.style.interface;
 
+import mo_yanxi.math;
 import align;
 
 import :events;
 import :scene;
+import :tooltip_interface;
 export import :elem_ptr;
 
 
@@ -143,7 +145,7 @@ struct cursor_states{
 	}
 };
 
-export struct elem{
+export struct elem : tooltip::spawner_general<elem>{
 	friend struct elem_ptr;
 	friend struct scene;
 
@@ -209,6 +211,54 @@ public:
 	elem& operator=(const elem& other) = delete;
 	elem& operator=(elem&& other) noexcept = delete;
 
+#pragma region Tooltip
+
+public:
+	[[nodiscard]] tooltip::align_config tooltip_get_align_config() const override{
+		tooltip::align_config cfg{
+			tooltip_create_config.layout_info.follow,
+			tooltip_create_config.layout_info.attach_point_tooltip
+		};
+		switch(tooltip_create_config.layout_info.follow){
+		case tooltip::anchor_type::owner :{
+			cfg.pos = align::get_vert(tooltip_create_config.layout_info.attach_point_spawner, bound_abs());
+			break;
+		}
+
+		default : break;
+		}
+		return cfg;
+	}
+
+	[[nodiscard]] bool tooltip_spawner_contains(math::vec2 cursorPos) const noexcept override{
+		return contains(cursorPos);
+
+	}
+
+	[[nodiscard]] bool tooltip_should_build(math::vec2 cursorPos) const noexcept override{
+		return true
+			and has_tooltip_builder()
+			and tooltip_create_config.auto_build()
+			and cursor_states_.time_tooltip > tooltip_create_config.min_hover_time;
+	}
+
+	[[nodiscard]] bool tooltip_should_maintain(math::vec2 cursorPos) const override{
+		assert(tooltip_handle.handle);
+		return !tooltip_create_config.auto_release || tooltip_handle.handle->is_focused_key();
+	}
+
+protected:
+	[[nodiscard]] scene& tooltip_get_scene() const noexcept override{
+		return get_scene();
+	}
+
+	void tooltip_on_drop_behavior_impl() override{
+		cursor_states_.time_tooltip = -10.f;
+	}
+
+public:
+#pragma endregion
+
 #pragma region Event
 
 	virtual void on_inbound_changed(bool is_inbounded, bool changed){
@@ -248,11 +298,11 @@ public:
 
 	virtual events::op_afterwards on_cursor_moved(const events::cursor_move event){
 		cursor_states_.time_stagnate = 0;
+		if(tooltip_create_config.use_stagnate_time && !event.delta().equals({})){
+			cursor_states_.time_tooltip = 0.;
+			tooltip_notify_drop();
+		}
 		return events::op_afterwards::fall_through;
-		// if(get_tooltip_prop().use_stagnate_time && !delta.equals({})){
-		// 	cursor_state.time_tooltip = 0.;
-		// 	tooltip_notify_drop();
-		// }
 	}
 
 	virtual events::op_afterwards on_scroll(const events::scroll event, std::span<elem* const> aboves){
@@ -269,7 +319,7 @@ public:
 public:
 	void try_draw(const rect clipSpace) const{
 		if(invisible) return;
-		if(!clipSpace.overlap_inclusive(bound_abs())) return;
+		// if(!clipSpace.overlap_inclusive(bound_abs())) return;
 		draw(clipSpace);
 	}
 
@@ -426,9 +476,9 @@ public:
 
 [[nodiscard]] bool contains(math::vec2 absPos) const noexcept;
 
-protected:
 [[nodiscard]] bool contains_self(math::vec2 absPos, float margin) const noexcept;
 
+protected:
 [[nodiscard]] virtual bool parent_contain_constrain(math::vec2 cursorPos) const noexcept;
 public:
 
@@ -744,6 +794,11 @@ bool set_fill_parent(
 					   }, direction_mask);
 }
 
+events::op_afterwards thoroughly_esc(elem* where) noexcept;
+
+events::op_afterwards thoroughly_esc(elem& where) noexcept{
+	return thoroughly_esc(std::addressof(where));
+}
 }
 
 export

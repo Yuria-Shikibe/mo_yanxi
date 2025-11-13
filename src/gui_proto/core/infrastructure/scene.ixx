@@ -1,10 +1,12 @@
 module;
 
 #include <cassert>
+#include <mimalloc.h>
 
 export module mo_yanxi.gui.infrastructure:scene;
 
 import :elem_ptr;
+import :tooltip_manager;
 import std;
 import mo_yanxi.gui.renderer.frontend;
 import mo_yanxi.handle_wrapper;
@@ -67,11 +69,13 @@ protected:
 	 */
 	bool request_cursor_update_{};
 
-	mr::heap_vector<elem*> last_inbounds_{mr::heap_allocator<elem*>{resource_.get()}};
-	mr::heap_uset<elem*> independent_layouts_{mr::heap_allocator<elem*>{resource_.get()}};
+	mr::heap_vector<elem*> last_inbounds_{mr::heap_allocator<elem*>{get_heap()}};
+	mr::heap_uset<elem*> independent_layouts_{mr::heap_allocator<elem*>{get_heap()}};
 
 	//must be the first to destruct
 	elem_ptr root_{};
+
+	tooltip::tooltip_manager tooltip_manager_{};
 
 	[[nodiscard]] scene_base() = default;
 
@@ -90,11 +94,11 @@ public:
 
 	template <typename T = std::byte>
 	[[nodiscard]] mr::heap_allocator<T> get_heap_allocator() const noexcept {
-		return mr::heap_allocator<T>{resource_.get()};
+		return mr::heap_allocator<T>{get_heap()};
 	}
 
 	[[nodiscard]] auto* get_memory_resource() const noexcept {
-		return resource_.get();
+		return get_heap();
 	}
 
 	template <std::derived_from<elem> T = elem, bool unchecked = false>
@@ -135,6 +139,10 @@ public:
 		if(focus_key_ == target)focus_key_ = nullptr;
 	}
 
+private:
+	mi_heap_t* get_heap() const noexcept{
+		return resource_.get();
+	}
 };
 
 
@@ -173,7 +181,7 @@ private:
 
 	void inform_cursor_move(math::vec2 pos){
 		inputs_.cursor_move_inform(pos);
-		on_cursor_pos_update();
+		update_cursor();
 	}
 
 	void input_key(const input_handle::key_set key);
@@ -187,7 +195,12 @@ private:
 
 	void on_scroll(const math::vec2 scroll) const;
 
-	void on_cursor_pos_update();
+public:
+	void update_cursor();
+
+	events::op_afterwards on_esc();
+
+private:
 #pragma endregion
 
 	void layout();
@@ -215,7 +228,8 @@ scene_base::scene_base(
 	mr::arena_id_t arena_id,
 	renderer_frontend&& renderer, std::in_place_type_t<T>, Args&&... args):
 	resource_(arena_id),
-	renderer_(std::move(renderer)), root_(static_cast<scene&>(*this), nullptr, std::in_place_type<T>, std::forward<Args>(args)...){
+	renderer_(std::move(renderer)),
+	root_(static_cast<scene&>(*this), nullptr, std::in_place_type<T>, std::forward<Args>(args)...){
 	inputs_.main_binds.set_context(std::ref(static_cast<scene&>(*this)));
 }
 }

@@ -2,6 +2,7 @@ module;
 
 #include <cassert>
 #include <vulkan/vulkan.h>
+#include <vk_mem_alloc.h>
 
 export module prototype.renderer.ui;
 
@@ -15,19 +16,259 @@ import mo_yanxi.graphic.draw.instruction.batch;
 import mo_yanxi.graphic.draw.instruction;
 
 import mo_yanxi.vk.util.uniform;
+import mo_yanxi.vk.util;
 import mo_yanxi.vk;
 import mo_yanxi.vk.cmd;
 
+import mo_yanxi.gui.alloc;
 
 import std;
 
 namespace mo_yanxi::gui{
 
+struct indirect_dispatcher{
+	using value_type = VkDispatchIndirectCommand;
+
+private:
+	vk::buffer buffer{};
+	value_type current{};
+
+public:
+	[[nodiscard]] indirect_dispatcher() = default;
+
+	[[nodiscard]] indirect_dispatcher(
+		vk::allocator& allocator,
+		const std::size_t chunk_count)
+		: buffer(allocator, VkBufferCreateInfo{
+			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			.size = sizeof(value_type) * chunk_count,
+			.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+		}, {
+			.usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+		})
+	{}
+
+	void set(math::u32size2 extent, math::u32size2 group_extent = {16, 16}) noexcept{
+		//Ceil Div
+		extent.add(group_extent.copy().sub(1u, 1u)).div(group_extent);
+
+		current = value_type{
+			.x = extent.x,
+			.y = extent.y,
+			.z = 1
+		};
+	}
+
+	void set_divided(math::u32size2 workgroup_extent) noexcept{
+		current = value_type{
+			.x = workgroup_extent.x,
+			.y = workgroup_extent.y,
+			.z = 1
+		};
+	}
+
+	void update(std::size_t index){
+		assert(index < buffer.get_size() / sizeof(value_type));
+
+		(void)vk::buffer_mapper{buffer}.load(
+				current, sizeof(value_type) * index
+			);
+	}
+
+	[[nodiscard]] VkDeviceSize offset_at(std::size_t index) const noexcept{
+		assert(index < buffer.get_size() / sizeof(value_type));
+		return index * sizeof(value_type);
+	}
+
+	explicit(false) operator VkBuffer() const noexcept{
+		return buffer;
+	}
+};
+
+struct blit_resources{
+	vk::image_handle input_base;
+	vk::image_handle input_back;
+
+	vk::image_handle output_base;
+	vk::image_handle output_back;
+};
+
+struct blitter{
+	struct ui_blit_info{
+		math::usize2 offset{};
+		math::usize2 cap{};
+
+		friend bool operator==(const ui_blit_info& lhs, const ui_blit_info& rhs) noexcept = default;
+	};
+
+private:
+	std::size_t current_blit_chunk_index{};
+	vk::command_chunk blit_command_chunk{};
+
+	std::vector<ui_blit_info> blit_infos{};
+	indirect_dispatcher dispatcher{};
+
+	vk::descriptor_layout descriptor_layout_{};
+	vk::descriptor_buffer descriptor_buffer_{};
+	vk::uniform_buffer uniform_buffer_{};
+
+	vk::pipeline_layout blit_pipeline_layout_{};
+	vk::pipeline blit_pipeline_{};
+public:
+	[[nodiscard]] blitter() = default;
+
+	[[nodiscard]] blitter(
+		vk::context& ctx,
+		const std::size_t chunk_count,
+		const VkPipelineShaderStageCreateInfo& shaderStageInfo
+		) :
+	blit_command_chunk(ctx.get_device(), ctx.get_compute_command_pool(), chunk_count)
+	, blit_infos(chunk_count)
+	, dispatcher(ctx.get_allocator(), chunk_count)
+
+	, descriptor_layout_(ctx.get_device(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, [](vk::descriptor_layout_builder& builder){
+		builder.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+
+		builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+
+		builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.push_seq(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+	})
+	, descriptor_buffer_(ctx.get_allocator(), descriptor_layout_, descriptor_layout_.binding_count(), chunk_count)
+	, uniform_buffer_(ctx.get_allocator(), sizeof(ui_blit_info) * chunk_count)
+	, blit_pipeline_layout_(ctx.get_device(), {}, {descriptor_layout_})
+	, blit_pipeline_(ctx.get_device(), blit_pipeline_layout_, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, shaderStageInfo)
+	{
+		const auto map = get_mapper();
+		for(std::size_t i = 0; i < descriptor_buffer_.get_chunk_count(); ++i){
+			(void)map.set_uniform_buffer(0,
+				uniform_buffer_.get_address() + sizeof(ui_blit_info) * i,
+				sizeof(ui_blit_info),
+				i
+			);
+		}
+	}
+
+	[[nodiscard]] vk::descriptor_mapper get_mapper() {
+		return vk::descriptor_mapper{descriptor_buffer_};
+	}
+
+	void update(const blit_resources& resources){
+		{
+			const auto map = get_mapper();
+			for(std::size_t i = 0; i < descriptor_buffer_.get_chunk_count(); ++i){
+				map.set_storage_image(1, resources.input_base.image_view, VK_IMAGE_LAYOUT_GENERAL, i);
+				map.set_storage_image(2, resources.input_back.image_view, VK_IMAGE_LAYOUT_GENERAL, i);
+				map.set_storage_image(3, resources.output_base.image_view, VK_IMAGE_LAYOUT_GENERAL, i);
+				map.set_storage_image(4, resources.output_back.image_view, VK_IMAGE_LAYOUT_GENERAL, i);
+			}
+		}
+
+		create_command(resources);
+	}
+
+	[[nodiscard]] auto& blit(math::rect_ortho_trivial<unsigned> region){
+		auto& cur = blit_command_chunk[current_blit_chunk_index];
+
+		static constexpr math::usize2 wg_unit_size{16, 16};
+		const auto wg_size = region.extent.copy().add(wg_unit_size.copy().sub(1u, 1u)).div(wg_unit_size);
+		const auto [rx, ry] = (wg_size * wg_unit_size - region.extent) / 2;
+		if(region.src.x > rx)region.src.x -= rx;
+		if(region.src.y > ry)region.src.y -= ry;
+
+		if(blit_infos[current_blit_chunk_index].offset != region.src){
+			const ui_blit_info info{region.src};
+			blit_infos[current_blit_chunk_index] = info;
+
+			cur.wait(blit_command_chunk.get_device());
+			(void)vk::buffer_mapper{uniform_buffer_}.load(info, sizeof(ui_blit_info) * current_blit_chunk_index);
+		}else{
+			cur.wait(blit_command_chunk.get_device());
+		}
+
+		dispatcher.set_divided(wg_size);
+		dispatcher.update(current_blit_chunk_index);
+		current_blit_chunk_index = (current_blit_chunk_index + 1) % blit_command_chunk.size();
+
+		return cur;
+	}
+
+private:
+	void create_command(const blit_resources& resources){
+		std::array attachments{resources.input_base.image, resources.input_back.image};
+		vk::cmd::dependency_gen dependency_gen{};
+
+		for (auto && [idx, unit] : blit_command_chunk | std::views::enumerate){
+			const vk::scoped_recorder scoped_recorder{unit, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT};
+
+			for(const auto attachment : attachments){
+				dependency_gen.push(
+					attachment,
+					VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+					VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+					VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
+					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+					VK_IMAGE_LAYOUT_GENERAL,
+					vk::image::default_image_subrange
+				);
+			}
+
+			dependency_gen.apply(scoped_recorder);
+
+			blit_pipeline_.bind(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE);
+			descriptor_buffer_.bind_chunk_to(scoped_recorder, VK_PIPELINE_BIND_POINT_COMPUTE, blit_pipeline_layout_, 0, idx);
+
+			vkCmdDispatchIndirect(scoped_recorder, dispatcher, dispatcher.offset_at(idx));
+
+			for(const auto attachment : attachments){
+				dependency_gen.push(
+					attachment,
+					VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+					VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
+					VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+					VK_ACCESS_2_TRANSFER_WRITE_BIT,
+					VK_IMAGE_LAYOUT_GENERAL,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					vk::image::default_image_subrange
+				);
+			}
+
+			dependency_gen.apply(scoped_recorder);
+
+			static constexpr VkClearColorValue clear{};
+			for(const auto attachment : attachments){
+				vkCmdClearColorImage(
+					scoped_recorder,
+					attachment, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					&clear,
+					1, &vk::image::default_image_subrange);
+			}
+
+			for(const auto attachment : attachments){
+				dependency_gen.push(
+					attachment,
+					VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+					VK_ACCESS_2_TRANSFER_WRITE_BIT,
+					VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+					VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+					vk::image::default_image_subrange
+				);
+			}
+
+			dependency_gen.apply(scoped_recorder);
+		}
+	}
+};
+
 export
 struct renderer{
 private:
 	graphic::draw::instruction::user_data_index_table ubo_table_{
-		graphic::draw::instruction::make_user_data_index_table<gui_reserved_user_data_tuple>()
+		graphic::draw::instruction::make_user_data_index_table<gui_reserved_user_data_tuple_uniform_buffer_used>()
 	};
 
 public:
@@ -40,9 +281,6 @@ private:
 	vk::pipeline_layout pipeline_layout_{};
 	vk::pipeline pipeline_{};
 
-	// vk::descriptor_layout descriptor_layout_{};
-	// vk::descriptor_buffer descriptor_buffer_{};
-
 	std::unique_ptr<std::pmr::unsynchronized_pool_resource> pool_resource{
 			std::make_unique<std::pmr::unsynchronized_pool_resource>()
 		};
@@ -54,54 +292,144 @@ private:
 	vk::color_attachment attachment_base{};
 	vk::color_attachment attachment_background{};
 
+	blitter blitter_{};
+	vk::storage_image blit_base{};
+	vk::storage_image blit_background{};
+
+
+	mr::vector<VkCommandBufferSubmitInfo> cache_command_buffer_submit_info_{};
+	mr::vector<VkSubmitInfo2> cache_submit_info_{};
+
+
 public:
 	[[nodiscard]] renderer() = default;
 
 	[[nodiscard]] explicit renderer(
 		vk::context& ctx,
 		VkSampler spr,
-		const vk::shader_module& ui_main_shader
+		const vk::shader_module& ui_main_shader,
+		const vk::shader_module& ui_main_blit_shader
 		)
-		: batch(ctx, spr, ubo_table_)
+		: batch(ctx, spr,
+			graphic::draw::instruction::make_user_data_index_table<gui_reserved_user_data_tuple>({
+				{}, {}, graphic::draw::instruction::user_data_flag::fence_like
+				}))
 	, general_descriptors_(ctx, [](vk::descriptor_layout_builder& b){
 		b.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
 		b.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
 	})
-	, uniform_buffer_(ctx.get_allocator(), ubo_table_.max_size() * batch.work_group_count(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
+	, uniform_buffer_(ctx.get_allocator(), ubo_table_.required_capacity() * batch.work_group_count(), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
 	, batch_commands_(ctx.get_graphic_command_pool())
 	, pipeline_layout_(
 		ctx.get_device(), 0,
 {batch.get_batch_descriptor_layout(), general_descriptors_.descriptor_set_layout()})
-
+	, blitter_{ctx, 1, ui_main_blit_shader.get_create_info(VK_SHADER_STAGE_COMPUTE_BIT)}
 	{
 		general_descriptors_.bind([&](const std::uint32_t idx, const vk::descriptor_mapper& mapper){
 			using T = graphic::draw::instruction::user_data_index_table;
-			for(auto&& [group, rng] : ubo_table_.get_entries() | std::views::chunk_by([](const T::identity_entry& l, const T::identity_entry& r){
-				return l.entry.group_index == r.entry.group_index;
-			}) | std::views::enumerate){
-				for (const auto & [binding, ientry] : rng | std::views::enumerate){
-					auto& entry = ientry.entry;
-					(void)mapper.set_uniform_buffer(
-						binding,
-						uniform_buffer_.get_address() + idx * ubo_table_.max_size() + entry.local_offset, entry.size,
-						idx);
-				}
+
+			for(auto&& [binding, ientry] : ubo_table_.get_entries()
+			    | std::views::take_while([](const T::identity_entry& l){
+				    return l.entry.group_index == 0;
+			    })
+			    | std::views::enumerate){
+				auto& entry = ientry.entry;
+				(void)mapper.set_uniform_buffer(
+					binding,
+					uniform_buffer_.get_address() + idx * ubo_table_.required_capacity() + entry.local_offset, entry.size,
+					idx
+					);
 			}
+			// for(auto&& [group, rng] : ubo_table_.get_entries() | std::views::chunk_by([](const T::identity_entry& l, const T::identity_entry& r){
+			// 	return l.entry.group_index == r.entry.group_index;
+			// }) | std::views::enumerate){
+			// 	for (const auto & [binding, ientry] : rng | std::views::enumerate){
+			// 		auto& entry = ientry.entry;
+			// 		(void)mapper.set_uniform_buffer(
+			// 			binding,
+			// 			uniform_buffer_.get_address() + idx * ubo_table_.max_size() + entry.local_offset, entry.size,
+			// 			idx);
+			// 	}
+			// }
 
 		});
 
+		batch.set_submit_callback([this](const graphic::draw::instruction::batch::command_acquire_config& config){
+			VkSemaphoreSubmitInfo blit_semaphore_submit_info{};
 
-		batch.set_submit_callback([&](const std::uint32_t idx, graphic::draw::instruction::batch::ubo_data_entries spn) -> VkCommandBuffer {
-			if(spn){
-				//TODO support multiple ubo
+
+			using namespace graphic::draw::instruction;
+
+			if(config.data_entries){
 				vk::buffer_mapper mapper{uniform_buffer_};
-				for (const auto & entry : spn.entries){
-					if(!entry)continue;
-					(void)mapper.load_range(entry.to_range(spn.base_address), entry.local_offset + idx * ubo_table_.max_size());
+				for (const auto & entry : config.data_entries.entries){
+					const auto data_span = entry.to_range(config.data_entries.base_address);
+					if(entry.local_offset != gui::data_offset_of<gui::blit_config>){
+						for(const unsigned idx : config.group_indices){
+							(void)mapper.load_range(data_span, entry.local_offset + idx * ubo_table_.required_capacity());
+						}
+					}else{
+						math::rect_ortho_trivial<unsigned> rect;
+						std::memcpy(&rect, data_span.data(), data_span.size_bytes());
+
+						/*
+						std::uint32_t blit_wait_count{};
+
+						batch.for_each_submit([&](unsigned idx, batch::work_group& group){
+							if(std::ranges::contains(config.group_indices, idx))return;
+							blit_to_waits[blit_wait_count] = VkSemaphoreSubmitInfo{
+								.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+								.semaphore = group.get_attc_semaphore(),
+								.value = group.get_current_signal_index(),
+								.stageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+							};
+
+							++blit_wait_count;
+						});*/
+
+						auto& cmd_unit = blitter_.blit(rect);
+						blit_semaphore_submit_info = cmd_unit.get_next_semaphore_submit_info(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+						cache_command_buffer_submit_info_.reserve(1 + config.group_indices.size());
+						cache_command_buffer_submit_info_.push_back(cmd_unit.get_command_submit_info());
+
+						cache_submit_info_.push_back(VkSubmitInfo2{
+							.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+							.commandBufferInfoCount = 1,
+							.pCommandBufferInfos = cache_command_buffer_submit_info_.data(),
+							.signalSemaphoreInfoCount = 1,
+							.pSignalSemaphoreInfos = &blit_semaphore_submit_info
+						});
+					}
 				}
 			}
 
-			return batch_commands_[idx];
+			// VkSemaphoreSubmitInfo blit_semaphore_submit_info_wait{blit_semaphore_submit_info};
+			// blit_semaphore_submit_info_wait.stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+			cache_command_buffer_submit_info_.reserve(config.group_indices.size());
+			for(const auto [i, group_idx] : config.group_indices | std::views::enumerate){
+				auto& cmd_ref = cache_command_buffer_submit_info_.emplace_back(VkCommandBufferSubmitInfo{
+					.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+					.commandBuffer = batch_commands_[group_idx],
+				});
+
+				//TODO wait blit?
+				cache_submit_info_.push_back({
+					.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+					// .waitSemaphoreInfoCount = (blit_semaphore_submit_info_wait.semaphore ? 1u : 0u),
+					// .pWaitSemaphoreInfos = (blit_semaphore_submit_info_wait.semaphore ? &blit_semaphore_submit_info_wait : nullptr),
+					.commandBufferInfoCount = 1,
+					.pCommandBufferInfos = &cmd_ref,
+					.signalSemaphoreInfoCount = 2,
+					.pSignalSemaphoreInfos = config.group_semaphores.data() + i * 2
+				});
+			}
+
+			if(cache_submit_info_.empty())return;
+			vkQueueSubmit2(context().graphic_queue(), cache_submit_info_.size(), cache_submit_info_.data(), nullptr);
+
+			cache_command_buffer_submit_info_.clear();
+			cache_submit_info_.clear();
+
 		});
 
 		init_pipeline(ui_main_shader);
@@ -119,7 +447,7 @@ public:
 				context().get_allocator(), extent,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 				VK_IMAGE_USAGE_SAMPLED_BIT,
-				VK_FORMAT_R16G16B16A16_SFLOAT
+				// VK_FORMAT_R16G16B16A16_SFLOAT
 			};
 		attachment_background =
 			vk::color_attachment{
@@ -128,14 +456,41 @@ public:
 				VK_IMAGE_USAGE_SAMPLED_BIT
 			};
 
+		blit_base =
+			vk::storage_image{
+				context().get_allocator(), extent,
+				1,
+				VK_FORMAT_R8G8B8A8_UNORM,
+				VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+			};
+
+		blit_background =
+			vk::storage_image{
+				context().get_allocator(), extent,
+				1,
+				VK_FORMAT_R8G8B8A8_UNORM,
+				VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+			};
+
 		{
 			auto transient = context().get_transient_graphic_command_buffer();
 			attachment_base.init_layout(transient);
 			attachment_background.init_layout(transient);
+
+			blit_base.init_layout_general(transient);
+			blit_background.init_layout_general(transient);
 		}
 
+		blitter_.update({
+			attachment_base, attachment_background,
+			blit_base, blit_background
+		});
 		record_command();
 	}
+
+	// void blit(math::urect region){
+	// 	blitter_.blit(context().compute_queue(), region);
+	// }
 
 	[[nodiscard]] vk::context& context() const noexcept{
 		return batch.context();
@@ -148,7 +503,7 @@ private:
 
 	void record_command(){
 		vk::dynamic_rendering dynamic_rendering{
-			{attachment_base.get_image_view()},
+			{attachment_base.get_image_view(), attachment_background.get_image_view()},
 			nullptr};
 
 		const graphic::draw::instruction::batch_descriptor_buffer_binding_info dbo_info{
@@ -179,7 +534,8 @@ private:
 			shader_module.get_create_info(VK_SHADER_STAGE_MESH_BIT_EXT, nullptr, "main_mesh"),
 			shader_module.get_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, nullptr, "main_frag")
 		});
-		gtp.push_color_attachment_format(VK_FORMAT_R16G16B16A16_SFLOAT, vk::blending::alpha_blend);
+		gtp.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::alpha_blend);
+		gtp.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::alpha_blend);
 
 		pipeline_ = vk::pipeline{context().get_device(), pipeline_layout_, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, gtp};
 	}
@@ -194,7 +550,7 @@ public:
 
 #pragma region Getter
 	[[nodiscard]] vk::image_handle get_base() const noexcept{
-		return attachment_base;
+		return blit_base;
 	}
 
 	[[nodiscard]] const math::mat3& get_screen_uniform_proj() const noexcept{

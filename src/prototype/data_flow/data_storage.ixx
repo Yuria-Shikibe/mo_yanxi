@@ -306,7 +306,7 @@ public:
 	[[nodiscard]] data_storage(std::in_place_type_t<T>, Args&& ...args) :
 		destructor_func(+[](void* p) static noexcept{
 			delete static_cast<T*>(p);
-		}), reference_ptr(new T{std::forward<Args&&>(args)}){
+		}), reference_ptr(new T{std::forward<Args&&>(args) ...}){
 	}
 
 	template <typename T, typename ...Args>

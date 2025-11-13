@@ -975,17 +975,17 @@ namespace mo_yanxi::game::ecs{
 				using params = unary_apply_to_tuple_t<std::decay_t, tuple_drop_first_elem_t<raw_params>>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				self.template slice_and_then<params, Exclusives>([&self, f = std::move(fn)](const span_tuple& p) FORCE_INLINE {
+				self.template slice_and_then<params, Exclusives>([&self, f = std::move(fn)] FORCE_INLINE (const span_tuple& p) {
 					auto count = std::ranges::size(std::get<0>(p));
 
 					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
 
-					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
+					[&] <std::size_t ...Idx> FORCE_INLINE (std::index_sequence<Idx...>) {
 						((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
 					}(std::make_index_sequence<std::tuple_size_v<params>>{});
 
 					for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
-						[&] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
+						[&] <std::size_t ...Idx> FORCE_INLINE (std::index_sequence<Idx...>) {
 							std::invoke(f, self, *(std::get<Idx>(iterators)++) ...);
 						}(std::make_index_sequence<std::tuple_size_v<params>>{});
 					}
@@ -994,17 +994,17 @@ namespace mo_yanxi::game::ecs{
 				using params = unary_apply_to_tuple_t<std::decay_t, raw_params>;
 				using span_tuple = unary_apply_to_tuple_t<strided_span, params>;
 
-				self.template slice_and_then<params, Exclusives>([f = std::move(fn)](const span_tuple& p) FORCE_INLINE {
+				self.template slice_and_then<params, Exclusives>([f = std::move(fn)] FORCE_INLINE (const span_tuple& p) {
 					auto count = std::ranges::size(std::get<0>(p));
 
 					unary_apply_to_tuple_t<strided_span_iterator, params> iterators{};
 
-					[&] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
+					[&] <std::size_t ...Idx> FORCE_INLINE (std::index_sequence<Idx...>) {
 						((std::get<Idx>(iterators) = std::ranges::begin(std::get<Idx>(p))), ...);
 					}(std::make_index_sequence<std::tuple_size_v<params>>{});
 
 					for(std::remove_cvref_t<decltype(count)> i = 0; i != count; ++i){
-						[&] <std::size_t ...Idx> (std::index_sequence<Idx...>) FORCE_INLINE {
+						[&] <std::size_t ...Idx> FORCE_INLINE (std::index_sequence<Idx...>) {
 							std::invoke(f,
 								(assert(std::get<Idx>(iterators) != std::ranges::end(std::get<Idx>(p))),
 									*(std::get<Idx>(iterators)++)) ...);
@@ -1113,7 +1113,7 @@ namespace mo_yanxi::game::ecs{
 			vec exclusives;
 
 			if constexpr (ExclusiveSize > 0){
-				[&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>) FORCE_INLINE {
+				[&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>) {
 					([&, this](type_identity_index idx){
 						if(auto itr = type_to_archetype.find(idx); itr != type_to_archetype.end()){
 
@@ -1135,7 +1135,7 @@ namespace mo_yanxi::game::ecs{
 				//TODO consider that 'none' is really casual, remove it?
 
 				bool none = false;
-				auto try_find = [&, this](type_identity_index idx) FORCE_INLINE -> std::span<const archetype_slice>{
+				auto try_find = [&, this](type_identity_index idx) -> std::span<const archetype_slice>{
 					// std::println(std::cerr, "{}", idx.name());
 					if(none)return {};
 
@@ -1197,7 +1197,7 @@ namespace mo_yanxi::game::ecs{
 					}
 
 
-					static constexpr auto checker = [] <typename RTup>(const RTup& rng) FORCE_INLINE{
+					static constexpr auto checker = [] <typename RTup>(const RTup& rng){
 #if DEBUG_CHECK
 						auto stride = std::get<0>(rng).stride();
 

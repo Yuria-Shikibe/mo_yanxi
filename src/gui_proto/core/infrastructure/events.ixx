@@ -29,6 +29,10 @@ export
 struct cursor_move{
 	math::vec2 src;
 	math::vec2 dst;
+
+	[[nodiscard]] math::vec2 delta() const noexcept{
+		return dst - src;
+	}
 };
 
 export

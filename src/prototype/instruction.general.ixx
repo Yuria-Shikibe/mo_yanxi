@@ -93,6 +93,7 @@ template <typename T>
 constexpr std::size_t get_size(const T& arg){
 	if constexpr (std::ranges::input_range<T>){
 		static_assert(std::ranges::sized_range<T>, "T must be sized range");
+		static_assert(std::is_trivially_copyable_v<std::ranges::range_value_t<T>>);
 		return std::ranges::size(arg) * sizeof(std::ranges::range_value_t<T>);
 	}else{
 		static_assert(std::is_trivially_copyable_v<T>);
@@ -103,7 +104,7 @@ constexpr std::size_t get_size(const T& arg){
 export
 template <typename... Args>
 constexpr std::size_t get_type_size_sum(const Args& ...args) noexcept{
-	return ((instruction::get_size(args)) + ... + 0);
+	return ((instruction::get_size(args)) + ... + 0uz);
 }
 
 export
@@ -136,8 +137,7 @@ union dispatch_info_payload{
 export
 template <typename EnumTy, typename DrawInfoTy>
 	requires (std::is_enum_v<EnumTy>)
-struct alignas(16)
-generic_instruction_head{
+struct alignas(16) generic_instruction_head{
 	EnumTy type;
 	std::uint32_t size; //size include head
 	dispatch_info_payload<DrawInfoTy> payload;
@@ -224,12 +224,20 @@ public:
 namespace mo_yanxi::graphic::draw{
 namespace instruction{
 
+#ifndef MO_YANXI_GRAPHIC_DRAW_INSTRUCTION_IMAGE_HANDLE_TYPE
+using image_handle_t = VkImageView;
+#else
+using image_handle_t = MO_YANXI_GRAPHIC_DRAW_INSTRUCTION_IMAGE_HANDLE_TYPE;
+static_assert(sizeof(image_handle_t) == 8)
+#endif
+
+//TODO support user defined size?
 export
 struct image_view_history{
 	static constexpr std::size_t max_cache_count = 4;
 	static_assert(max_cache_count % 4 == 0);
 	static_assert(sizeof(void*) == sizeof(std::uint64_t));
-	using handle_t = VkImageView;
+	using handle_t = image_handle_t;
 
 private:
 	handle_t latest{};
@@ -304,7 +312,7 @@ public:
 
 
 struct image_set_result{
-	VkImageView image;
+	image_handle_t image;
 	bool succeed;
 
 	constexpr explicit operator bool() const noexcept{
@@ -314,19 +322,19 @@ struct image_set_result{
 
 
 export union image_view{
-	VkImageView view;
+	image_handle_t view;
 	std::uint64_t index;
 
-	void set_view(VkImageView view) noexcept{
-		new(&this->view) VkImageView(view);
+	void set_view(image_handle_t view) noexcept{
+		new(&this->view) image_handle_t(view);
 	}
 
 	void set_index(std::uint32_t idx) noexcept{
 		new(&this->index) std::uint64_t(idx);
 	}
 
-	[[nodiscard]] VkImageView get_image_view() const noexcept{
-		return view; // std::bit_cast<VkImageView>(std::bit_cast<std::uintptr_t>(*this) & (~0b111));
+	[[nodiscard]] image_handle_t get_image_view() const noexcept{
+		return view;
 	}
 };
 
@@ -452,8 +460,6 @@ template <typename T, typename... Args>
 	const T& payload,
 	const Args&... args
 ){
-	static_assert(((sizeof(Args) % 16 == 0) && ...));
-
 	const auto total_size = instruction::get_instr_size<T, Args...>(args...);
 
 	auto pwhere = std::assume_aligned<16>(where);
@@ -464,7 +470,7 @@ template <typename T, typename... Args>
 
 	static constexpr auto place_at = []<typename Ty>(std::byte*& w, const Ty& arg){
 		if constexpr (std::ranges::contiguous_range<Ty>){
-			//no use uniti
+			static_assert(std::is_trivially_copyable_v<std::ranges::range_value_t<Ty>> && !std::ranges::range<std::ranges::range_value_t<Ty>>);
 			const auto byte_size = sizeof(std::ranges::range_value_t<Ty>) * std::ranges::size(arg);
 			std::memcpy(w, std::ranges::data(arg), byte_size);
 			return w = std::assume_aligned<16>(w + byte_size);
@@ -493,7 +499,7 @@ template <typename T, typename... Args>
 export
 template <known_instruction T, typename... Args>
 	requires (std::is_trivially_copyable_v<T> && valid_consequent_argument<T, Args...>)
-[[nodiscard]] FORCE_INLINE std::byte* place_instruction_at(
+FORCE_INLINE std::byte* place_instruction_at(
 	std::byte* const where,
 	const T& payload,
 	const Args&... args
@@ -505,7 +511,7 @@ template <known_instruction T, typename... Args>
 export
 template <typename T>
 	requires (std::is_trivially_copyable_v<T>)
-[[nodiscard]] FORCE_INLINE std::byte* place_ubo_update_at(
+FORCE_INLINE std::byte* place_ubo_update_at(
 	std::byte* const where,
 	const T& payload,
 	const user_data_indices info

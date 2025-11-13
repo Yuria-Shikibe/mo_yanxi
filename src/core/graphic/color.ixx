@@ -59,9 +59,6 @@ namespace mo_yanxi::graphic{
 		// }
 
 	public:
-		constexpr explicit(false) operator math::vec4() const noexcept{
-			return *this;
-		}
 
 		FORCE_INLINE constexpr color& set_light(float lumaScl = max_luma_scale) noexcept{
 			return mul_rgb(lumaScl);

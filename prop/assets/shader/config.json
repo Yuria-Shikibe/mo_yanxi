@@ -30,6 +30,10 @@
     {
       "file": "ui/draw.slang",
       "alias": "ui/draw/basic"
+    },
+    {
+      "file": "ui/blit.default.slang",
+      "alias": "ui/blit/basic"
     }
   ]
 }

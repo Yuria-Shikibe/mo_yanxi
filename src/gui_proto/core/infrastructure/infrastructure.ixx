@@ -7,6 +7,8 @@ export import :elem_ptr;
 export import :events;
 export import :scene;
 export import :ui_manager;
+export import :tooltip_interface;
+export import :tooltip_manager;
 
 export import mo_yanxi.input_handle;
 export import mo_yanxi.gui.alloc;

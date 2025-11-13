@@ -8,6 +8,8 @@ export module mo_yanxi.graphic.render_graph.post_process_pass;
 export import mo_yanxi.graphic.render_graph.manager;
 
 export import mo_yanxi.graphic.shader_reflect;
+import mo_yanxi.meta_programming;
+export import mo_yanxi.math.vector2;
 export import mo_yanxi.vk;
 
 import mo_yanxi.utility;
@@ -217,7 +219,7 @@ namespace mo_yanxi::graphic::render_graph{
 
 
 		void visit_in(inout_index index, std::invocable<bound_stage_resource&> auto fn){
-			for(const auto& connection : inout_map_.connection){
+			for(const auto& connection : inout_map_.connection()){
 				if(connection.slot.in == index){
 					std::invoke(fn, (*this)[connection.binding]);
 				}
@@ -225,7 +227,7 @@ namespace mo_yanxi::graphic::render_graph{
 		}
 
 		void visit_out(inout_index index, std::invocable<bound_stage_resource&> auto fn){
-			for(const auto& connection : inout_map_.connection){
+			for(const auto& connection : inout_map_.connection()){
 				if(connection.slot.out == index){
 					std::invoke(fn, (*this)[connection.binding]);
 				}

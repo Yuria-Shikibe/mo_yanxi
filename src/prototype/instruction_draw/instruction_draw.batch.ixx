@@ -2,6 +2,7 @@ module;
 
 #include <vulkan/vulkan.h>
 #include "ext/adapted_attributes.hpp"
+#include "ext/enum_operator_gen.hpp"
 #include "gch/small_vector.hpp"
 
 export module mo_yanxi.graphic.draw.instruction.batch;
@@ -178,6 +179,13 @@ constexpr inline std::size_t max_dispatch_per_workgroup = 32;
 constexpr inline std::size_t working_group_count = 4;
 
 
+export
+enum struct user_data_flag : std::uint32_t{
+	none,
+	fence_like = 1 << 0
+};
+
+BITMASK_OPS(export, user_data_flag);
 
 export
 struct user_data_index_table{
@@ -196,24 +204,26 @@ struct user_data_index_table{
 		}
 	};
 
-private:
 	struct identity_entry{
 		type_identity_index id;
 		entry entry;
+
+		//TODO make it more compact?
+		user_data_flag flag;
 	};
 
-	std::size_t maximum_size{};
+private:
+	std::size_t required_capacity_{};
 	gch::small_vector<identity_entry, 4> entries{};
-
 
 public:
 	template <typename ...Ts>
-	friend user_data_index_table make_user_data_index_table();
+	friend user_data_index_table make_user_data_index_table(std::initializer_list<user_data_flag> flags);
 
 	[[nodiscard]] user_data_index_table() = default;
 
-	[[nodiscard]] std::uint32_t max_size() const noexcept{
-		return maximum_size;
+	[[nodiscard]] std::uint32_t required_capacity() const noexcept{
+		return required_capacity_;
 	}
 
 	[[nodiscard]] std::uint32_t group_size_at(const identity_entry* where) const noexcept{
@@ -227,7 +237,12 @@ public:
 			}
 		}
 
-		return maximum_size - base_offset;
+		return required_capacity_ - base_offset;
+	}
+
+	[[nodiscard]] user_data_flag flag_at(const unsigned index) const noexcept{
+		assert(index < count());
+		return entries[index].flag;
 	}
 
 	[[nodiscard]] std::size_t count() const noexcept{
@@ -270,6 +285,10 @@ public:
 		return std::span{entries.data(), entries.size()};
 	}
 
+	auto get_entries_mut() noexcept {
+		return std::span{entries.data(), entries.size()};
+	}
+
 	void append(const user_data_index_table& other){
 		if(entries.empty()){
 			*this = other;
@@ -279,16 +298,16 @@ public:
 		entries.reserve(entries.size() + other.entries.size());
 		for (auto entry : other.entries){
 			entry.entry.group_index += group_base;
-			entry.entry.global_offset += maximum_size;
+			entry.entry.global_offset += required_capacity_;
 			entries.push_back(entry);
 		}
-		maximum_size += other.maximum_size;
+		required_capacity_ += other.required_capacity_;
 	}
 };
 
 export
 template <typename ...Ts>
-[[nodiscard]] user_data_index_table make_user_data_index_table(){
+[[nodiscard]] user_data_index_table make_user_data_index_table(std::initializer_list<user_data_flag> flags = {}){
 	user_data_index_table table{};
 
 	auto push = [&]<typename T, std::size_t I>(std::size_t current_base_size){
@@ -296,24 +315,29 @@ template <typename ...Ts>
 			.id = unstable_type_identity_of<T>(),
 			.entry = {
 				.size = static_cast<std::uint32_t>(sizeof(T)),
-				.local_offset = static_cast<std::uint32_t>(table.maximum_size - current_base_size),
-				.global_offset = static_cast<std::uint32_t>(table.maximum_size),
+				.local_offset = static_cast<std::uint32_t>(table.required_capacity_ - current_base_size),
+				.global_offset = static_cast<std::uint32_t>(table.required_capacity_),
 				.group_index = I
 			}
 		});
 
-		table.maximum_size += math::div_ceil<std::uint32_t>(sizeof(T), 16) * 16;
+		table.required_capacity_ += math::div_ceil<std::uint32_t>(sizeof(T), 16) * 16;
 	};
 
 	[&]<std::size_t ...Idx>(std::index_sequence<Idx...>){
 		([&]<typename T, std::size_t I>(){
-			const auto cur_base = table.maximum_size;
+			const auto cur_base = table.required_capacity_;
 
 			[&]<std::size_t ...J>(std::index_sequence<J...>){
 				(push.template operator()<std::tuple_element_t<J, T>, I>(cur_base), ...);
 			}(std::make_index_sequence<std::tuple_size_v<T>>{});
 		}.template operator()<Ts, Idx>(), ...);
 	}(std::index_sequence_for<Ts...>());
+
+	for (auto [idx, flag] : flags | std::views::enumerate){
+		if(idx >= table.count())break;
+		table.entries[idx].flag = flag;
+	}
 
 	return table;
 }
@@ -410,10 +434,20 @@ private:
 	std::uint64_t current_signal_index{};
 	vk::semaphore mesh_semaphore{};
 	vk::semaphore frag_semaphore{};
+	// vk::semaphore attc_semaphore{};
 
 	void set_sentinel(std::byte* instr_span_end) noexcept{
 		span_end = instr_span_end;
 	}
+
+public:
+	[[nodiscard]] std::uint64_t get_current_signal_index() const noexcept{
+		return current_signal_index;
+	}
+	//
+	// [[nodiscard]] VkSemaphore get_attc_semaphore() const noexcept{
+	// 	return attc_semaphore;
+	// }
 };
 
 export
@@ -423,6 +457,7 @@ struct batch_descriptor_buffer_binding_info{
 };
 
 struct batch{
+	using work_group = working_group;
 	static constexpr std::uint32_t batch_work_group_count = working_group_count;
 
 private:
@@ -460,15 +495,21 @@ private:
 	VkSampler sampler_{};
 
 public:
-	struct ubo_data_entries{
+	struct user_data_entries{
 		const std::byte* base_address;
 		std::span<const user_data_index_table::entry> entries;
 
-		explicit operator bool() noexcept{
+		explicit operator bool() const noexcept{
 			return !entries.empty();
 		}
-
 	};
+
+	struct command_acquire_config{
+		user_data_entries data_entries;
+		std::span<const unsigned> group_indices;
+		std::span<const VkSemaphoreSubmitInfo> group_semaphores;
+	};
+
 
 private:
 	/**
@@ -476,7 +517,10 @@ private:
 	 * @brief
 	 * (batch group index, ubo data update) -> Buffer to execute
 	 */
-	std::move_only_function<VkCommandBuffer(std::uint32_t, ubo_data_entries)> on_submit{};
+	std::move_only_function<void(const command_acquire_config&)> on_submit{};
+
+	// gch::small_vector<VkCommandBufferSubmitInfo, working_group_count * 2> cache_submit_command_submit_info_{};
+	// gch::small_vector<VkSubmitInfo2, working_group_count * 2> cache_submit_info_{};
 
 public:
 
@@ -501,7 +545,7 @@ public:
 		, descriptor_buffer_(context.get_allocator(), descriptor_layout_, descriptor_layout_.binding_count(),
 		                     working_group_count)
 		, ubo_table_(std::move(ubo_index_table))
-		, ubo_cache_(ubo_table_.max_size())
+		, ubo_cache_(ubo_table_.required_capacity())
 		, ubo_timeline_mark_(ubo_table_.count() * (1 + groups_.size()))
 		, instruction_buffer_(1U << 13U)
 		, dispatch_info_buffer_(
@@ -532,11 +576,13 @@ public:
 		for(auto&& group : groups_){
 			group.mesh_semaphore = vk::semaphore{context_->get_device(), 0};
 			group.frag_semaphore = vk::semaphore{context_->get_device(), 0};
+			// group.attc_semaphore = vk::semaphore{context_->get_device(), 0};
 		}
 	}
 
-	void set_submit_callback(std::invocable<std::uint32_t, ubo_data_entries> auto&& fn){
-		on_submit = std::forward<decltype(fn)>(fn);
+	template <std::invocable<const command_acquire_config&> T>
+	void set_submit_callback(T&& fn){
+		on_submit = std::forward<T>(fn);
 	}
 
 public:
@@ -587,21 +633,18 @@ public:
 	}
 
 	void consume_all(){
-		while(consume_n(working_group_count)){}
+		consume_n(std::numeric_limits<std::uint32_t>::max());
 	}
 
 	bool consume_n(unsigned count){
-		assert(count <= working_group_count);
 		assert(count > 0);
-		std::array<VkSemaphoreSubmitInfo, working_group_count * 2> semaphores{};
-		std::array<VkCommandBufferSubmitInfo, working_group_count> command_buffers{};
-		std::array<VkSubmitInfo2, working_group_count> submitInfo2{};
-		unsigned actuals{};
-		const auto intital_wait = get_pushed_group_count();
-		const auto initial_idle = groups_.size() - intital_wait;
-		bool unfinished = true;
 
-		auto need_wait = [&](const unsigned has_dispatched_count) -> bool{
+		unsigned initial_idle_group_index = current_idle_group_index_;
+		unsigned submitted_current{};
+		unsigned submitted_total{};
+
+		auto initial_idle = groups_.size() - get_pushed_group_count();
+		const auto need_wait = [&](const unsigned has_dispatched_count) -> bool{
 			return has_dispatched_count >= initial_idle;
 		};
 
@@ -612,10 +655,12 @@ public:
 			const auto sentinel = instruction_idle_ptr_ >= instruction_pend_ptr_
 				                      ? instruction_idle_ptr_
 				                      : instruction_buffer_.end();
-			const auto dspcinfo = get_dispatch_info(instruction_pend_ptr_, sentinel,
-			                                                     temp_dispatch_info_.group_info,
-			                                                     group.image_view_history, last_primit_offset_,
-			                                                     last_vertex_offset_);
+			const auto dspcinfo = get_dispatch_info(
+				instruction_pend_ptr_, sentinel,
+				temp_dispatch_info_.group_info,
+				group.image_view_history, last_primit_offset_,
+				last_vertex_offset_);
+
 			instruction_pend_ptr_ = dspcinfo.next;
 
 
@@ -633,11 +678,25 @@ public:
 			}
 
 			auto update_ubo = [&](std::span<const std::byte> data){
+				if(submitted_current){
+					submit_current(submitted_current, initial_idle_group_index);
+					initial_idle_group_index = current_idle_group_index_;
+					initial_idle = groups_.size() - get_pushed_group_count();
+					submitted_total += submitted_current;
+					submitted_current = 0;
+				}
+
 				const auto idx = next_head.payload.ubo.local_index;
+
 				const auto& entry = ubo_table_[idx];
 				assert(entry.size == data.size_bytes());
 				std::memcpy(ubo_cache_.data() + entry.global_offset, data.data(), data.size_bytes());
+				// if(idx == 2)return;
 				++ubo_timeline_mark_[idx];
+
+				if(!submitted_current){
+					submit_current(0, initial_idle_group_index, idx);
+				}
 			};
 
 
@@ -652,7 +711,7 @@ public:
 
 				const bool is_img_history_changed = group.image_view_history.check_changed();
 
-				if(need_wait(actuals)){
+				if(need_wait(submitted_current)){
 					//If requires wait and is not undispatched command
 					wait_one(is_img_history_changed);
 				}
@@ -675,7 +734,6 @@ public:
 				if(instr_shared_size){
 					//Resume next image from index to pointer to view
 					auto& generic = reinterpret_cast<primitive_generic&>(*(dspcinfo.next + sizeof(instruction_head)));
-
 					generic.image.set_view(dspcinfo.current_img);
 				}
 
@@ -700,62 +758,18 @@ public:
 				(void)vk::buffer_mapper{indirect_buffer}
 					.load(indirectCommandExt, sizeof(VkDrawMeshTasksIndirectCommandEXT) * current_idle_group_index_);
 
-
-				const auto ubo_total_count = ubo_table_.count();
-				std::size_t ubo_count = 0;
-				ubo_update_data_cache_.clear();
-				for(unsigned i = 0; i < ubo_total_count; ++i){
-					if(ubo_timeline_mark_[i + (current_idle_group_index_ + 1) * ubo_total_count] < ubo_timeline_mark_[i]){
-						ubo_timeline_mark_[i + (current_idle_group_index_ + 1) * ubo_total_count] = ubo_timeline_mark_[i];
-						ubo_update_data_cache_.push_back(ubo_table_[i]);
-						++ubo_count;
-					}
-				}
-
-				//usr update
-				assert(on_submit);
-				const auto cmdbuf =
-					on_submit(current_idle_group_index_, ubo_data_entries{ubo_cache_.data(), std::span{ubo_update_data_cache_.data(), ubo_count}});
-
+				++submitted_current;
+				++group.current_signal_index;
+				push_current_group();
 
 				if(dspcinfo.ubo_requires_update){
 					const auto data = get_ubo_data_span(dspcinfo.next);
 					update_ubo(data);
 					instruction_pend_ptr_ += data.size_bytes() + sizeof(instruction_head);
 				}
-
 				group.set_sentinel(instruction_pend_ptr_);
-				++group.current_signal_index;
 
-				semaphores[actuals * 2] = VkSemaphoreSubmitInfo{
-						.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-						.semaphore = group.mesh_semaphore,
-						.value = group.current_signal_index,
-						.stageMask = VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT,
-					};
-				semaphores[actuals * 2 + 1] = VkSemaphoreSubmitInfo{
-						.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-						.semaphore = group.frag_semaphore,
-						.value = group.current_signal_index,
-						.stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-					};
-				command_buffers[actuals] = VkCommandBufferSubmitInfo{
-						.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-						.commandBuffer = cmdbuf,
-					};
 
-				submitInfo2[actuals] = VkSubmitInfo2{
-						.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-						.waitSemaphoreInfoCount = 0,
-						.pWaitSemaphoreInfos = nullptr,
-						.commandBufferInfoCount = 1,
-						.pCommandBufferInfos = command_buffers.data() + actuals,
-						.signalSemaphoreInfoCount = 2,
-						.pSignalSemaphoreInfos = semaphores.data() + actuals * 2,
-					};
-
-				++actuals;
-				push_current_group();
 			}else{
 				if(dspcinfo.ubo_requires_update){
 					const auto data = get_ubo_data_span(dspcinfo.next);
@@ -764,7 +778,6 @@ public:
 					if(is_all_idle()){
 						instruction_dspt_ptr_ = instruction_pend_ptr_;
 					}else{
-						auto idx = get_back_group() - groups_.data();
 						get_back_group()->span_end = instruction_pend_ptr_;
 					}
 				}
@@ -778,17 +791,17 @@ public:
 				hasNext = true;
 			}
 
-			if(actuals == count || !dspcinfo.count){
-				if(hasNext) goto RET;
+			if(!hasNext && (submitted_total >= count || !dspcinfo.count)){
 				break;
 			}
 		}
 
-		unfinished = false;
 
-	RET:
-		if(actuals) vkQueueSubmit2(context_->graphic_queue(), actuals, submitInfo2.data(), nullptr);
-		return unfinished;
+		if(submitted_current){
+			submit_current(submitted_current, initial_idle_group_index);
+		}
+
+		return false;
 	}
 
 	void wait_one(bool wait_on_frag = true){
@@ -802,6 +815,24 @@ public:
 			instruction_dspt_ptr_ = group->span_end;
 			pop_front_group();
 		}
+	}
+
+	template <std::invocable<unsigned, working_group&> Fn>
+	FORCE_INLINE auto for_each_submit(Fn fn){
+		if(is_all_idle()) return;
+		auto cur = current_dspt_group_index_;
+
+		do{
+			if constexpr(std::predicate<Fn, working_group&>){
+				if(std::invoke(fn, cur, groups_[cur])){
+					return cur;
+				}
+			} else{
+				std::invoke(fn, cur, groups_[cur]);
+			}
+
+			cur = (cur + 1) % groups_.size();
+		} while(cur != current_idle_group_index_);
 	}
 
 	void wait_n(const std::uint32_t count, const bool wait_on_frag = true){
@@ -878,27 +909,91 @@ public:
 
 	void append_ubo_table(const user_data_index_table& table){
 		ubo_table_.append(table);
-		ubo_cache_.reserve(ubo_table_.max_size());
+		ubo_cache_.reserve(ubo_table_.required_capacity());
 		ubo_timeline_mark_.resize(ubo_table_.count() * (1 + groups_.size()));
 	}
 
 private:
-	template <std::invocable<unsigned, working_group&> Fn>
-	FORCE_INLINE auto for_each_submit(Fn fn){
-		if(is_all_idle()) return;
-		auto cur = current_dspt_group_index_;
+	void submit_current(unsigned submit_count, unsigned initial_group, unsigned ubo_force_update = std::numeric_limits<unsigned>::max()){
+		std::array<unsigned, working_group_count> group_indices;
+		for(unsigned i = 0; i < submit_count; i++){
+			group_indices[i] = (initial_group + i) % groups_.size();
+		}
 
-		do{
-			if constexpr(std::predicate<Fn, working_group&>){
-				if(std::invoke(fn, cur, groups_[cur])){
-					return cur;
+		const std::span indices_span{group_indices.data(), submit_count};
+
+		ubo_update_data_cache_.clear();
+		const auto ubo_total_count = ubo_table_.count();
+
+		if(submit_count){
+			assert(ubo_force_update == std::numeric_limits<unsigned>::max());
+
+			const auto latest_group = indices_span.back();
+			//TODO switch layout policy to make cache friendly?
+			for(unsigned i = 0; i < ubo_total_count; ++i){
+				if(ubo_timeline_mark_[i + (latest_group + 1) * ubo_total_count] < ubo_timeline_mark_[i]){
+					if((ubo_table_.flag_at(i) & user_data_flag::fence_like) != user_data_flag{}){
+						for(unsigned idx = 0; idx < groups_.size(); ++idx){
+							ubo_timeline_mark_[i + (idx + 1) * ubo_total_count] = ubo_timeline_mark_[i];
+						}
+					}else{
+						for(const auto idx : indices_span){
+							ubo_timeline_mark_[i + (idx + 1) * ubo_total_count] = ubo_timeline_mark_[i];
+						}
+					}
+
+
+					ubo_update_data_cache_.push_back(ubo_table_[i]);
 				}
-			} else{
-				std::invoke(fn, cur, groups_[cur]);
+			}
+		}else{
+			assert(ubo_force_update != std::numeric_limits<unsigned>::max());
+
+			ubo_update_data_cache_.push_back(ubo_table_[ubo_force_update]);
+			if((ubo_table_.flag_at(ubo_force_update) & user_data_flag::fence_like) != user_data_flag{}){
+				for(unsigned i = 0; i < groups_.size(); ++i){
+					ubo_timeline_mark_[ubo_force_update + (i + 1) * ubo_total_count] = ubo_timeline_mark_[ubo_force_update];
+				}
+			}else{
+				for(const auto i : indices_span){
+					ubo_timeline_mark_[ubo_force_update + (i + 1) * ubo_total_count] = ubo_timeline_mark_[ubo_force_update];
+				}
 			}
 
-			cur = (cur + 1) % groups_.size();
-		} while(cur != current_idle_group_index_);
+		}
+		//usr update
+		assert(on_submit);
+		std::array<VkSemaphoreSubmitInfo, working_group_count * 3> semaphores{};
+		for(unsigned i = 0; i < submit_count; ++i){
+			const auto& group = groups_[group_indices[i]];
+
+			semaphores[i * 2] = VkSemaphoreSubmitInfo{
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+				.semaphore = group.mesh_semaphore,
+				.value = group.current_signal_index,
+				.stageMask = VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT,
+			};
+
+			semaphores[i * 2 + 1] = VkSemaphoreSubmitInfo{
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+				.semaphore = group.frag_semaphore,
+				.value = group.current_signal_index,
+				.stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			};
+
+			// semaphores[i * 3 + 2] = VkSemaphoreSubmitInfo{
+			// 	.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+			// 	.semaphore = group.attc_semaphore,
+			// 	.value = group.current_signal_index,
+			// 	.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			// };
+		}
+
+		on_submit({
+			.data_entries = user_data_entries{ubo_cache_.data(), std::span{ubo_update_data_cache_.data(), ubo_update_data_cache_.size()}},
+			.group_indices = indices_span,
+			.group_semaphores = std::span{semaphores.data(), submit_count * 2}
+		});
 	}
 
 	[[nodiscard]] unsigned get_pushed_group_count() const noexcept{

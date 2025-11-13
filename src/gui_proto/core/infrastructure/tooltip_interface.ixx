@@ -4,7 +4,6 @@ module;
 
 export module mo_yanxi.gui.infrastructure:tooltip_interface;
 
-import :element;
 import :elem_ptr;
 
 export import mo_yanxi.math.vector2;
@@ -13,6 +12,8 @@ export import align;
 export import mo_yanxi.handle_wrapper;
 
 namespace mo_yanxi::gui::tooltip{
+
+export struct tooltip_manager;
 
 export
 enum struct anchor_type{
@@ -26,7 +27,7 @@ struct align_config{
 	anchor_type follow{};
 	align::pos align{};
 	std::optional<math::vec2> pos{};
-	layout::stated_extent extent{layout::extent_by_external};
+	layout::optional_mastering_extent extent{layout::extent_by_external};
 };
 
 export
@@ -57,6 +58,7 @@ struct create_config{
 
 export
 struct spawner{
+	friend tooltip_manager;
 protected:
 	exclusive_handle_member<elem*> tooltip_handle{};
 
@@ -69,13 +71,13 @@ public:
 	 * @brief
 	 * @return the align reference point in screen space
 	 */
-	[[nodiscard]] virtual align_config tooltip_align_policy() const = 0;
+	[[nodiscard]] virtual align_config tooltip_get_align_config() const = 0;
 
 	[[nodiscard]] virtual bool tooltip_should_maintain(math::vec2 cursorPos) const{
 		return false;
 	}
 
-	[[nodiscard]] virtual bool tooltip_owner_contains(math::vec2 cursorPos) const noexcept = 0;
+	[[nodiscard]] virtual bool tooltip_spawner_contains(math::vec2 cursorPos) const noexcept = 0;
 
 	[[nodiscard]] virtual bool tooltip_should_build(math::vec2 cursorPos) const noexcept = 0;
 
@@ -88,6 +90,7 @@ public:
 	}
 
 	elem_ptr tooltip_setup(){
+		assert(this->tooltip_handle == nullptr);
 		//TODO deal the previous tooltip here?
 		auto ptr = tooltip_build_impl();
 		this->tooltip_handle = ptr.get();
@@ -97,7 +100,10 @@ public:
 	void tooltip_notify_drop(){
 		tooltip_handle = nullptr;
 		tooltip_on_drop_behavior_impl();
+		//TODO Call scene drop
 	}
+
+	void tooltip_drop();
 
 protected:
 	virtual void tooltip_on_drop_behavior_impl(){
@@ -107,6 +113,7 @@ protected:
 
 	[[nodiscard]] virtual elem_ptr tooltip_build_impl() = 0;
 };
+
 
 export
 template<typename T>

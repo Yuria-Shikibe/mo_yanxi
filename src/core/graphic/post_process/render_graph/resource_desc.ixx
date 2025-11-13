@@ -12,11 +12,10 @@ import mo_yanxi.vk;
 import mo_yanxi.graphic.shader_reflect;
 import mo_yanxi.meta_programming;
 import mo_yanxi.utility;
+import mo_yanxi.vk.util;
 import mo_yanxi.referenced_ptr;
 
 import std;
-#define THOROUGH
-#define TRANSIENT
 
 namespace mo_yanxi::graphic::render_graph{
 	export
@@ -117,29 +116,29 @@ namespace mo_yanxi::graphic::render_graph{
 
 		export
 		struct image_requirement{
-			THOROUGH TRANSIENT decoration decr{};
+			decoration decr{};
 
-			THOROUGH std::uint32_t sample_count{};
+			std::uint32_t sample_count{};
 
-			THOROUGH VkFormat format{VK_FORMAT_UNDEFINED};
+			VkFormat format{VK_FORMAT_UNDEFINED};
 
-			THOROUGH VkImageUsageFlags usage{/*No Spec*/};
+			VkImageUsageFlags usage{/*No Spec*/};
 
-			THOROUGH VkImageAspectFlags aspect_flags{/*No Spec*/};
+			VkImageAspectFlags aspect_flags{/*No Spec*/};
 
 			/**
 			 * @brief explicitly specfied expected initial layout of the image
 			 */
-			TRANSIENT VkImageLayout override_layout{VK_IMAGE_LAYOUT_UNDEFINED};
+			VkImageLayout override_layout{VK_IMAGE_LAYOUT_UNDEFINED};
 
 			/**
 			 * @brief explicitly specfied expected final layout of the image
 			 */
-			TRANSIENT VkImageLayout override_output_layout{VK_IMAGE_LAYOUT_UNDEFINED};
+			VkImageLayout override_output_layout{VK_IMAGE_LAYOUT_UNDEFINED};
 
-			THOROUGH unsigned dim{no_req_spec};
-			THOROUGH unsigned mip_levels{no_req_spec};
-			THOROUGH unsigned scaled_times{no_req_spec};
+			unsigned dim{no_req_spec};
+			unsigned mip_levels{no_req_spec};
+			unsigned scaled_times{no_req_spec};
 
 			[[nodiscard]] VkImageUsageFlags get_required_usage() const noexcept{
 				VkImageUsageFlags rst{};
@@ -231,8 +230,8 @@ namespace mo_yanxi::graphic::render_graph{
 
 		export
 		struct buffer_requirement{
-			THOROUGH TRANSIENT VkDeviceSize size;
-			TRANSIENT VkAccessFlagBits2 access{VK_ACCESS_2_NONE};
+			VkDeviceSize size;
+			VkAccessFlagBits2 access{VK_ACCESS_2_NONE};
 
 			void promote(const buffer_requirement& other){
 				size = std::max(size, other.size);

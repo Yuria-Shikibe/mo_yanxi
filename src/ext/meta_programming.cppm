@@ -987,10 +987,4 @@ namespace mo_yanxi{
 		}
 	}();
 
-	constexpr auto t = type_to_index<std::tuple<int, float, double>>::index_of<float>;
-	static_assert(t == 1);
-
-	constexpr bool b = tuple_has_duplicate_types_v<std::tuple<int, float, int>>;
-
-
 }

@@ -161,14 +161,14 @@ namespace mo_yanxi::graphic{
 			float lastAngle{};
 			const float capSize = static_cast<float>(this->size() - 1) * percent;
 
-			auto drawImpl = [&](
+			auto drawImpl = [&] FORCE_INLINE (
 				int index,
 				const node_type prev,
 				const node_type next,
 				const float prevProg,
 				const float nextProg
 
-			) FORCE_INLINE -> float{
+			) -> float {
 				const auto dst = next.pos - prev.pos;
 				const auto scl = math::curve(dst.length(), 0.f, 0.5f) * radius * prev.scale / capSize;
 				const float z2 = -(dst).angle_rad();

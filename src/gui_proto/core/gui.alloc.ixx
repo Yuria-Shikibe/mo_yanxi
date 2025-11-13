@@ -27,7 +27,7 @@ public:
             if (!ptr_) {
                 throw std::bad_alloc();
             }else{
-                bool success = mi_manage_os_memory_ex(ptr_, size, true, false, true, -1, false, &arena_id_);
+                bool success = mi_manage_os_memory_ex(ptr_, size, true, false, true, -1, true, &arena_id_);
                 if (!success){
                     throw std::bad_alloc();
                 }
@@ -135,7 +135,9 @@ public:
     }
 
     ~heap(){
-        if(heap_) mi_heap_destroy(heap_);
+        if(heap_){
+            mi_heap_destroy(heap_);
+        }
     }
 
     heap(const heap& other) = delete;

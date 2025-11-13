@@ -9,6 +9,8 @@
 #include <vk_mem_alloc.h>
 // #include <freetype/freetype.h>
 
+#include <mimalloc.h>
+
 #include "../src/srl/srl.hpp"
 #include "../src/srl/srl.game.hpp"
 //
@@ -895,6 +897,7 @@ void draw_main(){
 	core::glfw::terminate();
 }
 
+
 int main(){
 	using namespace mo_yanxi;
 	using namespace mo_yanxi::game;
@@ -926,6 +929,8 @@ int main(){
 		[[nodiscard]] VertexUBO(math::matrix3 proj, math::matrix3 view) : proj(proj), view(view), reverse((view * proj).inv()){}
 	};
 
+	gui::global::initialize();
+
 	{
 
 #pragma region Shader
@@ -940,12 +945,13 @@ int main(){
 		vk::shader_module hdr_to_sdr{ctx.get_device(), assets::dir::shader_spv / "post_process.hdr_to_sdr.spv", VK_SHADER_STAGE_COMPUTE_BIT};
 		vk::shader_module volume_shader{ctx.get_device(), assets::dir::shader_spv / "post_process.volume_pass.spv", VK_SHADER_STAGE_COMPUTE_BIT};
 		vk::shader_module bloom_merge_shader{ctx.get_device(), assets::dir::shader_spv / "post_process.bloom.merge.spv", VK_SHADER_STAGE_COMPUTE_BIT};
+
+		vk::shader_module ui_blit{ctx.get_device(), assets::dir::shader_spv / "ui.blit.basic.spv", VK_SHADER_STAGE_COMPUTE_BIT};
 #pragma endregion
 
-		mo_yanxi::gui::renderer renderer{ctx, assets::graphic::samplers::texture_sampler, msh};
+		mo_yanxi::gui::renderer renderer{ctx, assets::graphic::samplers::texture_sampler, msh, ui_blit};
 		renderer.resize(ctx.get_extent());
 		// renderer.get_top_viewport().push_scissor({{200, 200, 520, 420}});
-		auto& batch = renderer.batch;
 
 #pragma region VK_RES
 		vk::uniform_buffer general_proj_ubo{ctx.get_allocator(), sizeof(VertexUBO), VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT};
@@ -960,8 +966,14 @@ int main(){
 #pragma region render_graph
 		render_graph::render_graph_manager manager{ctx};
 		auto& res = manager.add_explicit_resource(render_graph::resource_desc::independent_resource{render_graph::resource_desc::independent_image{}});
+		res.dependency = {
+			.src_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			.src_access = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+			.dst_stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+			.dst_access = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT
+		};
 		res.as_image().handle = renderer.get_base();
-		res.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		res.as_image().expected_layout = VK_IMAGE_LAYOUT_GENERAL;
 
 		auto volume_pass = manager.add_stage<render_graph::volume_pass>(render_graph::post_process_meta{volume_shader, {
 			{{0}, render_graph::no_slot, 0},
@@ -1037,7 +1049,7 @@ int main(){
 
 #pragma region ResizeSet
 		core::global::graphic::context.set_staging_image({
-			.image = hdr_to_sdr_pass.pass.at_out(0).as_image().image.image,
+			.image = renderer.get_base().image,
 			.extent = core::global::graphic::context.get_extent(),
 			.clear = false,
 			.owner_queue_family = core::global::graphic::context.compute_family(),
@@ -1057,14 +1069,14 @@ int main(){
 			renderer.resize({event.size.width, event.size.height});
 			gui::global::manager.resize(math::rect_ortho{tags::from_extent, {}, event.size.width, event.size.height}.as<float>());
 			res.as_image().handle = renderer.get_base();
-			res.as_image().expected_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			res.as_image().expected_layout = VK_IMAGE_LAYOUT_GENERAL;
 
 			manager.resize(event.size);
 			manager.reset_pass_resources();
 			manager.create_command();
 			core::global::graphic::context.set_staging_image(
 				{
-					.image = hdr_to_sdr_pass.pass.at_out(0).as_image().image.image,
+					.image = renderer.get_base().image,
 					.extent = core::global::graphic::context.get_extent(),
 					.clear = false,
 					.owner_queue_family = core::global::graphic::context.compute_family(),
@@ -1081,6 +1093,13 @@ int main(){
 			math::vec2 window_extent = math::vector2{core::global::graphic::context.get_extent().width, core::global::graphic::context.get_extent().height}.as<float>();
 			camera.resize_screen(window_extent.x, window_extent.y);
 
+			{
+				auto h = mi_heap_new();
+				mi_heap_destroy(h);
+				// auto arean = gui::mr::make_memory_pool(128);
+				// gui::mr::heap h{mi_arena_new()};
+			}
+			//
 			auto rst = gui::global::manager.add_scene<gui::loose_group>("main", true, renderer.create_frontend());
 			rst.scene.resize({{}, window_extent});
 			test::build_main_ui(rst.scene, rst.root_group);
@@ -1135,6 +1154,7 @@ int main(){
 
 		core::global::timer.reset_time();
 		while(!ctx.window().should_close()){
+			// std::this_thread::sleep_for(std::chrono::milliseconds{400});
 			using namespace draw;
 
 			ctx.window().poll_events();
@@ -1167,12 +1187,9 @@ int main(){
 			wgfx_input.set_context(cursor_world);
 
 			gui::global::manager.draw();
-			renderer.wait_idle();
 
-			// batch.reset();
-			vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {manager.get_main_command_buffer()});
 			ctx.flush();
-
+			vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {manager.get_main_command_buffer()});
 			++count;
 		}
 
@@ -1183,6 +1200,9 @@ int main(){
 
 		ctx.wait_on_device();
 	}
+
+	gui::global::terminate();
+
 	// main_loop();
 
 	test::dispose_content();

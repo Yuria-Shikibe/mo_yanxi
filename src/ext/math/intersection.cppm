@@ -181,7 +181,7 @@ namespace mo_yanxi::math{
 		const fp_t ub = (dx1 * yd - dy1 * xd) / d;
 		if(ub < 0 || ub > 1) return false;
 
-		out.set(x1 + dx1 * ua, y1 + dy1 * ua);
+		(void)out.set(x1 + dx1 * ua, y1 + dy1 * ua);
 		return true;
 	}
 

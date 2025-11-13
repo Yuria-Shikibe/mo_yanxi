@@ -273,23 +273,35 @@ namespace mo_yanxi::vk{
 				return command_buffer;
 			}
 
-			void submit(VkQueue queue, VkPipelineStageFlags2 signal_stage) & noexcept{
-				VkSemaphoreSubmitInfo to_signal{
-						.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-						.semaphore = semaphore,
-						.value = ++counting,
-						.stageMask = signal_stage
-					};
+			[[nodiscard]] VkSemaphoreSubmitInfo get_next_semaphore_submit_info(VkPipelineStageFlags2 signal_stage) noexcept{
+				return VkSemaphoreSubmitInfo{
+					.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+					.semaphore = semaphore,
+					.value = ++counting,
+					.stageMask = signal_stage
+				};
+			}
 
-				const VkCommandBufferSubmitInfo cmd_info{
-						.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-						.commandBuffer = command_buffer,
-					};
+			[[nodiscard]] VkCommandBufferSubmitInfo get_command_submit_info() const noexcept{
+				return VkCommandBufferSubmitInfo{
+					.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+					.commandBuffer = command_buffer,
+				};
+			}
+
+			void submit(
+				VkQueue queue,
+				VkPipelineStageFlags2 signal_stage,
+				std::span<const VkSemaphoreSubmitInfo> waiting_semaphores = {}
+				) & noexcept{
+				const VkSemaphoreSubmitInfo to_signal = get_next_semaphore_submit_info(signal_stage);
+
+				const VkCommandBufferSubmitInfo cmd_info = get_command_submit_info();
 
 				VkSubmitInfo2 submit_info{
 						.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-						.waitSemaphoreInfoCount = 0,
-						.pWaitSemaphoreInfos = nullptr,
+						.waitSemaphoreInfoCount = static_cast<std::uint32_t>(waiting_semaphores.size()),
+						.pWaitSemaphoreInfos = waiting_semaphores.size() == 0 ? nullptr : waiting_semaphores.data(),
 						.commandBufferInfoCount = 1,
 						.pCommandBufferInfos = &cmd_info,
 						.signalSemaphoreInfoCount = 1,
@@ -413,6 +425,14 @@ namespace mo_yanxi::vk{
 
 		[[nodiscard]] container_type::size_type size() const noexcept{
 			return units.size();
+		}
+
+		[[nodiscard]] VkDevice get_device() const noexcept{
+			return device;
+		}
+
+		[[nodiscard]] VkCommandPool get_pool() const noexcept{
+			return pool;
 		}
 	};
 

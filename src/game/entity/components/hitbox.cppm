@@ -197,7 +197,7 @@ namespace mo_yanxi::game{
 	};
 
 	export
-	class ccd_hitbox : protected hitbox_identity{
+	class ccd_hitbox : /*protected*/public hitbox_identity{
 	protected:
 
 		//TODO Should this member move to ccd hitbox?

@@ -15,6 +15,8 @@ import mo_yanxi.gui.alloc;
 //TODO move this to other namespace
 import mo_yanxi.vk.util.uniform;
 
+import mo_yanxi.meta_programming;
+
 import std;
 
 namespace mo_yanxi::gui{
@@ -66,10 +68,10 @@ struct layer_viewport{
 	};
 
 	math::frect viewport{};
-	mr::vector<scissor_raw> scissors{};
+	std::vector<scissor_raw> scissors{};
 
 	math::mat3 transform_to_root_screen{};
-	mr::vector<transform_pair> element_local_transform{};
+	std::vector<transform_pair> element_local_transform{};
 
 	[[nodiscard]] layer_viewport() = default;
 
@@ -128,7 +130,7 @@ struct layer_viewport{
 	}
 };
 
-struct ubo_screen_info{
+struct alignas(16) ubo_screen_info{
 	vk::padded_mat3 screen_to_uniform;
 };
 
@@ -140,7 +142,46 @@ struct alignas(16) ubo_layer_info{
 };
 
 export
-using gui_reserved_user_data_tuple = std::tuple<ubo_screen_info, ubo_layer_info>;
+struct alignas(16) blit_config{
+	math::rect_ortho_trivial<unsigned> blit_region;
+};
+
+
+
+export
+using gui_reserved_user_data_tuple = std::tuple<ubo_screen_info, ubo_layer_info, blit_config>;
+
+export
+using gui_reserved_user_data_tuple_uniform_buffer_used = std::tuple<ubo_screen_info, ubo_layer_info>;
+
+template <typename T, typename TupV>
+consteval std::size_t offset_of() noexcept{
+	union S{
+		T t{};
+		std::byte b[sizeof(T)];
+
+		constexpr S(){}
+
+		constexpr ~S(){
+			t.~T();
+		}
+	};
+
+	S s{};
+
+	const void* p = std::addressof(std::get<tuple_index_v<TupV, T>>(s.t));
+
+	for (std::ptrdiff_t i = 0; i < sizeof(T); ++i){
+		if(s.b + i == p)return i;
+	}
+
+	return static_cast<std::size_t>(std::bit_cast<std::uintptr_t>(nullptr));
+}
+
+export
+template <typename T>
+constexpr inline std::size_t data_offset_of = sizeof(gui_reserved_user_data_tuple) - sizeof(T) - gui::offset_of<gui_reserved_user_data_tuple, T>();
+
 
 template <typename T>
 constexpr inline graphic::draw::instruction::user_data_indices reserved_data_index_of{tuple_index_v<T, gui_reserved_user_data_tuple>, 0};
@@ -186,6 +227,7 @@ public:
 				//TODO support user defined indices
 				static_assert(false, "Unknown builtin type");
 			}else{
+				auto idcs = reserved_data_index_of<Instr>;
 				auto* next = batch_backend_interface_.acquire(instruction::get_instr_size<Instr>());
 				instruction::place_ubo_update_at(next, instr, reserved_data_index_of<Instr>);
 			}
@@ -209,6 +251,10 @@ public:
 
 	void flush() const{
 		batch_backend_interface_.flush();
+	}
+
+	void consume() const{
+		batch_backend_interface_.consume_all();
 	}
 
 	void notify_viewport_changed() const {

@@ -48,6 +48,12 @@ void elem::draw_background() const{
 
 void elem::update(float delta_in_ticks){
 	cursor_states_.update(delta_in_ticks);
+
+
+	if(cursor_states_.focused){
+		//TODO dependent above?
+		get_scene().tooltip_manager_.try_append_tooltip(*this, false);
+	}
 }
 
 void elem::clear_scene_references() noexcept{
@@ -148,5 +154,15 @@ void elem::reset_scene(struct gui::scene* scene) noexcept{
 	for (auto && child : children()){
 		child->reset_scene(scene);
 	}
+}
+
+events::op_afterwards util::thoroughly_esc(elem* where) noexcept{
+	while(where){
+		if(where->on_esc() == events::op_afterwards::intercepted){
+			return events::op_afterwards::intercepted;
+		}
+		where = where->parent();
+	}
+	return events::op_afterwards::fall_through;
 }
 }

@@ -56,7 +56,7 @@ namespace mo_yanxi::game::ecs::chamber{
 	public:
 		using tile_type = tile;
 
-		using grid_type = dim2::grid<tile_type, unsigned, {16u, 16u}>;
+		using grid_type = dim2::grid<tile_type, unsigned, math::usize2{16u, 16u}>;
 
 		void insert(entity_id building){
 			assert(building);
@@ -176,7 +176,7 @@ namespace mo_yanxi::game::ecs::chamber{
 	private:
 		math::frect wrap_bound_{};
 		game::quad_tree<tile_type> quad_tree_{{}};
-		grid_type tiles{};
+		dim2::grid<tile_type, unsigned, math::usize2{16u, 16u}> tiles{};
 
 		void rebuild_tree(){
 			std::destroy_at(&quad_tree_);

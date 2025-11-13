@@ -18,9 +18,9 @@ public:
 
 	[[nodiscard]] mpsc_queue() = default;
 
-	[[nodiscard]] explicit mpsc_queue(const Cont::allocator_type& alloc) noexcept(std::is_nothrow_constructible_v<Cont, const Cont::allocator_type&>) requires requires{
+	[[nodiscard]] explicit mpsc_queue(const typename Cont::allocator_type& alloc) noexcept(std::is_nothrow_constructible_v<Cont, const typename Cont::allocator_type&>) requires requires{
 		typename Cont::allocator_type;
-		requires std::constructible_from<Cont, const Cont::allocator_type&>;
+		requires std::constructible_from<Cont, const typename Cont::allocator_type&>;
 	}
 		: m_queue(alloc){
 	}

@@ -495,13 +495,14 @@ namespace mo_yanxi::game{
 
 			bool apply_grid_op(math::vec2 cursorpos){
 				switch(grid_op_){
-				case operation::move:
+				case operation::move:{
 					auto mov = get_grid_edit_offset(cursorpos);
 					grid.move(mov);
 					mirrow_channel.move(mov);
 					grid_op_ = operation::none;
 
 					return true;
+				}
 				default: return false;
 				}
 			}

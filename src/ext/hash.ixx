@@ -108,7 +108,7 @@ namespace mo_yanxi::algo{
 
 		const auto size = std::ranges::distance(range);
 		static constexpr bool is_pow2 = is_constexpr_range_with_power_of_2_size<Rng&&>();
-		static constexpr auto modder = [](auto index, auto sz) static constexpr noexcept FORCE_INLINE {
+		static constexpr auto modder = [](auto index, auto sz) static constexpr noexcept {
 			if constexpr (is_pow2){
 				return index & (sz - 1);
 			}else{

@@ -35,6 +35,15 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 					c.emplace_head<gui::elem>();
 					c.set_head_size(50);
 					c.create_content([](gui::table& e){
+						e.set_tooltip_state({
+							.layout_info = gui::tooltip::align_meta{
+								.follow = gui::tooltip::anchor_type::owner,
+								.attach_point_spawner = align::pos::top_right,
+								.attach_point_tooltip = align::pos::top_left,
+							},
+						}, [](gui::table& tooltip){
+							tooltip.emplace_back<gui::elem>().cell().set_size({160, 60});
+						});
 						e.set_entire_align(align::pos::top_left);
 						for(int k = 0; k < 5; ++k){
 							e.emplace_back<gui::elem>().cell().set_size({250, 60});

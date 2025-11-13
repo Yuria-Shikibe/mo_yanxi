@@ -1,6 +1,7 @@
 module;
 
 #include <cassert>
+#include <mimalloc.h>
 
 export module mo_yanxi.gui.infrastructure:elem_ptr;
 

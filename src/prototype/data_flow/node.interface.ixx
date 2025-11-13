@@ -122,6 +122,7 @@ export struct node;
  * @param successors 边的目标节点
  * @return 如果会形成环，返回 true, 否则返回 false
  */
+export
 bool is_ring_bridge(const node* self, const node* successors);
 
 struct node : referenced_object{
@@ -588,7 +589,6 @@ bool is_reachable(const node* start_node, const node* target_node, std::unordere
 	return false;
 }
 
-export
 bool is_ring_bridge(const node* self, const node* successors) {
 	if (self == successors) {
 		return true;

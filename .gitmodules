@@ -1,6 +1,6 @@
 [submodule "submodules/VulkanMemoryAllocator"]
 	path = submodules/VulkanMemoryAllocator
-	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+	url = https://github.com/sawickiap/VulkanMemoryAllocator.git
 
 [submodule "submodules/plf_hive"]
 	path = submodules/plf_hive

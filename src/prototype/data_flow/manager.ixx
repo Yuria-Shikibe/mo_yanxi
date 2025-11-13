@@ -73,7 +73,9 @@ public:
 	}
 
 	bool erase_node(node& n, bool disconnect_it) noexcept {
-		if(auto itr = std::ranges::find(nodes_anonymous_, &n, &referenced_ptr<node>::get); itr != nodes_anonymous_.end()){
+		if(auto itr = std::ranges::find(nodes_anonymous_, &n, [](const referenced_ptr<node>& nd){
+			return nd.get();
+		}); itr != nodes_anonymous_.end()){
 			if(disconnect_it){
 				(*itr)->erase_self_from_context();
 			}

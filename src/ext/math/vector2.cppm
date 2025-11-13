@@ -225,25 +225,25 @@ namespace mo_yanxi::math{
 		}
 
 
-		CONST_FN FORCE_INLINE constexpr vector2& set(const T ox, const T oy) noexcept {
+		FORCE_INLINE constexpr vector2& set(const T ox, const T oy) noexcept {
 			this->x = ox;
 			this->y = oy;
 
 			return *this;
 		}
 
-		CONST_FN FORCE_INLINE constexpr vector2& snap_to(const_pass_t snap, const_pass_t offset = {}) noexcept {
+		FORCE_INLINE constexpr vector2& snap_to(const_pass_t snap, const_pass_t offset = {}) noexcept {
 			this->x = math::snap_to(x, snap.x, offset.x);
 			this->y = math::snap_to(y, snap.y, offset.y);
 
 			return *this;
 		}
 
-		CONST_FN FORCE_INLINE constexpr vector2& set(const T val) noexcept {
+		FORCE_INLINE constexpr vector2& set(const T val) noexcept {
 			return this->set(val, val);
 		}
 
-		CONST_FN FORCE_INLINE constexpr vector2& set(const_pass_t tgt) noexcept {
+		FORCE_INLINE constexpr vector2& set(const_pass_t tgt) noexcept {
 			return this->operator=(tgt);
 		}
 
@@ -515,7 +515,7 @@ namespace mo_yanxi::math{
 		}
 
 		template <std::floating_point Fp>
-		CONST_FN FORCE_INLINE constexpr vector2& rotate_rad(const Fp rad) noexcept{
+		FORCE_INLINE constexpr vector2& rotate_rad(const Fp rad) noexcept{
 			const auto [c, s] = math::cos_sin(rad);
 			//  Matrix Multi
 			//  cos rad		-sin rad	x    crx   -sry
@@ -524,7 +524,7 @@ namespace mo_yanxi::math{
 		}
 
 		template <std::floating_point Fp>
-		CONST_FN FORCE_INLINE constexpr vector2& rotate(const Fp cos, const Fp sin) noexcept{
+		FORCE_INLINE constexpr vector2& rotate(const Fp cos, const Fp sin) noexcept{
 			if constexpr(std::floating_point<T>) {
 				return this->set(cos * x - sin * y, sin * x + cos * y);
 			}else {
@@ -1307,7 +1307,7 @@ namespace mo_yanxi::math{
 
 	export
 	template <std::floating_point T = float>
-	constexpr inline optional_vec2<T> nullopt_vec2 = vectors::constant2<T>::SNaN;
+	constexpr inline optional_vec2<T> nullopt_vec2 = optional_vec2<T>{vectors::constant2<T>::SNaN};
 
 }
 

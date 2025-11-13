@@ -15,6 +15,8 @@ import mo_yanxi.refable_tuple;
 import mo_yanxi.math.vector2;
 import mo_yanxi.utility;
 
+import mo_yanxi.meta_programming;
+
 import magic_enum;
 
 import std;
@@ -476,7 +478,7 @@ private:
 	void trigger(pos_binding_target target, math::vec2 pos) override{
 		for (const auto & bind : pos_bindingses_[std::to_underlying(target)]){
 			[&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>){
-				bind.cast_and_exec<ParamTy...>(pos, static_cast<ParamTy>(std::get<Idx>(context_)) ...);
+				bind.template cast_and_exec<ParamTy...>(pos, static_cast<ParamTy>(std::get<Idx>(context_)) ...);
 			}(std::index_sequence_for<ParamTy...>{});
 		}
 	}
@@ -484,7 +486,7 @@ private:
 	void trigger(bool inbounded, math::vec2 pos) override{
 		for (const auto & bind : inbounds_){
 			[&, this]<std::size_t ...Idx>(std::index_sequence<Idx...>){
-				bind.cast_and_exec<ParamTy...>(inbounded, pos, static_cast<ParamTy>(std::get<Idx>(context_)) ...);
+				bind.template cast_and_exec<ParamTy...>(inbounded, pos, static_cast<ParamTy>(std::get<Idx>(context_)) ...);
 			}(std::index_sequence_for<ParamTy...>{});
 		}
 	}

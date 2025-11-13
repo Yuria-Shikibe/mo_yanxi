@@ -14,17 +14,13 @@ end
 
 add_requires("glfw")
 add_requires("spirv-cross")
-if is_mode("debug") then
-    add_requireconfs("spirv-cross", {configs = {runtimes = "MDd", debug = true}})
-else
-    add_requireconfs("spirv-cross", {configs = {runtimes = "MD", debug = false}})
-end
+
 
 add_requires("msdfgen", {
     configs = {
         openmp = true,
-        extensions = true ,
---         toolchains = "clang-cl"
+        extensions = true,
+        --toolchains = "clang-cl",
     }
  })
 add_requires("freetype")
@@ -32,10 +28,15 @@ add_requires("nanosvg")
 add_requires("mimalloc v2.2.4")
 add_requires("protobuf-cpp", {
     configs = {
---         toolchains = "clang-cl",
         zlib = true,
+        --toolchains = "clang-cl",
     }
 })
+if is_mode("debug") then
+    add_requireconfs("spirv-cross", {configs = {runtimes = "MDd", debug = true}})
+else
+    add_requireconfs("spirv-cross", {configs = {runtimes = "MD", debug = false}})
+end
 
 target("protobuf_gen")
     set_kind("static")
@@ -51,6 +52,8 @@ target("mo_yanxi")
     set_languages("c++latest")
     set_policy("build.c++.modules", true)
 
+    --add_cxflags("-stdlib=platform")
+
     if is_mode("debug") then
         add_cxflags("/RTCsu")
         add_defines("DEBUG_CHECK=1")
@@ -63,18 +66,16 @@ target("mo_yanxi")
     end
 
     add_deps("protobuf_gen")
-    --add_deps("magic_enum")
 
     add_defines("_MSVC_STL_HARDENING=1")
     add_defines("_MSVC_STL_DESTRUCTOR_TOMBSTONES=1")
+    add_defines("_CRT_SECURE_NO_WARNINGS")
     add_defines("MAGIC_ENUM_USE_STD_MODULE")
 
 
     set_warnings("all")
     set_warnings("pedantic")
---     add_vectorexts("avx", "avx2", "avx512")
-    add_vectorexts("avx", "avx2"--[[ , "avx512" ]])
---     add_vectorexts("sse", "sse2", "sse3", "ssse3", "sse4.2")
+    add_vectorexts("avx", "avx2"--[[, "avx512" ]])
 
     add_cxflags("/diagnostics:column")
     add_cxflags("/FC")

@@ -4,6 +4,8 @@ module;
 
 module mo_yanxi.gui.infrastructure;
 
+import mo_yanxi.core.global.graphic;
+
 namespace mo_yanxi::gui{
 scene::scene(scene&& other) noexcept: scene_base{std::move(other)}{
 	root().reset_scene(this);
@@ -19,15 +21,59 @@ scene& scene::operator=(scene&& other) noexcept{
 }
 
 void scene::update(float delta_in_tick){
+	tooltip_manager_.update(delta_in_tick, get_cursor_pos(), is_mouse_pressed());
+
 	if(request_cursor_update_){
-		on_cursor_pos_update();
+		update_cursor();
 	}
 	root().update(delta_in_tick);
 }
 
 void scene::draw(rect clip){
-	gui::viewport_guard _{renderer(), region_};
-	root_->draw(clip);
+	{
+		gui::viewport_guard _{renderer(), region_};
+		const auto root_bound = region_.round<int>().max_src({});
+
+		/*if(dialog_manager.empty())*/{
+			// for (auto&& elem : tooltip_manager_.get_draw_sequence()){
+			// 	if(elem.belowScene){
+			// 		elem.element->try_draw(region_);
+			// 		const auto bound = elem.element->bound_abs().round<int>().intersection_with(root_bound).as<unsigned>();
+			// 		renderer().push(ubo_blit_info{
+			// 			.blit_region = {bound.src, bound.extent()}
+			// 		});
+			// 		renderer().consume();
+			// 	}
+			// }
+			root_->draw(clip);
+			renderer().push(blit_config{
+				.blit_region = {root_bound.src.as<unsigned>(), root_bound.extent().as<unsigned>()}
+			});
+
+			// for (const auto & independent_draw : independent_draw_){
+			// 	independent_draw.elem->draw_independent();
+			// }
+
+			// renderer.batch->consume_all();
+			//renderer.batch.blit_viewport(get_region());
+
+		}/*else{
+			dialog_manager.draw_all(clipSpace);
+		}*/
+
+		for (auto&& elem : tooltip_manager_.get_draw_sequence()){
+			if(!elem.belowScene){
+				elem.element->try_draw(clip);
+				const auto bound = elem.element->bound_abs().round<int>().intersection_with(root_bound).as<unsigned>();
+				renderer().push(blit_config{
+					.blit_region = {bound.src, bound.extent()}
+				});
+
+			}
+		}
+	}
+	renderer().consume();
+
 }
 
 void scene::input_key(const input_handle::key_set key){
@@ -36,9 +82,9 @@ void scene::input_key(const input_handle::key_set key){
 	if(key.action == input_handle::act::press && key.key_code == std::to_underlying(input_handle::key::esc)){
 		//TODO onEsc
 
-		// if(on_esc() == esc_flag::fall_through){
-		// 	on_cursor_pos_update(get_cursor_pos(), true);
-		// }
+		if(on_esc() == events::op_afterwards::fall_through){
+			update_cursor();
+		}
 	}else{
 		elem* focus = focus_key_;
 
@@ -85,37 +131,35 @@ void scene::on_scroll(const math::vec2 scroll) const{
 	}
 }
 
-void scene::on_cursor_pos_update(){
+void scene::update_cursor(){
 	request_cursor_update_ = false;
 	mr::heap_vector<elem*> inbounds{get_heap_allocator()};
 
 	//TODO tooltip & dialog window
-	// for (auto && activeTooltip : tooltip_manager.get_active_tooltips() | std::views::reverse){
-	// 	if(tooltip_manager.is_below_scene(activeTooltip.element.get()))continue;
-	// 	inbounds = activeTooltip.element->dfs_find_deepest_element(cursor_pos);
-	// 	if(!inbounds.empty())goto upt;
-	// }
-
-	// if(auto dialog = dialog_manager.top()){
-	// 	if(inbounds.empty()){
-	// 		inbounds = dialog->dfs_find_deepest_element(cursor_pos);
-	// 	}
-	// }else{
-	// 	if(inbounds.empty()){
-	// 		inbounds = root->dfs_find_deepest_element(cursor_pos);
-	// 	}
-	//
-	// 	if(inbounds.empty()){
-	// 		for (auto && activeTooltip : tooltip_manager.get_active_tooltips() | std::views::reverse){
-	// 			if(!tooltip_manager.is_below_scene(activeTooltip.element.get()))continue;
-	// 			inbounds = activeTooltip.element->dfs_find_deepest_element(cursor_pos);
-	// 			if(!inbounds.empty())goto upt;
-	// 		}
-	// 	}
-	// }
-	if(inbounds.empty()){
-		inbounds = util::dfs_find_deepest_element(&root(), get_cursor_pos(), get_heap_allocator<elem*>());
+	for (auto && activeTooltip : tooltip_manager_.get_active_tooltips() | std::views::reverse){
+		if(tooltip_manager_.is_below_scene(activeTooltip.element.get()))continue;
+		inbounds = util::dfs_find_deepest_element(activeTooltip.element.get(), get_cursor_pos(), get_heap_allocator<elem*>());
+		if(!inbounds.empty())goto upt;
 	}
+
+	/*if(auto dialog = dialog_manager.top()){
+		if(inbounds.empty()){
+			inbounds = dialog->dfs_find_deepest_element(cursor_pos);
+		}
+	}else*/{
+		if(inbounds.empty()){
+			inbounds = util::dfs_find_deepest_element(&root(), get_cursor_pos(), get_heap_allocator<elem*>());
+		}
+
+		if(inbounds.empty()){
+			for (auto && activeTooltip : tooltip_manager_.get_active_tooltips() | std::views::reverse){
+				if(!tooltip_manager_.is_below_scene(activeTooltip.element.get()))continue;
+				inbounds = util::dfs_find_deepest_element(activeTooltip.element.get(), get_cursor_pos(), get_heap_allocator<elem*>());
+				if(!inbounds.empty())goto upt;
+			}
+		}
+	}
+
 
 	upt:
 
@@ -134,6 +178,15 @@ void scene::on_cursor_pos_update(){
 	 }
 
 	 focus_cursor_->on_cursor_moved(events::cursor_move{.src = inputs_.last_cursor_pos(), .dst = inputs_.cursor_pos()});
+}
+
+events::op_afterwards scene::on_esc(){
+	if(tooltip_manager_.on_esc() != events::op_afterwards::fall_through)return events::op_afterwards::intercepted;
+
+	elem* focus = focus_key_;
+	if(!focus) focus = focus_cursor_;
+
+	return util::thoroughly_esc(focus);
 }
 
 void scene::resize(const math::frect region){
@@ -216,7 +269,7 @@ void scene::update_mouse_state(const input_handle::key_set k){
 	}
 
 	if(focus_cursor_ && focus_cursor_->is_focus_extended_by_mouse()){
-		on_cursor_pos_update();
+		update_cursor();
 	}
 }
 

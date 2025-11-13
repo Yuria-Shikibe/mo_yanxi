@@ -47,7 +47,6 @@ export struct shockwave{
 
 template <typename T>
 	requires requires(T t){
-		requires std::is_pointer_interconvertible_with_class(&T::generic);
 		{ t.generic } -> std::same_as<volume_generic&>;
 	}
 [[nodiscard]] FORCE_INLINE constexpr bool check_is_expired(const T& instr, float current_time) noexcept {

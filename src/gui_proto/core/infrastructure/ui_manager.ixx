@@ -8,6 +8,7 @@ import mo_yanxi.heterogeneous;
 import mo_yanxi.gui.alloc;
 import :scene;
 
+
 namespace mo_yanxi::gui{
 
 namespace scene_names{
@@ -23,11 +24,12 @@ struct scene_add_result{
 
 export
 struct ui_manager{
+
 	[[nodiscard]]  ui_manager() : ui_manager(128){
 
 	}
 
-	[[nodiscard]] explicit ui_manager(const std::size_t PoolSize_MB) : pool_(mr::make_memory_pool(PoolSize_MB)){
+	[[nodiscard]] explicit ui_manager(const std::size_t PoolSize_MB) : pool_(PoolSize_MB > 0 ? mr::make_memory_pool(PoolSize_MB) : mr::raw_memory_pool{}){
 
 	}
 
@@ -41,6 +43,7 @@ private:
 	scene* focus{};
 
 public:
+
 	scene* switch_scene_to(std::string_view name) noexcept{
 		if(auto scene = scenes.try_find(name)){
 			return std::exchange(focus, scene);
@@ -63,6 +66,9 @@ private:
 		return itr.first->second;
 	}
 public:
+	[[nodiscard]] mr::raw_memory_pool& get_pool() noexcept{
+		return pool_;
+	}
 
 	template <std::derived_from<elem> T, typename... Args>
 		requires (std::constructible_from<T, scene&, elem*, Args&&...>)

@@ -261,7 +261,9 @@ namespace mo_yanxi::ui{
 
 	protected:
 		decltype(children)::iterator find(elem* elem) noexcept{
-			return std::ranges::find(children, elem, &elem_ptr::get);
+			return std::ranges::find(children, elem, [](const elem_ptr& elem_ptr){
+				return elem_ptr.get();
+			});
 		}
 	};
 

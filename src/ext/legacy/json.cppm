@@ -1,3 +1,4 @@
+/*
 module;
 
 #include <cassert>
@@ -31,7 +32,7 @@ namespace mo_yanxi::json{
 	export namespace keys{
 		/**
 		 * @brief Indeicate this json info refer to a Polymorphic Class
-		 */
+		 #1#
 		constexpr std::string_view Typename = "$ty"; //type
 		constexpr std::string_view Tag = "$tag";       //tag
 		constexpr std::string_view ID = "$id";        //id
@@ -909,3 +910,4 @@ module : private;
 mo_yanxi::json::json_value::json_value(parse_string_t, const std::string_view json_str){
 	this->operator=(parse(json_str));
 }
+*/

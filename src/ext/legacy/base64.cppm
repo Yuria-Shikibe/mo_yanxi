@@ -77,7 +77,7 @@ export namespace mo_yanxi::encode{
 		cont.push_back(std::uint8_t{});
 	}
 	[[nodiscard]] constexpr RetContainer decode(Range&& toDecode){
-		if(std::ranges::size(toDecode) & 0x03 != 0){
+		if((std::ranges::size(toDecode) & 0x03) != 0){
 			throw bad_code{"Decode Failed"};
 		}
 

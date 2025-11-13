@@ -223,8 +223,19 @@ template <typename Fn, typename Tup>
 using apply_result_t = typename apply_result<Fn, Tup>::type;
 
 template <typename Fn, typename TupLike>
+void helper(TupLike&& tupLike){
+	[&]<std::size_t ... Idx>(std::index_sequence<Idx...>){
+		Fn::operator()(std::get<Idx>(std::forward<TupLike>(tupLike))...);
+	}(std::make_index_sequence<std::tuple_size_v<TupLike>>{});
+}
+
+template <typename Fn, typename TupLike>
 constexpr bool is_static_appliable_v = requires(TupLike&& tupLike){
+#ifdef __clang__
+	helper<Fn>(std::forward<TupLike>(tupLike));
+#else
 	std::apply(Fn::operator(), std::forward<TupLike>(tupLike));
+#endif
 };
 
 template <typename T>

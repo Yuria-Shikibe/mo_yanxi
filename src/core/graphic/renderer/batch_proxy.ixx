@@ -6,6 +6,7 @@ module;
 export module mo_yanxi.graphic.batch_proxy;
 
 export import mo_yanxi.vk.batch;
+export import mo_yanxi.vk.util;
 export import mo_yanxi.vk;
 
 import mo_yanxi.heterogeneous.open_addr_hash;

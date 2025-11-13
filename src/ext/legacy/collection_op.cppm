@@ -7,7 +7,7 @@ export module ext.collection_operation;
 import std;
 
 export namespace mo_yanxi::algo{
-	enum struct merge_policy : int{
+	enum struct merge_policy : unsigned{
 		replace   = 0,
 		join      = 0b0000'0001,
 		overlaped = 0b0000'0010,

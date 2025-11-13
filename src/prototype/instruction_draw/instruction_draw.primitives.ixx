@@ -141,6 +141,15 @@ export struct line_node{
 	//TODO uv?
 };
 
+template <typename ...Args>
+struct frist_of_pack;
+
+template <typename T, typename ...Args>
+struct frist_of_pack<T, Args...> : std::type_identity<T>{};
+
+template <typename ...Args>
+using frist_of_pack_t = frist_of_pack<Args...>::type;
+
 export struct line_segments{
 	primitive_generic generic;
 
@@ -163,7 +172,7 @@ export struct line_segments{
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
 		const Args&... args
 	) noexcept{
-		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<Args..., line_node>){
+		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<frist_of_pack_t<Args...>, line_node>){
 			return line_segments::get_vertex_count(std::ranges::size(args...));
 		}else{
 			return line_segments::get_vertex_count(sizeof...(Args));
@@ -175,7 +184,7 @@ export struct line_segments{
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count(
 		const Args&... args
 	) noexcept{
-		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<Args..., line_node>){
+		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<frist_of_pack_t<Args...>, line_node>){
 			return line_segments::get_primitive_count(std::ranges::size(args...));
 		}else{
 			return line_segments::get_primitive_count(sizeof...(Args));
@@ -201,7 +210,7 @@ export struct line_segments_closed : line_segments{
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_vertex_count(
 		const Args&... args
 	) noexcept{
-		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<Args..., line_node>){
+		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<frist_of_pack_t<Args...>, line_node>){
 			return line_segments::get_vertex_count(std::ranges::size(args...));
 		}else{
 			return line_segments::get_vertex_count(sizeof...(Args));
@@ -212,7 +221,7 @@ export struct line_segments_closed : line_segments{
 	[[nodiscard]] FORCE_INLINE CONST_FN static constexpr std::uint32_t get_primitive_count(
 		const Args&... args
 	) noexcept{
-		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<Args..., line_node>){
+		if constexpr (sizeof...(Args) == 1 && contiguous_range_of<frist_of_pack_t<Args...>, line_node>){
 			return line_segments::get_primitive_count(std::ranges::size(args...));
 		}else{
 			return line_segments::get_primitive_count(sizeof...(Args));

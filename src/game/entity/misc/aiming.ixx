@@ -289,7 +289,7 @@ namespace mo_yanxi::game{
 				return false;
 			}
 
-			local_pos_ = self_transform.apply_inv_to(target_local_offset | entity->*&ecs::mech_motion::trans);
+			local_pos_ = self_transform.apply_inv_to(target_local_offset | entity->at<ecs::mech_motion>().trans);
 			return true;
 		}
 	};
