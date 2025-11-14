@@ -396,15 +396,21 @@ protected:
 
 public:
 
-	[[nodiscard]] std::optional<layout::layout_policy> search_parent_layout_policy(bool allowNone) const noexcept{
-		auto ptr = parent();
-		while(ptr != nullptr){
+	[[nodiscard]] static std::optional<layout::layout_policy> search_layout_policy(const elem* from, bool allowNone) noexcept{
+		auto ptr = from;
+		while(true){
+			if(!ptr){
+				return std::nullopt;
+			}
 			if(auto p = ptr->search_layout_policy_getter_impl()){
 				if(allowNone || p.value() != layout::layout_policy::none)return p;
 			}
 			ptr = ptr->parent();
 		}
-		return std::nullopt;
+	}
+
+	[[nodiscard]] std::optional<layout::layout_policy> search_parent_layout_policy(bool allowNone) const noexcept{
+		return search_layout_policy(parent(), allowNone);
 	}
 
 protected:

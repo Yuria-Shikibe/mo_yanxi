@@ -2,188 +2,220 @@
 // Created by Matrix on 2025/6/1.
 //
 
-export module mo_yanxi.ui.menu;
+export module mo_yanxi.gui.elem.menu;
 
-import mo_yanxi.ui.elem.list;
-import mo_yanxi.ui.elem.table;
-import mo_yanxi.ui.elem.scroll_pane;
-import mo_yanxi.ui.elem.button;
+import mo_yanxi.gui.elem.sequence;
+import mo_yanxi.gui.elem.scroll_pane;
+import mo_yanxi.gui.elem.two_segment_elem;
 import std;
 
-namespace mo_yanxi::ui{
+namespace mo_yanxi::gui{
+//the menu's layout is completely same as the sequence
 
-	export
-	template <typename B, typename E>
-	struct menu_elem_create_handle{
-		create_handle<B, list::cell_type> button;
-		E& elem;
-	};
 
-	export
-	struct menu : list{
-	private:
-		static constexpr std::size_t content_index = 1;
-		static constexpr align::padding1d<float> button_group_pad = {4, 4};
-
-		static constexpr unsigned no_switched = std::numeric_limits<unsigned>::max();
-		unsigned last_index_{no_switched};
-		scroll_pane* button_menu_pane{};
-		std::vector<elem_ptr> sub_elements{};
-
-		template <std::derived_from<elem> T>
-		struct button_of : T{
-		private:
-			using base = T;
-
-			menu& get_menu() const noexcept{
-				// self -> parent(list) -> parent(scroll_pane) -> parent(menu)
-				return static_cast<menu&>(*this->get_parent()->get_parent()->get_parent());
-			}
-
-			input_event::click_result on_click(const input_event::click click_event) override{
-				if(click_event.code.matches(core::ctrl::lmb_click)){
-					menu& menu = get_menu();
-					auto idx = menu.get_index_of(this);
-					if(menu.last_index_ == idx){
-						get_menu().reset_switch();
-					}else{
-						get_menu().call_switch(idx);
-					}
-
-				}
-
-				return base::on_click(click_event);
-			}
-
-			void update(float delta_in_ticks) override{
-				base::update(delta_in_ticks);
-
-				menu& menu = get_menu();
-				auto idx = menu.get_index_of(this);
-				this->elem::activated = menu.last_index_ == idx;
-			}
-
-		public:
-			template <typename ...Args>
-			[[nodiscard]] button_of(scene* scene, group* group, Args&& ...args)
-				: base(scene, group, std::forward<Args>(args) ...){
-				this->interactivity = interactivity::enabled;
-
-			}
+template <typename HeadTy = gui::elem, typename BodyTy = gui::elem>
+struct menu_create_result{
+	create_handle<HeadTy, sequence::cell_type> head;
+	BodyTy& body;
+};
 
 
 
-		};
+export
+struct menu : two_segment_elem{
+private:
+	layout::expand_policy expand_policy_{};
 
-		unsigned get_index_of(const elem* elem) const noexcept{
-			const auto& t = get_button_group();
-			const auto rng = t.get_children();
-			const auto itr = std::ranges::find(rng, elem, &elem_ptr::get);
-			if(itr != rng.end()){
-				const auto idx = std::ranges::distance(rng.begin(), itr);
-				return idx;
-			}
+	/**
+	 * @brief Current Entry Index, or the index of the end of the entries when use default element.
+	 */
+	std::size_t current_showing_{};
+	mr::heap_vector<elem_ptr> entries{get_scene().get_heap_allocator()};
 
-			return no_switched;
-		}
-
-		void call_switch(const unsigned idx){
-			if(last_index_ != no_switched){
-				auto element_at_last_index = exchange_element(content_index, std::move(sub_elements[idx]), true);
-				sub_elements[idx] = std::exchange(sub_elements[last_index_], std::move(element_at_last_index));
-			}else{
-				sub_elements[idx] = exchange_element(content_index, std::move(sub_elements[idx]), true);
-			}
-			last_index_ = idx;
-		}
-
-		void reset_switch(){
-			if(last_index_ != no_switched){
-				sub_elements[last_index_] = exchange_element(content_index, std::move(sub_elements[last_index_]), true);
-				last_index_ = no_switched;
-			}
-		}
-
-	public:
-		[[nodiscard]] table& get_default_elem() const noexcept{
-			if(last_index_ != no_switched){
-				return static_cast<table&>(*sub_elements[last_index_]);
-			}else{
-				return static_cast<table&>(*get_children()[content_index]);
-			}
-		}
-
-		[[nodiscard]] list& get_button_group() const noexcept{
-			return button_menu_pane->get_item<list>();
-		}
-
-		[[nodiscard]] scroll_pane& get_button_group_pane() const noexcept{
-			return *button_menu_pane;
-		}
-
-		[[nodiscard]] menu(scene* scene, group* group)
-			: list(scene, group){
-
-			//TODO implement vertical layout
-
-			auto pane = list::emplace<scroll_pane>();
-			pane.cell().pad.set(8);
-
-
-			button_menu_pane = std::to_address(pane);
-			button_menu_pane->set_layout_policy(layout_policy::vert_major);
-			button_menu_pane->set_style();
-			button_menu_pane->function_init([](list& lst){
-				lst.set_layout_policy(layout_policy::vert_major);
-				lst.template_cell.set_external();
-				lst.set_style();
+	void init(elem_ptr&& default_content){
+		interactivity = interactivity_flag::children_only;
+		create_head([](scroll_pane& scroll_pane){
+			scroll_pane.create([](sequence& sequence){
+				sequence.interactivity = interactivity_flag::children_only;
+				sequence.set_style();
+				sequence.set_expand_policy(layout::expand_policy::prefer);
 			});
+		}, layout::transpose_layout(layout_policy_));
+		items[1] = std::move(default_content);
+	}
 
-			pane.cell().set_size(80);
+	[[nodiscard]] sequence& get_button_sequence() const{
+		return elem_cast<sequence, true>(elem_cast<scroll_pane, true>(*items[0]).get_item());
+	}
 
-			//Default element
-			list::emplace<ui::table>();
+public:
+	template <typename... Args>
+		requires (std::constructible_from<elem_ptr, scene&, elem*, Args&&...>)
+	[[nodiscard]] menu(
+		scene& scene, elem* parent,
+		layout::layout_policy layout_policy,
+		Args&&... args
+	)
+	: two_segment_elem(scene, parent, layout_policy){
+		init(elem_ptr{scene, this, std::forward<Args>(args)...});
+	}
+
+	[[nodiscard]] menu(scene& scene, elem* parent)
+	: menu(scene, parent, layout::layout_policy::hori_major, std::in_place_type<elem>){
+	}
+
+	auto& get_head_template_cell() const noexcept{
+		return get_button_sequence().template_cell;
+	}
+
+	menu_create_result<elem, elem> insert(std::size_t index, elem_ptr&& head, elem_ptr&& body){
+		index = std::min(index, entries.size());
+		if(current_showing_ <= index){
+			++current_showing_;
 		}
+		auto hdl = get_button_sequence().insert_and_get(index, std::move(head));
+		auto& body_ref = *body;
+		entries.insert(entries.begin() + index, std::move(body));
+		return {std::move(hdl), body_ref};
+	}
 
-		auto emplace() = delete;
-		auto function_init() = delete;
-		auto create() = delete;
+	template <elem_init_func HeadInit, elem_init_func BodyInit>
+	menu_create_result<elem_init_func_create_t<HeadInit>, elem_init_func_create_t<BodyInit>>
+		create(std::size_t index, HeadInit&& head, BodyInit&& body){
+		auto rst = insert(index,
+			elem_ptr{get_scene(), this, std::forward<HeadInit>(head)},
+			elem_ptr{get_scene(), this, std::forward<BodyInit>(body)}
+		);
 
-		void set_button_group_height(const float height){
-			cells[0].cell.set_size(height);
+		return {
+			rst.head.cast_to<elem_init_func_create_t<HeadInit>>(),
+			elem_cast<elem_init_func_create_t<BodyInit>, true>(rst.body)
+		};
+	}
+
+	template <elem_init_func HeadInit, elem_init_func BodyInit>
+	menu_create_result<elem_init_func_create_t<HeadInit>, elem_init_func_create_t<BodyInit>>
+	create_back(HeadInit&& head, BodyInit&& body){
+		return this->create(entries.size(),
+			std::forward<HeadInit>(head), std::forward<BodyInit>(body)
+		);
+	}
+
+	void set_expand_policy(layout::expand_policy policy){
+		if(util::try_modify(expand_policy_, policy)){
 			notify_isolated_layout_changed();
-			// notify_layout_changed(spread_direction::all_visible);
-		}
 
-		template <typename B, typename E>
-		menu_elem_create_handle<button_of<B>, E> add_elem(){
-			auto& g = get_button_group();
-			if(g.has_children()){
-				g.get_last_cell().pad = button_group_pad;
+			if(expand_policy_ == layout::expand_policy::passive){
+				layout_state.inherent_accept_mask -= propagate_mask::child;
+				layout_state.intercept_lower_to_isolated = true;
+			} else{
+				layout_state.inherent_accept_mask |= propagate_mask::child;
+				layout_state.intercept_lower_to_isolated = false;
 			}
-
-			auto b = get_button_group().emplace<button_of<B>>();
-			auto& e = sub_elements.emplace_back(elem_ptr{get_scene(), this, std::in_place_type<E>});
-			return menu_elem_create_handle<button_of<B>, E>{std::move(b), static_cast<E&>(*e)};
 		}
+	}
 
-		void erase_elem(std::size_t index) noexcept{
-			if(index >= sub_elements.size())return;
-			if(last_index_ == index){
-				reset_switch();
+	[[nodiscard]] layout::expand_policy get_expand_policy() const noexcept{
+		return expand_policy_;
+	}
+
+	void set_layout_policy(const layout::layout_policy layout_policy){
+		//TODO ban none
+		if(util::try_modify(layout_policy_, layout_policy)){
+			notify_isolated_layout_changed();
+			auto trsp = layout::transpose_layout(layout_policy);
+			elem_cast<scroll_pane, true>(*items[0]).set_layout_policy(trsp);
+			get_button_sequence().set_layout_policy(trsp);
+		}
+	}
+
+	void layout_elem() override{
+		elem::layout_elem();
+		layout_children(expand_policy_);
+
+		for(auto& item : items){
+			item->try_layout();
+		}
+	}
+
+	void switch_to(std::size_t index){
+		if(index == current_showing_)return;
+		if(index > entries.size()){
+			throw std::out_of_range{"index out of range"};
+		}
+		if(index == entries.size()){
+			std::swap(entries[current_showing_], items[1]);
+		}else{
+			if(current_showing_ == entries.size()){
+				std::swap(entries[index], items[1]);
+			}else{
+				std::swap(entries[current_showing_], items[1]);
+				std::swap(items[1], entries[index]);
 			}
-
-			sub_elements.erase(sub_elements.begin() + index);
 		}
 
-	private:
-		elem_ptr exchange_element(const std::size_t where, elem_ptr&& elem, bool isolated_notify) override{
-			return universal_group::exchange_element(where, std::move(elem), isolated_notify);
-		}
-	};
+		notify_layout_changed(propagate_mask::lower);
+		notify_isolated_layout_changed();
+		current_showing_ = index;
+	}
 
-	// void foo(){
-	// 	menu menu{nullptr, nullptr};
-	// 	menu.function_init();
-	// }
+	events::op_afterwards on_click(const events::click event, std::span<elem* const> aboves) override{
+		if(aboves.size() < 3)return events::op_afterwards::fall_through;
+		//this -> scroll[0] -> sequence[1] -> actual button[2]
+		auto* elem = aboves[2];
+		auto& seq = get_button_sequence();
+		auto idx = seq.find_index(elem);
+		if(idx == seq.children().size())return events::op_afterwards::fall_through;
+
+		if(event.key.on_release()){
+			if(idx == current_showing_){
+				switch_to(entries.size());
+			}else{
+				switch_to(idx);
+			}
+		}
+
+		return events::op_afterwards::intercepted;
+	}
+
+protected:
+	std::optional<math::vec2> pre_acquire_size_impl(layout::optional_mastering_extent extent) override{
+		switch(layout_policy_){
+		case layout::layout_policy::hori_major :{
+			if(extent.width_pending()) return std::nullopt;
+			break;
+		}
+		case layout::layout_policy::vert_major :{
+			if(extent.height_pending()) return std::nullopt;
+			break;
+		}
+		case layout::layout_policy::none :{
+			if(extent.fully_mastering()) return extent.potential_extent();
+			return std::nullopt;
+		}
+		default : std::unreachable();
+		}
+
+		auto potential = extent.potential_extent();
+		const auto dep = extent.get_pending();
+
+		auto [majorTargetDep, minorTargetDep] = layout::get_vec_ptr<bool>(layout_policy_);
+
+		if(dep.*minorTargetDep){
+			auto [majorTarget, minorTarget] = layout::get_vec_ptr(layout_policy_);
+
+			if(expand_policy_ == layout::expand_policy::passive){
+				potential.*minorTarget = this->content_extent().*minorTarget;
+			} else{
+				potential.*minorTarget = get_layout_minor_dim_config(potential.*majorTarget).masterings;
+			}
+		}
+
+		if(auto pref = get_prefer_content_extent(); pref && expand_policy_ == layout::expand_policy::prefer){
+			potential.max(pref.value());
+		}
+
+		return potential;
+	}
+};
 }

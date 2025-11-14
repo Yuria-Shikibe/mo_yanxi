@@ -1,38 +1,7 @@
 module mo_yanxi.gui.elem.collapser;
 
 namespace mo_yanxi::gui{
-void collapser::update_item_size(bool isContent) const{
-	const auto size = item_size[isContent];
-	const auto [major, minor] = layout::get_vec_ptr(layout_policy_);
 
-	if(!layout::is_size_pending(size)){
-		auto sz = content_extent();
-		sz.*minor = size;
-		items[isContent]->resize(sz, propagate_mask::lower);
-		items[isContent]->restriction_extent = sz;
-	} else{
-		auto csize = content_extent();
-		layout::optional_mastering_extent extent{csize};
-		extent.set_minor_pending(layout_policy_);
-		auto finalsize = items[isContent]->pre_acquire_size(extent).value();
-		finalsize.*major = csize.*major;
-		items[isContent]->restriction_extent = extent;
-		items[isContent]->resize(finalsize, propagate_mask::lower);
-	}
-}
-
-bool collapser::update_abs_src(math::vec2 parent_content_src) noexcept{
-	if(elem::update_abs_src(parent_content_src)){
-		auto [_, minor] = layout::get_vec_ptr(layout_policy_);
-		auto src = content_src_pos_abs();
-		items[0]->update_abs_src(src);
-		auto sz = items[0]->extent();
-		src.*minor += pad_ + sz.*minor;
-		items[1]->update_abs_src(src);
-		return true;
-	}
-	return false;
-}
 
 void collapser::update_collapse(float delta) noexcept{
 	const bool enterable = expandable();
@@ -63,10 +32,15 @@ void collapser::update_collapse(float delta) noexcept{
 		if(expand_reload_ >= 1){
 			expand_reload_ = 0.f;
 			state_ = collapser_state::expanded;
-			if(update_opacity_during_expand_)content().update_opacity(get_draw_opacity());
+			if(update_opacity_during_expand_)body().update_opacity(get_draw_opacity());
 		}else if(update_opacity_during_expand_){
-			content().update_opacity(get_interped_progress() * get_draw_opacity());
+			body().update_opacity(get_interped_progress() * get_draw_opacity());
 		}
+
+		if(transpose_head_and_body_){
+			set_children_src();
+		}
+
 		break;
 	}
 	case collapser_state::expanded:{
@@ -78,7 +52,7 @@ void collapser::update_collapse(float delta) noexcept{
 				if(std::isinf(settings.expand_speed)){
 					state_ = collapser_state::un_expand;
 				}else{
-					state_ = collapser_state::exit_expanding;
+					state_ = collapser_state::exiting_expand;
 				}
 			}
 		}else{
@@ -86,42 +60,51 @@ void collapser::update_collapse(float delta) noexcept{
 		}
 		break;
 	}
-	case collapser_state::exit_expanding:{
+	case collapser_state::exiting_expand:{
 		expand_reload_ = std::fdim(expand_reload_, settings.expand_speed * delta);
 		notify_layout_changed(propagate_mask::force_upper);
 		require_scene_cursor_update();
 
 		if(expand_reload_ == 0.f){
 			state_ = collapser_state::un_expand;
-			if(update_opacity_during_expand_)content().update_opacity(0);
+			if(update_opacity_during_expand_)body().update_opacity(0);
 		}else if(update_opacity_during_expand_){
-			content().update_opacity(get_interped_progress() * get_draw_opacity());
+			body().update_opacity(get_interped_progress() * get_draw_opacity());
 		}
+
+		if(transpose_head_and_body_){
+			set_children_src();
+		}
+
 		break;
 	}
 	default: std::unreachable();
 	}
 }
 
+
 std::optional<math::vec2> collapser::pre_acquire_size_impl(layout::optional_mastering_extent extent){
-	auto table_size = head().pre_acquire_size(extent).value_or(head().extent());
+	auto pendings = extent.get_pending();
+	auto [pd_major, pd_minor] = layout::get_vec_ptr<bool>(layout_policy_);
+	auto [major, minor] = layout::get_vec_ptr(layout_policy_);
 
-	if(layout_policy_ == layout::layout_policy::hori_major){
-		extent.set_height_pending();
-		extent.set_width(table_size.x);
-	} else if(layout_policy_ == layout::layout_policy::vert_major){
-		extent.set_width_pending();
-		extent.set_height(table_size.y);
+	auto potential = extent.potential_extent();
+
+	if(pendings.*pd_major){
+		auto head_sz = head().pre_acquire_size(extent).value_or(head().extent());
+		potential.*major = head_sz.*major;
 	}
 
-	if(float prog = get_interped_progress(); prog >= std::numeric_limits<float>::epsilon()){
-		auto [_, minor] = layout::get_vec_ptr(layout_policy_);
-		auto content_ext = content().pre_acquire_size(extent).value_or(content().extent());
-		content_ext.*minor += pad_;
-		table_size.*minor += content_ext.*minor * prog;
+	if(item_size[0].type == layout::size_category::passive || item_size[1].type == layout::size_category::passive){
+		return std::nullopt;
 	}
 
-	return table_size;
+	auto layout_rst = get_layout_minor_dim_config(potential.*major);
+	const auto prog = get_interped_progress();
+	layout_rst.size[1] *= prog;
+	potential.*minor = std::min(std::ranges::fold_left(layout_rst.size, pad_ * prog, std::plus<>{}), potential.*minor);
+
+	return potential;
 }
 
 events::op_afterwards collapser::on_click(const events::click event, std::span<elem* const> aboves){
@@ -155,16 +138,16 @@ void collapser::draw_content(const rect clipSpace) const{
 	switch(state_){
 	case collapser_state::un_expand : break;
 	case collapser_state::expanding :[[fallthrough]];
-	case collapser_state::exit_expanding :{
+	case collapser_state::exiting_expand :{
 		auto& r = get_scene().renderer();
-		r.push_scissor({get_collapsed_region()});
+		r.push_scissor({get_expand_region()});
 		r.notify_viewport_changed();
-		content().draw(space);
+		body().draw(space);
 		r.pop_scissor();
 		r.notify_viewport_changed();
 		break;
 	}
-	case collapser_state::expanded : content().draw(space);
+	case collapser_state::expanded : body().draw(space);
 		break;
 	default : std::unreachable();
 	}
@@ -176,23 +159,31 @@ float collapser::get_interped_progress() const noexcept{
 	};
 	switch(state_){
 	case collapser_state::expanding: [[fallthrough]];
-	case collapser_state::exit_expanding: return smoother(expand_reload_);
+	case collapser_state::exiting_expand: return smoother(expand_reload_);
 	case collapser_state::un_expand: return 0;
 	case collapser_state::expanded: return 1;
 	default: std::unreachable();
 	}
 }
 
-rect collapser::get_collapsed_region() const noexcept{
+rect collapser::get_expand_region() const noexcept{
 	const auto [_, minor] = layout::get_vec_ptr(layout_policy_);
 	const auto prog = get_interped_progress();
-	const auto off = head().extent().*minor + pad_ * prog;
 	auto content_src = content_src_pos_abs();
-	content_src.*minor += off;
 
-	auto content_ext = content_extent();
-	content_ext.*minor = math::fdim(content_ext.*minor, off);
 
-	return rect{tags::from_extent, content_src, content_ext};
+	if(transpose_head_and_body_){
+		auto content_ext = body().extent();
+		content_ext.*minor *= prog;
+		return rect{tags::from_extent, content_src, content_ext};
+	}else{
+		auto content_ext = content_extent();
+		const auto off = head().extent().*minor + pad_ * prog;
+		content_src.*minor += off;
+		content_ext.*minor = math::fdim(content_ext.*minor, off);
+
+		return rect{tags::from_extent, content_src, content_ext};
+	}
+
 }
 }

@@ -19,6 +19,13 @@ namespace mo_yanxi::gui::layout{
 	struct cell_create_result{
 		Elem& elem;
 		Cell& cell; //Dangling Caution
+
+		template <typename T>
+			requires (std::derived_from<Elem, T>)
+		explicit(false) operator cell_create_result<T, Cell>() const noexcept{
+			return {elem, cell};
+		}
+
 	};
 
 	export

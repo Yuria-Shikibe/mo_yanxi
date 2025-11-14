@@ -10,6 +10,7 @@ import mo_yanxi.gui.elem.scroll_pane;
 import mo_yanxi.gui.elem.collapser;
 import mo_yanxi.gui.elem.table;
 import mo_yanxi.gui.elem.grid;
+import mo_yanxi.gui.elem.menu;
 
 void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 	auto e = scene.create<gui::manual_table>();
@@ -18,7 +19,7 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 
 	{
 		auto hdl = mroot.emplace_back<mo_yanxi::gui::scroll_pane>(gui::layout::layout_policy::vert_major);
-		hdl.cell().region_scale = {.0f, .0f, .6f, 1.f};
+		hdl.cell().region_scale = {.0f, .0f, .4f, 1.f};
 		hdl.cell().align = gui::align::pos::bottom_left;
 
 		hdl->create([](mo_yanxi::gui::sequence& sequence){
@@ -28,7 +29,7 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 			sequence.template_cell.set_pad({6.f});
 
 			for(int i = 0; i < 14; ++i){
-				sequence.create_back([](::mo_yanxi::gui::collapser& c){
+				sequence.create_back([&](::mo_yanxi::gui::collapser& c){
 					c.set_update_opacity_during_expand(true);
 					c.set_expand_cond(gui::collapser_expand_cond::inbound);
 
@@ -76,12 +77,57 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 						}
 						// e.interactivity = gui::interactivity_flag::enabled;
 					});
+
+					c.set_head_body_transpose(i & 1);
+
 				});
 			}
 		});
 	}
-
 	{
+		auto hdl = mroot.create_back([](mo_yanxi::gui::menu& menu){
+			// menu.set_layout_policy(gui::layout::layout_policy::vert_major);
+			menu.set_head_size(90);
+			menu.get_head_template_cell().set_size(240).set_pad({4, 4});
+
+			for(int i = 0; i < 4; ++i){
+				auto hdl = menu.create_back([](gui::elem& e){
+
+					e.interactivity = gui::interactivity_flag::enabled;
+				}, [&](gui::sequence& e){
+					e.set_expand_policy(gui::layout::expand_policy::passive);
+					e.template_cell.set_pad({4, 4});
+					for(int j = 0; j < i + 1; ++j){
+						e.emplace_back<gui::elem>();
+					}
+				});
+			}
+		});
+		hdl->set_expand_policy(gui::layout::expand_policy::passive);
+		hdl.cell().region_scale = {.0f, .0f, .6f, 1.f};
+		hdl.cell().align = gui::align::pos::bottom_right;
+		//
+		// hdl->create([](gui::table& table){
+		// 	table.set_expand_policy(gui::layout::expand_policy::prefer);
+		// 	table.set_entire_align(align::pos::center);
+		// 	for(int i = 0; i < 4; ++i){
+		// 		table.emplace_back<gui::elem>().cell().set_size({60, 120});
+		// 		table.emplace_back<gui::elem>();
+		// 		table.end_line();
+		// 	}
+		// 	table.emplace_back<gui::elem>().cell().set_height(40).set_width_passive(.85f).saturate = true;
+		// 	//.align = align::pos::center;
+		// 	// table.emplace_back<gui::elem>();
+		// 	table.end_line();
+		//
+		// 	for(int i = 0; i < 4; ++i){
+		// 		table.emplace_back<gui::elem>().cell().set_size({120, 120});
+		// 		table.emplace_back<gui::elem>();
+		// 		table.end_line();
+		// 	}
+		// });
+	}
+	/*{
 		auto hdl = mroot.emplace_back<mo_yanxi::gui::scroll_pane>();
 		hdl.cell().region_scale = {.0f, .0f, .4f, 1.f};
 		hdl.cell().align = gui::align::pos::bottom_right;
@@ -106,7 +152,7 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 			}
 		});
 
-	}
+	}*/
 	/*{
 		auto hdl = mroot.emplace_back<mo_yanxi::gui::scroll_pane>();
 		hdl.cell().region_scale = {.0f, .0f, .6f, 1.f};

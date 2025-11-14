@@ -70,10 +70,15 @@ namespace mo_yanxi::gui{
 			}
 		}
 
-	private:
 		[[nodiscard]] std::span<const elem_ptr> children() const noexcept override{
 			return {&item, 1};
 		}
+
+		[[nodiscard]] elem& get_item() const noexcept {
+			return *item;
+		}
+
+	private:
 
 		[[nodiscard]] bool parent_contain_constrain(math::vec2 cursorPos) const noexcept override{
 			return get_viewport().contains_loose(cursorPos) && elem::parent_contain_constrain(cursorPos);

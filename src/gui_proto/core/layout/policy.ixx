@@ -21,15 +21,26 @@ export bool is_size_pending(float size) noexcept{
 	return std::isinf(size);
 }
 
+//TODO make it hori/vert/nullopt?
 export enum class layout_policy{
 	none,
 	hori_major,
 	vert_major,
 };
 
+export
+constexpr layout_policy transpose_layout(layout_policy policy) noexcept{
+	switch(policy){
+	case layout_policy::none : return layout_policy::none;
+	case layout_policy::hori_major : return layout_policy::vert_major;
+	case layout_policy::vert_major : return layout_policy::hori_major;
+	default : std::unreachable();
+	}
+}
+
 export enum class expand_policy{
 	resize_to_fit,
-	immutable,
+	passive,
 	prefer,
 };
 
@@ -44,7 +55,7 @@ export struct stated_size{
 	size_category type{size_category::passive};
 	float value{1.};
 
-	constexpr friend bool operator==(const stated_size& lhs, const stated_size& rhs) noexcept = delete;
+	constexpr friend bool operator==(const stated_size& lhs, const stated_size& rhs) noexcept = default;
 
 	[[nodiscard]] constexpr bool mastering() const noexcept{
 		return type == size_category::mastering;
@@ -281,6 +292,17 @@ public:
 		case layout_policy::hori_major : set_height_pending();
 			return;
 		case layout_policy::vert_major : set_width_pending();
+			return;
+		default : std::unreachable();
+		}
+	}
+
+	constexpr void set_major_pending(layout_policy policy) noexcept{
+		switch(policy){
+		case layout_policy::none : return;
+		case layout_policy::hori_major : set_width_pending();
+			return;
+		case layout_policy::vert_major : set_height_pending();
 			return;
 		default : std::unreachable();
 		}

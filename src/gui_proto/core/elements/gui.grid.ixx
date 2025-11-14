@@ -412,7 +412,7 @@ public:
 	void layout_elem() override{
 		auto rst = need_relayout_head_ ? update_table_head_size(content_extent()) + boarder_extent() : extent();
 		switch(expand_policy_){
-		case layout::expand_policy::immutable : break;
+		case layout::expand_policy::passive : break;
 		case layout::expand_policy::prefer : if(auto ext = get_prefer_extent()){
 				rst.max(ext.value());
 			}
@@ -438,7 +438,7 @@ public:
 	}
 
 	std::optional<math::vec2> pre_acquire_size_impl(layout::optional_mastering_extent extent) override{
-		if(expand_policy_ == layout::expand_policy::immutable)return std::nullopt;
+		if(expand_policy_ == layout::expand_policy::passive)return std::nullopt;
 		auto req = need_relayout_head_ ? update_table_head_size(extent.potential_extent().inf_to0()) : content_extent();
 
 		if(expand_policy_ == layout::expand_policy::prefer){

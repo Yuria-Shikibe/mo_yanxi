@@ -7,6 +7,7 @@ export module mo_yanxi.gui.elem.collapser;
 
 export import mo_yanxi.gui.infrastructure;
 export import mo_yanxi.gui.layout.policies;
+export import mo_yanxi.gui.elem.two_segment_elem;
 
 import std;
 
@@ -24,7 +25,7 @@ enum struct collapser_state : std::uint8_t{
 	un_expand,
 	expanding,
 	expanded,
-	exit_expanding,
+	exiting_expand,
 };
 
 struct collapser_settings{
@@ -36,15 +37,8 @@ struct collapser_settings{
 };
 
 export
-struct collapser : elem{
+struct collapser : two_segment_elem{
 private:
-	std::array<elem_ptr, 2> items{};
-	std::array<float, 2> item_size{layout::pending_size, layout::pending_size};
-	layout::layout_policy layout_policy_{
-			search_parent_layout_policy(false).value_or(layout::layout_policy::hori_major)
-		};
-
-	float pad_ = 8;
 	float expand_reload_{};
 
 	collapser_expand_cond expand_cond_{};
@@ -52,39 +46,29 @@ private:
 	bool clicked_{};
 	bool update_opacity_during_expand_{};
 
-	void update_item_size(bool isContent) const;
-
-	void set_item_size(bool isContent, float size){
-		if(util::try_modify(item_size[isContent], size)){
-			update_item_size(isContent);
-		}
-	}
-
-	void update_item_size() const{
-		update_item_size(false);
-		update_item_size(true);
-	}
-
-	bool update_abs_src(math::vec2 parent_content_src) noexcept override;
-
 	void update_collapse(float delta) noexcept;
 
 public:
 	collapser_settings settings{};
 
-	[[nodiscard]] collapser(scene& scene, elem* parent)
-		: elem(scene, parent){
+	[[nodiscard]] collapser(scene& scene, elem* parent, layout::layout_policy layout_policy)
+	: two_segment_elem(scene, parent, layout_policy){
 		interactivity = gui::interactivity_flag::children_only;
 		layout_state.intercept_lower_to_isolated = true;
+		item_size[0] = {layout::size_category::pending, 1};
+		item_size[1] = {layout::size_category::pending, 1};
 	}
 
-	[[nodiscard]] elem& head() const noexcept{
-		return *items[0];
+	[[nodiscard]] collapser(scene& scene, elem* parent)
+		: collapser(scene, parent, elem::search_layout_policy(parent, false).value_or(layout::layout_policy::hori_major)){
 	}
 
-	[[nodiscard]] elem& content() const noexcept{
-		return *items[1];
-	}
+	using two_segment_elem::create;
+	using two_segment_elem::emplace;
+	using two_segment_elem::emplace_head;
+	using two_segment_elem::emplace_content;
+	using two_segment_elem::create_head;
+	using two_segment_elem::create_content;
 
 	[[nodiscard]] collapser_expand_cond get_expand_cond() const noexcept{
 		return expand_cond_;
@@ -108,70 +92,6 @@ public:
 		}
 	}
 
-	[[nodiscard]] layout::layout_policy get_layout_policy() const{
-		return layout_policy_;
-	}
-
-	void set_layout_policy(const layout::layout_policy layout_policy){
-		if(util::try_modify(layout_policy_, layout_policy)){
-			notify_isolated_layout_changed();
-		}
-	}
-
-	void set_head_size(float size){
-		set_item_size(false, size);
-	}
-
-	void set_content_size(float size){
-		set_item_size(true, size);
-	}
-
-
-	template <std::derived_from<elem> E, typename... Args>
-		requires (std::constructible_from<E, scene&, elem*, Args...>)
-	E& emplace(bool as_content, Args&&... args){
-		items[as_content] = elem_ptr{get_scene(), this, std::in_place_type<E>, std::forward<Args>(args)...};
-		notify_isolated_layout_changed();
-		return static_cast<E&>(*items[as_content]);
-	}
-
-	template <invocable_elem_init_func Fn, typename... Args>
-	auto& create(
-		bool as_content,
-		Fn&& init,
-		Args&&... args
-	){
-		items[as_content] = elem_ptr{get_scene(), this, std::forward<Fn>(init), std::forward<Args>(args)...};
-		notify_isolated_layout_changed();
-		return static_cast<elem_init_func_create_t<Fn>&>(*items[as_content]);
-	}
-
-	template <std::derived_from<elem> E, typename... Args>
-		requires (std::constructible_from<E, scene&, elem*, Args...>)
-	E& emplace_head(Args&&... args){
-		return this->emplace<E>(false, std::forward<Args>(args)...);
-	}
-
-	template <std::derived_from<elem> E, typename... Args>
-		requires (std::constructible_from<E, scene&, elem*, Args...>)
-	E& emplace_content(Args&&... args){
-		return this->emplace<E>(true, std::forward<Args>(args)...);
-	}
-
-	template <invocable_elem_init_func Fn, typename... Args>
-	auto& create_head(Fn&& init, Args&&... args){
-		return this->create(false, std::forward<Fn>(init), std::forward<Args>(args)...);
-	}
-
-	template <invocable_elem_init_func Fn, typename... Args>
-	auto& create_content(Fn&& init, Args&&... args){
-		return this->create(true, std::forward<Fn>(init), std::forward<Args>(args)...);
-	}
-
-	[[nodiscard]] std::span<const elem_ptr> children() const noexcept override{
-		return items;
-	}
-
 	[[nodiscard]] bool is_update_opacity_during_expand() const{
 		return update_opacity_during_expand_;
 	}
@@ -179,51 +99,68 @@ public:
 	void set_update_opacity_during_expand(const bool update_opacity_during_expand) noexcept{
 		if(util::try_modify(update_opacity_during_expand_, update_opacity_during_expand) && items[1]){
 			if(update_opacity_during_expand){
-				content().update_opacity(get_interped_progress() * get_draw_opacity());
+				body().update_opacity(get_interped_progress() * get_draw_opacity());
 			} else{
-				content().update_opacity(get_draw_opacity());
+				body().update_opacity(get_draw_opacity());
 			}
 		}
 	}
 
+	void layout_elem() override{
+		elem::layout_elem();
+		layout_children(layout::expand_policy::passive);
+
+		for(auto& item : items){
+			item->try_layout();
+		}
+	}
 protected:
+	void set_item_size(bool isContent, layout::stated_size size) override{
+		if(size.type == layout::size_category::passive){
+			throw layout::illegal_layout{"Passive is not allowd here"};
+		}
+
+		two_segment_elem::set_item_size(isContent, size);
+	}
+
 	std::optional<math::vec2> pre_acquire_size_impl(layout::optional_mastering_extent extent) override;
 
 	events::op_afterwards on_click(const events::click event, std::span<elem* const> aboves) override;
 
 	void draw_content(const rect clipSpace) const override;
 
-	void layout_elem() override{
-		elem::layout_elem();
-		update_item_size();
-
-		for(auto& item : items){
-			item->try_layout();
-		}
-	}
-
 	void update(float delta_in_ticks) override{
-		elem::update(delta_in_ticks);
-
-		for(auto& item : items){
-			item->update(delta_in_ticks);
-		}
+		two_segment_elem::update(delta_in_ticks);
 
 		update_collapse(delta_in_ticks);
-		content().invisible = state_ == collapser_state::un_expand;
+		body().invisible = state_ == collapser_state::un_expand;
+	}
+
+	void set_children_src() const final{
+		auto [_, minor] = layout::get_vec_ptr(layout_policy_);
+		auto src = content_src_pos_abs();
+
+		if(transpose_head_and_body_){
+			items[1]->update_abs_src(src);
+			const auto sz = items[1]->extent();
+			src.*minor += (pad_ + sz.*minor) * get_interped_progress();
+			items[0]->update_abs_src(src);
+		}else{
+			items[0]->update_abs_src(src);
+			const auto sz = items[0]->extent();
+			src.*minor += pad_ + sz.*minor;
+			items[1]->update_abs_src(src);
+		}
 	}
 
 	[[nodiscard]] float get_interped_progress() const noexcept;
 
 	[[nodiscard]] bool is_expanding() const noexcept{
-		return state_ == collapser_state::expanding || state_ == collapser_state::exit_expanding;
+		return state_ == collapser_state::expanding || state_ == collapser_state::exiting_expand;
 	}
 
-	[[nodiscard]] rect get_collapsed_region() const noexcept;
+	[[nodiscard]] rect get_expand_region() const noexcept;
 
-	[[nodiscard]] std::optional<layout::layout_policy> search_layout_policy_getter_impl() const noexcept override{
-		return get_layout_policy();
-	}
 };
 
 }

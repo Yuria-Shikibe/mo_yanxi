@@ -92,20 +92,29 @@ std::optional<math::vec2> sequence::pre_acquire_size_impl(layout::optional_maste
 	if(dep.*minorTargetDep){
 		auto [majorTarget, minorTarget] = layout::get_vec_ptr(policy_);
 
-		if(expand_policy_ == layout::expand_policy::immutable){
+		if(expand_policy_ == layout::expand_policy::passive){
 			potential.*minorTarget = this->content_extent().*minorTarget;
 		}else{
 			auto [minor_length, _] = get_list_layout_minor_mastering_length(*this, potential.*majorTarget);
 			potential.*minorTarget = minor_length;
 		}
+	}
 
+	if(auto pref = get_prefer_content_extent(); pref && expand_policy_ == layout::expand_policy::prefer){
+		potential.max(pref.value());
 	}
 
 	return potential;
 }
 
 void sequence::layout_elem(){
-	if(cells_.empty()) return;
+	if(cells_.empty()){
+		if(auto pref = get_prefer_extent(); pref && expand_policy_ == layout::expand_policy::prefer){
+			resize(pref.value(), propagate_mask::force_upper);
+		}
+		return;
+	}
+
 	auto [majorTarget, minorTarget] = layout::get_vec_ptr(policy_);
 
 	gch::small_vector<float, 16, mr::unvs_allocator<float>> sizes{};
@@ -114,7 +123,7 @@ void sequence::layout_elem(){
 	auto content_sz = content_extent();
 	auto [masterings, passives] = get_list_layout_minor_mastering_length(*this, content_sz.*majorTarget, &sizes);
 
-	if(expand_policy_ != layout::expand_policy::immutable){
+	if(expand_policy_ != layout::expand_policy::passive){
 		math::vec2 size;
 		size.*majorTarget = content_sz.*majorTarget;
 		size.*minorTarget = masterings;

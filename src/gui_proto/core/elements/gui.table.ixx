@@ -276,7 +276,7 @@ export struct table : universal_group<table_cell_adaptor::cell_type, table_cell_
 
 protected:
 	std::optional<math::vec2> pre_acquire_size_impl(layout::optional_mastering_extent extent) override{
-		if(expand_policy_ == layout::expand_policy::immutable) return std::nullopt;
+		if(expand_policy_ == layout::expand_policy::passive) return std::nullopt;
 
 		const auto grid = util::countRowAndColumn_toVector(cells_, &table_cell_adaptor::line_feed);
 		if(grid.empty()) return std::nullopt;

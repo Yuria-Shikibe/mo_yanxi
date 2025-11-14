@@ -127,7 +127,7 @@ public:
 
 #pragma region Override
 public:
-	[[nodiscard]] std::span<const elem_ptr> children() const noexcept override{
+	[[nodiscard]] std::span<const elem_ptr> children() const noexcept final{
 		return children_;
 	}
 
@@ -192,6 +192,10 @@ public:
 
 	decltype(children_)::iterator find(elem* elem) noexcept{
 		return std::ranges::find(children_, elem, &elem_ptr::get);
+	}
+
+	std::size_t find_index(elem* elem) noexcept{
+		return std::ranges::distance(children_.begin(), find(elem));
 	}
 #pragma endregion
 

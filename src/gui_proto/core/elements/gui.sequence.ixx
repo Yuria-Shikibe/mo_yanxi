@@ -36,7 +36,7 @@ namespace mo_yanxi::gui{
 			if(util::try_modify(expand_policy_, policy)){
 				notify_isolated_layout_changed();
 
-				if(expand_policy_ == layout::expand_policy::immutable){
+				if(expand_policy_ == layout::expand_policy::passive){
 					layout_state.inherent_accept_mask -= propagate_mask::child;
 					layout_state.intercept_lower_to_isolated = true;
 				}else{
