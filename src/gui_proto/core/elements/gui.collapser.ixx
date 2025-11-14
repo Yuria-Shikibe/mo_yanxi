@@ -12,6 +12,7 @@ import std;
 
 namespace mo_yanxi::gui{
 export
+//TODO as bit flag?
 enum struct collapser_expand_cond : std::uint8_t{
 	click,
 	inbound,
@@ -94,6 +95,7 @@ public:
 	}
 
 	[[nodiscard]] bool expandable() const noexcept{
+		//TODO maintain if children has tooltip?
 		switch(expand_cond_){
 		case collapser_expand_cond::inbound:
 			return cursor_states_.inbound;

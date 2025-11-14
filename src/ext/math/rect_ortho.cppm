@@ -1121,6 +1121,39 @@ FORCE_INLINE constexpr rect_ortho<T> find_largest_non_edge_exclusive_intersectin
 	}
 
 	return candidates[idx];
+
+}
+
+export
+template <arithmetic T>
+[[nodiscard]] rect_ortho<T> fit_rect_within_bound(const rect_ortho<T>& bound, const rect_ortho<T>& tofit) {
+    if (bound.contains_loose(tofit)) {
+        return tofit;
+    }
+
+	auto off = tofit.src;
+	auto sz = tofit.extent();
+    if (tofit.width() <= bound.width()) {
+        if (tofit.get_src_x() < bound.get_src_x()) {
+            off.x = bound.get_src_x();
+        } else if (tofit.get_end_x() > bound.get_end_x()) {
+            off.x = bound.get_end_x() - tofit.width();
+        }
+    } else {
+        sz.x = bound.width();
+    }
+
+    if (tofit.height() <= bound.height()) {
+        if (tofit.get_src_y() < bound.get_src_y()) {
+            off.y = bound.get_src_y();
+        } else if (tofit.get_end_y() > bound.get_end_y()) {
+            off.y = bound.get_end_y() - tofit.height();
+        }
+    } else {
+    	sz.y = bound.height();
+    }
+
+	return {tags::unchecked, tags::from_extent, off, sz};
 }
 
 // export

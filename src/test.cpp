@@ -38,11 +38,37 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 						e.set_tooltip_state({
 							.layout_info = gui::tooltip::align_meta{
 								.follow = gui::tooltip::anchor_type::owner,
-								.attach_point_spawner = align::pos::top_right,
-								.attach_point_tooltip = align::pos::top_left,
+								.attach_point_spawner = align::pos::top_left,
+								.attach_point_tooltip = align::pos::top_right,
 							},
 						}, [](gui::table& tooltip){
-							tooltip.emplace_back<gui::elem>().cell().set_size({160, 60});
+							using namespace gui;
+							struct dialog_creator : elem{
+								[[nodiscard]] dialog_creator(gui::scene& scene, elem* parent)
+								: elem(scene, parent){
+									interactivity = interactivity_flag::enabled;
+								}
+
+								gui::events::op_afterwards on_click(const gui::events::click event, std::span<elem* const> aboves) override{
+									if(event.key.on_release()){
+										get_scene().create_overlay({
+												.extent = {
+													{layout::size_category::passive, .4f},
+													{layout::size_category::scaling, 1.f}
+												},
+												.align = align::pos::center,
+											}, [](table& e){
+												e.end_line().emplace_back<elem>();
+												e.end_line().emplace_back<elem>();
+												e.end_line().emplace_back<elem>();
+												e.end_line().emplace_back<elem>();
+												e.end_line().emplace_back<elem>();
+											});
+									}
+									return gui::events::op_afterwards::intercepted;
+								}
+							};
+							tooltip.emplace_back<dialog_creator>().cell().set_size({160, 60});
 						});
 						e.set_entire_align(align::pos::top_left);
 						for(int k = 0; k < 5; ++k){

@@ -261,6 +261,10 @@ struct key_set{
 		  mode_bits(mode){
 	}
 
+	[[nodiscard]] bool on_release() const noexcept{
+		return action == act::release;
+	}
+
 	[[nodiscard]] constexpr bool match(key_set expected) const noexcept{
 		return matched(key{key_code}, key{expected.key_code}) && matched(action, expected.action) && matched(mode_bits, expected.mode_bits);
 	}

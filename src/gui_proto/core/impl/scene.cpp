@@ -5,6 +5,7 @@ module;
 module mo_yanxi.gui.infrastructure;
 
 import mo_yanxi.core.global.graphic;
+import std;
 
 namespace mo_yanxi::gui{
 scene::scene(scene&& other) noexcept: scene_base{std::move(other)}{
@@ -22,6 +23,7 @@ scene& scene::operator=(scene&& other) noexcept{
 
 void scene::update(float delta_in_tick){
 	tooltip_manager_.update(delta_in_tick, get_cursor_pos(), is_mouse_pressed());
+	overlay_manager_.update(delta_in_tick);
 
 	if(request_cursor_update_){
 		update_cursor();
@@ -34,21 +36,31 @@ void scene::draw(rect clip){
 		gui::viewport_guard _{renderer(), region_};
 		const auto root_bound = region_.round<int>().max_src({});
 
-		/*if(dialog_manager.empty())*/{
-			// for (auto&& elem : tooltip_manager_.get_draw_sequence()){
-			// 	if(elem.belowScene){
-			// 		elem.element->try_draw(region_);
-			// 		const auto bound = elem.element->bound_abs().round<int>().intersection_with(root_bound).as<unsigned>();
-			// 		renderer().push(ubo_blit_info{
-			// 			.blit_region = {bound.src, bound.extent()}
-			// 		});
-			// 		renderer().consume();
-			// 	}
-			// }
-			root_->draw(clip);
+		for (auto&& elem : tooltip_manager_.get_draw_sequence()){
+			if(elem.belowScene){
+				elem.element->try_draw(region_);
+				const auto bound = elem.element->bound_abs().round<int>().intersection_with(root_bound).as<unsigned>();
+				renderer().push(blit_config{
+					.blit_region = {bound.src, bound.extent()}
+				});
+			}
+		}
+
+		root_->draw(clip);
+		renderer().push(blit_config{
+			.blit_region = {root_bound.src.as<unsigned>(), root_bound.extent().as<unsigned>()}
+		});
+
+		for (const auto & draw_sequence : overlay_manager_.get_draw_sequence()){
+			draw_sequence->draw(clip);
+			const auto bound = draw_sequence->bound_abs().round<int>().intersection_with(root_bound).as<unsigned>();
 			renderer().push(blit_config{
-				.blit_region = {root_bound.src.as<unsigned>(), root_bound.extent().as<unsigned>()}
+				.blit_region = {bound.src, bound.extent()}
 			});
+		}
+
+		/*if(dialog_manager.empty())*/{
+
 
 			// for (const auto & independent_draw : independent_draw_){
 			// 	independent_draw.elem->draw_independent();
@@ -80,7 +92,7 @@ void scene::input_key(const input_handle::key_set key){
 	inputs_.inform(key);
 
 	if(key.action == input_handle::act::press && key.key_code == std::to_underlying(input_handle::key::esc)){
-		//TODO onEsc
+
 
 		if(on_esc() == events::op_afterwards::fall_through){
 			update_cursor();
@@ -142,11 +154,12 @@ void scene::update_cursor(){
 		if(!inbounds.empty())goto upt;
 	}
 
-	/*if(auto dialog = dialog_manager.top()){
+	if(!overlay_manager_.empty()){
+		auto& top = *std::ranges::rbegin(overlay_manager_);
 		if(inbounds.empty()){
-			inbounds = dialog->dfs_find_deepest_element(cursor_pos);
+			inbounds = util::dfs_find_deepest_element(top.get(), get_cursor_pos(), get_heap_allocator<elem*>());
 		}
-	}else*/{
+	}else{
 		if(inbounds.empty()){
 			inbounds = util::dfs_find_deepest_element(&root(), get_cursor_pos(), get_heap_allocator<elem*>());
 		}
@@ -181,6 +194,7 @@ void scene::update_cursor(){
 }
 
 events::op_afterwards scene::on_esc(){
+	if(overlay_manager_.on_esc() != events::op_afterwards::fall_through)return events::op_afterwards::intercepted;
 	if(tooltip_manager_.on_esc() != events::op_afterwards::fall_through)return events::op_afterwards::intercepted;
 
 	elem* focus = focus_key_;
@@ -193,6 +207,7 @@ void scene::resize(const math::frect region){
 	if(util::try_modify(region_, region)){
 		renderer().resize(region);
 		root_->resize(region.extent());
+		overlay_manager_.resize(region);
 	}
 }
 

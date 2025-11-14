@@ -4,8 +4,6 @@ module;
 
 export module mo_yanxi.gui.infrastructure:element;
 
-export import mo_yanxi.math.vector2;
-export import mo_yanxi.math.rect_ortho;
 export import mo_yanxi.ui.clamped_size;
 
 export import mo_yanxi.gui.layout.policies;
@@ -146,8 +144,8 @@ struct cursor_states{
 };
 
 export struct elem : tooltip::spawner_general<elem>{
-	friend struct elem_ptr;
-	friend struct scene;
+	friend elem_ptr;
+	friend scene;
 
 private:
 	void(*deleter_)(elem*) noexcept = nullptr;
@@ -248,7 +246,7 @@ public:
 	}
 
 protected:
-	[[nodiscard]] scene& tooltip_get_scene() const noexcept override{
+	[[nodiscard]] struct scene& tooltip_get_scene() const noexcept override{
 		return get_scene();
 	}
 
@@ -319,7 +317,7 @@ public:
 public:
 	void try_draw(const rect clipSpace) const{
 		if(invisible) return;
-		// if(!clipSpace.overlap_inclusive(bound_abs())) return;
+		if(!clipSpace.overlap_inclusive(bound_abs())) return;
 		draw(clipSpace);
 	}
 
@@ -353,6 +351,13 @@ public:
 	virtual void update(float delta_in_ticks);
 
 	void clear_scene_references() noexcept;
+	void clear_scene_references_recursively() noexcept{
+		clear_scene_references();
+
+		for (auto && child : children()){
+			child->clear_scene_references_recursively();
+		}
+	}
 
 	void require_scene_cursor_update() const noexcept{
 		get_scene().request_cursor_update();

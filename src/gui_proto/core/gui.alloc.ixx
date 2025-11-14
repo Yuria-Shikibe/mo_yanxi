@@ -174,6 +174,12 @@ template <typename T = std::byte>
 using heap_allocator = mi_heap_stl_allocator<T>;
 
 export
+template <typename T = std::byte>
+heap_allocator<T> get_default_heap_allocator(){
+    return heap_allocator<T>{mi_heap_get_default()};
+}
+
+export
 template <typename T>
 using unvs_allocator = mi_stl_allocator<T>;
 

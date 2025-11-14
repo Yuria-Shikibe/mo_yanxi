@@ -7,6 +7,7 @@ export module mo_yanxi.gui.infrastructure:scene;
 
 import :elem_ptr;
 import :tooltip_manager;
+import :dialog_manager;
 import std;
 import mo_yanxi.gui.renderer.frontend;
 import mo_yanxi.handle_wrapper;
@@ -18,11 +19,7 @@ export import mo_yanxi.gui.alloc;
 
 
 namespace mo_yanxi::gui{
-export using vec2 = math::vec2;
-export using rect = math::frect;
 
-using allocator_type = std::pmr::polymorphic_allocator<>;
-constexpr bool b = std::allocator_traits<allocator_type>::propagate_on_container_swap::value;
 struct mouse_state{
 	math::vec2 src{};
 	bool pressed{};
@@ -75,7 +72,9 @@ protected:
 	//must be the first to destruct
 	elem_ptr root_{};
 
-	tooltip::tooltip_manager tooltip_manager_{};
+	tooltip::tooltip_manager tooltip_manager_{get_heap_allocator()};
+	overlay_manager overlay_manager_{get_heap_allocator()};
+
 
 	[[nodiscard]] scene_base() = default;
 
@@ -123,7 +122,6 @@ public:
 		return inputs_.cursor_pos();
 	}
 
-
 	[[nodiscard]] bool is_mouse_pressed() const noexcept{
 		return std::ranges::any_of(mouse_states_, std::identity{}, &mouse_state::pressed);
 	}
@@ -132,15 +130,15 @@ public:
 		return mouse_states_[std::to_underlying(mouse_button_code)].pressed;
 	}
 
-
 	void drop_event_focus(const elem* target) noexcept{
 		if(focus_scroll_ == target)focus_scroll_ = nullptr;
 		if(focus_cursor_ == target)focus_cursor_ = nullptr;
 		if(focus_key_ == target)focus_key_ = nullptr;
 	}
 
+
 private:
-	mi_heap_t* get_heap() const noexcept{
+	[[nodiscard]] mi_heap_t* get_heap() const noexcept{
 		return resource_.get();
 	}
 };
@@ -166,6 +164,22 @@ public:
 
 
 	void resize(const math::frect region);
+
+	template <invocable_elem_init_func Fn, typename... Args>
+	auto create_overlay(const overlay_layout layout, Fn&& fn, Args&&... args){
+		return static_cast<overlay_create_result<elem_init_func_create_t<Fn>>>(
+			overlay_manager_.push_back(layout, elem_ptr{*this, nullptr, std::forward<Fn>(fn), std::forward<Args>(args)...})
+		);
+	}
+
+	template <typename T, typename... Args>
+		requires (constructible_elem<T, Args&&...>)
+	overlay_create_result<T> emplace_overlay(const overlay_layout layout, Args&&... args){
+		return static_cast<overlay_create_result<T>>(
+			overlay_manager_.push_back(layout, elem_ptr{*this, nullptr, std::in_place_type<T>, std::forward<Args>(args)...})
+		);
+	}
+
 
 private:
 	void update(float delta_in_tick);

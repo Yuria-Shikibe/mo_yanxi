@@ -5,6 +5,8 @@ module;
 
 export module mo_yanxi.gui.infrastructure:elem_ptr;
 
+export import mo_yanxi.math.vector2;
+export import mo_yanxi.math.rect_ortho;
 
 import mo_yanxi.gui.alloc;
 import mo_yanxi.func_initialzer;
@@ -15,6 +17,13 @@ namespace mo_yanxi::gui{
 
 export struct elem;
 export struct scene;
+
+export using vec2 = math::vec2;
+export using rect = math::frect;
+
+export
+template <typename Elem, typename ...Args>
+concept constructible_elem = std::constructible_from<Elem, scene&, elem*, Args&&...>;
 
 export
 template <typename Fn>
@@ -54,7 +63,7 @@ struct elem_ptr{
 	}
 
 	template <typename T, typename... Args>
-		requires (std::constructible_from<T, scene&, elem*, Args&&...>)
+		requires (constructible_elem<T, Args&&...>)
 	[[nodiscard]] elem_ptr(scene& scene, elem* group, std::in_place_type_t<T>, Args&&... args)
 		: element{elem_ptr::new_elem<T>(scene, group, std::forward<Args>(args)...)}{
 	}

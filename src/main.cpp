@@ -1049,7 +1049,7 @@ int main(){
 
 #pragma region ResizeSet
 		core::global::graphic::context.set_staging_image({
-			.image = renderer.get_base().image,
+			.image = hdr_to_sdr_pass.pass.at_out(0).as_image().image.image,
 			.extent = core::global::graphic::context.get_extent(),
 			.clear = false,
 			.owner_queue_family = core::global::graphic::context.compute_family(),
@@ -1076,7 +1076,7 @@ int main(){
 			manager.create_command();
 			core::global::graphic::context.set_staging_image(
 				{
-					.image = renderer.get_base().image,
+					.image = hdr_to_sdr_pass.pass.at_out(0).as_image().image.image,
 					.extent = core::global::graphic::context.get_extent(),
 					.clear = false,
 					.owner_queue_family = core::global::graphic::context.compute_family(),
@@ -1172,13 +1172,6 @@ int main(){
 				// batch.update_ubo(proj);
 
 				(void)vk::buffer_mapper{general_proj_ubo}.load(proj);
-
-				// renderer.top_viewport().set_local_transform(camera.get_v2v_mat({}));
-				// auto screenP = renderer.top_viewport().get_element_to_root_screen() * camera.get_viewport_center();
-				// auto pos = renderer.get_screen_uniform_proj() * screenP;
-				// // bloom_pass.meta.set_scale(camera.map_scale(0.9f, 1.5f));
-				// renderer.notify_viewport_changed();
-
 			}
 
 			volume_pass.meta->update(core::global::timer.global_time() * 60.f);
@@ -1188,8 +1181,8 @@ int main(){
 
 			gui::global::manager.draw();
 
-			ctx.flush();
 			vk::cmd::submit_command(core::global::graphic::context.compute_queue(), {manager.get_main_command_buffer()});
+			ctx.flush();
 			++count;
 		}
 

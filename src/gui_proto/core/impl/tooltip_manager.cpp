@@ -15,26 +15,11 @@ void tooltip_instance::update_layout(const tooltip_manager& manager, math::vec2 
 	if(policy.extent.fully_mastering()){
 		element->set_prefer_extent(policy.extent.potential_extent());
 	}
-	//
-	// math::vec2 sz{};
-	// math::vec2 fsz{};
 
-	//Legacy
-	// if(policy.follow == tooltip_follow::dialog){
-	// 	auto [fx, fy] = element->property.fill_parent;
-	// 	if(fx){
-	// 		fsz.x = manager.scene->get_extent().x;
-	// 		element->context_size_restriction.set_width(fsz.x);
-	// 	}
-	//
-	// 	if(fy){
-	// 		fsz.y = manager.scene->get_extent().y;
-	// 		element->context_size_restriction.set_height(fsz.y);
-	// 	}
-	// }
 
 	if(element->layout_state.check_any_changed()){
-		auto sz = element->pre_acquire_size(policy.extent).value_or(policy.extent.potential_extent().inf_to0().max({60, 60}));
+		auto sz = element->pre_acquire_size(policy.extent).value_or(
+			policy.extent.potential_extent().inf_to0().clamp_xy({60, 60}, element->get_scene().get_region().extent()));
 		element->resize(sz);
 
 		element->layout_elem();
@@ -48,12 +33,6 @@ void tooltip_instance::update_layout(const tooltip_manager& manager, math::vec2 
 		followOffset += cursor_pos;
 		break;
 	}
-	//
-	// case anchor_type::dialog :{
-	// 	followOffset += align::get_vert(policy.align, manager.scene->get_region());
-	// 	break;
-	// }
-
 	case anchor_type::initial_pos :{
 		if(!is_pos_set()){
 			followOffset += cursor_pos;
@@ -63,7 +42,6 @@ void tooltip_instance::update_layout(const tooltip_manager& manager, math::vec2 
 
 		break;
 	}
-
 	case anchor_type::owner :{
 		followOffset += policy.pos.value_or({});
 
@@ -72,8 +50,10 @@ void tooltip_instance::update_layout(const tooltip_manager& manager, math::vec2 
 	default : break;
 	}
 
-	last_pos = followOffset;
-	element->update_abs_src(followOffset);
+	rect region{tags::unchecked, tags::from_extent, followOffset, element->extent()};
+	region = math::rect::fit_rect_within_bound(element->get_scene().get_region(), region);
+	last_pos = region.src;
+	element->update_abs_src(region.src);
 }
 
 tooltip_instance& tooltip_manager::append_tooltip(
@@ -88,12 +68,8 @@ tooltip_instance& tooltip_manager::append_tooltip(
 tooltip_instance& tooltip_manager::append_tooltip(spawner& owner, elem_ptr&& elem,
 	bool belowScene, bool fade_in){
 
-	// if(owner.has_tooltip()){
-	// 	owner.tooltip_notify_drop();
-	// }
-
 	auto& scene = owner.tooltip_get_scene();
-	auto& val = actives.emplace_back(std::move(elem), &owner);
+	auto& val = actives_.emplace_back(std::move(elem), &owner);
 	val.update_layout(*this, scene.get_cursor_pos());
 	scene.update_cursor(/*true*/);
 
@@ -120,14 +96,14 @@ void tooltip_manager::update(
 	bool is_mouse_pressed){
 	updateDropped(delta_in_time);
 
-	for (auto&& active : actives){
+	for (auto&& active : actives_){
 		active.element->update(delta_in_time);
 		active.element->try_layout();
 		active.update_layout(*this, cursor_pos);
 	}
 
 	if(!is_mouse_pressed){
-		const auto lastNotInBound = std::ranges::find_if_not(actives, [&, this](const tooltip_instance& toolTip){
+		const auto lastNotInBound = std::ranges::find_if_not(actives_, [&, this](const tooltip_instance& toolTip){
 			if(toolTip.owner->tooltip_should_drop(cursor_pos))return false;
 
 			const auto follow = toolTip.owner->tooltip_get_align_config().follow;
@@ -142,13 +118,13 @@ void tooltip_manager::update(
 }
 
 events::op_afterwards tooltip_manager::on_esc(){
-	for (auto&& elem : actives | std::views::reverse){
+	for (auto&& elem : actives_ | std::views::reverse){
 		if(util::thoroughly_esc(elem.element.get()) != events::op_afterwards::fall_through){
 			return events::op_afterwards::intercepted;
 		}
 	}
 
-	if(!actives.empty()){
+	if(!actives_.empty()){
 		drop_back();
 		return events::op_afterwards::intercepted;
 	}
@@ -168,7 +144,7 @@ bool tooltip_manager::drop(ActivesItr be, ActivesItr se){
 		return tooltip_expired{std::move(validToolTip.element), RemoveFadeTime};
 	}));
 
-	actives.erase(be, se);
+	actives_.erase(be, se);
 	return true;
 }
 

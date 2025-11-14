@@ -37,7 +37,12 @@ void debug_elem_drawer::draw(const elem& element, rect region, float opacityScl)
 			.v00 = region.vert_00(),
 			.v11 = region.vert_11(),
 			.stroke = 1,
-			.vert_color = {c.mul_a(opacityScl), c.create_lerp(colors::ACID, f1).mul_a(opacityScl), c.create_lerp(colors::ORANGE, f2).mul_a(opacityScl), c.create_lerp(colors::CRIMSON, f3).mul_a(opacityScl)}
+			.vert_color = {
+				c.mul_a(opacityScl),
+				c.create_lerp(colors::ACID.to_light(2), f1).mul_a(opacityScl),
+				c.create_lerp(colors::ORANGE.to_light(2), f2).mul_a(opacityScl),
+				c.create_lerp(colors::CRIMSON.to_light(2), f3).mul_a(opacityScl)
+			}
 		});
 
 }

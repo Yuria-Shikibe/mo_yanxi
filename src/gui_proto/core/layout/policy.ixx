@@ -132,7 +132,7 @@ export struct stated_extent{
 
 	constexpr friend bool operator==(const stated_extent& lhs, const stated_extent& rhs) noexcept = delete;
 
-	[[nodiscard]] constexpr bool fully_dependent() const noexcept{
+	[[nodiscard]] constexpr bool fully_pending() const noexcept{
 		return width.type == size_category::pending && height.type == size_category::pending;
 	}
 

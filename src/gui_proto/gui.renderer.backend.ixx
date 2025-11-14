@@ -447,7 +447,7 @@ public:
 				context().get_allocator(), extent,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 				VK_IMAGE_USAGE_SAMPLED_BIT,
-				// VK_FORMAT_R16G16B16A16_SFLOAT
+				VK_FORMAT_R16G16B16A16_SFLOAT
 			};
 		attachment_background =
 			vk::color_attachment{
@@ -460,7 +460,7 @@ public:
 			vk::storage_image{
 				context().get_allocator(), extent,
 				1,
-				VK_FORMAT_R8G8B8A8_UNORM,
+				VK_FORMAT_R16G16B16A16_SFLOAT,
 				VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 			};
 
@@ -534,7 +534,7 @@ private:
 			shader_module.get_create_info(VK_SHADER_STAGE_MESH_BIT_EXT, nullptr, "main_mesh"),
 			shader_module.get_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, nullptr, "main_frag")
 		});
-		gtp.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::alpha_blend);
+		gtp.push_color_attachment_format(VK_FORMAT_R16G16B16A16_SFLOAT, vk::blending::alpha_blend);
 		gtp.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::alpha_blend);
 
 		pipeline_ = vk::pipeline{context().get_device(), pipeline_layout_, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, gtp};
