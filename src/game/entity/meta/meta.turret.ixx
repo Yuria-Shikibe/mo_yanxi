@@ -10,7 +10,7 @@ export import mo_yanxi.game.meta.projectile;
 import mo_yanxi.math;
 import mo_yanxi.array_stack;
 import mo_yanxi.game.ecs.component.drawer;
-import mo_yanxi.graphic.image_manage;
+import mo_yanxi.graphic.image_atlas.util;
 import mo_yanxi.graphic.draw.func;
 
 import std;

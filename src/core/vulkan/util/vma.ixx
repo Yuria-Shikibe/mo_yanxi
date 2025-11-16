@@ -8,6 +8,7 @@ module;
 export module mo_yanxi.vk.util:vma;
 
 export import :exception;
+export import mo_yanxi.vk.universal_handle;
 import mo_yanxi.handle_wrapper;
 
 // NOLINTBEGIN(*-misplaced-const)
@@ -35,31 +36,44 @@ namespace mo_yanxi::vk{
 			VmaAllocatorCreateFlags append_flags = 0
 			) : allocator(
 			{
-				.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT | append_flags,
+				.flags = append_flags,
 				.physicalDevice = physical_device,
 				.device = device,
 				.instance = instance,
-				.vulkanApiVersion = VK_API_VERSION_1_3,
+				.vulkanApiVersion = VK_API_VERSION_1_4,
 			}
 		){
 		}
+		[[nodiscard]] explicit(false)
+		allocator(
+			const context_info& context_info,
+			VmaAllocatorCreateFlags append_flags = 0
+			) : allocator(context_info.instance, context_info.physical_device, context_info.device, append_flags){
+		}
 
-		VmaAllocatorInfo get_info() const noexcept{
+		[[nodiscard]] VmaAllocatorInfo get_info() const noexcept{
 			VmaAllocatorInfo info;
 			vmaGetAllocatorInfo(handle, &info);
 			return info;
 		}
 
-		VkDevice get_device() const noexcept{
+		[[nodiscard]] VkDevice get_device() const noexcept{
 			VmaAllocatorInfo info;
 			vmaGetAllocatorInfo(handle, &info);
 			return info.device;
 		}
 
-		VkPhysicalDevice get_physical_device() const noexcept{
+		[[nodiscard]] VkPhysicalDevice get_physical_device() const noexcept{
 			VmaAllocatorInfo info;
 			vmaGetAllocatorInfo(handle, &info);
 			return info.physicalDevice;
+		}
+
+
+		[[nodiscard]] context_info get_context_info() const noexcept{
+			VmaAllocatorInfo info;
+			vmaGetAllocatorInfo(handle, &info);
+			return {info.instance, info.physicalDevice, info.device};
 		}
 
 		~allocator(){

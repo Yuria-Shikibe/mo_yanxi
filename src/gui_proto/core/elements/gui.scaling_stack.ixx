@@ -9,8 +9,8 @@ import std;
 namespace mo_yanxi::gui{
 	using passive_cell_adaptor = cell_adaptor<layout::scaled_cell>;
 
-	export struct manual_table : celled_group<passive_cell_adaptor>{
-		[[nodiscard]] manual_table(scene& scene, elem* parent)
+	export struct scaling_stack : celled_group<passive_cell_adaptor>{
+		[[nodiscard]] scaling_stack(scene& scene, elem* parent)
 			: universal_group<layout::scaled_cell>(scene, parent){
 			layout_state.ignore_children();
 			layout_state.intercept_lower_to_isolated = true;
@@ -42,6 +42,7 @@ namespace mo_yanxi::gui{
 			adaptor.cell.allocated_region = region;
 
 			adaptor.apply(*this, {region.width(), region.height()});
+			if(!is_pos_smooth())adaptor.cell.update_relative_src(*adaptor.element, content_src_pos_abs());
 		}
 	};
 }

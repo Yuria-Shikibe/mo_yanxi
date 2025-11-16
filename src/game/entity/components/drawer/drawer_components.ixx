@@ -8,7 +8,7 @@ export import mo_yanxi.math.trans2;
 export import mo_yanxi.game.ecs.component.manage;
 export import mo_yanxi.game.world.graphic;
 
-import mo_yanxi.graphic.image_manage;
+import mo_yanxi.graphic.image_atlas.util;
 import mo_yanxi.graphic.draw;
 import mo_yanxi.graphic.draw.func;
 

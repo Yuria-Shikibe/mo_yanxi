@@ -1,6 +1,6 @@
 module mo_yanxi.ui.assets;
 
-import mo_yanxi.graphic.image_manage;
+import mo_yanxi.graphic.image_atlas;
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.assets.directories;
 import mo_yanxi.ui.primitives;
@@ -21,7 +21,7 @@ mo_yanxi::ui::theme::icons::icon_raw_present load_svg(
 				mo_yanxi::graphic::msdf::sdf_image_range,
 				boarder
 			}, extent
-		}).first;
+		}).region;
 
 	ui_page.mark_protected(name);
 	return static_cast<mo_yanxi::ui::theme::icons::icon_raw_present>(rst);
@@ -61,7 +61,7 @@ void load_icons(mo_yanxi::graphic::image_page& ui_page){
 }
 
 void mo_yanxi::ui::theme::load(void* erased_image_atlas){
-	graphic::image_atlas& atlas = *static_cast<graphic::image_atlas*>(erased_image_atlas);
+	auto& atlas = *static_cast<graphic::image_atlas*>(erased_image_atlas);
 	auto& page = atlas.create_image_page("ui");
 
 	using namespace std::literals;
@@ -72,7 +72,7 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 			graphic::sdf_load{
 				graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f, 3.f), 4.}, math::usize2{96, 96}, 2
 			}, true
-		).first;
+		).region;
 
 		graphic::allocated_image_region& boarder_thin = page.register_named_region(
 			"edge_thin"s,
@@ -80,7 +80,7 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 				graphic::msdf::msdf_generator{graphic::msdf::create_boarder(12.f, 2.f), 4.}, math::usize2{96, 96}, 2
 			},
 			true
-		).first;
+		).region;
 
 		graphic::allocated_image_region& base = page.register_named_region(
 			"base"s,
@@ -89,7 +89,7 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 				math::usize2{96, 96}, 3
 			},
 			true
-		).first;
+		).region;
 
 		graphic::allocated_image_region& line = page.register_named_region(
 			"line"s,
@@ -97,7 +97,7 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 				graphic::msdf::msdf_generator{graphic::msdf::svg_to_shape((assets::dir::svg.path() / "ui/line.svg").string().data())},
 				{40u, 24u}, 1
 			},
-			true).first;
+			true).region;
 
 		graphic::allocated_image_region& side_bar = page.register_named_region(
 			"side_bar"s,
@@ -105,7 +105,7 @@ void mo_yanxi::ui::theme::load(void* erased_image_atlas){
 				graphic::msdf::msdf_generator{graphic::msdf::svg_to_shape((assets::dir::svg.path() / "ui/side_bar.svg").string().data())},
 				{96, 96}
 			},
-			true).first;
+			true).region;
 
 		shapes::edge = {
 				boarder,

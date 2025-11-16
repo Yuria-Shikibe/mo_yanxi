@@ -22,7 +22,7 @@ import mo_yanxi.circular_array;
 import mo_yanxi.event;
 import std;
 
-
+export import mo_yanxi.vk.universal_handle;
 
 
 namespace mo_yanxi::vk{
@@ -102,6 +102,10 @@ namespace mo_yanxi::vk{
 
 		[[nodiscard]] explicit(false) context(const VkApplicationInfo& app_info){
 			init(app_info);
+		}
+
+		explicit(false) operator context_info() const noexcept{
+			return {instance, physical_device, device};
 		}
 
 		void set_staging_image(const swap_chain_staging_image_data& image_data, bool instantly_create_command = true){
@@ -244,7 +248,7 @@ namespace mo_yanxi::vk{
 		}
 
 		[[nodiscard]] allocator create_allocator(VmaAllocatorCreateFlags append_flags = 0) const{
-			return vk::allocator{instance, physical_device, device, append_flags};
+			return vk::allocator{instance, physical_device, device, append_flags | VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT};
 		}
 
 	private:
@@ -275,7 +279,7 @@ namespace mo_yanxi::vk{
 				frame_data.fetch_semaphore = semaphore{device};
 			}
 
-			allocator_ = vk::allocator{instance, physical_device, device, VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT};
+			allocator_ = vk::allocator{instance, physical_device, device, VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT | VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT};
 
 			createSwapChain();
 		}

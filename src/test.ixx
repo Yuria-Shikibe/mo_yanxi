@@ -15,7 +15,7 @@ import mo_yanxi.core.window;
 import mo_yanxi.ui.primitives;
 import mo_yanxi.ui.style;
 import mo_yanxi.ui.assets;
-import mo_yanxi.graphic.image_manage;
+import mo_yanxi.graphic.image_atlas;
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.graphic.color;
 import mo_yanxi.graphic.image_multi_region;
@@ -46,9 +46,11 @@ export turret_drawer drawer;
 void load(){
 	drawer = {
 			.base_component = {
-				.base_image = core::global::assets::atlas["main"].register_named_region(graphic::bitmap_path_load{
+				.base_image = core::global::assets::atlas["main"].register_named_region(
+					"lsr",
+					graphic::bitmap_path_load{
 						R"(D:\projects\mo_yanxi\prop\assets\texture\test\turret\beam-laser-turret.png)"
-					}).first
+					}).region
 			}
 		};
 

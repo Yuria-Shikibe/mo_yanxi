@@ -49,7 +49,7 @@ import mo_yanxi.graphic.renderer.ui;
 import mo_yanxi.graphic.draw.func;
 
 import mo_yanxi.graphic.draw.multi_region;
-import mo_yanxi.graphic.image_manage;
+import mo_yanxi.graphic.image_atlas;
 import mo_yanxi.graphic.image_multi_region;
 
 import mo_yanxi.graphic.layers.ui.grid_drawer;
@@ -385,7 +385,7 @@ void main_loop(){
 
 	auto& context = core::global::graphic::context;
 
-	graphic::image_atlas& atlas{core::global::assets::atlas};
+	auto& atlas{core::global::assets::atlas};
 	graphic::image_page& main_page = atlas.create_image_page("main");
 
 	test::load_tex(atlas);
@@ -439,9 +439,9 @@ void main_loop(){
 
 	// test::set_swapchain_flusher();
 
-	graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.light.png)"}).first;
-	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
-	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
+	graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.light.png)"}).region;
+	graphic::borrowed_image_region base_region = main_page.register_named_region("pester", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).region;
+	graphic::borrowed_image_region base_region2 = main_page.register_named_region("pesterasd", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).region;
 
 
 	using grided_entity_desc = game::ecs::desc::grid_entity;
@@ -1109,14 +1109,14 @@ int main(){
 
 		camera.set_scale_range({0.2f, 4.f});
 
-		graphic::image_atlas& atlas{core::global::assets::atlas};
+		auto& atlas{core::global::assets::atlas};
 		graphic::image_page& main_page = atlas.create_image_page("main");
 
-		graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
-		graphic::borrowed_image_region r1 = atlas.create_image_page("1").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
-		graphic::borrowed_image_region r2 = atlas.create_image_page("2").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
-		graphic::borrowed_image_region r3 = atlas.create_image_page("3").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).first;
-		graphic::borrowed_image_region r4 = atlas.create_image_page("4").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).first;
+		graphic::borrowed_image_region light_region = main_page.register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).region;
+		graphic::borrowed_image_region r1 = atlas.create_image_page("1").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).region;
+		graphic::borrowed_image_region r2 = atlas.create_image_page("2").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).region;
+		graphic::borrowed_image_region r3 = atlas.create_image_page("3").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\assets\texture\pester.png)"}).region;
+		graphic::borrowed_image_region r4 = atlas.create_image_page("4").register_named_region("pester.light", graphic::bitmap_path_load{R"(D:\projects\mo_yanxi\prop\CustomUVChecker_byValle_1K.png)"}).region;
 
 		graphic::uniformed_trail trail{120, 0.5f};
 

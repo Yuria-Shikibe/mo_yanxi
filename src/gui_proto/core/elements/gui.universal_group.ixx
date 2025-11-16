@@ -163,10 +163,21 @@ struct universal_group : public basic_group{
 	cell_type template_cell{};
 
 protected:
+	bool has_smooth_pos_animation_{};
 	mr::heap_vector<adaptor_type> cells_{get_heap_allocator<adaptor_type>()};
 
 public:
 	using basic_group::basic_group;
+
+	bool update(float delta_in_ticks) override{
+		if(!basic_group::update(delta_in_ticks))return false;
+
+		if(has_smooth_pos_animation_){
+			update_children_src(delta_in_ticks);
+		}
+
+		return true;
+	}
 
 	[[nodiscard]] std::span<const adaptor_type> cells() const noexcept{
 		return cells_;
@@ -274,6 +285,16 @@ public:
 		return cells_.back().cell;
 	}
 
+	[[nodiscard]] bool is_pos_smooth() const noexcept{
+		return has_smooth_pos_animation_;
+	}
+
+	void set_has_smooth_pos_animation(const bool has_smooth_pos_animation){
+		if(util::try_modify(has_smooth_pos_animation_, has_smooth_pos_animation)){
+			if(!has_smooth_pos_animation)notify_isolated_layout_changed();
+		}
+	}
+
 protected:
 	virtual void on_element_add(adaptor_type& adaptor){
 		basic_group::on_element_add(*adaptor.element);
@@ -281,6 +302,19 @@ protected:
 
 	void on_element_add(elem& adaptor) const final{
 	}
+
+	void update_children_src(float delta){
+		auto speed = .5f * delta;
+		for (auto && cell : cells_){
+			cell.cell.update_relative_src(*cell.element, content_src_pos_abs(), speed);
+		}
+	}
+	void update_children_src_instantly(){
+		for (auto && cell : cells_){
+			cell.cell.update_relative_src(*cell.element, content_src_pos_abs());
+		}
+	}
+
 };
 
 export

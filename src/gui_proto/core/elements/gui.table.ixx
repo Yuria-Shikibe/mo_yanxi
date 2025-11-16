@@ -35,6 +35,8 @@ public:
 	std::vector<layout::stated_extent> size_data{};
 };
 
+export struct table;
+
 class table_layout_context{
 	using cell_adaptor_type = table_cell_adaptor;
 
@@ -163,13 +165,13 @@ public:
 
 	void place_cells(
 		std::span<cell_adaptor_type> cells,
-		elem& parent,
+		table& parent,
 		math::frect region = {}
 	);
 };
 
 
-export struct table : universal_group<table_cell_adaptor::cell_type, table_cell_adaptor>{
+struct table : universal_group<table_cell_adaptor::cell_type, table_cell_adaptor>{
 	[[nodiscard]] table(scene& scene, elem* parent)
 		: universal_group(scene, parent){
 		layout_state.intercept_lower_to_isolated = true;

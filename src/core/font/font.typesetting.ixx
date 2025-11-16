@@ -1,7 +1,7 @@
 module;
 
-#include "../src/ext/enum_operator_gen.hpp"
-#include "../src/ext/adapted_attributes.hpp"
+#include "ext/enum_operator_gen.hpp"
+#include "ext/adapted_attributes.hpp"
 
 export module mo_yanxi.font.typesetting;
 
@@ -1004,10 +1004,6 @@ namespace mo_yanxi::font::typesetting{
 			return layout;
 		}
 	};
-
-	//全词换行
-	//假换行提示
-	//
 
 	export
 	void apd_default_modifiers(parser& parser){

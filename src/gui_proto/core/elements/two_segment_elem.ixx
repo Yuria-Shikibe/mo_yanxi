@@ -103,12 +103,13 @@ public:
 		items[1]->try_draw(space);
 	}
 
-	void update(float delta_in_ticks) override{
-		elem::update(delta_in_ticks);
+	bool update(float delta_in_ticks) override{
+		if(!elem::update(delta_in_ticks))return false;
 
 		for(auto& item : items){
 			item->update(delta_in_ticks);
 		}
+		return true;
 	}
 
 protected:

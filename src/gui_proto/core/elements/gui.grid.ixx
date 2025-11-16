@@ -497,7 +497,7 @@ private:
 			const auto ext = dst.copy().fdim(src);
 			cell.cell.allocated_region = rect{tags::unchecked, tags::from_extent, src, ext};
 			cell.apply(*this, cell.cell.allocated_region.extent());
-
+			if(!is_pos_smooth())cell.cell.update_relative_src(*cell.element, content_src_pos_abs());
 
 		}
 	}

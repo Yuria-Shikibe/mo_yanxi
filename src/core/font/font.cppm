@@ -1,8 +1,6 @@
 module;
 
 #if DEBUG_CHECK
-
-
 #define FT_CONFIG_OPTION_ERROR_STRINGS
 #endif
 
@@ -10,11 +8,7 @@ module;
 #include <ft2build.h>
 #include <freetype/freetype.h>
 
-//TODO hide msdf impl
-// extern "C++"{
-	// #include <msdfgen/msdfgen.h>
 #include <msdfgen/msdfgen-ext.h>
-// }
 
 export module mo_yanxi.font;
 import std;
@@ -34,7 +28,6 @@ import mo_yanxi.referenced_ptr;
 
 namespace mo_yanxi::font{
 	export constexpr inline math::vec2 font_draw_expand{graphic::msdf::sdf_image_boarder, graphic::msdf::sdf_image_boarder};
-	// export constexpr inline math::vec2 font_draw_expand{8, 8};
 
 	void check(FT_Error error);
 

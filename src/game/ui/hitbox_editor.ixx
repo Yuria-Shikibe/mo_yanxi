@@ -14,7 +14,7 @@ import mo_yanxi.game.quad_tree;
 import mo_yanxi.game.quad_tree_interface;
 
 import mo_yanxi.graphic.camera;
-import mo_yanxi.graphic.image_manage;
+import mo_yanxi.graphic.image_atlas.util;
 
 import mo_yanxi.game.ui.viewport;
 import mo_yanxi.ui.elem.check_box;

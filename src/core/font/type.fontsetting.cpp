@@ -215,8 +215,6 @@ namespace mo_yanxi::font::typesetting{
 		tokenized_text formatted_text{layout.get_text(), {.reserve = reserve_tokens}};
 
 		this->operator()(layout, context, formatted_text);
-		// auto idx = parse(layout, context, formatted_text);
-		// end_parse(layout, context, formatted_text, idx + 1);
 	}
 
 

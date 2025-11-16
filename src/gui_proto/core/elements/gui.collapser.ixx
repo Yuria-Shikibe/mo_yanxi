@@ -129,11 +129,12 @@ protected:
 
 	void draw_content(const rect clipSpace) const override;
 
-	void update(float delta_in_ticks) override{
-		two_segment_elem::update(delta_in_ticks);
+	bool update(float delta_in_ticks) override{
+		if(!two_segment_elem::update(delta_in_ticks))return false;
 
 		update_collapse(delta_in_ticks);
 		body().invisible = state_ == collapser_state::un_expand;
+		return true;
 	}
 
 	void set_children_src() const final{

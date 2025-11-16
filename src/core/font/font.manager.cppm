@@ -7,7 +7,7 @@ export module mo_yanxi.font.manager;
 export import mo_yanxi.font;
 
 import mo_yanxi.graphic.image_region;
-import mo_yanxi.graphic.image_manage;
+import mo_yanxi.graphic.image_atlas;
 
 import mo_yanxi.math.vector2;
 
@@ -41,7 +41,6 @@ export namespace mo_yanxi::font{
 		std::int32_t style_index{};
 	};
 
-
 	struct concat_string{
 		std::string family_name{};
 		std::int32_t style_index{};
@@ -53,7 +52,6 @@ export namespace mo_yanxi::font{
 			  style_index(view.style_index){
 		}
 	};
-
 
 	struct concat_string_hasher{
 		using is_transparent = void;
@@ -101,6 +99,7 @@ export namespace mo_yanxi::font{
 			return lhs.family_name == rhs.family_name && lhs.style_index == rhs.style_index;
 		}
 	};
+
 	using face_id = unsigned;
 	using font_index_hash_map =
 	fixed_open_addr_hash_map<
@@ -158,12 +157,12 @@ export namespace mo_yanxi::font{
 				auto gen = ptr.get_generator(key.size.x, key.size.y);
 
 				const auto aloc = page().register_named_region(std::move(name),
-				                                               graphic::image_load_description{
-					                                               graphic::sdf_load{
-						                                               gen.crop(key.code), ptr.get_extent()
-					                                               }
-				                                               });
-				return glyph{ptr, aloc.first};
+					graphic::image_load_description{
+						graphic::sdf_load{
+							gen.crop(key.code), ptr.get_extent()
+						}
+					});
+				return glyph{ptr, aloc.region};
 			}
 
 			return glyph{ptr};

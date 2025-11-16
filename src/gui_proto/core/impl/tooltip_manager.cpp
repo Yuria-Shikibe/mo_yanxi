@@ -3,6 +3,7 @@ module;
 #include <cassert>
 
 module mo_yanxi.gui.infrastructure;
+import mo_yanxi.gui.action.generic;
 
 namespace mo_yanxi::gui::tooltip{
 void tooltip_instance::update_layout(const tooltip_manager& manager, math::vec2 cursor_pos){
@@ -74,10 +75,10 @@ tooltip_instance& tooltip_manager::append_tooltip(spawner& owner, elem_ptr&& ele
 	scene.update_cursor(/*true*/);
 
 	// TODO action
-	// if(fade_in){
-	// 	val.element->update_opacity(0.f);
-	// 	val.element->push_action<action::alpha_action>(5, 1.);
-	// }
+	if(fade_in){
+		val.element->update_opacity(0.f);
+		val.element->push_action<action::alpha_action>(10, nullptr, 1.);
+	}
 
 	drawSequence.push_back({val.element.get(), belowScene});
 	return val;

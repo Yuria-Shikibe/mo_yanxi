@@ -142,13 +142,13 @@ public:
 		return false;
 	}
 
-	void update(const float delta_in_ticks) override{
+	bool update(const float delta_in_ticks) override{
 		expired_.clear();
 
-		elem::update(delta_in_ticks);
-
-		if(is_sleep()) return;
+		if(!elem::update(delta_in_ticks))return false;
 		update_children(delta_in_ticks);
+
+		return true;
 	}
 
 	void draw_content(const rect clipSpace) const override{

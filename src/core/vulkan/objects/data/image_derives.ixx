@@ -4,14 +4,15 @@ module;
 
 export module mo_yanxi.vk:image_derives;
 
-import std;
+export import mo_yanxi.vk.universal_handle;
 import mo_yanxi.handle_wrapper;
 import mo_yanxi.vk.util;
 
 //TODO remove bitmap
 import mo_yanxi.graphic.bitmap;
-
 import :resources;
+
+import std;
 
 namespace mo_yanxi::vk{
 	export
@@ -25,12 +26,6 @@ namespace mo_yanxi::vk{
 	}
 
 	constexpr VkDeviceSize v = get_mipmap_pixels(4, 2);
-
-	export
-	struct image_handle{
-		VkImage image;
-		VkImageView image_view;
-	};
 
 	struct combined_image{
 	protected:
@@ -75,11 +70,6 @@ namespace mo_yanxi::vk{
 		return std::min(get_recommended_mip_level(extent.width, extent.height), ceil);
 	}
 
-	export
-	struct texture_buffer_write{
-		VkBuffer buffer;
-		VkRect2D region;
-	};
 
 	export
 	struct texture_bitmap_write{
@@ -94,8 +84,6 @@ namespace mo_yanxi::vk{
 		std::uint32_t layers{};
 		VkFormat format_{};
 
-		// image image;
-		// image_view image_view;
 	public:
 		[[nodiscard]] texture() = default;
 
@@ -270,6 +258,7 @@ namespace mo_yanxi::vk{
 
 			for(const texture_buffer_write& arg : args){
 				cmd::copy_buffer_to_image(command_buffer, arg.buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {VkBufferImageCopy{
+					.bufferOffset = arg.buffer_offset,
 					.imageSubresource = {
 						.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 						.mipLevel = 0,

@@ -51,14 +51,29 @@ void elem::draw_background() const{
 	if(style)style->draw(*this, bound_abs(), get_draw_opacity());
 }
 
-void elem::update(float delta_in_ticks){
+bool elem::update(float delta_in_ticks){
 	cursor_states_.update(delta_in_ticks);
 
+	if(sleep)return false;
 
 	if(cursor_states_.focused){
 		//TODO dependent above?
 		get_scene().tooltip_manager_.try_append_tooltip(*this, false);
 	}
+
+	for(float actionDelta = delta_in_ticks; !actions.empty();){
+		const auto& current = actions.front();
+
+		actionDelta = current->update(actionDelta, *this);
+
+		if(actionDelta >= 0) [[unlikely]] {
+			actions.pop_front();
+		} else{
+			break;
+		}
+	}
+
+	return true;
 }
 
 void elem::clear_scene_references() noexcept{

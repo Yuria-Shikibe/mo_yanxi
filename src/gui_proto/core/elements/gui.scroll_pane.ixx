@@ -93,7 +93,7 @@ namespace mo_yanxi::gui{
 			elem::on_focus_changed(is_focused);
 		}
 
-		void update(const float delta_in_ticks) override;
+		bool update(const float delta_in_ticks) override;
 
 		void draw_content(const rect clipSpace) const override;
 

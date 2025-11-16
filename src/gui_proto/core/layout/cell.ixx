@@ -60,12 +60,11 @@ namespace mo_yanxi::gui::layout{
 		void apply_to(
 			const elem& group,
 			elem& elem,
-			optional_mastering_extent cell_expected_restriction_extent) const{
+			optional_mastering_extent cell_expected_restriction_extent
+			)const{
 			elem.set_scaling(group.get_scaling() * scaling);
 			const auto extent = allocated_region.extent();
 
-			elem.set_rel_pos(get_relative_src(extent));
-			elem.update_abs_src(group.content_src_pos_abs());
 			elem.resize(extent, propagate_mask::lower);
 
 			if(!cell_expected_restriction_extent.width_pending()){
@@ -80,6 +79,15 @@ namespace mo_yanxi::gui::layout{
 			elem.try_layout();
 		}
 
+		void update_relative_src(elem& elem, math::vec2 parent_content_src) const{
+			elem.set_rel_pos(get_relative_src(allocated_region.extent()));
+			elem.update_abs_src(parent_content_src);
+		}
+
+		void update_relative_src(elem& elem, math::vec2 parent_content_src, float lerp_alpha) const{
+			elem.set_rel_pos(get_relative_src(allocated_region.extent()), lerp_alpha);
+			elem.update_abs_src(parent_content_src);
+		}
 
 	};
 

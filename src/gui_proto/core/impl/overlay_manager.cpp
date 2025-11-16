@@ -2,10 +2,21 @@ module mo_yanxi.gui.infrastructure;
 
 import :scene;
 
+import mo_yanxi.gui.action.generic;
 import mo_yanxi.utility;
 import mo_yanxi.graphic.renderer.ui;
 
 namespace mo_yanxi::gui{
+overlay_create_result<elem> overlay_manager::push_back(const overlay_layout& layout, elem_ptr&& elem_ptr, bool fade_in){
+	if(fade_in){
+		elem_ptr->update_opacity(0.f);
+		elem_ptr->push_action<action::alpha_action>(10, nullptr, 1.);
+	}
+	overlay& dlg = overlays_.emplace_back(overlay{std::move(elem_ptr), layout});
+	draw_sequence_.push_back(dlg.get());
+	return {dlg};
+}
+
 void overlay_manager::truncate(container::iterator where){
 	std::ranges::subrange rng{where, overlays_.end()};
 	for (const auto & dialog : rng){

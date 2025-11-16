@@ -191,7 +191,7 @@ void mo_yanxi::game::ui::hitbox_editor::build_menu(){
 }
 
 void mo_yanxi::game::ui::hitbox_editor::set_image_ref(const std::filesystem::path& path){
-	auto region = core::global::assets::atlas[graphic::image_page::name_temp].async_allocate(
+	auto region = core::global::assets::atlas["temp"].async_allocate(
 		{graphic::bitmap_path_load{path.string()}}
 	);
 

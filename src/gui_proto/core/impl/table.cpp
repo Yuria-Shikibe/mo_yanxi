@@ -246,7 +246,7 @@ math::vec2 table_layout_context::allocate_cells(
 	return restricted_allocate_pendings(cells, valid_size, layout_masters(cells, scaling));
 }
 
-void table_layout_context::place_cells(const std::span<cell_adaptor_type> cells, elem& parent, math::frect region){
+void table_layout_context::place_cells(const std::span<cell_adaptor_type> cells, table& parent, math::frect region){
 	auto view = cells | std::views::chunk_by([](const cell_adaptor_type& current, const cell_adaptor_type&){
 		return !current.line_feed;
 	}) | std::views::enumerate;
@@ -307,7 +307,7 @@ void table_layout_context::place_cells(const std::span<cell_adaptor_type> cells,
 						align::get_offset_of(elem.cell.align, cell_actuall_size, rect{cell_maximum_size});
 				elem.cell.allocated_region.set_size(cell_actuall_size);
 				elem.apply(parent, ext);
-
+				if(!parent.is_pos_smooth())elem.cell.update_relative_src(*elem.element, parent.content_src_pos_abs());
 			}
 
 

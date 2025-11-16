@@ -5,7 +5,7 @@ module;
 export module mo_yanxi.game.faction;
 
 import mo_yanxi.graphic.color;
-import mo_yanxi.graphic.image_manage;
+import mo_yanxi.graphic.image_atlas.util;
 
 import std;
 

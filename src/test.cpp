@@ -11,12 +11,20 @@ import mo_yanxi.gui.elem.collapser;
 import mo_yanxi.gui.elem.table;
 import mo_yanxi.gui.elem.grid;
 import mo_yanxi.gui.elem.menu;
+import mo_yanxi.gui.elem.label;
 
 void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
-	auto e = scene.create<gui::manual_table>();
+	auto e = scene.create<gui::scaling_stack>();
 	e->set_fill_parent({true, true});
-	auto& mroot = static_cast<gui::manual_table&>(root.insert(0, std::move(e)));
+	auto& mroot = static_cast<gui::scaling_stack&>(root.insert(0, std::move(e)));
 
+	auto hdl = mroot.create_back([](mo_yanxi::gui::label& label){
+		label.set_text("楼上的下来搞核桑，，!");
+		label.set_fit();
+	});
+	hdl.cell().region_scale = {.0f, .0f, .4f, 1.f};
+	hdl.cell().align = gui::align::pos::bottom_left;
+	/*
 	{
 		auto hdl = mroot.emplace_back<mo_yanxi::gui::scroll_pane>(gui::layout::layout_policy::vert_major);
 		hdl.cell().region_scale = {.0f, .0f, .4f, 1.f};
@@ -84,6 +92,8 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 			}
 		});
 	}
+	*/
+
 	{
 		auto hdl = mroot.create_back([](mo_yanxi::gui::menu& menu){
 			// menu.set_layout_policy(gui::layout::layout_policy::vert_major);
@@ -95,6 +105,7 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 
 					e.interactivity = gui::interactivity_flag::enabled;
 				}, [&](gui::sequence& e){
+					e.set_has_smooth_pos_animation(true);
 					e.set_expand_policy(gui::layout::expand_policy::passive);
 					e.template_cell.set_pad({4, 4});
 					for(int j = 0; j < i + 1; ++j){

@@ -8,8 +8,8 @@ import prototype.renderer.ui;
 import mo_yanxi.graphic.draw.instruction;
 
 namespace mo_yanxi::gui{
-void scroll_pane::update(const float delta_in_ticks){
-	elem::update(delta_in_ticks);
+bool scroll_pane::update(const float delta_in_ticks){
+	if(!elem::update(delta_in_ticks))return false;
 
 
 	{//scroll update
@@ -28,6 +28,8 @@ void scroll_pane::update(const float delta_in_ticks){
 	// prevRatio = getScrollRatio(scroll.base);
 
 	if(item)item->update(delta_in_ticks);
+
+	return true;
 }
 
 void scroll_pane::draw_content(const rect clipSpace) const{

@@ -4,7 +4,7 @@ module;
 #include <vk_mem_alloc.h>
 #include <cassert>
 
-module mo_yanxi.graphic.image_manage;
+module mo_yanxi.graphic.image_atlas;
 
 import mo_yanxi.vk.cmd;
 
@@ -63,14 +63,12 @@ namespace mo_yanxi::graphic{
 		}
 
 		fence_.wait_and_reset();
-		vk::cmd::submit_command(
-			context_->get_device().graphic_queue(1), command_buffer, fence_);
+		vk::cmd::submit_command(working_queue_, command_buffer, fence_);
 
 		running_command_buffer_ = std::move(command_buffer);
 
 
-		auto sz = using_buffer_.get_size();
-		if(sz > 0){
+		if(auto sz = using_buffer_.get_size(); sz > 0){
 			stagings.insert({sz, std::exchange(using_buffer_, std::move(buffer))});
 		}else{
 			using_buffer_ = std::move(buffer);
@@ -78,7 +76,8 @@ namespace mo_yanxi::graphic{
 
 
 		if(stagings.size() > 16){
-			//TODO better resource recycle
+			//TODO since stagings have fixed capacity, use array instead
+			//TODO better resource recycle, LRU?
 			stagings.clear();
 		}
 

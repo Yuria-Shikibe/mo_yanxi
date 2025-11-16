@@ -11,6 +11,7 @@ export import mo_yanxi.gui.flags;
 export import mo_yanxi.gui.util;
 
 export import mo_yanxi.gui.style.interface;
+export import mo_yanxi.gui.action;
 
 import mo_yanxi.math;
 import align;
@@ -158,6 +159,7 @@ private:
 	math::vec2 absolute_pos_{};
 	boarder boarder_{};
 	boarder style_boarder_cache_{style::get_default_style_drawer()->get_boarder()};
+	std::deque<action::action_ptr<elem>, mr::heap_allocator<action::action_ptr<elem>>> actions{scene_->get_heap_allocator()};
 
 public:
 	layout::optional_mastering_extent restriction_extent{};
@@ -208,6 +210,20 @@ public:
 	elem(elem&& other) noexcept = delete;
 	elem& operator=(const elem& other) = delete;
 	elem& operator=(elem&& other) noexcept = delete;
+
+#pragma region Action
+
+public:
+	template <std::derived_from<action::action<elem>> ActionType, typename... Args>
+		requires (std::constructible_from<ActionType, mr::heap_allocator<>, Args&&...>)
+	ActionType& push_action(Args&&... args){
+		auto& ptr = actions.emplace_back(std::in_place_type<ActionType>, get_scene().get_heap_allocator(), std::forward<Args>(args)...);
+		auto& ref = static_cast<ActionType&>(*ptr);
+		return ref;
+	}
+
+
+#pragma endregion
 
 #pragma region Tooltip
 
@@ -348,7 +364,7 @@ public:
 #pragma region Behavior
 public:
 
-	virtual void update(float delta_in_ticks);
+	virtual bool update(float delta_in_ticks);
 
 	void clear_scene_references() noexcept;
 	void clear_scene_references_recursively() noexcept{
@@ -644,6 +660,16 @@ public:
 
 	constexpr void set_rel_pos(math::vec2 p) noexcept{
 		relative_pos_ = p;
+	}
+
+	constexpr void set_rel_pos(math::vec2 p, float lerp_alpha) noexcept{
+		if(lerp_alpha <= 0)return;
+		const auto approch = p - relative_pos_;
+		if(approch.is_zero(std::numeric_limits<float>::epsilon() * 16) || lerp_alpha >= 1.f){
+			relative_pos_ = p;
+		}else{
+			relative_pos_ = math::fma(approch, lerp_alpha, relative_pos_);
+		}
 	}
 
 

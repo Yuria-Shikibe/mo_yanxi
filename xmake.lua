@@ -104,6 +104,7 @@ target("mo_yanxi")
     add_includedirs("submodules/small_vector/source/include")
     add_includedirs("submodules/tim_sort/include")
     add_includedirs("submodules/stb")
+    add_includedirs("submodules/rectangle_bin_pack")
 
     local vulkan_sdk = os.getenv("VULKAN_SDK")
 

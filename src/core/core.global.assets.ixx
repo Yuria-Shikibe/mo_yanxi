@@ -4,7 +4,7 @@
 
 export module mo_yanxi.core.global.assets;
 
-export import mo_yanxi.graphic.image_manage;
+export import mo_yanxi.graphic.image_atlas;
 export import mo_yanxi.font.manager;
 
 namespace mo_yanxi::core::global::assets{
