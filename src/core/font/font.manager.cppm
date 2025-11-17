@@ -116,6 +116,7 @@ export namespace mo_yanxi::font{
 		string_hash_map<font_face> fontFaces{};
 		font_index_hash_map face_to_index{};
 
+		std::mutex mutex_{};
 
 		[[nodiscard]] static std::string format(const unsigned idx, const char_code code, const glyph_size_type size){
 			return std::format("{}.{:#X}|{},{}", idx, std::bit_cast<int>(code), size.x, size.y);
@@ -139,7 +140,8 @@ export namespace mo_yanxi::font{
 			return *fontPage;
 		}
 
-		[[nodiscard]] face_id get_face_id(const font_face& ff) noexcept{
+	private:
+		[[nodiscard]] face_id get_face_id(const font_face& ff){
 			const concat_string_view sv{ff.face().get_family_name(), ff.face().get_face_index()};
 			if(auto itr = face_to_index.find(sv); itr != face_to_index.end()){
 				return itr->second;
@@ -148,14 +150,20 @@ export namespace mo_yanxi::font{
 			auto idx = face_to_index.size();
 			return face_to_index.try_emplace(sv, idx).first->second;
 		}
+	public:
 
 		[[nodiscard]] glyph get_glyph_exact(font_face& ff, const glyph_identity key){
+			std::lock_guard _{mutex_};
 			const auto ptr = ff.obtain(key.code, key.size);
 
 			if(!is_space(key.code)){
 				auto name = format(get_face_id(ff), key.code, key.size);
-				auto gen = ptr.get_generator(key.size.x, key.size.y);
 
+				if(const auto prev = page().find(name)){
+					return glyph{ptr, *prev};
+				}
+
+				const auto gen = ptr.get_generator(key.size.x, key.size.y);
 				const auto aloc = page().register_named_region(std::move(name),
 					graphic::image_load_description{
 						graphic::sdf_load{

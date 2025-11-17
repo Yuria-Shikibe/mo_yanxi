@@ -17,6 +17,8 @@ import mo_yanxi.gui.util;
 export import mo_yanxi.input_handle;
 export import mo_yanxi.gui.alloc;
 
+export import mo_yanxi.react_flow;
+
 
 namespace mo_yanxi::gui{
 
@@ -69,12 +71,21 @@ protected:
 	mr::heap_vector<elem*> last_inbounds_{mr::heap_allocator<elem*>{get_heap()}};
 	mr::heap_uset<elem*> independent_layouts_{mr::heap_allocator<elem*>{get_heap()}};
 
+	//TODO adopt with allocator
+	std::unique_ptr<react_flow::manager> react_flow_{std::make_unique<react_flow::manager>()};
+
+	std::unordered_multimap<
+		const elem*, referenced_ptr<react_flow::node>,
+		std::hash<const elem*>, std::equal_to<const elem*>,
+		mr::heap_allocator<std::pair<const elem* const, referenced_ptr<react_flow::node>>>>
+	elem_owned_nodes_{};
+
+
 	//must be the first to destruct
 	elem_ptr root_{};
 
 	tooltip::tooltip_manager tooltip_manager_{get_heap_allocator()};
 	overlay_manager overlay_manager_{get_heap_allocator()};
-
 
 	[[nodiscard]] scene_base() = default;
 
@@ -136,11 +147,25 @@ public:
 		if(focus_key_ == target)focus_key_ = nullptr;
 	}
 
+	[[nodiscard]] react_flow::manager& get_react_flow() const noexcept{
+		return *react_flow_;
+	}
+
+protected:
+	void drop_elem_nodes(const elem* elem) noexcept{
+		auto [begin, end] = elem_owned_nodes_.equal_range(elem);
+		for(auto cur = begin; cur != end; ++cur){
+			cur->second->disconnect_self_from_context();
+		}
+		elem_owned_nodes_.erase(begin, end);
+	}
 
 private:
 	[[nodiscard]] mi_heap_t* get_heap() const noexcept{
 		return resource_.get();
 	}
+
+
 };
 
 
@@ -179,6 +204,23 @@ public:
 			overlay_manager_.push_back(layout, elem_ptr{*this, nullptr, std::in_place_type<T>, std::forward<Args>(args)...})
 		);
 	}
+
+	template <typename T, typename ...Args>
+	[[nodiscard]] T& request_independent_react_node(Args&& ...args){
+		return react_flow_->add_node<T>( std::forward<Args>(args)...);
+	}
+
+	bool erase_independent_react_node(react_flow::node& node, bool disconnect_it) noexcept {
+		return react_flow_->erase_node(node, disconnect_it);
+	}
+
+	template <typename T, std::derived_from<elem> E, typename ...Args>
+	referenced_ptr<T> request_react_node(E& elem, Args&& ...args){
+		referenced_ptr<T> ptr = react_flow_->make_node<T>(elem, std::forward<Args>(args)...);
+		elem_owned_nodes_.insert({std::addressof(elem), react_flow::node_ptr{ptr}});
+		return ptr;
+	}
+
 
 
 private:
@@ -229,7 +271,7 @@ private:
 
 	void swap_focus(elem* newFocus);
 
-	void drop_all_focus(const elem* target) noexcept;
+	void drop_(const elem* target) noexcept;
 
 	void notify_isolated_layout_update(elem* element){
 		independent_layouts_.insert(element);

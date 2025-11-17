@@ -106,8 +106,6 @@ namespace mo_yanxi::font::typesetting{
 		math::vec2 correct_scale{};
 
 		[[nodiscard]] FORCE_INLINE math::frect get_draw_bound() const noexcept{
-			CHECKED_ASSUME(correct_scale.x >= 0);
-			CHECKED_ASSUME(correct_scale.y >= 0);
 			return region.copy().expand(font_draw_expand * correct_scale);
 		}
 

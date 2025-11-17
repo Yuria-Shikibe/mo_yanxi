@@ -55,7 +55,7 @@ protected:
 		on_update();
 	}
 
-	void update(manager& manager, std::size_t, const void* in_data_pass_by_copy) override{
+	void on_push(manager& manager, std::size_t, const void* in_data_pass_by_copy) override{
 		const T& target = *static_cast<const T*>(in_data_pass_by_copy);
 
 		data_ = target;
@@ -100,7 +100,7 @@ struct modifier_base : type_aware_node<Ret>{
 	using arg_type = std::tuple<std::remove_const_t<Args>...>;
 
 private:
-	std::array<referenced_ptr<node>, arg_count> parents{};
+	std::array<node_ptr, arg_count> parents{};
 	std::vector<successor_entry> successors{};
 
 	async_type async_type_{};
@@ -143,7 +143,7 @@ public:
 	[[nodiscard]] data_state get_data_state() const noexcept override{
 		data_state states{};
 
-		for(const referenced_ptr<node>& p : parents){
+		for(const node_ptr& p : parents){
 			update_state_enum(states, p->get_data_state());
 		}
 
@@ -154,7 +154,7 @@ public:
 		return std::span{in_type_indices};
 	}
 
-	void erase_self_from_context() noexcept final{
+	void disconnect_self_from_context() noexcept final{
 		for(std::size_t i = 0; i < parents.size(); ++i){
 			if(auto& ptr = parents[i]){
 				static_cast<node&>(*ptr).erase_successors_impl(i, *this);
@@ -167,7 +167,7 @@ public:
 		successors.clear();
 	}
 
-	[[nodiscard]] std::span<const referenced_ptr<node>> get_inputs() const noexcept final{
+	[[nodiscard]] std::span<const node_ptr> get_inputs() const noexcept final{
 		return parents;
 	}
 
@@ -176,8 +176,8 @@ public:
 	}
 
 private:
-	void async_resume(manager& manager, const void* data) const{
-		this->update_children(manager, *static_cast<const Ret*>(data));
+	void async_resume(manager& manager, Ret& data) const{
+		this->update_children(manager, data);
 	}
 
 	bool connect_successors_impl(std::size_t slot, node& post) final{
@@ -229,7 +229,7 @@ protected:
 		}
 	}
 
-	void update_children(manager& manager, const Ret& val) const{
+	virtual void update_children(manager& manager, Ret& val) const{
 		for(const successor_entry& successor : this->successors){
 			successor.update(manager, val);
 		}
@@ -247,11 +247,11 @@ protected:
 		}(std::index_sequence_for<Args...>());
 	}
 
-	virtual std::optional<Ret> operator()(const std::stop_token& stop_token, Args&&... args) const{
+	virtual std::optional<Ret> operator()(const std::stop_token& stop_token, Args&&... args){
 		return this->operator()(stop_token, std::as_const(args)...);
 	}
 
-	virtual std::optional<Ret> operator()(const std::stop_token& stop_token, const Args&... args) const = 0;
+	virtual std::optional<Ret> operator()(const std::stop_token& stop_token, const Args&... args) = 0;
 
 	virtual bool load_argument_to(arg_type& arguments, bool allow_expired){
 		return [&, this]<std::size_t ... Idx>(std::index_sequence<Idx...>){
@@ -292,7 +292,7 @@ public:
 		--modifier_->dispatched_count_;
 
 		if(rst_cache_){
-			modifier_->async_resume(manager, std::addressof(rst_cache_.value()));
+			modifier_->async_resume(manager, rst_cache_.value());
 		}
 	}
 
@@ -331,7 +331,7 @@ struct modifier_transient : modifier_base<Ret, Args...>{
 	}
 
 protected:
-	void update(manager& manager, std::size_t target_index, const void* in_data_pass_by_copy) override{
+	void on_push(manager& manager, std::size_t target_index, const void* in_data_pass_by_copy) override{
 		typename base::arg_type arguments{};
 
 		bool any_failed{false};
@@ -341,7 +341,7 @@ protected:
 				if(I == target_index){
 					std::get<I>(arguments) = *static_cast<const Ty*>(in_data_pass_by_copy);
 				}else{
-					auto& n = *static_cast<const referenced_ptr<node>&>(this->get_inputs()[I]);
+					auto& n = *static_cast<const node_ptr&>(this->get_inputs()[I]);
 					if(auto rst = node_type_cast<Ty>(n).request(true)){
 						std::get<I>(arguments) = std::move(rst).value();
 					}else{
@@ -421,7 +421,7 @@ public:
 	}
 
 protected:
-	void update(manager& manager, std::size_t slot, const void* in_data_pass_by_copy) override{
+	void on_push(manager& manager, std::size_t slot, const void* in_data_pass_by_copy) override{
 		assert(slot < base::arg_count);
 		update_data(slot, in_data_pass_by_copy);
 
@@ -463,7 +463,7 @@ private:
 			([&, this]<std::size_t I>(){
 				if(!dirty[I])return;
 
-				node& n = *static_cast<const referenced_ptr<node>&>(this->get_inputs()[Idx]);
+				node& n = *static_cast<const node_ptr&>(this->get_inputs()[Idx]);
 				if(auto rst = node_type_cast<std::tuple_element_t<Idx, typename base::arg_type>>(n).request(false)){
 					dirty.set(I, false);
 					std::get<Idx>(arguments) = std::move(rst).value();
@@ -492,7 +492,7 @@ private:
 	bool is_expired_{};
 	bool is_lazy_{};
 
-	referenced_ptr<node> parent{};
+	node_ptr parent{};
 	std::vector<successor_entry> successors{};
 
 public:
@@ -519,7 +519,7 @@ protected:
 		std::ranges::for_each(successors, &successor_entry::mark_updated);
 	}
 
-	void update(manager& manager, std::size_t from_index, const void* in_data_pass_by_copy) override{
+	void on_push(manager& manager, std::size_t from_index, const void* in_data_pass_by_copy) override{
 		cache_ = static_cast<T*>(in_data_pass_by_copy);
 		is_expired_ = false;
 
@@ -532,7 +532,7 @@ protected:
 		}
 	}
 
-	void erase_self_from_context() noexcept final{
+	void disconnect_self_from_context() noexcept final{
 		for (const auto & successor : successors){
 			successor.entity->erase_predecessor_impl(successor.index, *this);
 		}
@@ -542,7 +542,7 @@ protected:
 	}
 
 
-	[[nodiscard]] std::span<const referenced_ptr<node>> get_inputs() const noexcept final{
+	[[nodiscard]] std::span<const node_ptr> get_inputs() const noexcept final{
 		return {&parent, 1};
 	}
 

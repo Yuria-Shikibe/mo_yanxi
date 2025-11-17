@@ -4,6 +4,8 @@ import mo_yanxi.gui.infrastructure;
 import mo_yanxi.gui.infrastructure.group;
 import mo_yanxi.gui.global;
 
+import mo_yanxi.react_flow;
+
 import mo_yanxi.gui.elem.manual_table;
 import mo_yanxi.gui.elem.sequence;
 import mo_yanxi.gui.elem.scroll_pane;
@@ -13,15 +15,18 @@ import mo_yanxi.gui.elem.grid;
 import mo_yanxi.gui.elem.menu;
 import mo_yanxi.gui.elem.label;
 
-void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
+void test::build_main_ui(gui::scene& scene, gui::loose_group& root, mo_yanxi::react_flow::node& console_input){
 	auto e = scene.create<gui::scaling_stack>();
 	e->set_fill_parent({true, true});
 	auto& mroot = static_cast<gui::scaling_stack&>(root.insert(0, std::move(e)));
 
-	auto hdl = mroot.create_back([](mo_yanxi::gui::label& label){
-		label.set_text("楼上的下来搞核桑，，!");
-		label.set_fit();
+	auto& layoutnode = scene.request_independent_react_node<mo_yanxi::gui::label_layout_node>();
+	layoutnode.connect_predecessor(console_input);
+
+	auto hdl = mroot.create_back([&](mo_yanxi::gui::async_label& label){
+		label.set_dependency(layoutnode);
 	});
+
 	hdl.cell().region_scale = {.0f, .0f, .4f, 1.f};
 	hdl.cell().align = gui::align::pos::bottom_left;
 	/*
@@ -101,10 +106,10 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root){
 			menu.get_head_template_cell().set_size(240).set_pad({4, 4});
 
 			for(int i = 0; i < 4; ++i){
-				auto hdl = menu.create_back([](gui::elem& e){
+				auto hdl = menu.create_back([](mo_yanxi::gui::elem& e){
 
 					e.interactivity = gui::interactivity_flag::enabled;
-				}, [&](gui::sequence& e){
+				}, [&](mo_yanxi::gui::sequence& e){
 					e.set_has_smooth_pos_animation(true);
 					e.set_expand_policy(gui::layout::expand_policy::passive);
 					e.template_cell.set_pad({4, 4});

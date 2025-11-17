@@ -47,6 +47,7 @@ export enum struct data_state{
 
 ENUM_COMPARISON_OPERATORS(data_state, export)
 
+export
 template <typename T>
 using request_pass_handle = std::expected<data_package_optimal<T>, data_state>;
 
@@ -114,6 +115,8 @@ struct intermediate_cache;
 
 export struct node;
 
+export
+using node_ptr = referenced_ptr<node>;
 
 /**
  * @brief 判断在 n0 的 output 中加入 n1 后是否会形成环
@@ -153,7 +156,7 @@ struct node : referenced_object{
 		return data_state::failed;
 	}
 
-	[[nodiscard]] virtual std::span<const referenced_ptr<node>> get_inputs() const noexcept{
+	[[nodiscard]] virtual std::span<const node_ptr> get_inputs() const noexcept{
 		return {};
 	}
 
@@ -243,7 +246,7 @@ struct node : referenced_object{
 		return prev.disconnect_successors(*this);
 	}
 
-	virtual void erase_self_from_context() noexcept{
+	virtual void disconnect_self_from_context() noexcept{
 	}
 
 protected:
@@ -270,7 +273,7 @@ protected:
 	 * @param manager
 	 * @param in_data_pass_by_copy ptr to const data, provided by parent
 	 */
-	virtual void update(manager& manager, std::size_t from_index, const void* in_data_pass_by_copy){
+	virtual void on_push(manager& manager, std::size_t from_index, const void* in_data_pass_by_copy){
 	}
 
 	/**
@@ -347,7 +350,8 @@ struct type_aware_node : node{
 template <typename T>
 type_aware_node<T>& node_type_cast(node& node) noexcept(!MO_YANXI_DATA_FLOW_ENABLE_TYPE_CHECK){
 #if MO_YANXI_DATA_FLOW_ENABLE_TYPE_CHECK
-	if(node.get_out_socket_type_index() != unstable_type_identity_of<T>()){
+	auto idt = node.get_out_socket_type_index();
+	if( idt != unstable_type_identity_of<T>()){
 		throw invalid_node{"Node type NOT match"};
 	}
 #endif
@@ -356,7 +360,7 @@ type_aware_node<T>& node_type_cast(node& node) noexcept(!MO_YANXI_DATA_FLOW_ENAB
 
 struct successor_entry{
 	std::size_t index;
-	referenced_ptr<node> entity;
+	node_ptr entity;
 
 	[[nodiscard]] successor_entry() = default;
 
@@ -368,7 +372,7 @@ struct successor_entry{
 	template <typename T>
 	void update(manager& manager, const T& data) const{
 		assert(unstable_type_identity_of<T>() == entity->get_in_socket_type_index()[index]);
-		entity->update(manager, index, std::addressof(data));
+		entity->on_push(manager, index, std::addressof(data));
 	}
 
 	void mark_updated() const{
@@ -418,7 +422,7 @@ struct provider_general : type_aware_node<T>{
 	}
 
 
-	void erase_self_from_context() noexcept final{
+	void disconnect_self_from_context() noexcept final{
 		for(const auto& successor : successors){
 			successor.entity->disconnect_predecessor(successor.index, *this);
 		}
@@ -457,12 +461,12 @@ struct terminal_cached;
 template <typename T>
 struct terminal : type_aware_node<T>{
 private:
-	referenced_ptr<node> parent{};
+	node_ptr parent{};
 
 public:
 	static constexpr data_type_index node_data_type_index = unstable_type_identity_of<T>();
 
-	[[nodiscard]] std::span<const referenced_ptr<node>> get_inputs() const noexcept final{
+	[[nodiscard]] std::span<const node_ptr> get_inputs() const noexcept final{
 		return {&parent, 1};
 	}
 
@@ -486,9 +490,11 @@ public:
 		}
 	}
 
-	void erase_self_from_context() noexcept final{
-		parent->erase_successors_impl(0, *this);
-		parent.reset();
+	void disconnect_self_from_context() noexcept final{
+		if(parent){
+			parent->erase_successors_impl(0, *this);
+			parent.reset();
+		}
 	}
 
 	request_pass_handle<T> request_raw(const bool allow_expired) override{
@@ -521,7 +527,7 @@ private:
 	friend terminal_cached<T>;
 	bool is_expired_{};
 
-	void update(manager& manager, const std::size_t from_index, const void* in_data_pass_by_copy) final{
+	void on_push(manager& manager, const std::size_t from_index, const void* in_data_pass_by_copy) final{
 		assert(from_index == 0);
 		this->on_update(*static_cast<const T*>(in_data_pass_by_copy));
 	}

@@ -55,8 +55,8 @@ namespace mo_yanxi::font::typesetting{
 
 		bound.max_height({
 				.width = 0,
-				.ascender = placementPos.y - current.region.get_src_y(),
-				.descender = current.region.get_end_y() - placementPos.y
+				.ascender = placementPos.y - current.region.get_src_y() + 6,
+				.descender = current.region.get_end_y() - placementPos.y + 6
 			});
 		bound.width = std::max(bound.width, current.region.get_end_x());
 		pen_advance += advance;
@@ -216,12 +216,6 @@ namespace mo_yanxi::font::typesetting{
 
 		this->operator()(layout, context, formatted_text);
 	}
-
-
-
-
-
-
 
 	tokenized_text::tokenized_text(const std::string_view string, const token_sentinel sentinel){
 		static constexpr auto InvalidPos = std::string_view::npos;

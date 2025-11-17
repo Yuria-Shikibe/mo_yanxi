@@ -26,6 +26,8 @@ import mo_yanxi.vk.universal_handle;
 
 import mo_yanxi.heterogeneous;
 import mo_yanxi.condition_variable_single;
+import mo_yanxi.mpsc_queue;
+import mo_yanxi.utility;
 
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.io.image;
@@ -34,8 +36,6 @@ import std;
 
 namespace mo_yanxi::graphic{
 constexpr math::usize2 DefaultTexturePageSize = math::vectors::constant2<std::uint32_t>::base_vec2 * (4096);
-
-struct image_page_base;
 
 using region_type = combined_image_region<size_awared_uv<uniformed_rect_uv>>;
 
@@ -157,52 +157,75 @@ struct allocated_image_load_description{
 	math::urect region{};
 };
 
+struct texture_allocation_request{
+	VkExtent2D extent;
+	VkClearColorValue clear_color_value;
+	std::atomic<vk::texture*>* done_ptr;
+};
+
+struct async_loader_task{
+	using variant_t = std::variant<allocated_image_load_description, texture_allocation_request>;
+	variant_t task;
+};
+
 struct async_image_loader{
 private:
 	VkQueue working_queue_{};
 	vk::allocator async_allocator_{};
 	vk::command_pool command_pool_{};
 	vk::command_buffer running_command_buffer_{};
-	vk::fence fence_{};
+	vk::fence region_fence_{};
+	vk::fence allocation_fence_{};
 
 	vk::buffer using_buffer_{};
 
 	std::multimap<VkDeviceSize, vk::buffer> stagings{};
-	std::mutex queue_mutex{};
-	condition_variable_single queue_cond{};
-	std::vector<allocated_image_load_description> queue{};
+
+	std::mutex region_queue_mutex{};
+	condition_variable_single region_queue_cond{};
+	std::vector<async_loader_task> region_queue{};
+
 
 	std::atomic_flag loading{};
 
 	std::jthread working_thread{};
 
 	static void work_func(std::stop_token stop_token, async_image_loader& self){
-		std::vector<allocated_image_load_description> dumped_queue{};
+		std::vector<async_loader_task> dumped_queue{};
 
 		while(!stop_token.stop_requested()){
 			{
-				std::unique_lock lock(self.queue_mutex);
+				std::unique_lock lock(self.region_queue_mutex);
 
-				self.queue_cond.wait(lock, [&]{
-					return !self.queue.empty() || stop_token.stop_requested();
+				self.region_queue_cond.wait(lock, [&]{
+					return !self.region_queue.empty() || stop_token.stop_requested();
 				});
 
-				dumped_queue = std::exchange(self.queue, {});
+				dumped_queue = std::exchange(self.region_queue, {});
 			}
 
 			self.loading.test_and_set(std::memory_order::relaxed);
 			for(auto& desc : dumped_queue){
 				if(stop_token.stop_requested()) break;
-				self.load(std::move(desc));
+				std::visit(overload{
+					[&self](allocated_image_load_description& desc){
+						self.load(std::move(desc));
+					},
+					[&self](texture_allocation_request& desc){
+						self.load(desc);
+					},
+				}, desc.task);
 			}
 			self.loading.clear(std::memory_order::release);
 			self.loading.notify_all();
 		}
 
-		self.fence_.wait();
+		self.region_fence_.wait();
 	}
 
 	void load(allocated_image_load_description&& desc);
+
+	void load(const texture_allocation_request& desc);
 
 public:
 	[[nodiscard]] async_image_loader() = default;
@@ -216,7 +239,8 @@ public:
 	working_queue_{working_queue},
 	async_allocator_(vk::allocator(context, VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT)),
 	command_pool_(context.device, graphic_family_index, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT),
-	fence_(context.device, true),
+	region_fence_(context.device, true),
+	allocation_fence_(context.device, false),
 	working_thread([](std::stop_token stop_token, async_image_loader& self){
 		work_func(std::move(stop_token), self);
 	}, std::ref(*this)){
@@ -224,10 +248,18 @@ public:
 
 	void push(allocated_image_load_description&& desc){
 		{
-			std::lock_guard lock(queue_mutex);
-			queue.push_back(std::move(desc));
+			std::lock_guard lock(region_queue_mutex);
+			region_queue.emplace_back(std::move(desc));
 		}
-		queue_cond.notify_one();
+		region_queue_cond.notify_one();
+	}
+
+	void push(const texture_allocation_request& desc){
+		{
+			std::lock_guard lock(region_queue_mutex);
+			region_queue.emplace_back(desc);
+		}
+		region_queue_cond.notify_one();
 	}
 
 	void wait() const noexcept{
@@ -242,9 +274,9 @@ public:
 
 	~async_image_loader(){
 		working_thread.request_stop();
-		queue_cond.notify_one();
+		region_queue_cond.notify_one();
 		wait();
-		fence_.wait();
+		region_fence_.wait();
 	}
 };
 
@@ -275,15 +307,19 @@ struct image_register_result{
 	bool inserted;
 };
 
-struct image_page_base{
+export
+struct image_page{
 private:
 	async_image_loader* loader_{};
 	vk::allocator* allocator_{};
-	vk::command_buffer temp_commandbuf_{};
-	VkQueue queue_{};
 
 	math::usize2 page_size_{};
+
+	std::mutex subpage_mtx_{};
 	plf::hive<sub_page> subpages_{};
+	std::atomic<vk::texture*> ptr_to_texture_temp_{nullptr};
+	std::atomic<sub_page*> task_post_lock_{};
+
 	VkClearColorValue clear_color_{};
 	std::uint32_t margin{};
 
@@ -291,52 +327,35 @@ private:
 	std::unordered_set<allocated_image_region*> protected_regions{};
 
 public:
-	[[nodiscard]] image_page_base() = default;
+	[[nodiscard]] image_page() = default;
 
-	[[nodiscard]] explicit image_page_base(
+	[[nodiscard]] explicit image_page(
 		async_image_loader& loader,
 		vk::allocator& allocator,
-		vk::command_buffer&& command_buffer,
-		VkQueue queue,
 		const math::usize2 page_size = DefaultTexturePageSize,
 		const VkClearColorValue& clear_color = {},
 		const std::uint32_t margin = 4)
 	:
 	loader_(&loader),
 	allocator_(&allocator),
-	temp_commandbuf_(std::move(command_buffer)),
-	queue_(queue),
 	page_size_(page_size),
 	clear_color_(clear_color),
 	margin(margin){
+		loader_->push(texture_allocation_request{
+					.extent = {page_size_.x, page_size_.y},
+					.clear_color_value = clear_color_,
+					.done_ptr = &ptr_to_texture_temp_
+				});
+
+		sub_page* sub_page = &*subpages_.emplace(page_size_);
+		ptr_to_texture_temp_.wait(nullptr, std::memory_order::relaxed);
+		sub_page->texture = std::move(*ptr_to_texture_temp_.load(std::memory_order::acquire));
+
+		ptr_to_texture_temp_.store(nullptr, std::memory_order_release);
+		ptr_to_texture_temp_.notify_one();
 	}
 
 private:
-	sub_page& add_page(vk::allocator& allocator, VkCommandBuffer command_buffer){
-		//TODO dynamic page size to handle large image?
-		auto& subpage = *subpages_.emplace(allocator, VkExtent2D{page_size_.x, page_size_.y});
-
-		vk::cmd::clear_color(
-			command_buffer,
-			subpage.texture.get_image(),
-			clear_color_,
-			{
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel = 0,
-				.levelCount = subpage.texture.get_mip_level(),
-				.baseArrayLayer = 0,
-				.layerCount = subpage.texture.get_layers()
-			},
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-			VK_ACCESS_NONE,
-			VK_ACCESS_SHADER_READ_BIT,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-		);
-
-		return subpage;
-	}
-
 	allocated_image_region async_load(image_load_description&& desc, page_acquire_result&& result) const{
 		loader_->push({
 				.texture = *result.handle,
@@ -354,67 +373,65 @@ public:
 		image_load_description&& desc
 	){
 		const auto extent = desc.get_extent();
-
-		for(auto& subpass : subpages_){
-			if(auto rst = subpass.acquire(extent, margin)){
-				return async_load(std::move(desc), std::move(rst.value()));
-			}
-		}
-
-		clear_unused();
-
-		for(auto& subpass : subpages_){
-			if(auto rst = subpass.acquire(extent, margin)){
-				return async_load(std::move(desc), std::move(rst.value()));
-			}
-		}
-
-		prepare_command(temp_commandbuf_);
-		auto& newSubpage = add_page(*allocator_, temp_commandbuf_);
-		submit_command(temp_commandbuf_, queue_);
-		auto rst = newSubpage.acquire(extent, margin);
-
-		if(!rst){
+		if(extent.x > page_size_.x || extent.y > page_size_.y){
 			throw bad_image_allocation{};
 		}
 
-		return async_load(std::move(desc), std::move(rst.value()));
-	}
+		while(true){
+			//TODO optimize the mutex
+			{
+				std::lock_guard _{subpage_mtx_};
+				for(auto& subpass : subpages_){
+					if(auto rst = subpass.acquire(extent, margin)){
+						return async_load(std::move(desc), std::move(rst.value()));
+					}
+				}
+			}
 
-	//TODO support offset
-	[[nodiscard]] allocated_image_region allocate(
-		VkBuffer buffer,
-		math::usize2 extent
-	){
-		prepare_command(temp_commandbuf_);
+			clear_unused();
 
-		for(auto& subpass : subpages_){
-			if(auto rst = subpass.push(temp_commandbuf_, buffer, extent, margin)){
-				submit_command(temp_commandbuf_, queue_);
-				return std::move(rst.value());
+			{
+				std::lock_guard _{subpage_mtx_};
+				for(auto& subpass : subpages_){
+					if(auto rst = subpass.acquire(extent, margin)){
+						return async_load(std::move(desc), std::move(rst.value()));
+					}
+				}
+			}
+
+			sub_page* sub_page{};
+			if(task_post_lock_.exchange(nullptr, std::memory_order_relaxed)){
+				try{
+					loader_->push(texture_allocation_request{
+						.extent = {page_size_.x, page_size_.y},
+						.clear_color_value = clear_color_,
+						.done_ptr = &ptr_to_texture_temp_
+					});
+
+					{
+						std::lock_guard _{subpage_mtx_};
+						sub_page = &*subpages_.emplace(page_size_);
+					}
+				}catch(...){
+					task_post_lock_.store(&*subpages_.rbegin(), std::memory_order_release);
+					throw;
+				}
+
+				ptr_to_texture_temp_.wait(nullptr, std::memory_order::relaxed);
+				sub_page->texture = std::move(*ptr_to_texture_temp_.load(std::memory_order::acquire));
+
+				task_post_lock_.store(&*subpages_.rbegin(), std::memory_order_release);
+
+				ptr_to_texture_temp_.store(nullptr, std::memory_order_release);
+				ptr_to_texture_temp_.notify_one();
+			}else{
+				while(task_post_lock_.compare_exchange_strong(sub_page, nullptr, std::memory_order_relaxed, std::memory_order_acquire)){}
+			}
+
+			if(auto rst = sub_page->acquire(extent, margin)){
+				return async_load(std::move(desc), std::move(rst.value()));
 			}
 		}
-
-		clear_unused();
-
-		for(auto& subpass : subpages_){
-			if(auto rst = subpass.push(temp_commandbuf_, buffer, extent, margin)){
-				submit_command(temp_commandbuf_, queue_);
-				return std::move(rst.value());
-			}
-		}
-
-		auto& newSubpage = add_page(*allocator_, temp_commandbuf_);
-		auto rst = newSubpage.push(temp_commandbuf_, buffer, extent, margin);
-
-		if(!rst){
-			vkEndCommandBuffer(temp_commandbuf_);
-			vkResetCommandBuffer(temp_commandbuf_, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
-			throw std::invalid_argument("Invalid region size");
-		}
-
-		submit_command(temp_commandbuf_, queue_);
-		return std::move(rst.value());
 	}
 
 	template <typename Str, typename T>
@@ -488,6 +505,11 @@ public:
 		return self.named_image_regions.at(localName);
 	}
 
+
+	~image_page(){
+		drop();
+	}
+
 protected:
 	void drop(){
 		for (auto& protected_region : protected_regions){
@@ -498,35 +520,11 @@ protected:
 };
 
 export
-struct image_page : image_page_base{
-	using image_page_base::image_page_base;
-
-	~image_page(){
-		drop();
-	}
-
-	image_page(const image_page& other) = delete;
-
-	image_page(image_page&& other) noexcept = default;
-
-	image_page& operator=(const image_page& other) = delete;
-
-	image_page& operator=(image_page&& other) noexcept{
-		if(this == &other) return *this;
-		drop();
-		image_page_base::operator =(std::move(other));
-		return *this;
-	}
-};
-
-export
 struct image_atlas{
 private:
 	vk::allocator* allocator_{};
-	vk::command_pool command_pool_{};
-	VkQueue default_allocation_queue_{};
-	string_hash_map<image_page> pages{};
 	std::unique_ptr<async_image_loader> async_image_loader_{};
+	string_hash_map<image_page> pages{};
 
 public:
 	[[nodiscard]] image_atlas() = default;
@@ -534,12 +532,9 @@ public:
 	[[nodiscard]] image_atlas(
 	vk::allocator& allocator,
 	std::uint32_t graphic_family_index,
-	VkQueue loader_working_queue,
-	VkQueue default_allocation_queue
+	VkQueue loader_working_queue
 	) :
 	allocator_(std::addressof(allocator)),
-	command_pool_{allocator.get_device(), graphic_family_index, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT},
-	default_allocation_queue_{default_allocation_queue},
 	async_image_loader_{std::make_unique<async_image_loader>(allocator.get_context_info(), graphic_family_index, loader_working_queue)}{
 	}
 
@@ -548,14 +543,14 @@ public:
 		const VkClearColorValue& clearColor = {},
 		const math::usize2 size = DefaultTexturePageSize,
 		const std::uint32_t margin = 4){
-		return pages.try_emplace(name, image_page{*async_image_loader_, *allocator_,  command_pool_.obtain(), default_allocation_queue_, size, clearColor, margin}).first->second;
+		return pages.try_emplace(name, *async_image_loader_, *allocator_, size, clearColor, margin).first->second;
 	}
 
 	image_page& operator[](const std::string_view name){
 		if(auto itr = pages.find(name); itr != pages.end()){
 			return itr->second;
 		}else{
-			return pages.try_emplace(name, image_page{*async_image_loader_, *allocator_,  command_pool_.obtain(), default_allocation_queue_, DefaultTexturePageSize, {}, 4}).first->second;
+			return create_image_page(name);
 		}
 
 	}
@@ -596,8 +591,7 @@ public:
 			return *page->find(localName);
 		}
 
-		//TODO no print here?
-		std::println(std::cerr, "TextureRegion Not Found: {}", name_category_local);
+		// std::println(std::cerr, "TextureRegion Not Found: {}", name_category_local);
 		throw std::out_of_range("Undefined Region Name");
 	}
 

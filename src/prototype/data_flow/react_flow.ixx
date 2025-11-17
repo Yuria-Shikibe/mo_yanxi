@@ -4,6 +4,7 @@ export import :node_interface;
 export import :manager;
 export import :nodes;
 
+export import mo_yanxi.referenced_ptr;
 //TODO support multi async consumer and better scheduler?
 
 namespace mo_yanxi::react_flow{
@@ -32,7 +33,7 @@ void example(){
 	struct modifier_str_to_num : modifier_transient<int, std::string>{
 		using modifier_transient::modifier_transient;
 	protected:
-		std::optional<int> operator()(const std::stop_token& stop_token, const std::string& arg) const override{
+		std::optional<int> operator()(const std::stop_token& stop_token, const std::string& arg) override{
 			int val{};
 
 			for(int i = 0; i < 4; ++i){
@@ -53,7 +54,7 @@ void example(){
 	struct modifier_num_to_num : modifier_argument_cached<int, int>{
 		using modifier_argument_cached::modifier_argument_cached;
 	protected:
-		std::optional<int> operator()(const std::stop_token& stop_token, const int& arg) const override{
+		std::optional<int> operator()(const std::stop_token& stop_token, const int& arg) override{
 			return -arg;
 		}
 	};

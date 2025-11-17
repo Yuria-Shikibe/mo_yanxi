@@ -22,7 +22,7 @@ namespace mo_yanxi::vk{
 			.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
 			.mipLodBias = 0,
 			.anisotropyEnable = true,
-			.maxAnisotropy = 1,
+			.maxAnisotropy = 4,
 			.compareEnable = false,
 			.compareOp = VK_COMPARE_OP_NEVER,
 			.minLod = 0,

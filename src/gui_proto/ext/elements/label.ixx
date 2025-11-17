@@ -168,12 +168,121 @@ protected:
 			}
 		}
 
-
 		return glyph_layout.extent();
 	}
+
 
 	[[nodiscard]] std::optional<font::typesetting::layout_pos_t> get_layout_pos(math::vec2 globalPos) const;
 
 	void draw_text() const;
+};
+
+export struct async_label;
+
+export
+struct async_label_terminal : react_flow::terminal<const font::typesetting::glyph_layout*>{
+	async_label* label;
+
+	[[nodiscard]] explicit async_label_terminal(async_label& label)
+	: label(std::addressof(label)){
+	}
+
+	void on_update(const font::typesetting::glyph_layout* const& data) override;
+};
+
+
+struct async_label : elem{
+private:
+	bool scale_text_to_fit{true};
+	async_label_terminal* terminal{};
+
+	layout::expand_policy expand_policy_{};
+
+public:
+	std::optional<graphic::color> text_color_scl{};
+	align::pos text_entire_align{align::pos::top_left};
+
+	[[nodiscard]] async_label(scene& scene, elem* parent)
+	: elem(scene, parent), terminal{&*get_scene().request_react_node<async_label_terminal>(*this)}{
+	}
+
+	~async_label() override{
+		if(terminal)get_scene().erase_independent_react_node(*terminal, true);
+	}
+
+	void set_fit(bool is_scale_text_to_fit){
+		if(util::try_modify(scale_text_to_fit, is_scale_text_to_fit)){
+			notify_layout_changed(propagate_mask::force_upper);
+		}
+	}
+
+protected:
+	void draw_content(const rect clipSpace) const override;
+
+public:
+	void set_dependency(react_flow::node& glyph_layout_prov){
+		if(terminal->get_inputs()[0] != std::addressof(glyph_layout_prov)){
+			terminal->disconnect_self_from_context();
+			terminal->connect_predecessor(glyph_layout_prov);
+			notify_layout_changed(propagate_mask::all);
+		}
+	}
+
+	// void layout_elem() override{
+	// 	auto& layout = *terminal->request(true).value();
+	// }
+
+protected:
+
+	std::optional<math::vec2> pre_acquire_size_impl(layout::optional_mastering_extent extent) override{
+		if(!terminal)return std::nullopt;
+		auto& layout = *terminal->request(true).value();
+		return extent.potential_extent().inf_to0().max(layout.extent());
+	}
+};
+
+export
+struct label_layout_node : react_flow::modifier_transient<const font::typesetting::glyph_layout*/*, math::vec2*/, std::string>{
+private:
+	const font::typesetting::parser* parser_{&font::typesetting::global_parser};
+	font::typesetting::glyph_layout layout_{};
+
+public:
+	[[nodiscard]] label_layout_node()
+	: modifier_transient(react_flow::async_type::async_latest){
+	}
+
+protected:
+	react_flow::request_pass_handle<const font::typesetting::glyph_layout*> request_raw(bool allow_expired) override{
+		if(get_dispatched() > 0 && !allow_expired){
+			return std::unexpected{react_flow::data_state::expired};
+		}
+		return react_flow::request_pass_handle<const font::typesetting::glyph_layout*>{&layout_};
+	}
+
+	std::optional<const font::typesetting::glyph_layout*> operator()(
+		const std::stop_token& stop_token/*, const math::vec2& bound*/, const std::string& str) override{
+
+		if(layout_.get_text() != str){
+			layout_.set_text(std::string{str});
+			layout_.clear();
+		}
+
+		layout_.set_clamp_size(math::vectors::constant2<float>::inf_positive_vec2);
+
+		// if(layout_.get_clamp_size() != bound){
+		// 	layout_.set_clamp_size(bound);
+		// 	if(!layout_.extent().equals(bound)){
+		// 		layout_.clear();
+		// 	}
+		// }
+
+		if(stop_token.stop_requested())return std::nullopt;
+
+		if(layout_.empty()){
+			parser_->operator()(layout_, 1);
+		}
+		return std::addressof(layout_);
+	}
 };
 }

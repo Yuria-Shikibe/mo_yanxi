@@ -142,6 +142,7 @@ export namespace mo_yanxi::vk{
 		void set_no_deduced_stage() noexcept{
 			declStage = {};
 		}
+
 		void set_stage(VkShaderStageFlagBits stage) noexcept{
 			declStage = stage;
 		}

@@ -155,16 +155,27 @@ export
 struct sub_page{
 	friend allocated_image_region;
 
-	// private:
+private:
+	std::binary_semaphore lock{1};
+public:
+
 	vk::texture texture{};
 	allocator2d<> allocator{};
 
-	auto allocate(const math::usize2 size){
-		return allocator.allocate(size);
+	auto allocate(const math::usize2 size) try {
+		lock.acquire();
+		auto rst = allocator.allocate(size);
+		lock.release();
+		return rst;
+	} catch(...){
+		lock.release();
+		throw;
 	}
 
-	auto deallocate(const math::usize2 point) noexcept{
-		return allocator.deallocate(point);
+	void deallocate(const math::usize2 point) noexcept{
+		lock.acquire();
+		allocator.deallocate(point);
+		lock.release();
 	}
 
 public:
@@ -184,6 +195,10 @@ public:
 		const VkExtent2D extent_2d
 	)
 	: texture(allocator, extent_2d), allocator({extent_2d.width, extent_2d.height}){
+	}
+	[[nodiscard]] explicit sub_page(
+		const math::usize2 extent_2d
+	) : allocator(extent_2d){
 	}
 
 	//TODO merge similar code

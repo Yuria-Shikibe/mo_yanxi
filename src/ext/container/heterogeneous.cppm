@@ -220,7 +220,7 @@ namespace mo_yanxi{
 			if(auto itr = this->find(key); itr != this->end()){
 				return {itr, false};
 			}else{
-				return this->emplace(std::string(key), typename self_type::mapped_type{std::forward<Arg>(val) ...});
+				return this->try_emplace(std::string(key), std::forward<Arg>(val) ...);
 			}
 		}
 

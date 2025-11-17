@@ -6,7 +6,7 @@ import mo_yanxi.graphic.draw.instruction;
 namespace mo_yanxi::graphic::draw{
 using namespace instruction;
 void glyph_layout(
-	const gui::renderer_frontend& renderer,
+gui::renderer_frontend& renderer,
 	const font::typesetting::glyph_layout& layout,
 	const math::vec2 offset,
 	const float opacityScl = 1.f){
@@ -14,6 +14,7 @@ void glyph_layout(
 	using namespace mo_yanxi::graphic;
 	color tempColor{};
 
+	gui::mode_guard _{renderer, gui::draw_mode_param{gui::draw_mode::msdf}};
 	for(const auto& row : layout.rows()){
 		const auto lineOff = row.src + offset;
 		for(auto&& glyph : row.glyphs){
@@ -46,7 +47,7 @@ void glyph_layout(
 }
 
 void glyph_layout(
-	const gui::renderer_frontend& renderer,
+gui::renderer_frontend& renderer,
 	const font::typesetting::glyph_layout& layout,
 	const math::vec2 offset,
 	const graphic::color color_scl,
@@ -55,6 +56,7 @@ void glyph_layout(
 	using namespace mo_yanxi::graphic;
 	color tempColor{};
 
+	gui::mode_guard _{renderer, gui::draw_mode_param{gui::draw_mode::msdf}};
 	for(const auto& row : layout.rows()){
 		const auto lineOff = row.src + offset;
 		for(auto&& glyph : row.glyphs){
@@ -136,5 +138,64 @@ void label::draw_text() const{
 void label::draw_content(const rect clipSpace) const{
 	draw_background();
 	draw_text();
+}
+
+
+
+void async_label_terminal::on_update(const font::typesetting::glyph_layout* const& data){
+	if(data->extent().beyond(label->content_extent())){
+		label->notify_layout_changed(propagate_mask::local | propagate_mask::force_upper);
+	}
+
+}
+
+void async_label::draw_content(const rect clipSpace) const{
+	draw_background();
+	if(!terminal)return;
+	auto& layout = *terminal->request(true).value();
+	auto& renderer = get_scene().renderer();
+
+	using namespace graphic;
+	using namespace graphic::draw::instruction;
+
+	gui::mode_guard _{renderer, gui::draw_mode_param{gui::draw_mode::msdf}};
+
+	math::mat3 mat;
+	const auto reg_ext = align::embed_to(align::scale::fit, layout.extent(), content_extent());
+	const auto opacityScl = get_draw_opacity();
+
+	mat.set_rect_transform({}, layout.extent(), content_src_pos_abs(), reg_ext);
+	gui::transform_guard _t{renderer, mat};
+
+	color tempColor{};
+	for(const auto& row : layout.rows()){
+		const auto lineOff = row.src;
+		for(auto&& glyph : row.glyphs){
+			if(!glyph.glyph) continue;
+
+			tempColor = glyph.color;
+
+			if(opacityScl != 1.f){
+				tempColor.a *= opacityScl;
+			}
+
+			if(glyph.code.code == U'\0'){
+				tempColor.mul_a(.65f);
+			}
+
+			const auto region = glyph.get_draw_bound().move(lineOff);
+
+			renderer.push(rectangle_ortho{
+				.generic = {
+					.image = glyph.glyph.get_cache().view,
+				},
+				.v00 = region.vert_00(),
+				.v11 = region.vert_11(),
+				.uv00 = glyph.glyph.get_cache().uv.v00(),
+				.uv11 = glyph.glyph.get_cache().uv.v11(),
+				.vert_color = tempColor
+			});
+		}
+	}
 }
 }

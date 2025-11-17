@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any, Union
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
 
 
 def check_slangc_compiler(slangc_path: Union[str, Path]) -> bool:
@@ -117,7 +119,7 @@ def compile_shader(
         shader_root: str,
         output_dir: str,
         common_options: List[str],
-        shader_file: str,
+        shader_alias: str,
         input_file: str,
         shader_options: List[str],
         include_dirs: List[str]
@@ -129,7 +131,7 @@ def compile_shader(
         shader_root: 着色器根目录
         output_dir: 输出目录
         common_options: 通用编译选项
-        shader_file: 着色器文件名
+        shader_alias: 着色器别名或文件名，用于生成输出文件
         input_file: 输入文件完整路径
         shader_options: 着色器特定选项
         include_dirs: 包含目录列表
@@ -139,7 +141,7 @@ def compile_shader(
     """
     try:
         # 生成输出文件名
-        shader_name = Path(shader_file).with_suffix('.spv')
+        shader_name = Path(shader_alias).with_suffix('.spv')
         shader_name = str(shader_name).replace(os.sep, '.').replace('/', '.')
         output_file = os.path.join(output_dir, shader_name)
 
@@ -157,18 +159,19 @@ def compile_shader(
         args.extend(['-o', output_file])
         args.append(input_file)
 
-        print(f"\n正在编译: {shader_file} << {input_file}")
+        print(f"\n正在编译: {shader_alias} << {input_file}")
         print(f"输出文件: {output_file}")
-        print(f"编译命令: {' '.join(args)}")
+        # 取消打印命令，因为并行时会刷屏
+        # print(f"编译命令: {' '.join(args)}")
 
         # 执行编译
-        result = subprocess.run(args, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(args, capture_output=True, text=True, timeout=60)
 
         if result.returncode == 0:
-            print(f"✓ 编译成功: {shader_file}")
+            print(f"✓ 编译成功: {shader_alias}")
             return True, result.stdout
         else:
-            print(f"✗ 编译失败: {shader_file}")
+            print(f"✗ 编译失败: {shader_alias}")
             print(f"错误信息: {result.stderr}")
 
             # 如果编译失败，删除目标文件
@@ -179,9 +182,9 @@ def compile_shader(
             return False, result.stderr
 
     except subprocess.TimeoutExpired:
-        print(f"✗ 编译超时: {shader_file}")
+        print(f"✗ 编译超时: {shader_alias}")
         # 删除可能部分生成的文件
-        output_file = os.path.join(output_dir, f"{Path(shader_file).stem}.spv")
+        output_file = os.path.join(output_dir, f"{Path(shader_alias).stem}.spv")
         if os.path.exists(output_file):
             os.remove(output_file)
         return False, "编译超时"
@@ -192,10 +195,19 @@ def compile_shader(
 
 def main() -> None:
     """主函数"""
-    parser = argparse.ArgumentParser(description='SLANG着色器批量编译工具')
+    parser = argparse.ArgumentParser(description='SLANG着色器批量编译工具 (并行版)')
     parser.add_argument('slangc_path', help='slangc编译器路径')
     parser.add_argument('output_dir', help='输出目录（相对路径）')
     parser.add_argument('config_file', help='配置文件路径（相对路径）')
+
+    # 新增-j参数，用于指定并行度
+    default_jobs = multiprocessing.cpu_count()
+    parser.add_argument(
+        '-j', '--jobs',
+        type=int,
+        default=default_jobs,
+        help=f'允许并行执行的任务数 (默认: {default_jobs})'
+    )
 
     args = parser.parse_args()
 
@@ -208,11 +220,12 @@ def main() -> None:
     config_file = Path(args.config_file).absolute()
 
     print("=" * 50)
-    print("SLANG着色器批量编译工具")
+    print("SLANG着色器批量编译工具 (并行版)")
     print("=" * 50)
     print(f"编译器路径: {slangc_path}")
     print(f"输出目录: {output_dir}")
     print(f"配置文件: {config_file}")
+    print(f"并行度 (-j): {args.jobs}")
     print("-" * 50)
 
     # 步骤1: 检查slangc编译器
@@ -225,52 +238,66 @@ def main() -> None:
 
     # 步骤3: 解析JSON配置
     common_options, shaders, shader_root, include_dirs = parse_config(config_file)
-    if common_options is None:
+    if common_options is None or shaders is None:
         sys.exit(1)
 
     # 创建输出目录
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"✓ 输出目录已创建/确认: {output_dir}")
 
-    # 步骤4: 编译所有着色器
+    # 步骤4: 并行编译所有着色器
     print("\n开始编译着色器...")
     print("-" * 50)
 
     success_count = 0
     fail_count = 0
 
-    for shader_config in shaders:
-        shader_file: str = shader_config['file']
-        shader_options: List[str] = shader_config['options']
+    with ProcessPoolExecutor(max_workers=args.jobs) as executor:
+        futures = {}
+        for shader_config in shaders:
+            shader_file: str = shader_config['file']
+            shader_options: List[str] = shader_config['options']
+            shader_alias: str = shader_config.get('alias', shader_file)
 
-        # 处理着色器文件的路径
-        if shader_root:
-            # 如果指定了shader_root，则相对于脚本目录+shader_root
-            full_shader_path = Path(shader_root).resolve().joinpath(shader_file)
-        else:
-            # 否则相对于脚本目录
-            full_shader_path = script_dir / shader_file
+            # 处理着色器文件的路径
+            if shader_root:
+                full_shader_path = Path(shader_root).resolve().joinpath(shader_file)
+            else:
+                full_shader_path = script_dir / shader_file
 
-        if not full_shader_path.is_file():
-            print(f"✗ 着色器文件不存在: {full_shader_path}")
-            fail_count += 1
-            continue
+            if not full_shader_path.is_file():
+                print(f"✗ 着色器文件不存在: {full_shader_path}")
+                fail_count += 1
+                continue
 
-        success, message = compile_shader(
-            str(slangc_path),
-            shader_root,
-            str(output_dir),
-            common_options,
-            shader_config.get('alias', shader_file),
-            str(full_shader_path),
-            shader_options,
-            include_dirs
-        )
+            # 提交任务到进程池
+            future = executor.submit(
+                compile_shader,
+                str(slangc_path),
+                shader_root,
+                str(output_dir),
+                common_options,
+                shader_alias,
+                str(full_shader_path),
+                shader_options,
+                include_dirs
+            )
+            futures[future] = shader_alias
 
-        if success:
-            success_count += 1
-        else:
-            fail_count += 1
+        print(f"已提交 {len(futures)} 个编译任务，使用 {args.jobs} 个并行进程...")
+
+        # 获取已完成任务的结果
+        for future in as_completed(futures):
+            shader_alias = futures[future]
+            try:
+                success, message = future.result()
+                if success:
+                    success_count += 1
+                else:
+                    fail_count += 1
+            except Exception as e:
+                print(f"✗ 运行编译任务 '{shader_alias}' 时发生意外错误: {e}")
+                fail_count += 1
 
     # 输出总结
     print("\n" + "=" * 50)

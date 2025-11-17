@@ -129,7 +129,7 @@ import mo_yanxi.gui.alloc;
 import mo_yanxi.gui.global;
 
 import mo_yanxi.react_flow;
-import mo_yanxi.spsc_queue;
+import mo_yanxi.mpsc_queue;
 
 import test;
 import std;
@@ -936,8 +936,10 @@ int main(){
 #pragma region Shader
 		auto& ctx = core::global::graphic::context;
 
-		vk::shader_module msh{ctx.get_device(), assets::dir::shader_spv / "ui.draw.basic.spv"};
-		msh.set_no_deduced_stage();
+		vk::shader_module ui_basic{ctx.get_device(), assets::dir::shader_spv / "ui.draw.basic.spv"};
+		vk::shader_module ui_msdf {ctx.get_device(), assets::dir::shader_spv / "ui.draw.sdf.spv"};
+		ui_basic.set_no_deduced_stage();
+		ui_msdf.set_no_deduced_stage();
 
 
 
@@ -949,7 +951,29 @@ int main(){
 		vk::shader_module ui_blit{ctx.get_device(), assets::dir::shader_spv / "ui.blit.basic.spv", VK_SHADER_STAGE_COMPUTE_BIT};
 #pragma endregion
 
-		mo_yanxi::gui::renderer renderer{ctx, assets::graphic::samplers::texture_sampler, msh, ui_blit};
+		static constexpr auto default_creator = +[](
+						vk::pipeline& pipeline,
+						const vk::shader_module& shader_module,
+						const vk::pipeline_layout& layout){
+			vk::graphic_pipeline_template gtp{};
+			gtp.set_shaders({
+					shader_module.get_create_info(VK_SHADER_STAGE_MESH_BIT_EXT, nullptr, "main_mesh"),
+					shader_module.get_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, nullptr, "main_frag")
+				});
+			gtp.push_color_attachment_format(VK_FORMAT_R16G16B16A16_SFLOAT, vk::blending::alpha_blend);
+			gtp.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::alpha_blend);
+
+			pipeline = vk::pipeline{layout.get_device(), layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, gtp};
+		};
+
+		mo_yanxi::gui::renderer renderer{
+				ctx, assets::graphic::samplers::ui_sampler,
+				{
+					gui::pipeline_creator{ui_basic, default_creator},
+					gui::pipeline_creator{ui_msdf, default_creator},
+				},
+				ui_blit
+			};
 		renderer.resize(ctx.get_extent());
 		// renderer.get_top_viewport().push_scissor({{200, 200, 520, 420}});
 
@@ -1100,12 +1124,34 @@ int main(){
 				// gui::mr::heap h{mi_arena_new()};
 			}
 			//
-			auto rst = gui::global::manager.add_scene<gui::loose_group>("main", true, renderer.create_frontend());
-			rst.scene.resize({{}, window_extent});
-			test::build_main_ui(rst.scene, rst.root_group);
-
 		}
 #pragma endregion
+
+#pragma region UI_Init
+		math::vec2 window_extent = math::vector2{core::global::graphic::context.get_extent().width, core::global::graphic::context.get_extent().height}.as<float>();
+		auto scene_add_rst = gui::global::manager.add_scene<gui::loose_group>("main", true, renderer.create_frontend());
+		scene_add_rst.scene.resize({{}, window_extent});
+
+		auto& console_input_node = scene_add_rst.scene.request_independent_react_node<react_flow::provider_cached<std::string>>();
+		test::build_main_ui(scene_add_rst.scene, scene_add_rst.root_group, console_input_node);
+
+		auto thd = std::jthread([&cnode = console_input_node](std::stop_token t){
+			while(!t.stop_requested()){
+				std::string str;
+				std::cin >> str;
+
+				if(t.stop_requested()){
+					break;
+				}
+
+				gui::global::manager.get_scene("main")->get_react_flow().push_posted_act([&, s = std::move(str)] mutable {
+					cnode.update_value(std::move(s));
+				});
+			}
+		});
+
+#pragma endregion
+
 
 		camera.set_scale_range({0.2f, 4.f});
 

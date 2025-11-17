@@ -62,8 +62,8 @@ namespace mo_yanxi::graphic{
 									  }, desc.mip_level, mipmap_level, desc.layer_index, 1);
 		}
 
-		fence_.wait_and_reset();
-		vk::cmd::submit_command(working_queue_, command_buffer, fence_);
+		region_fence_.wait_and_reset();
+		vk::cmd::submit_command(working_queue_, command_buffer, region_fence_);
 
 		running_command_buffer_ = std::move(command_buffer);
 
@@ -81,5 +81,38 @@ namespace mo_yanxi::graphic{
 			stagings.clear();
 		}
 
+	}
+
+	void async_image_loader::load(const texture_allocation_request& desc){
+		vk::command_buffer command_buffer{command_pool_.obtain()};
+		vk::texture texture{async_allocator_, desc.extent};
+
+		{
+			vk::scoped_recorder scoped_recorder{command_buffer};
+			vk::cmd::clear_color(
+				command_buffer,
+				texture.get_image(),
+				desc.clear_color_value,
+				{
+					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+					.baseMipLevel = 0,
+					.levelCount = texture.get_mip_level(),
+					.baseArrayLayer = 0,
+					.layerCount = texture.get_layers()
+				},
+				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+				VK_ACCESS_NONE,
+				VK_ACCESS_NONE,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+			);
+		}
+
+		vk::cmd::submit_command(working_queue_, command_buffer, allocation_fence_);
+		allocation_fence_.wait_and_reset();
+
+		desc.done_ptr->store(std::addressof(texture), std::memory_order_release);
+		desc.done_ptr->notify_one();
+		desc.done_ptr->wait(std::addressof(texture), std::memory_order_relaxed);
 	}
 }

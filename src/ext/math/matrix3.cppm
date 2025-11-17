@@ -442,8 +442,8 @@ namespace mo_yanxi::math{
 			return *this;
 		}
 
-		constexpr matrix3& set_rect_transform(const vec2_t src, const vec2_t src_w, const vec2_t dst, const vec2_t w) noexcept{
-			const auto scl = w / src_w;
+		constexpr matrix3& set_rect_transform(const vec2_t src, const vec2_t src_extent, const vec2_t dst, const vec2_t dst_extent) noexcept{
+			const auto scl = dst_extent / src_extent;
 			const auto mov = dst - src * scl;
 
 			c1 = {scl.x, 0, 0};

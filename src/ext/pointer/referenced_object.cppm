@@ -20,6 +20,9 @@ struct referenced_ptr;
 
 template <typename T, typename D>
 struct referenced_ptr{
+	template <typename Ty, typename Dy>
+	friend struct referenced_ptr;
+
 	using element_type = std::remove_const_t<T>;
 	using pointer = T*;
 
@@ -43,6 +46,14 @@ struct referenced_ptr{
 		}{
 	}
 
+	template <std::derived_from<T> Ty>
+	explicit(false) referenced_ptr(const referenced_ptr<Ty>& other) : referenced_ptr{other.get()}{}
+
+	template <std::derived_from<T> Ty>
+	explicit(false) referenced_ptr(referenced_ptr<Ty>&& other) : object{std::exchange(other.object, {})}{
+	}
+
+
 private:
 	void delete_elem(pointer t) noexcept {
 		std::invoke(deleter, t);
@@ -53,12 +64,6 @@ private:
 	void incr() noexcept;
 
 public:
-	template <typename L>
-		requires (std::derived_from<T, L>)
-	explicit(false) operator referenced_ptr<L>() const noexcept requires(std::same_as<D, std::default_delete<T>> && std::has_virtual_destructor_v<L>){
-		return referenced_ptr<L>{object};
-	}
-
 	explicit constexpr operator bool() const noexcept{
 		return object != nullptr;
 	}
@@ -211,6 +216,7 @@ protected:
 	 * @return true if should be destructed
 	 */
 	constexpr bool ref_decr() noexcept{
+		assert(reference_count_ != 0);
 		--reference_count_;
 		return reference_count_ == 0;
 	}
@@ -306,3 +312,10 @@ void referenced_ptr<T, D>::incr() noexcept{
 }
 }
 
+template <typename T, typename D>
+struct std::hash<mo_yanxi::referenced_ptr<T, D>>{
+	static std::size_t operator()(const mo_yanxi::referenced_ptr<T, D>& ptr) noexcept{
+		static constexpr std::hash<T*> hasher{};
+		return hasher(ptr.get());
+	}
+};

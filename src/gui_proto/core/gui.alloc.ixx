@@ -199,6 +199,11 @@ using heap_uset = std::unordered_set<T, Hasher, Keyeq, heap_allocator<T>>;
 
 
 export
+template <typename K, typename V, class Hasher = std::hash<K>, class Keyeq = std::equal_to<K>>
+using heap_umap = std::unordered_map<K, V, Hasher, Keyeq, heap_allocator<std::pair<const K, V>>>;
+
+
+export
 template <typename T>
 using vector = std::vector<T, unvs_allocator<T>>;
 

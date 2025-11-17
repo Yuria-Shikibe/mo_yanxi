@@ -1,5 +1,5 @@
 
-export module mo_yanxi.spsc_queue;
+export module mo_yanxi.mpsc_queue;
 
 import std;
 import mo_yanxi.condition_variable_single;

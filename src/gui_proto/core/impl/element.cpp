@@ -78,7 +78,7 @@ bool elem::update(float delta_in_ticks){
 
 void elem::clear_scene_references() noexcept{
 	assert(scene_ != nullptr);
-	scene_->drop_all_focus(this);
+	scene_->drop_(this);
 }
 
 std::optional<math::vec2> elem::pre_acquire_size_no_boarder_clip(const layout::optional_mastering_extent extent){

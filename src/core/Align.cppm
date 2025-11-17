@@ -296,7 +296,7 @@ namespace mo_yanxi{
 		}
 
 		template <arithmetic T>
-		constexpr math::vector2<T> embed_to(const scale stretch, math::vector2<T> srcSize, math::vector2<T> toBound) noexcept{
+		[[nodiscard]] constexpr math::vector2<T> embed_to(const scale stretch, math::vector2<T> srcSize, math::vector2<T> toBound) noexcept{
 			switch(stretch){
 			case scale::fit :{
 				const float scale = align::get_fit_embed_scale(srcSize, toBound);

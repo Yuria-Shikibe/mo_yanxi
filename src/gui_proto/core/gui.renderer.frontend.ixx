@@ -146,10 +146,23 @@ struct alignas(16) blit_config{
 	math::rect_ortho_trivial<unsigned> blit_region;
 };
 
+export
+enum struct draw_mode : std::uint32_t{
+	def,
+	msdf,
+
+	COUNT_or_fallback,
+};
+
+export
+struct alignas(16) draw_mode_param{
+	draw_mode mode_;
+	std::uint32_t _cap[3];
+};
 
 
 export
-using gui_reserved_user_data_tuple = std::tuple<ubo_screen_info, ubo_layer_info, blit_config>;
+using gui_reserved_user_data_tuple = std::tuple<ubo_screen_info, ubo_layer_info, blit_config, draw_mode_param>;
 
 export
 using gui_reserved_user_data_tuple_uniform_buffer_used = std::tuple<ubo_screen_info, ubo_layer_info>;
@@ -385,6 +398,22 @@ public:
 	guard_base(renderer){
 		renderer.top_viewport().push_local_transform(transform);
 		renderer.notify_viewport_changed();
+	}
+
+};
+export
+struct mode_guard : guard_base<mode_guard>{
+private:
+	friend guard_base;
+
+	void pop() const{
+		renderer_->push(draw_mode_param{draw_mode::COUNT_or_fallback});
+	}
+
+public:
+	[[nodiscard]] mode_guard(renderer_frontend& renderer, const draw_mode_param& param) :
+	guard_base(renderer){
+		renderer.push(param);
 	}
 
 };

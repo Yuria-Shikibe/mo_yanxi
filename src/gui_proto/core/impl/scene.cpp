@@ -22,6 +22,7 @@ scene& scene::operator=(scene&& other) noexcept{
 }
 
 void scene::update(float delta_in_tick){
+	react_flow_->update();
 	tooltip_manager_.update(delta_in_tick, get_cursor_pos(), is_mouse_pressed());
 	overlay_manager_.update(delta_in_tick);
 
@@ -323,7 +324,8 @@ void scene::swap_focus(elem* newFocus){
 	}
 }
 
-void scene::drop_all_focus(const elem* target) noexcept{
+void scene::drop_(const elem* target) noexcept{
+	drop_elem_nodes(target);
 	drop_event_focus(target);
 	std::erase(last_inbounds_, target);
 	// asyncTaskOwners.erase(const_cast<elem*>(target));

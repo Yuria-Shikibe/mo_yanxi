@@ -11,8 +11,8 @@ void mo_yanxi::core::global::assets::init(void* vk_context_ptr){
 	atlas = graphic::image_atlas{
 		context.get_allocator(),
 		context.graphic_family(),
-		context.graphic_queue(),
-		context.get_device().graphic_queue(1)};
+		context.get_device().graphic_queue(1)
+		};
 
 	font_manager.set_page(atlas.create_image_page("font"));
 
@@ -40,7 +40,8 @@ void mo_yanxi::core::global::assets::init(void* vk_context_ptr){
 }
 
 void mo_yanxi::core::global::assets::dispose(){
-	font_manager = {};
+	std::destroy_at(&font_manager);
+	std::construct_at(&font_manager);
 
 	std::destroy_at(&atlas);
 	std::construct_at(&atlas);

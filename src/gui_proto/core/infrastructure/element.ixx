@@ -742,6 +742,12 @@ public:
 
 #pragma endregion
 
+public:
+	template <typename T, typename S, typename ...Args>
+	referenced_ptr<T> request_react_node(this S& self, Args&& ...args){
+		return self.get_scene().template request_react_node<T>(self, std::forward<Args>(args)...);
+	}
+
 protected:
 	template <typename T>
 	auto get_heap_allocator() const noexcept{

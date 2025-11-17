@@ -166,7 +166,7 @@ task_end()
 
 task("gen_slang")
     on_run(function ()
-        os.exec("py ./build_scripts/slang_builder.py ./prop/util/bin/slangc.exe ./prop/assets/shader/spv ./prop/assets/shader/config.json")
+        os.exec("py ./build_scripts/slang_builder.py ./prop/util/bin/slangc.exe ./prop/assets/shader/spv ./prop/assets/shader/config.json -j 30")
     end)
 
     set_menu{usage = "compile slang to spirv"}

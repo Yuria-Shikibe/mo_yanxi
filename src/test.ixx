@@ -39,7 +39,7 @@ using namespace mo_yanxi;
 using namespace mo_yanxi::game::meta::turret;
 
 export
-void build_main_ui(gui::scene& scene, gui::loose_group& root);
+void build_main_ui(gui::scene& scene, gui::loose_group& root, mo_yanxi::react_flow::node& console_input);
 
 export turret_drawer drawer;
 
