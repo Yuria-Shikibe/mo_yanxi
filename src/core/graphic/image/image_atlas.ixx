@@ -323,7 +323,10 @@ private:
 	VkClearColorValue clear_color_{};
 	std::uint32_t margin{};
 
+	std::mutex named_image_regions_mtx_{};
 	string_hash_map<allocated_image_region> named_image_regions{};
+
+	std::mutex protected_regionss_mtx_{};
 	std::unordered_set<allocated_image_region*> protected_regions{};
 
 public:
@@ -419,11 +422,10 @@ public:
 
 				ptr_to_texture_temp_.wait(nullptr, std::memory_order::relaxed);
 				sub_page->texture = std::move(*ptr_to_texture_temp_.load(std::memory_order::acquire));
-
-				task_post_lock_.store(&*subpages_.rbegin(), std::memory_order_release);
-
 				ptr_to_texture_temp_.store(nullptr, std::memory_order_release);
 				ptr_to_texture_temp_.notify_one();
+
+				task_post_lock_.store(&*subpages_.rbegin(), std::memory_order_release);
 			}else{
 				while(task_post_lock_.compare_exchange_strong(sub_page, nullptr, std::memory_order_relaxed, std::memory_order_acquire)){}
 			}
@@ -442,25 +444,41 @@ public:
 		const bool mark_as_protected = false){
 		std::string_view sv{std::as_const(name)};
 
-		if(const auto itr = named_image_regions.find(sv); itr != named_image_regions.end()){
-			return {itr->second, false};
+		allocated_image_region* rst;
+
+		{
+			std::lock_guard lg{named_image_regions_mtx_};
+			if(const auto itr = named_image_regions.find(sv); itr != named_image_regions.end()){
+				return {itr->second, false};
+			}
+
+			rst = &named_image_regions.try_emplace(std::forward<Str>(name)).first->second;
 		}
 
-		auto [itr, inserted] = named_image_regions.emplace(
-			std::forward<Str>(name),
-			this->async_allocate(image_load_description{std::forward<T>(desc)})
-		);
+		*rst = this->async_allocate(image_load_description{std::forward<T>(desc)});
 
-		if(mark_as_protected && inserted){
+		if(mark_as_protected){
 			mark_protected(sv);
 		}
 
-		return {itr->second, inserted};
+		return {*rst, true};
 	}
 
 	bool mark_protected(const std::string_view localName) noexcept{
-		if(const auto page = named_image_regions.try_find(localName)){
-			if(protected_regions.insert(page).second){
+		allocated_image_region* page;
+		{
+			std::lock_guard lg{named_image_regions_mtx_};
+			page = named_image_regions.try_find(localName);
+		}
+
+		if(page){
+			bool inserted;
+			{
+				std::lock_guard lg{protected_regionss_mtx_};
+				inserted = protected_regions.insert(page).second;
+			}
+
+			if(inserted){
 				//not inserted
 				page->ref_incr();
 				return true;
@@ -474,8 +492,20 @@ public:
 	}
 
 	bool mark_unprotected(const std::string_view localName) noexcept{
-		if(const auto page = named_image_regions.try_find(localName)){
-			if(protected_regions.erase(page)){
+		allocated_image_region* page;
+		{
+			std::lock_guard lg{named_image_regions_mtx_};
+			page = named_image_regions.try_find(localName);
+		}
+
+		if(page){
+			bool erased;
+			{
+				std::lock_guard lg{protected_regionss_mtx_};
+				erased = protected_regions.erase(page);
+			}
+
+			if(erased){
 				page->ref_decr();
 				return true;
 			}

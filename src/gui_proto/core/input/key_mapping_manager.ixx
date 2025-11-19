@@ -124,7 +124,7 @@ public:
 	}
 
 	void update(const float delta_in_tick){
-		main_binds.update(delta_in_tick);
+		main_binds.on_push(delta_in_tick);
 
 		mouse_velocity_ = cursor_pos_;
 		mouse_velocity_ -= last_cursor_pos_;

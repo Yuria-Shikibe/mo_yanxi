@@ -26,7 +26,7 @@ namespace mo_yanxi::graphic::draw{
 				if(!glyph.glyph) continue;
 				last_elem = &glyph;
 
-				acquirer << glyph.glyph.get_cache();
+				acquirer << *glyph.glyph;
 				tempColor = glyph.color;
 
 				if(opacityScl != 1.f){
@@ -87,7 +87,7 @@ namespace mo_yanxi::graphic::draw{
 				if(!glyph.glyph) continue;
 				last_elem = &glyph;
 
-				acquirer << glyph.glyph.get_cache();
+				acquirer << *glyph.glyph;
 				tempColor = glyph.color * color_scl;
 
 				if(opacityScl != 1.f){

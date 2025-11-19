@@ -1,7 +1,10 @@
 module;
 
 #include <cassert>
+#include <google/protobuf/message_lite.h>
+
 #include "ext/enum_operator_gen.hpp"
+#include "magic_enum/magic_enum.hpp"
 
 #ifndef MO_YANXI_DATA_FLOW_ENABLE_TYPE_CHECK
 #define MO_YANXI_DATA_FLOW_ENABLE_TYPE_CHECK 1
@@ -435,7 +438,7 @@ struct provider_general : type_aware_node<T>{
 
 private:
 	void update_value_unchecked(T&& value){
-		this->update(std::addressof(value));
+		this->on_push(std::addressof(value));
 	}
 
 	bool connect_successors_impl(const std::size_t slot, node& post) final{
@@ -450,7 +453,10 @@ protected:
 	manager* manager_{};
 	std::vector<successor_entry> successors{};
 
-	virtual void update(void* in_data_pass_by_move){
+	virtual void on_push(void* in_data_pass_by_move){
+		for (auto && successor : successors){
+			successor.update(*manager_, *static_cast<const T*>(in_data_pass_by_move));
+		}
 	}
 };
 
@@ -578,6 +584,7 @@ private:
 
 
 bool is_reachable(const node* start_node, const node* target_node, std::unordered_set<const node*>& visited) {
+	if(start_node == nullptr)return false;
 	if (start_node == target_node) {
 		return true;
 	}

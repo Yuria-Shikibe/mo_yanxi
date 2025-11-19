@@ -352,6 +352,10 @@ public:
 	}
 
 protected:
+	virtual void on_opacity_changed(float previous){
+
+	}
+
 	void draw_background() const;
 
 	virtual void draw_content(const rect clipSpace) const{
@@ -401,7 +405,9 @@ public:
 
 	std::optional<math::vec2> pre_acquire_size(const layout::optional_mastering_extent extent);
 
-	void notify_layout_changed(propagate_mask propagation) noexcept;
+	//TODO responsibility chain to notify one?
+
+	void notify_layout_changed(propagate_mask propagation);
 
 	void notify_isolated_layout_changed();
 
@@ -706,18 +712,22 @@ public:
 		return context_opacity_ * inherent_opacity_;
 	}
 
-	void update_opacity(const float val) noexcept{
+	void update_context_opacity(const float val) noexcept{
+		const auto prev = get_draw_opacity();
 		if(util::try_modify(context_opacity_, val)){
+			on_opacity_changed(prev);
 			for(const auto& element : children()){
-				element->update_opacity(get_draw_opacity());
+				element->update_context_opacity(get_draw_opacity());
 			}
 		}
 	}
 
 	void set_opacity(const float val) noexcept{
+		const auto prev = get_draw_opacity();
 		if(util::try_modify(inherent_opacity_, val)){
+			on_opacity_changed(prev);
 			for(const auto& element : children()){
-				element->update_opacity(get_draw_opacity());
+				element->update_context_opacity(get_draw_opacity());
 			}
 		}
 	}

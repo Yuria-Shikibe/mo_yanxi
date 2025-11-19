@@ -167,33 +167,9 @@ using gui_reserved_user_data_tuple = std::tuple<ubo_screen_info, ubo_layer_info,
 export
 using gui_reserved_user_data_tuple_uniform_buffer_used = std::tuple<ubo_screen_info, ubo_layer_info>;
 
-template <typename T, typename TupV>
-consteval std::size_t offset_of() noexcept{
-	union S{
-		T t{};
-		std::byte b[sizeof(T)];
-
-		constexpr S(){}
-
-		constexpr ~S(){
-			t.~T();
-		}
-	};
-
-	S s{};
-
-	const void* p = std::addressof(std::get<tuple_index_v<TupV, T>>(s.t));
-
-	for (std::ptrdiff_t i = 0; i < sizeof(T); ++i){
-		if(s.b + i == p)return i;
-	}
-
-	return static_cast<std::size_t>(std::bit_cast<std::uintptr_t>(nullptr));
-}
-
 export
 template <typename T>
-constexpr inline std::size_t data_offset_of = sizeof(gui_reserved_user_data_tuple) - sizeof(T) - gui::offset_of<gui_reserved_user_data_tuple, T>();
+constexpr inline std::size_t data_offset_of = mo_yanxi::tuple_offset_of_v<T, gui_reserved_user_data_tuple>;
 
 
 template <typename T>
@@ -247,7 +223,45 @@ public:
 		}
 	}
 
-	void resize(math::frect region){
+	[[nodiscard]] bool push(const std::byte* instr, const std::size_t instr_size) const {
+		assert(instr_size % graphic::draw::instruction::instr_required_align == 0);
+		auto ptr_to_batch = batch_backend_interface_.acquire(instr_size);
+		if(!ptr_to_batch)return false;
+		std::memcpy(ptr_to_batch, instr, instr_size);
+		return true;
+	}
+
+	[[nodiscard]] bool push(const std::span<const std::byte> raw_instr) const {
+		return push(raw_instr.data(), raw_instr.size());
+	}
+
+	bool push_same_instr(const std::span<const std::byte> raw_instr, const std::size_t instr_unit_size) const{
+		assert(raw_instr.size() % instr_unit_size == 0);
+
+		const std::byte* cur = raw_instr.data();
+		const std::byte* const sentinel = raw_instr.data() + raw_instr.size();
+		const std::byte* next = sentinel;
+
+		while(cur != sentinel){
+			while(true){
+				if(!push(std::span{cur, next})){
+					const auto sub = ((next - cur) / instr_unit_size) / 2 * instr_unit_size;
+					if(!sub)return false;
+					next -= sub;
+				}else{
+					auto dst_to_cur = next - cur;
+					auto dst_to_stl = sentinel - next;
+					cur = next;
+					next += std::min(dst_to_stl, dst_to_cur * 2);
+					break;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	void resize(const math::frect region){
 		if(region_ == region)return;
 		region_ = region;
 		init_projection();

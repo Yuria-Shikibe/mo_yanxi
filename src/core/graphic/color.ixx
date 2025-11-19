@@ -64,6 +64,14 @@ namespace mo_yanxi::graphic{
 			return mul_rgb(lumaScl);
 		}
 
+		[[nodiscard]] FORCE_INLINE constexpr color to_light_by_luma(float target) const noexcept{
+			auto luma = r * 0.299 + g * 0.587 + b * 0.114;
+			if(luma < std::numeric_limits<float>::epsilon()){
+				return {};
+			}
+			return copy().mul_rgb(target / luma);
+		}
+
 		[[nodiscard]] FORCE_INLINE constexpr color to_light(float lumaScl = max_luma_scale) const noexcept{
 			return copy().set_light(lumaScl);
 		}

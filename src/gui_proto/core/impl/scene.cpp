@@ -146,38 +146,42 @@ void scene::on_scroll(const math::vec2 scroll) const{
 
 void scene::update_cursor(){
 	request_cursor_update_ = false;
-	mr::heap_vector<elem*> inbounds{get_heap_allocator()};
 
-	//TODO tooltip & dialog window
-	for (auto && activeTooltip : tooltip_manager_.get_active_tooltips() | std::views::reverse){
-		if(tooltip_manager_.is_below_scene(activeTooltip.element.get()))continue;
-		inbounds = util::dfs_find_deepest_element(activeTooltip.element.get(), get_cursor_pos(), get_heap_allocator<elem*>());
-		if(!inbounds.empty())goto upt;
-	}
+	if(!focus_cursor_ || !focus_cursor_->is_focus_extended_by_mouse()){
+		//TODO using double swap buffer to reduce heap allocation?
+		mr::heap_vector<elem*> inbounds{get_heap_allocator()};
 
-	if(!overlay_manager_.empty()){
-		auto& top = *std::ranges::rbegin(overlay_manager_);
-		if(inbounds.empty()){
-			inbounds = util::dfs_find_deepest_element(top.get(), get_cursor_pos(), get_heap_allocator<elem*>());
-		}
-	}else{
-		if(inbounds.empty()){
-			inbounds = util::dfs_find_deepest_element(&root(), get_cursor_pos(), get_heap_allocator<elem*>());
+		//TODO tooltip & dialog window
+		for (auto && activeTooltip : tooltip_manager_.get_active_tooltips() | std::views::reverse){
+			if(tooltip_manager_.is_below_scene(activeTooltip.element.get()))continue;
+			inbounds = util::dfs_find_deepest_element(activeTooltip.element.get(), get_cursor_pos(), get_heap_allocator<elem*>());
+			if(!inbounds.empty())goto upt;
 		}
 
-		if(inbounds.empty()){
-			for (auto && activeTooltip : tooltip_manager_.get_active_tooltips() | std::views::reverse){
-				if(!tooltip_manager_.is_below_scene(activeTooltip.element.get()))continue;
-				inbounds = util::dfs_find_deepest_element(activeTooltip.element.get(), get_cursor_pos(), get_heap_allocator<elem*>());
-				if(!inbounds.empty())goto upt;
+		if(!overlay_manager_.empty()){
+			auto& top = *std::ranges::rbegin(overlay_manager_);
+			if(inbounds.empty()){
+				inbounds = util::dfs_find_deepest_element(top.get(), get_cursor_pos(), get_heap_allocator<elem*>());
+			}
+		}else{
+			if(inbounds.empty()){
+				inbounds = util::dfs_find_deepest_element(&root(), get_cursor_pos(), get_heap_allocator<elem*>());
+			}
+
+			if(inbounds.empty()){
+				for (auto && activeTooltip : tooltip_manager_.get_active_tooltips() | std::views::reverse){
+					if(!tooltip_manager_.is_below_scene(activeTooltip.element.get()))continue;
+					inbounds = util::dfs_find_deepest_element(activeTooltip.element.get(), get_cursor_pos(), get_heap_allocator<elem*>());
+					if(!inbounds.empty())goto upt;
+				}
 			}
 		}
+
+
+		upt:
+
+		update_inbounds(std::move(inbounds));
 	}
-
-
-	upt:
-
-	update_inbounds(std::move(inbounds));
 
 	if(!focus_cursor_) return;
 
@@ -282,11 +286,12 @@ void scene::update_mouse_state(const input_handle::key_set k){
 
 	if(a == act::release){
 		mouse_states_[c].clear(get_cursor_pos());
+
+		if(focus_cursor_ && focus_cursor_->is_focus_extended_by_mouse()){
+			update_cursor();
+		}
 	}
 
-	if(focus_cursor_ && focus_cursor_->is_focus_extended_by_mouse()){
-		update_cursor();
-	}
 }
 
 

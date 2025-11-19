@@ -4,6 +4,7 @@ export module mo_yanxi.react_flow:manager;
 
 import :node_interface;
 import mo_yanxi.referenced_ptr;
+import mo_yanxi.utility;
 import mo_yanxi.mpsc_queue;
 
 namespace mo_yanxi::react_flow{
@@ -62,11 +63,7 @@ public:
 
 	template <std::derived_from<node> T, typename ...Args>
 	[[nodiscard]] referenced_ptr<T> make_node(Args&& ...args){
-		if constexpr (std::constructible_from<T, manager&, Args&&...>){
-			return referenced_ptr<T>(std::in_place, *this, std::forward<Args>(args)...);
-		}else{
-			return referenced_ptr<T>(std::in_place, std::forward<Args>(args)...);
-		}
+		return mo_yanxi::back_redundant_construct<referenced_ptr<T>, 1>(std::in_place, *this, std::forward<Args>(args)...);
 	}
 
 	template <std::derived_from<node> T, typename ...Args>

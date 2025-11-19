@@ -23,9 +23,26 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root, mo_yanxi::re
 	auto& layoutnode = scene.request_independent_react_node<mo_yanxi::gui::label_layout_node>();
 	layoutnode.connect_predecessor(console_input);
 
-	auto hdl = mroot.create_back([&](mo_yanxi::gui::async_label& label){
-		label.set_dependency(layoutnode);
+	/*auto hdl = mroot.create_back([&](mo_yanxi::gui::scroll_pane& scroll_pane){
+		scroll_pane.create([](mo_yanxi::gui::label& label){
+			label.set_fit();
+			label.set_expand_policy(gui::layout::expand_policy::prefer);
+			// label.set_typesetting_policy(font::typesetting::layout_policy::auto_feed_line | font::typesetting::layout_policy::block_line_feed);
+			label.set_text("AAA BBB CCC12345 DDD EEE 1234567!123123");
+		});
+	});*/
+	auto hdl = mroot.create_back([&](mo_yanxi::gui::scroll_pane& scroll_pane){
+		scroll_pane.create([&](mo_yanxi::gui::async_label& label){
+			label.set_as_config_prov();
+			label.set_dependency(layoutnode);
+			label.set_text_color_scl(graphic::colors::RED.to_light_by_luma(1.2));
+			// label.set_expand_policy(gui::layout::expand_policy::prefer);
+		});
 	});
+	//
+	// auto hdl = mroot.create_back([&](mo_yanxi::gui::async_label& label){
+	// 	label.set_dependency(layoutnode);
+	// });
 
 	hdl.cell().region_scale = {.0f, .0f, .4f, 1.f};
 	hdl.cell().align = gui::align::pos::bottom_left;

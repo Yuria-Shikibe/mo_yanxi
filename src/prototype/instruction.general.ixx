@@ -12,6 +12,25 @@ namespace mo_yanxi::graphic::draw::instruction{
 export template<typename Rng, typename T>
 concept contiguous_range_of = std::ranges::contiguous_range<Rng> && std::same_as<std::ranges::range_value_t<Rng>, T>;
 
+export constexpr inline std::size_t instr_required_align = 16;
+
+static_assert(std::has_single_bit(instr_required_align));
+
+export FORCE_INLINE std::byte* find_aligned_on(std::byte* where) noexcept{
+	const auto A = std::bit_cast<std::uintptr_t>(where);
+	static constexpr std::size_t M = instr_required_align;
+	static constexpr std::size_t Mask = M - 1;
+
+	// A + Mask: 确保至少跨越到下一个 M 的倍数
+	// & ~Mask: 清零低位，实现向下取整到 M 的倍数
+	const auto next = (A + Mask) & (~Mask);
+
+	return std::bit_cast<std::byte*>(next);
+}
+
+export FORCE_INLINE const std::byte* find_aligned_on(const std::byte* where) noexcept{
+	return find_aligned_on(const_cast<std::byte*>(where));
+}
 
 export struct instruction_buffer{
  	static constexpr std::size_t align = 32;
@@ -137,7 +156,7 @@ union dispatch_info_payload{
 export
 template <typename EnumTy, typename DrawInfoTy>
 	requires (std::is_enum_v<EnumTy>)
-struct alignas(16) generic_instruction_head{
+struct alignas(instr_required_align) generic_instruction_head{
 	EnumTy type;
 	std::uint32_t size; //size include head
 	dispatch_info_payload<DrawInfoTy> payload;
@@ -240,9 +259,9 @@ struct image_view_history{
 	using handle_t = image_handle_t;
 
 private:
+	alignas(32) std::array<handle_t, max_cache_count> images{};
 	handle_t latest{};
 	std::uint32_t latest_index{};
-	alignas(32) std::array<handle_t, max_cache_count> images{};
 	std::uint32_t count{};
 	bool changed{};
 
@@ -342,7 +361,7 @@ export struct draw_mode{
 	std::uint32_t cap;
 };
 
-export struct alignas(16) primitive_generic{
+export struct alignas(instr_required_align) primitive_generic{
 	image_view image;
 	draw_mode mode;
 	float depth;
@@ -379,6 +398,7 @@ export struct draw_payload{
 };
 
 export using instruction_head = generic_instruction_head<instr_type, draw_payload>;
+
 
 static_assert(std::is_standard_layout_v<instruction_head>);
 
@@ -419,7 +439,7 @@ template <typename T, typename... Args>
 	}
 constexpr instruction_head make_instruction_head(const T& instr, const Args&... args) noexcept{
 	const auto required = instruction::get_instr_size<T, Args...>(args...);
-	assert(required % 16 == 0);
+	assert(required % instr_required_align == 0);
 
 	const auto vtx = [&] -> std::uint32_t{
 		if constexpr(known_instruction<T>){
@@ -448,13 +468,13 @@ constexpr instruction_head make_instruction_head(const T& instr, const Args&... 
 
 export
 [[nodiscard]] FORCE_INLINE const instruction_head& get_instr_head(const void* p) noexcept{
-	return *start_lifetime_as<instruction_head>(std::assume_aligned<16>(p));
+	return *start_lifetime_as<instruction_head>(std::assume_aligned<instr_required_align>(p));
 }
 
 
 template <typename T, typename... Args>
 	requires (std::is_trivially_copyable_v<T> && valid_consequent_argument<T, Args...>)
-[[nodiscard]] FORCE_INLINE std::byte* place_instr_at_impl(
+FORCE_INLINE void place_instr_at_impl(
 	std::byte* const where,
 	const instruction_head& head,
 	const T& payload,
@@ -462,7 +482,8 @@ template <typename T, typename... Args>
 ){
 	const auto total_size = instruction::get_instr_size<T, Args...>(args...);
 
-	auto pwhere = std::assume_aligned<16>(where);
+	assert(std::bit_cast<std::uintptr_t>(where) % instr_required_align == 0);
+	auto pwhere = std::assume_aligned<instr_required_align>(where);
 
 	std::memcpy(pwhere, &head, sizeof(instruction_head));
 	pwhere += sizeof(instruction_head);
@@ -473,10 +494,10 @@ template <typename T, typename... Args>
 			static_assert(std::is_trivially_copyable_v<std::ranges::range_value_t<Ty>> && !std::ranges::range<std::ranges::range_value_t<Ty>>);
 			const auto byte_size = sizeof(std::ranges::range_value_t<Ty>) * std::ranges::size(arg);
 			std::memcpy(w, std::ranges::data(arg), byte_size);
-			return w = std::assume_aligned<16>(w + byte_size);
+			return w = std::assume_aligned<instr_required_align>(w + byte_size);
 		}else{
 			std::memcpy(w, &arg, sizeof(Ty));
-			return w = std::assume_aligned<16>(w + sizeof(Ty));
+			return w = std::assume_aligned<instr_required_align>(w + sizeof(Ty));
 		}
 	};
 
@@ -486,37 +507,30 @@ template <typename T, typename... Args>
 		[&]<std::size_t ... Idx>(std::index_sequence<Idx...>) FORCE_INLINE{
 			(place_at.template operator()<Args>(pwhere, args), ...);
 		}(std::make_index_sequence<sizeof...(Args)>{});
-
-		std::memset(pwhere, 0, sizeof(instruction_head));
-		return pwhere;
-	} else{
-		const auto end = std::assume_aligned<16>(pwhere + total_size - sizeof(instruction_head));
-		std::memset(end, 0, sizeof(instruction_head));
-		return end;
 	}
 }
 
 export
 template <known_instruction T, typename... Args>
 	requires (std::is_trivially_copyable_v<T> && valid_consequent_argument<T, Args...>)
-FORCE_INLINE std::byte* place_instruction_at(
+FORCE_INLINE void place_instruction_at(
 	std::byte* const where,
 	const T& payload,
 	const Args&... args
 ) noexcept{
-	return instruction::place_instr_at_impl(
+	instruction::place_instr_at_impl(
 		where, instruction::make_instruction_head(payload, args...), payload, args...);
 }
 
 export
 template <typename T>
 	requires (std::is_trivially_copyable_v<T>)
-FORCE_INLINE std::byte* place_ubo_update_at(
+FORCE_INLINE void place_ubo_update_at(
 	std::byte* const where,
 	const T& payload,
 	const user_data_indices info
 ) noexcept{
-	return instruction::place_instr_at_impl(
+	instruction::place_instr_at_impl(
 		where, instruction_head{
 			.type = instr_type::uniform_update,
 			.size = get_instr_size<T>(),

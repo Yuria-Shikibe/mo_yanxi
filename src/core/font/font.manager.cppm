@@ -6,6 +6,7 @@ export module mo_yanxi.font.manager;
 
 export import mo_yanxi.font;
 
+import mo_yanxi.graphic.image_region.borrow;
 import mo_yanxi.graphic.image_region;
 import mo_yanxi.graphic.image_atlas;
 
@@ -17,19 +18,20 @@ import std;
 
 export namespace mo_yanxi::font{
 
-	struct glyph : graphic::cached_image_region{
+	struct glyph : graphic::universal_borrowed_image_region<graphic::combined_image_region<graphic::uniformed_rect_uv>, referenced_object_atomic_nonpropagation>{
 		glyph_wrap meta{};
+
 	private:
 		glyph_metrics metrics_{};
+
 	public:
+		[[nodiscard]] glyph() = default;
 
-		[[nodiscard]] constexpr glyph() = default;
+		[[nodiscard]] glyph(const glyph_wrap& meta, graphic::allocated_image_region& region)
+			: universal_borrowed_image_region{region}, meta{meta}, metrics_{(*meta.face)->glyph->metrics}{}
 
-		[[nodiscard]] constexpr glyph(const glyph_wrap& meta, graphic::allocated_image_region& region)
-			: cached_image_region{region}, meta{meta}, metrics_{(*meta.face)->glyph->metrics}{}
-
-		[[nodiscard]] constexpr explicit(false) glyph(const glyph_wrap& meta)
-			: cached_image_region{nullptr}, meta{meta}, metrics_{(*meta.face)->glyph->metrics}{}
+		[[nodiscard]] explicit(false) glyph(const glyph_wrap& meta)
+			: universal_borrowed_image_region{}, meta{meta}, metrics_{(*meta.face)->glyph->metrics}{}
 
 		[[nodiscard]] const glyph_metrics& metrics() const noexcept{
 			return metrics_;

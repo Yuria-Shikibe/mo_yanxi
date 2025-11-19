@@ -11,6 +11,7 @@ export import :tooltip_interface;
 export import :tooltip_manager;
 export import :dialog_manager;
 
+export import mo_yanxi.gui.renderer.frontend;
 export import mo_yanxi.input_handle;
 export import mo_yanxi.gui.alloc;
 export import align;

@@ -32,9 +32,9 @@ void collapser::update_collapse(float delta) noexcept{
 		if(expand_reload_ >= 1){
 			expand_reload_ = 0.f;
 			state_ = collapser_state::expanded;
-			if(update_opacity_during_expand_)body().update_opacity(get_draw_opacity());
+			if(update_opacity_during_expand_)body().update_context_opacity(get_draw_opacity());
 		}else if(update_opacity_during_expand_){
-			body().update_opacity(get_interped_progress() * get_draw_opacity());
+			body().update_context_opacity(get_interped_progress() * get_draw_opacity());
 		}
 
 		if(transpose_head_and_body_){
@@ -67,9 +67,9 @@ void collapser::update_collapse(float delta) noexcept{
 
 		if(expand_reload_ == 0.f){
 			state_ = collapser_state::un_expand;
-			if(update_opacity_during_expand_)body().update_opacity(0);
+			if(update_opacity_during_expand_)body().update_context_opacity(0);
 		}else if(update_opacity_during_expand_){
-			body().update_opacity(get_interped_progress() * get_draw_opacity());
+			body().update_context_opacity(get_interped_progress() * get_draw_opacity());
 		}
 
 		if(transpose_head_and_body_){

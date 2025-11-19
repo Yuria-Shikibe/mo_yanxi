@@ -76,7 +76,7 @@ tooltip_instance& tooltip_manager::append_tooltip(spawner& owner, elem_ptr&& ele
 
 	// TODO action
 	if(fade_in){
-		val.element->update_opacity(0.f);
+		val.element->update_context_opacity(0.f);
 		val.element->push_action<action::alpha_action>(10, nullptr, 1.);
 	}
 
@@ -153,7 +153,7 @@ void tooltip_manager::updateDropped(float delta_in_time){
 	for (auto&& tooltip : dropped){
 		tooltip.remainTime -= delta_in_time;
 		tooltip.element->update(delta_in_time);
-		tooltip.element->update_opacity(tooltip.remainTime / RemoveFadeTime);
+		tooltip.element->update_context_opacity(tooltip.remainTime / RemoveFadeTime);
 		if(tooltip.remainTime <= 0){
 			std::erase(drawSequence, tooltip.element.get());
 		}

@@ -184,6 +184,50 @@ template <typename T>
 using unvs_allocator = mi_stl_allocator<T>;
 
 export
+template <typename T, std::size_t align>
+    requires (std::has_single_bit(align))
+struct aligned_heap_allocator : mi_heap_stl_allocator<T>{
+    using typename mi_heap_stl_allocator<T>::size_type;
+    using mi_heap_stl_allocator<T>::mi_heap_stl_allocator;
+
+    template<class U>
+    [[nodiscard]] explicit(false) aligned_heap_allocator(const mi_heap_stl_allocator<U>& hp) noexcept
+    : mi_heap_stl_allocator<T>(hp){
+    }
+
+    template<class U, std::size_t align_2> aligned_heap_allocator(const aligned_heap_allocator<U, align_2>& x) noexcept : mi_heap_stl_allocator<T>(x){
+
+    }
+
+    mi_decl_nodiscard T* allocate(size_type count){
+        return static_cast<T*>(::mi_heap_malloc_aligned(this->heap.get(), count * sizeof(T), align));
+    }
+
+    mi_decl_nodiscard T* allocate(size_type count, const void*){
+        return this->allocate(count);
+    }
+
+    aligned_heap_allocator select_on_container_copy_construction() const { return *this; }
+    void deallocate(T* p, size_type size){
+        ::mi_free_size_aligned(p, size * sizeof(T), align);
+    }
+
+    // template<class U, std::size_t align_2> struct rebind { typedef aligned_heap_allocator<U, align_2> other; };
+    template<class U> struct rebind{
+        typedef aligned_heap_allocator<U, align> other;
+    };
+};
+
+export
+template<class T1, class T2, std::size_t align1, std::size_t align2>
+bool operator==(const aligned_heap_allocator<T1, align1>& x, const aligned_heap_allocator<T2, align2>& y) mi_attr_noexcept {
+    if constexpr (align1 != align2){
+        return false;
+    }
+    return (x.is_equal(y));
+}
+
+export
 raw_memory_pool make_memory_pool(std::size_t MB){
     return raw_memory_pool{MB * 1024 * 1024};
 }

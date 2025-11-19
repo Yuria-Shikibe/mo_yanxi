@@ -36,7 +36,7 @@ using region_type = combined_image_region<size_awared_uv<uniformed_rect_uv>>;
 export
 struct allocated_image_region :
 	region_type,
-	referenced_object{
+	referenced_object_atomic_nonpropagation{
 protected:
 	math::urect region{};
 	exclusive_handle_member<sub_page*> page{};
@@ -78,12 +78,14 @@ public:
 		return page;
 	}
 
-	using referenced_object::droppable;
-	using referenced_object::ref_decr;
-	using referenced_object::ref_incr;
+	using referenced_object_atomic_nonpropagation::droppable;
+	using referenced_object_atomic_nonpropagation::ref_decr;
+	using referenced_object_atomic_nonpropagation::ref_incr;
 
-	explicit(false) operator universal_borrowed_image_region<region_type>() noexcept{
-		return {*this, *this};
+	template <typename T>
+		requires (std::convertible_to<region_type, T>)
+	explicit(false) operator universal_borrowed_image_region<T, referenced_object_atomic_nonpropagation>() noexcept{
+		return {*this, static_cast<T>(static_cast<const region_type&>(*this))};
 	}
 };
 
@@ -107,8 +109,10 @@ struct borrowed_image_region : referenced_ptr<allocated_image_region, no_deletio
 		}
 	}
 
-	explicit(false) operator universal_borrowed_image_region<region_type>() const noexcept{
-		return {**this, **this};
+	template <typename T>
+		requires std::convertible_to<region_type, T>
+	explicit(false) operator universal_borrowed_image_region<T, referenced_object_atomic_nonpropagation>() noexcept{
+		return {**this, static_cast<T>(static_cast<const region_type&>(**this))};
 	}
 };
 
@@ -140,8 +144,10 @@ public:
 		return cache_;
 	}
 
-	explicit(false) operator universal_borrowed_image_region<region_type>() const noexcept{
-		return {**this, **this};
+	template <typename T>
+		requires std::convertible_to<region_type, T>
+	explicit(false) operator universal_borrowed_image_region<T, referenced_object_atomic_nonpropagation>() noexcept{
+		return {**this, static_cast<T>(static_cast<const region_type&>(**this))};
 	}
 };
 

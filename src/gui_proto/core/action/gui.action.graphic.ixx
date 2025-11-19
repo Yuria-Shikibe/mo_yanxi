@@ -62,7 +62,7 @@ namespace mo_yanxi::gui::action{
 		}
 
 		void apply(elem& elem, const float progress) override{
-			elem.update_opacity(math::lerp(initialAlpha, dst_alpha, progress));
+			elem.update_context_opacity(math::lerp(initialAlpha, dst_alpha, progress));
 		}
 
 		void begin(elem& elem) override{
@@ -70,7 +70,7 @@ namespace mo_yanxi::gui::action{
 		}
 
 		void end(elem& elem) override{
-			elem.update_opacity(dst_alpha);
+			elem.update_context_opacity(dst_alpha);
 		}
 	};
 

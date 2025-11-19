@@ -45,5 +45,7 @@ void mo_yanxi::vk::DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUti
 	const VkAllocationCallbacks* pAllocator){
 	if(auto* func = LoadFuncPtr(instance, vkDestroyDebugUtilsMessengerEXT)){
 		func(instance, callback, pAllocator);
+	}else{
+		std::terminate();
 	}
 }

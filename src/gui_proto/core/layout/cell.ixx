@@ -65,8 +65,6 @@ namespace mo_yanxi::gui::layout{
 			elem.set_scaling(group.get_scaling() * scaling);
 			const auto extent = allocated_region.extent();
 
-			elem.resize(extent, propagate_mask::lower);
-
 			if(!cell_expected_restriction_extent.width_pending()){
 				cell_expected_restriction_extent.set_width(extent.x);
 			}
@@ -76,6 +74,7 @@ namespace mo_yanxi::gui::layout{
 			}
 
 			elem.restriction_extent = cell_expected_restriction_extent;
+			elem.resize(extent, propagate_mask::lower);
 			elem.try_layout();
 		}
 

@@ -93,7 +93,7 @@ std::optional<math::vec2> elem::pre_acquire_size(const layout::optional_masterin
 	});
 }
 
-void elem::notify_layout_changed(propagate_mask propagation) noexcept{
+void elem::notify_layout_changed(propagate_mask propagation){
 	if(check_propagate_satisfy(propagation, propagate_mask::local)) layout_state.notify_self_changed();
 
 	if(parent_){
@@ -119,6 +119,7 @@ void elem::notify_layout_changed(propagate_mask propagation) noexcept{
 }
 
 void elem::notify_isolated_layout_changed(){
+	layout_state.notify_self_changed();
 	get_scene().notify_isolated_layout_update(this);
 }
 

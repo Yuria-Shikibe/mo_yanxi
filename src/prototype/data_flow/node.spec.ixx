@@ -27,6 +27,23 @@ public:
 	: provider_general<T>(manager), lazy_(is_lazy){
 	}
 
+	using provider_general<T>::update_value;
+
+	template <bool check_equal = false, std::invocable<T&> Proj, typename Ty>
+		requires (std::assignable_from<std::invoke_result_t<Proj, T&>, Ty&&>)
+	void update_value(Proj proj, Ty&& value){
+
+		auto& val = std::invoke(std::move(proj), data_);
+		if constexpr (check_equal){
+			if(val == value){
+				return;
+			}
+		}
+
+		val = std::forward<Ty>(value);
+		on_update();
+	}
+
 	[[nodiscard]] bool is_lazy() const noexcept{
 		return lazy_;
 	}
@@ -48,7 +65,7 @@ public:
 
 protected:
 
-	void update(void* in_data_pass_by_move) override{
+	void on_push(void* in_data_pass_by_move) override{
 		T& target = *static_cast<T*>(in_data_pass_by_move);
 
 		data_ = std::move(target);
@@ -247,6 +264,8 @@ protected:
 		}(std::index_sequence_for<Args...>());
 	}
 
+	//TODO support which changed?
+
 	virtual std::optional<Ret> operator()(const std::stop_token& stop_token, Args&&... args){
 		return this->operator()(stop_token, std::as_const(args)...);
 	}
@@ -341,12 +360,19 @@ protected:
 				if(I == target_index){
 					std::get<I>(arguments) = *static_cast<const Ty*>(in_data_pass_by_copy);
 				}else{
-					auto& n = *static_cast<const node_ptr&>(this->get_inputs()[I]);
-					if(auto rst = node_type_cast<Ty>(n).request(true)){
-						std::get<I>(arguments) = std::move(rst).value();
+					auto& nptr = static_cast<const node_ptr&>(this->get_inputs()[I]);
+					if(!nptr){
+						static_assert(std::is_default_constructible_v<Ty>);
+						std::get<I>(arguments) = Ty{};
 					}else{
-						any_failed = true;
+						auto& n = *nptr;
+						if(auto rst = node_type_cast<Ty>(n).request(true)){
+						std::get<I>(arguments) = std::move(rst).value();
+						}else{
+							any_failed = true;
+						}
 					}
+
 
 				}
 			}.template operator()<Idx>(), ...);

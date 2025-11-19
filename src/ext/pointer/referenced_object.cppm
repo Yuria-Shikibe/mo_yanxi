@@ -41,8 +41,9 @@ struct referenced_ptr{
 	}
 
 	template <typename... Args>
+		requires (std::constructible_from<T, Args...>)
 	[[nodiscard]] explicit constexpr referenced_ptr(std::in_place_t, Args&&... args) : referenced_ptr{
-			new element_type{std::forward<Args>(args)...}
+			new element_type(std::forward<Args>(args)...)
 		}{
 	}
 
@@ -124,7 +125,8 @@ public:
 
 	constexpr referenced_ptr& operator=(referenced_ptr&& other) noexcept{
 		if(this == &other) return *this;
-		std::swap(object, other.object);
+		this->reset(other.object);
+
 		return *this;
 	}
 
@@ -169,6 +171,11 @@ export constexpr inline persistent_tag_t persistent{};
 
 
 export
+/**
+ * @warning
+ * The move of ref count is only designed to use with external lifetime manage.
+ * If it is used with default deleter, may cause dangling like errors.
+ */
 struct referenced_object{
 
 private:
@@ -190,7 +197,7 @@ public:
 
 	constexpr referenced_object& operator=(referenced_object&& other) noexcept{
 		if(this == &other) return *this;
-		std::swap(reference_count_, other.reference_count_);
+		reference_count_ = std::exchange(other.reference_count_, {});
 		return *this;
 	}
 
@@ -226,6 +233,63 @@ protected:
 	friend struct referenced_ptr;
 };
 
+export
+/**
+ * @warning Must work with external lifetime manage
+ * does not propagate reference count on copy/move
+ */
+struct referenced_object_atomic_nonpropagation{
+
+private:
+	std::atomic_size_t reference_count_{};
+
+public:
+	[[nodiscard]] referenced_object_atomic_nonpropagation() = default;
+
+	referenced_object_atomic_nonpropagation(const referenced_object_atomic_nonpropagation& other) noexcept{}
+
+	referenced_object_atomic_nonpropagation& operator=(const referenced_object_atomic_nonpropagation& other) noexcept {
+		return *this;
+	}
+
+	referenced_object_atomic_nonpropagation(referenced_object_atomic_nonpropagation&& other) noexcept {
+	}
+
+	referenced_object_atomic_nonpropagation& operator=(referenced_object_atomic_nonpropagation&& other) noexcept{
+		return *this;
+	}
+
+protected:
+
+	[[nodiscard]] std::size_t ref_count() const noexcept{
+		return reference_count_.load(std::memory_order_relaxed);
+	}
+
+	[[nodiscard]] bool droppable() const noexcept{
+		return reference_count_.load(std::memory_order_acquire) == 0;
+	}
+
+	/**
+	 * @brief take reference
+	 */
+	void ref_incr() noexcept{
+		reference_count_.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	/**
+	 * @brief drop referebce
+	 * @return true if should be destructed
+	 */
+	bool ref_decr() noexcept{
+		auto last = reference_count_.fetch_sub(1, std::memory_order_release);
+		assert(last != 0);
+		return last == 1;
+	}
+
+
+	template <typename T, typename D>
+	friend struct referenced_ptr;
+};
 
 export
 struct referenced_object_persistable{

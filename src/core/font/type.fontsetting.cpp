@@ -2,13 +2,20 @@ module mo_yanxi.font.typesetting;
 
 namespace mo_yanxi::font::typesetting{
 	namespace func{
-		float get_upper_pad(const parse_context& context, const glyph_layout& layout,
-		                     const layout_rect region) noexcept{
+		float get_upper_pad(
+			const parse_context& context,
+			const glyph_layout& layout,
+			const layout_rect region
+			) noexcept{
+			//TODO make it decideable by params
+			static constexpr float fixed_line_spacing = 8;
 			const auto default_spacing = context.get_line_spacing();
 			auto upper_pad = region.ascender;
 			if(context.get_current_row() > 0){
 				const auto& last_line = layout[context.get_current_row() - 1];
-				upper_pad = std::max(region.ascender + last_line.bound.descender, default_spacing);
+				upper_pad = std::max(region.ascender + last_line.bound.descender + fixed_line_spacing, default_spacing);
+			}else{
+				upper_pad += fixed_line_spacing;
 			}
 
 			return upper_pad;
@@ -55,8 +62,8 @@ namespace mo_yanxi::font::typesetting{
 
 		bound.max_height({
 				.width = 0,
-				.ascender = placementPos.y - current.region.get_src_y() + 6,
-				.descender = current.region.get_end_y() - placementPos.y + 6
+				.ascender = placementPos.y - current.region.get_src_y(),
+				.descender = current.region.get_end_y() - placementPos.y
 			});
 		bound.width = std::max(bound.width, current.region.get_end_x());
 		pen_advance += advance;
@@ -177,16 +184,21 @@ namespace mo_yanxi::font::typesetting{
 
 		layout_unit unit{};
 
-		auto stl = std::prev(view.end());
+		const auto stl = std::prev(view.end());
+
+		const bool block_line_feed = (layout.policy() & layout_policy::block_line_feed) != layout_policy{} && (layout.policy() & layout_policy::auto_feed_line) == layout_policy{};
 
 		for(; itr != stl; ++itr){
 			auto [layout_index, code] = *itr;
-
 			lastTokenItr = func::exec_tokens(layout, context, *this, lastTokenItr, formatted_text, layout_index);
-
 			unit.push_glyph(context, code, layout_index);
 
-			//TODO decide when to flush layout unit
+			if(block_line_feed
+				&& code.code <= std::numeric_limits<signed char>::max()
+				&& std::isalnum(static_cast<unsigned char>(code.code))) {
+				continue;
+			}
+
 			if(!flush(context, layout, unit, code.code == U'\n' || code.code == U'\0')){
 				if((layout.policy() & layout_policy::truncate) != layout_policy{}){
 					do{
@@ -198,6 +210,13 @@ namespace mo_yanxi::font::typesetting{
 			}
 		}
 
+		// [重要补充]：循环结束后，检查 buffer 是否还有残留字符。
+		// 如果文本以字母/数字结尾（例如 "Hello"），循环内的逻辑会跳过最后一次 flush，
+		// 因此必须在这里强制提交剩余的 buffer。
+		if(block_line_feed && !unit.buffer.empty()){
+			flush(context, layout, unit, false); // 非换行，非终止（终止由 end_parse 处理）
+		}
+
 		if(itr != stl){
 			layout.clip = true;
 		}else{
@@ -207,6 +226,12 @@ namespace mo_yanxi::font::typesetting{
 		end_parse(layout, context, *itr.base(), itr - view.begin());
 
 		layout.captured_size.min(layout.get_clamp_size());
+	}
+
+	void parser::operator()(glyph_layout& layout, parse_context&& context) const{
+		layout.elements.clear();
+		const tokenized_text formatted_text{layout.get_text(), {.reserve = reserve_tokens}};
+		this->operator()(layout, std::move(context), formatted_text);
 	}
 
 	void parser::operator()(glyph_layout& layout, const float scale) const{

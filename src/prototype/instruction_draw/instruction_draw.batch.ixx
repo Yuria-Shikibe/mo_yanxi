@@ -591,9 +591,14 @@ public:
 		 * TODO eagerly consume valids?
 		 */
 		const auto total_reserved_req = instr_self_size + sizeof(instruction_head);
+		if(total_reserved_req > instruction_buffer_.size()){
+			return nullptr;
+		}
 
 		while(this->check_need_block<false>(instruction_idle_ptr_, total_reserved_req)){
-			if(is_all_idle()) consume_n(working_group_count / 2);
+			if(is_all_idle()){
+				consume_n(working_group_count / 2);
+			}
 			wait_one(false);
 		}
 
@@ -601,15 +606,26 @@ public:
 			if(is_all_idle()) consume_n(working_group_count / 2);
 			//Reverse buffer to head
 			while(this->check_need_block<true>(instruction_buffer_.begin(), total_reserved_req)){
-				if(is_all_idle()) consume_n(working_group_count / 2);
+				if(is_all_idle()){
+					consume_n(working_group_count / 2);
+				}
 				wait_one(false);
+				if(is_all_done()){
+					instruction_pend_ptr_ = instruction_buffer_.begin();
+					instruction_dspt_ptr_ = instruction_buffer_.begin();
+					break;
+				}
 			}
 
 			instruction_idle_ptr_ = instruction_buffer_.begin() + instr_self_size;
+			std::memset(instruction_idle_ptr_, 0, sizeof(instruction_head));
 			return instruction_buffer_.begin();
 		}
 
-		return std::exchange(instruction_idle_ptr_, instruction_idle_ptr_ + instr_self_size);
+		const auto next = instruction_idle_ptr_ + instr_self_size;
+		std::memset(next, 0, sizeof(instruction_head));
+
+		return std::exchange(instruction_idle_ptr_, next);
 	}
 
 	template <instruction::known_instruction T, typename... Args>
@@ -796,12 +812,11 @@ public:
 			}
 		}
 
-
 		if(submitted_current){
 			submit_current(submitted_current, initial_idle_group_index);
 		}
 
-		return false;
+		return submitted_total < count;
 	}
 
 	void wait_one(bool wait_on_frag = true){

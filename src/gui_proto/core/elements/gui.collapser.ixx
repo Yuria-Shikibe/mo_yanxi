@@ -99,9 +99,9 @@ public:
 	void set_update_opacity_during_expand(const bool update_opacity_during_expand) noexcept{
 		if(util::try_modify(update_opacity_during_expand_, update_opacity_during_expand) && items[1]){
 			if(update_opacity_during_expand){
-				body().update_opacity(get_interped_progress() * get_draw_opacity());
+				body().update_context_opacity(get_interped_progress() * get_draw_opacity());
 			} else{
-				body().update_opacity(get_draw_opacity());
+				body().update_context_opacity(get_draw_opacity());
 			}
 		}
 	}

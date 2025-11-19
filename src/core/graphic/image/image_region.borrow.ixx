@@ -14,12 +14,13 @@ namespace mo_yanxi::graphic{
  * @tparam T image region type
  */
 export
-template <typename T>
-struct universal_borrowed_image_region : referenced_ptr<referenced_object, no_deletion_on_ref_count_to_zero>{
+template <typename T, typename Base>
+struct universal_borrowed_image_region : referenced_ptr<Base, no_deletion_on_ref_count_to_zero>{
+	using base_type = Base;
 	using region_type = T;
 
 private:
-	template <typename Ty>
+	template <typename Ty, typename BaseTy>
 	friend struct universal_borrowed_image_region;
 
 	region_type cache_{};
@@ -28,19 +29,19 @@ public:
 	[[nodiscard]] universal_borrowed_image_region() = default;
 
 	[[nodiscard]] universal_borrowed_image_region(
-		referenced_object& target,
+		base_type& target,
 		const region_type& region
 		)
-		: referenced_ptr(std::addressof(target)), cache_(region){
+		: referenced_ptr<Base, no_deletion_on_ref_count_to_zero>(std::addressof(target)), cache_(region){
 	}
 
 	template <typename Ty>
 		requires (std::constructible_from<region_type, Ty>)
 	[[nodiscard]] universal_borrowed_image_region(
-		referenced_object& target,
+		base_type& target,
 		Ty&& region
 		)
-		: referenced_ptr(std::addressof(target)), cache_(std::forward<Ty>(region)){
+		: referenced_ptr<Base, no_deletion_on_ref_count_to_zero>(std::addressof(target)), cache_(std::forward<Ty>(region)){
 	}
 
 	template <typename Ty>
@@ -48,9 +49,9 @@ public:
 			region = static_cast<region_type>(t);
 		}
 	[[nodiscard]] explicit(!std::convertible_to<const Ty&, region_type>) universal_borrowed_image_region(
-		const universal_borrowed_image_region<Ty>& target
+		const universal_borrowed_image_region<Ty, Base>& target
 	) noexcept(std::is_nothrow_constructible_v<region_type, const Ty&>)
-	: referenced_ptr(target), cache_(static_cast<region_type>(target.cache_)){
+	: referenced_ptr<Base, no_deletion_on_ref_count_to_zero>(target), cache_(static_cast<region_type>(target.cache_)){
 
 	}
 
@@ -59,9 +60,9 @@ public:
 			region = static_cast<region_type>(std::move(t));
 		}
 	[[nodiscard]] explicit(!std::convertible_to<const Ty&, region_type>) universal_borrowed_image_region(
-		universal_borrowed_image_region<Ty>&& target
+		universal_borrowed_image_region<Ty, Base>&& target
 	) noexcept(std::is_nothrow_constructible_v<region_type, Ty&&>)
-	: referenced_ptr(std::move(target)), cache_(static_cast<region_type>(std::move(target.cache_))){}
+	: referenced_ptr<Base, no_deletion_on_ref_count_to_zero>(std::move(target)), cache_(static_cast<region_type>(std::move(target.cache_))){}
 
 	const region_type& operator*() const noexcept{
 		return cache_;
