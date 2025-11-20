@@ -215,10 +215,10 @@ public:
 	}
 
 	template <typename T, std::derived_from<elem> E, typename ...Args>
-	referenced_ptr<T> request_react_node(E& elem, Args&& ...args){
+	T& request_react_node(E& elem, Args&& ...args){
 		referenced_ptr<T> ptr = react_flow_->make_node<T>(elem, std::forward<Args>(args)...);
 		elem_owned_nodes_.insert({std::addressof(elem), react_flow::node_ptr{ptr}});
-		return ptr;
+		return *ptr;
 	}
 
 

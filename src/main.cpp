@@ -1200,7 +1200,7 @@ int main(){
 
 		core::global::timer.reset_time();
 		while(!ctx.window().should_close()){
-			// std::this_thread::sleep_for(std::chrono::milliseconds{400});
+
 			using namespace draw;
 
 			ctx.window().poll_events();
@@ -1215,8 +1215,6 @@ int main(){
 					math::mat3_idt,
 					camera.get_world_to_uniformed()
 				};
-				// batch.update_ubo(proj);
-
 				(void)vk::buffer_mapper{general_proj_ubo}.load(proj);
 			}
 

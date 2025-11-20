@@ -17,8 +17,8 @@ struct provider_cached : provider_general<T>{
 	static_assert(std::is_object_v<value_type>);
 
 private:
-	T data_;
-	bool lazy_;
+	T data_{};
+	bool lazy_{};
 
 public:
 	[[nodiscard]] provider_cached() = default;

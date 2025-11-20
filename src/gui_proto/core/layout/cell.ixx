@@ -110,7 +110,7 @@ namespace mo_yanxi::gui::layout{
 			return *this;
 		}
 
-		auto& set_external(){
+		auto& set_pending(){
 			this->stated_size = {size_category::pending, 1};
 			return *this;
 		}

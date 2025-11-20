@@ -7,7 +7,7 @@ module mo_yanxi.gui.infrastructure;
 import mo_yanxi.graphic.draw.instruction;
 
 namespace mo_yanxi::gui{
-void debug_elem_drawer::draw(const elem& element, rect region, float opacityScl) const{
+void style::debug_elem_drawer::draw(const elem& element, rect region, float opacityScl) const{
 
 	auto cregion = element.clip_to_content_bound(region);
 
@@ -32,16 +32,18 @@ void debug_elem_drawer::draw(const elem& element, rect region, float opacityScl)
 	float f2 = element.cursor_state().get_factor_of(&cursor_states::time_pressed);
 	float f3 = element.cursor_state().get_factor_of(&cursor_states::time_focus);
 
+	float light = (element.is_toggled() ? 1.6f : 1.f) * (element.is_disabled() ? .5f : 1.f);
+
 	region.shrink(1.f);
 	element.get_scene().renderer().push(draw::instruction::rectangle_ortho_outline{
 			.v00 = region.vert_00(),
 			.v11 = region.vert_11(),
 			.stroke = 1,
 			.vert_color = {
-				c.mul_a(opacityScl),
-				c.create_lerp(colors::ACID.to_light(2), f1).mul_a(opacityScl),
-				c.create_lerp(colors::ORANGE.to_light(2), f2).mul_a(opacityScl),
-				c.create_lerp(colors::CRIMSON.to_light(2), f3).mul_a(opacityScl)
+				c.mul_a(opacityScl).set_light(light),
+				c.create_lerp(colors::ACID.to_light(2), f1).mul_a(opacityScl).set_light(light),
+				c.create_lerp(colors::ORANGE.to_light(2), f2).mul_a(opacityScl).set_light(light),
+				c.create_lerp(colors::CRIMSON.to_light(2), f3).mul_a(opacityScl).set_light(light),
 			}
 		});
 

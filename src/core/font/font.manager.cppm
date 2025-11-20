@@ -1,6 +1,7 @@
 module;
 
 #include <cassert>
+#include <freetype/freetype.h>
 
 export module mo_yanxi.font.manager;
 
@@ -19,19 +20,20 @@ import std;
 export namespace mo_yanxi::font{
 
 	struct glyph : graphic::universal_borrowed_image_region<graphic::combined_image_region<graphic::uniformed_rect_uv>, referenced_object_atomic_nonpropagation>{
-		glyph_wrap meta{};
-
 	private:
 		glyph_metrics metrics_{};
 
 	public:
 		[[nodiscard]] glyph() = default;
 
-		[[nodiscard]] glyph(const glyph_wrap& meta, graphic::allocated_image_region& region)
-			: universal_borrowed_image_region{region}, meta{meta}, metrics_{(*meta.face)->glyph->metrics}{}
+		[[nodiscard]] glyph(const glyph_metrics& metrics, graphic::allocated_image_region& region)
+			: universal_borrowed_image_region{region}, metrics_{metrics}{
+			assert(region.view != nullptr);
+			assert(this->operator*().view != nullptr);
+		}
 
-		[[nodiscard]] explicit(false) glyph(const glyph_wrap& meta)
-			: universal_borrowed_image_region{}, meta{meta}, metrics_{(*meta.face)->glyph->metrics}{}
+		[[nodiscard]] explicit(false) glyph(const glyph_metrics& metrics)
+			: universal_borrowed_image_region{}, metrics_{metrics}{}
 
 		[[nodiscard]] const glyph_metrics& metrics() const noexcept{
 			return metrics_;
@@ -144,6 +146,8 @@ export namespace mo_yanxi::font{
 
 	private:
 		[[nodiscard]] face_id get_face_id(const font_face& ff){
+			std::lock_guard _{mutex_};
+
 			const concat_string_view sv{ff.face().get_family_name(), ff.face().get_face_index()};
 			if(auto itr = face_to_index.find(sv); itr != face_to_index.end()){
 				return itr->second;
@@ -155,31 +159,36 @@ export namespace mo_yanxi::font{
 	public:
 
 		[[nodiscard]] glyph get_glyph_exact(font_face& ff, const glyph_identity key){
-			std::lock_guard _{mutex_};
-			const auto ptr = ff.obtain(key.code, key.size);
 
-			if(!is_space(key.code)){
-				auto name = format(get_face_id(ff), key.code, key.size);
+			const auto [ptr, mtx, gen, ext] = ff.obtain(key.code, key.size);
 
-				if(const auto prev = page().find(name)){
-					return glyph{ptr, *prev};
-				}
-
-				const auto gen = ptr.get_generator(key.size.x, key.size.y);
-				const auto aloc = page().register_named_region(std::move(name),
-					graphic::image_load_description{
-						graphic::sdf_load{
-							gen.crop(key.code), ptr.get_extent()
-						}
-					});
-				return glyph{ptr, aloc.region};
+			if(!gen.face ||is_space(key.code)){
+				return glyph{mtx};
 			}
 
-			return glyph{ptr};
+			auto id = get_face_id(ff);
+			auto name = format(id, key.code, key.size);
+			if(const auto prev = page().find(name)){
+				return glyph{mtx, *prev};
+			}
+
+			graphic::sdf_load load;
+			{
+				auto _ = ptr->get_msdf_lock();
+				load = graphic::sdf_load{
+					gen.crop(key.code), ext
+				};
+			}
+
+			const auto aloc = page().register_named_region(
+				std::move(name),
+				graphic::image_load_description{std::move(load)});
+			assert(aloc.region.view != nullptr);
+			return glyph{mtx, aloc.region};
 		}
 
 		font_face& register_face(std::string_view keyName, std::string_view fontName){
-			return fontFaces.insert_or_assign(keyName, font_face{fontName}).first->second;
+			return fontFaces.try_emplace(keyName, fontName).first->second;
 		}
 
 		[[nodiscard]] font_face* find_face(std::string_view keyName) noexcept{

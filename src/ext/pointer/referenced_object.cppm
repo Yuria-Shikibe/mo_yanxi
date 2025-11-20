@@ -48,9 +48,11 @@ struct referenced_ptr{
 	}
 
 	template <std::derived_from<T> Ty>
+		requires (std::is_const_v<T> == std::is_const_v<Ty>)
 	explicit(false) referenced_ptr(const referenced_ptr<Ty>& other) : referenced_ptr{other.get()}{}
 
 	template <std::derived_from<T> Ty>
+		requires (std::is_const_v<T> == std::is_const_v<Ty>)
 	explicit(false) referenced_ptr(referenced_ptr<Ty>&& other) : object{std::exchange(other.object, {})}{
 	}
 
@@ -312,12 +314,11 @@ public:
 	}
 
 	constexpr referenced_object_persistable(referenced_object_persistable&& other) noexcept
-		: reference_count_{std::exchange(other.reference_count_, {})}{
+		: reference_count_{}{
 	}
 
 	constexpr referenced_object_persistable& operator=(referenced_object_persistable&& other) noexcept{
 		if(this == &other) return *this;
-		std::swap(reference_count_, other.reference_count_);
 		return *this;
 	}
 

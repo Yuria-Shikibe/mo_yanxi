@@ -178,6 +178,11 @@ void record_glyph_draw_instructions(
 	buffer.resize(actual);
 }
 
+void sync_label_terminal::on_update(const std::string& data){
+	terminal<std::string>::on_update(data);
+	label_->set_text(data);
+}
+
 
 std::optional<mo_yanxi::font::typesetting::layout_pos_t> label::get_layout_pos(
 	const math::vec2 globalPos) const{

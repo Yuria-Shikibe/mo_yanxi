@@ -28,6 +28,8 @@ export using ui::clamped_fsize;
 
 export constexpr inline boarder default_boarder{8, 8, 8, 8};
 
+namespace style{
+
 export struct elem_style_drawer : style_drawer<elem>{
 	using style_drawer::style_drawer;
 
@@ -55,7 +57,7 @@ export struct empty_drawer final : elem_style_drawer{
 	}
 };
 
-namespace style{
+
 using elem_style_ptr = referenced_ptr<const elem_style_drawer>;
 
 export constexpr inline debug_elem_drawer debug_style;
@@ -63,7 +65,7 @@ export constexpr inline empty_drawer empty_style;
 
 export inline const elem_style_drawer* global_default_style_drawer{};
 
-export const elem_style_drawer* get_default_style_drawer() noexcept{
+export inline const elem_style_drawer* get_default_style_drawer() noexcept{
 	return global_default_style_drawer == nullptr ? &debug_style : global_default_style_drawer;
 }
 
@@ -168,11 +170,11 @@ protected:
 	cursor_states cursor_states_{};
 
 	math::bool2 fill_parent_{};
-	bool extend_focus_until_mouse_drop_{};
+	bool extend_focus_until_mouse_drop{};
+	bool propagate_scaling_{true};
 
 	math::vec2 inherent_scaling_{1.f, 1.f};
 	math::vec2 context_scaling_{1.f, 1.f};
-	bool propagate_scaling_{true};
 
 public:
 	//TODO using bit flags?
@@ -341,7 +343,7 @@ public:
 		draw_content(clipSpace);
 	}
 
-	void set_style(const elem_style_drawer& style) noexcept{
+	void set_style(const style::elem_style_drawer& style) noexcept{
 		this->style = std::addressof(style);
 		style_boarder_cache_ = style.get_boarder();
 	}
@@ -562,11 +564,11 @@ public:
 
 
 	[[nodiscard]] bool is_focus_extended_by_mouse() const noexcept{
-		return extend_focus_until_mouse_drop_;
+		return extend_focus_until_mouse_drop;
 	}
 
 	void set_focus_extended_by_mouse(bool b) noexcept{
-		extend_focus_until_mouse_drop_ = b;
+		extend_focus_until_mouse_drop = b;
 	}
 
 	[[nodiscard]] bool is_root_element() const noexcept{

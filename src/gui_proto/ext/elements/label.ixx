@@ -20,8 +20,21 @@ struct text_style{
 	align::pos align;
 	float scale;
 };
+export
+struct label;
 
 export
+struct sync_label_terminal : react_flow::terminal<std::string>{
+	label* label_;
+
+	[[nodiscard]] explicit sync_label_terminal(label& label)
+	: label_(std::addressof(label)){
+	}
+
+protected:
+	void on_update(const std::string& data) override;
+};
+
 struct label : elem{
 protected:
 	const font::typesetting::parser* parser{&font::typesetting::global_parser};
@@ -32,7 +45,7 @@ protected:
 	bool fit_{};
 
 	layout::expand_policy expand_policy_{};
-
+	sync_label_terminal* notifier_{};
 public:
 	math::vec2 max_fit_scale_bound{math::vectors::constant2<float>::inf_positive_vec2};
 	std::optional<graphic::color> text_color_scl{};
@@ -114,6 +127,16 @@ public:
 
 	[[nodiscard]] std::string_view get_text() const noexcept{
 		return glyph_layout.get_text();
+	}
+
+
+	sync_label_terminal& request_react_node(){
+		if(notifier_){
+			return *notifier_;
+		}
+		auto& node = get_scene().request_react_node<sync_label_terminal>(*this);
+		this->notifier_ = &node;
+		return node;
 	}
 
 protected:
@@ -254,7 +277,7 @@ public:
 	align::pos text_entire_align{align::pos::top_left};
 
 	[[nodiscard]] async_label(scene& scene, elem* parent)
-	: elem(scene, parent), terminal{&*get_scene().request_react_node<async_label_terminal>(*this)}{
+	: elem(scene, parent), terminal{&get_scene().request_react_node<async_label_terminal>(*this)}{
 	}
 
 	~async_label() override{
@@ -279,7 +302,7 @@ protected:
 public:
 	config_prov_node* set_as_config_prov(){
 		if(!config_prov_){
-			config_prov_ = &*get_scene().request_react_node<config_prov_node>(*this);
+			config_prov_ = &get_scene().request_react_node<config_prov_node>(*this);
 			config_prov_->update_value({
 				.layout_policy = font::typesetting::layout_policy::def
 			});
@@ -380,7 +403,8 @@ private:
 	const font::typesetting::parser* parser_{&font::typesetting::global_parser};
 
 	float last_scale_{1.f};
-	font::typesetting::glyph_layout layout_{};
+	std::atomic_uint current_idx_{0};
+	font::typesetting::glyph_layout layout_[2]{};
 
 public:
 	[[nodiscard]] label_layout_node()
@@ -392,39 +416,44 @@ protected:
 		if(get_dispatched() > 0 && !allow_expired){
 			return std::unexpected{react_flow::data_state::expired};
 		}
-		return react_flow::request_pass_handle<const font::typesetting::glyph_layout*>{&layout_};
+		return react_flow::request_pass_handle<const font::typesetting::glyph_layout*>{layout_ + current_idx_.load(std::memory_order::acquire)};
 	}
+
 
 	std::optional<const font::typesetting::glyph_layout*> operator()(
 		const std::stop_token& stop_token,
 		async_label_layout_config&& param,
 		std::string&& str
 	) override{
-		if(layout_.get_text() != str){
-			layout_.set_text(std::move(str));
-			layout_.clear();
+		const unsigned idx = !static_cast<bool>(current_idx_.load(std::memory_order::acquire));
+		auto& glayout = layout_[idx];
+
+		if(glayout.get_text() != str){
+			glayout.set_text(std::move(str));
+			glayout.clear();
 		}
 
-		if(layout_.get_clamp_size() != param.bound){
-			layout_.set_clamp_size(param.bound);
-			layout_.clear();
+		if(glayout.get_clamp_size() != param.bound){
+			glayout.set_clamp_size(param.bound);
+			glayout.clear();
 		}
 
-		if(layout_.set_policy(param.layout_policy)){
-			layout_.clear();
+		if(glayout.set_policy(param.layout_policy)){
+			glayout.clear();
 		}
 
 		if(util::try_modify(last_scale_, param.throughout_scale)){
-			layout_.clear();
+			glayout.clear();
 		}
 
 		if(stop_token.stop_requested())return std::nullopt;
 
-		if(layout_.empty()){
-			parser_->operator()(layout_, param.throughout_scale);
+		if(glayout.empty()){
+			parser_->operator()(glayout, param.throughout_scale);
+			current_idx_.store(idx, std::memory_order::release);
 		}
 
-		return std::addressof(layout_);
+		return std::addressof(glayout);
 	}
 
 	std::optional<const font::typesetting::glyph_layout*> operator()(

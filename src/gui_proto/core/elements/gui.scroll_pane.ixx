@@ -35,7 +35,7 @@ namespace mo_yanxi::gui{
 			: elem(scene, parent), layout_policy_{policy}{
 			interactivity = interactivity_flag::enabled;
 
-			extend_focus_until_mouse_drop_ = true;
+			extend_focus_until_mouse_drop = true;
 			layout_state.intercept_lower_to_isolated = true;
 		}
 

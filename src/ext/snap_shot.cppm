@@ -24,6 +24,7 @@ export namespace mo_yanxi{
 			{ t == t } noexcept;
 		};
 
+		using selection_ptr = T snap_shot::*;
 		using value_type = T;
 
 		T base{};

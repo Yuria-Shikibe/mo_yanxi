@@ -147,7 +147,7 @@ void scene::on_scroll(const math::vec2 scroll) const{
 void scene::update_cursor(){
 	request_cursor_update_ = false;
 
-	if(!focus_cursor_ || !focus_cursor_->is_focus_extended_by_mouse()){
+	if(!(focus_cursor_ && is_mouse_pressed() && focus_cursor_->is_focus_extended_by_mouse())){
 		//TODO using double swap buffer to reduce heap allocation?
 		mr::heap_vector<elem*> inbounds{get_heap_allocator()};
 

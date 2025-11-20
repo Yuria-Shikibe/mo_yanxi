@@ -64,7 +64,7 @@ public:
 	: menu(scene, parent, layout::layout_policy::hori_major, std::in_place_type<elem>){
 	}
 
-	auto& get_head_template_cell() const noexcept{
+	layout::partial_mastering_cell& get_head_template_cell() const noexcept{
 		return get_button_sequence().template_cell;
 	}
 
@@ -146,6 +146,8 @@ public:
 		if(index == entries.size()){
 			std::swap(entries[current_showing_], items[1]);
 		}else{
+			get_button_sequence().children()[index]->toggled = true;
+
 			if(current_showing_ == entries.size()){
 				std::swap(entries[index], items[1]);
 			}else{
@@ -156,6 +158,9 @@ public:
 
 		notify_layout_changed(propagate_mask::lower);
 		notify_isolated_layout_changed();
+		if(current_showing_ != entries.size()){
+			get_button_sequence().children()[current_showing_]->toggled = false;
+		}
 		current_showing_ = index;
 	}
 

@@ -17,6 +17,7 @@ import mo_yanxi.math.vector2;
 
 import mo_yanxi.graphic.msdf;
 import mo_yanxi.handle_wrapper;
+import mo_yanxi.concurrent.guard;
 
 namespace mo_yanxi::font{
 export constexpr inline math::vec2 font_draw_expand{graphic::msdf::sdf_image_boarder, graphic::msdf::sdf_image_boarder};
@@ -159,6 +160,7 @@ export constexpr auto ASCII_CHARS = []() constexpr{
 
 	return charCodes;
 }();
+export struct font_face;
 
 struct font_face_handle : exclusive_handle<FT_Face>{
 	exclusive_handle_member<msdfgen::FontHandle*> msdfHdl{};
@@ -180,11 +182,30 @@ struct font_face_handle : exclusive_handle<FT_Face>{
 		msdfHdl = msdfgen::loadFont(graphic::msdf::HACK_get_ft_library_from(&global_free_type_lib), path);
 	}
 
+	friend font_face;
+
+
+	[[nodiscard]] std::string_view get_family_name() const noexcept{
+		return {handle->family_name};
+	}
+
+	[[nodiscard]] std::string_view get_style_name() const noexcept{
+		return {handle->style_name};
+	}
+
+	[[nodiscard]] std::string get_fullname() const{
+		return std::format("{}.{}", get_family_name(), get_style_name());
+	}
+
+	[[nodiscard]] auto get_face_index() const noexcept{
+		return handle->face_index;
+	}
 
 	[[nodiscard]] FT_UInt index_of(const char_code code) const noexcept{
 		return FT_Get_Char_Index(handle, code);
 	}
 
+private:
 	[[nodiscard]] FT_Error load_glyph(const FT_UInt index, const FT_Int32 loadFlags) const noexcept{
 		return FT_Load_Glyph(handle, index, loadFlags);
 	}
@@ -230,21 +251,6 @@ struct font_face_handle : exclusive_handle<FT_Face>{
 		return handle->glyph;
 	}
 
-	[[nodiscard]] std::string_view get_family_name() const{
-		return {handle->family_name};
-	}
-
-	[[nodiscard]] std::string_view get_style_name() const{
-		return {handle->style_name};
-	}
-
-	[[nodiscard]] std::string get_fullname() const{
-		return std::format("{}.{}", get_family_name(), get_style_name());
-	}
-
-	[[nodiscard]] auto get_face_index() const{
-		return handle->face_index;
-	}
 };
 
 export struct glyph_wrap{
@@ -253,35 +259,34 @@ export struct glyph_wrap{
 
 	[[nodiscard]] glyph_wrap() = default;
 
-	[[nodiscard]] explicit glyph_wrap(
+	[[nodiscard]] glyph_wrap(
 		const char_code code,
 		font_face_handle& face) :
 	code{code},
 	face(&face){
 	}
 
-	[[nodiscard]] graphic::msdf::msdf_glyph_generator get_generator(const unsigned w, const unsigned h) const noexcept{
-		face->set_size(w, h);
-		return graphic::msdf::msdf_glyph_generator{
-				face->msdfHdl,
-				(*face)->size->metrics.x_ppem, (*face)->size->metrics.y_ppem
-			};
-	}
-
-	[[nodiscard]] math::usize2 get_extent() const noexcept{
-		(void)face->load_and_get(code, FT_LOAD_DEFAULT);
-		return {
-				(*face)->glyph->bitmap.width + graphic::msdf::sdf_image_boarder * 2,
-				(*face)->glyph->bitmap.rows + graphic::msdf::sdf_image_boarder * 2
-			};
-	}
 
 };
 
-export struct font_face{
+[[nodiscard]] math::usize2 get_extent(const font_face_handle& face, const char_code code) noexcept {
+	return {
+		face->glyph->bitmap.width + graphic::msdf::sdf_image_boarder * 2,
+		face->glyph->bitmap.rows + graphic::msdf::sdf_image_boarder * 2
+	};
+}
+export struct acquire_result{
+	font_face* wrap;
+	glyph_metrics metrics;
+	graphic::msdf::msdf_glyph_generator generator;
+	math::usize2 extent;
+};
+
+struct font_face{
 private:
 	font_face_handle face_{};
-
+	mutable std::binary_semaphore mutex_{1};
+	mutable std::binary_semaphore msdf_mutex_{1};
 public:
 	//TODO english char replacement ?
 	font_face* fallback{};
@@ -297,13 +302,26 @@ public:
 	: face_{fontPath.data()}{
 	}
 
-	[[nodiscard]] glyph_wrap obtain(const char_code code, const glyph_size_type size){
+	[[nodiscard]] auto get_msdf_lock() noexcept {
+		return ccur::semaphore_acq_guard{msdf_mutex_};
+	}
+
+	[[nodiscard]] acquire_result obtain(const char_code code, const glyph_size_type size){
 		assert((size.x != 0 || size.y != 0) && "must at least one none zero");
 
-		check(face_.set_size(size.x, size.y));
-		if(const auto shot = face_.load_and_get(code, FT_LOAD_DEFAULT)){
-			if(shot.value()->bitmap.width != 0 && shot.value()->bitmap.rows != 0){
-				return glyph_wrap{code, face_};
+		{
+			ccur::semaphore_acq_guard _{mutex_};
+			check(face_.set_size(size.x, size.y));
+			if(const auto shot = face_.load_and_get(code, FT_LOAD_DEFAULT)){
+				if(shot.value()->bitmap.width != 0 && shot.value()->bitmap.rows != 0){
+					return acquire_result{
+						this,
+						face_->glyph->metrics,
+						graphic::msdf::msdf_glyph_generator{
+							face_.msdfHdl,
+							face_->size->metrics.x_ppem, face_->size->metrics.y_ppem
+						}, get_extent(face_, code)};
+				}
 			}
 		}
 
@@ -312,19 +330,21 @@ public:
 			return fallback->obtain(code, size);
 		}
 
-		return glyph_wrap{code, face_};
+		return acquire_result{this, face_->glyph->metrics};
 	}
 
 	[[nodiscard]] float get_line_spacing(const math::usize2 sz) const{
+		ccur::semaphore_acq_guard _{mutex_};
+
 		check(face_.set_size(sz));
 		return normalize_len(face_->size->metrics.height);
 	}
 
-	[[nodiscard]] glyph_wrap obtain(const char_code code, const glyph_size_type::value_type size) noexcept{
+	[[nodiscard]] acquire_result obtain(const char_code code, const glyph_size_type::value_type size) noexcept{
 		return obtain(code, {size, 0});
 	}
 
-	[[nodiscard]] glyph_wrap obtain_snapped(const char_code code, const glyph_size_type::value_type size) noexcept{
+	[[nodiscard]] acquire_result obtain_snapped(const char_code code, const glyph_size_type::value_type size) noexcept{
 		return obtain(code, get_snapped_size(size));
 	}
 
@@ -339,12 +359,9 @@ public:
 	}
 
 	font_face(const font_face& other) = delete;
-
-	font_face(font_face&& other) noexcept = default;
-
+	font_face(font_face&& other) noexcept = delete;
 	font_face& operator=(const font_face& other) = delete;
-
-	font_face& operator=(font_face&& other) noexcept = default;
+	font_face& operator=(font_face&& other) noexcept = delete;
 };
 
 }

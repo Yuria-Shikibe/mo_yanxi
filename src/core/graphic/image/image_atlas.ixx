@@ -316,6 +316,7 @@ private:
 	math::usize2 page_size_{};
 
 	std::mutex subpage_mtx_{};
+
 	plf::hive<sub_page> subpages_{};
 	std::atomic<vk::texture*> ptr_to_texture_temp_{nullptr};
 	std::atomic<sub_page*> task_post_lock_{};
@@ -452,10 +453,8 @@ public:
 				return {itr->second, false};
 			}
 
-			rst = &named_image_regions.try_emplace(std::forward<Str>(name)).first->second;
+			rst = &named_image_regions.try_emplace(std::forward<Str>(name), this->async_allocate(image_load_description{std::forward<T>(desc)})).first->second;
 		}
-
-		*rst = this->async_allocate(image_load_description{std::forward<T>(desc)});
 
 		if(mark_as_protected){
 			mark_protected(sv);
@@ -515,6 +514,7 @@ public:
 	}
 
 	void clear_unused() noexcept{
+		std::lock_guard lg{named_image_regions_mtx_};
 		std::erase_if(named_image_regions, [](decltype(named_image_regions)::const_reference region){
 			return region.second.droppable();
 		});
@@ -522,16 +522,19 @@ public:
 
 	template <typename T>
 	[[nodiscard]] auto* find(this T& self, const std::string_view localName) noexcept{
+		std::lock_guard lg{self.named_image_regions_mtx_};
 		return self.named_image_regions.try_find(localName);
 	}
 
 	template <typename T>
 	[[nodiscard]] auto& at(this T& self, const std::string_view localName){
+		std::lock_guard lg{self.named_image_regions_mtx_};
 		return self.named_image_regions.at(localName);
 	}
 
 	template <typename T>
 	[[nodiscard]] auto& operator[](this T& self, const std::string_view localName){
+		std::lock_guard lg{self.named_image_regions_mtx_};
 		return self.named_image_regions.at(localName);
 	}
 
@@ -542,6 +545,7 @@ public:
 
 protected:
 	void drop(){
+		std::lock_guard _{protected_regionss_mtx_};
 		for (auto& protected_region : protected_regions){
 			protected_region->ref_decr();
 		}

@@ -512,6 +512,9 @@ protected:
 	void connect_predecessor_impl(const std::size_t slot, node& prev) final{
 		assert(slot == 0);
 		parent = std::addressof(prev);
+		if(auto dat = this->nothrow_request(true)){
+			this->on_update(*dat);
+		}
 	}
 
 	void erase_predecessor_impl(std::size_t slot, node& prev) noexcept final{
