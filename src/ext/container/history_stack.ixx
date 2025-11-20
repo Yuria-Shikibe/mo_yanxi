@@ -15,7 +15,7 @@ namespace mo_yanxi{
 		using container_type = std::deque<T>;
 		using size_type = typename container_type::size_type;
 		using iterator_type = typename container_type::iterator;
-		
+
 	private:
 		size_type capacity_{64};
 		container_type entries_{};
@@ -29,7 +29,7 @@ namespace mo_yanxi{
 			return std::ranges::distance(entries_.begin(), current_entry_);
 		}
 
-		void relocate_current_to_last() noexcept{
+		constexpr void relocate_current_to_last() noexcept{
 			if(entries_.empty()){
 				current_entry_ = entries_.begin();
 			}else{
@@ -39,8 +39,9 @@ namespace mo_yanxi{
 	public:
 		[[nodiscard]] constexpr history_stack() = default;
 
-		[[nodiscard]] constexpr explicit history_stack(size_type capacity)
-			: capacity_(capacity){
+		template <typename ...Args>
+		[[nodiscard]] constexpr explicit(sizeof...(Args) == 0) history_stack(size_type capacity, Args&& ...args)
+			: capacity_(capacity), entries_{std::forward<Args>(args)...}{
 		}
 
 		[[nodiscard]] constexpr bool empty() const noexcept{
@@ -75,14 +76,14 @@ namespace mo_yanxi{
 			return !entries_.empty() && current_entry_ != std::ranges::prev(entries_.end());
 		}
 
-		constexpr void to_prev() noexcept{
-			if(current_entry_ == entries_.begin())return;
-			--current_entry_;
+		constexpr const value_type* to_prev() noexcept{
+			if(current_entry_ == entries_.begin())return nullptr;
+			return std::to_address(current_entry_--);
 		}
 
-		constexpr void to_next() noexcept{
-			if(entries_.empty() || current_entry_ == std::ranges::prev(entries_.end())) return;
-			++current_entry_;
+		constexpr const value_type* to_next() noexcept{
+			if(entries_.empty() || current_entry_ == std::ranges::prev(entries_.end())) return nullptr;
+			return std::to_address(current_entry_++);
 		}
 
 		[[nodiscard]] constexpr const value_type& get() const noexcept{
@@ -104,7 +105,7 @@ namespace mo_yanxi{
 		}
 
 		constexpr std::optional<value_type> pop_and_get() noexcept{
-			if(!entries_.empty()){
+			if(entries_.empty()){
 				return std::nullopt;
 			}
 
@@ -121,7 +122,7 @@ namespace mo_yanxi{
 			current_entry_ = entries_.begin();
 		}
 
-		void truncate() noexcept{
+		constexpr void truncate() noexcept{
 			if(current_entry_ == entries_.end())return;
 			entries_.erase(std::ranges::next(current_entry_), entries_.end());
 		}

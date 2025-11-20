@@ -325,7 +325,7 @@ public:
 			}
 		}
 
-		if(fallback){
+		if(fallback && !is_space(code)){
 			assert(fallback != this);
 			return fallback->obtain(code, size);
 		}

@@ -365,7 +365,7 @@ protected:
 				return std::nullopt;
 			}
 
-			if(const auto playout = terminal->request(false)){
+			if(const auto playout = terminal->request(true)){
 				auto ext = extent.potential_extent().inf_to0();
 				ext.max((*playout)->extent());
 
@@ -445,6 +445,7 @@ protected:
 		if(util::try_modify(last_scale_, param.throughout_scale)){
 			glayout.clear();
 		}
+
 
 		if(stop_token.stop_requested())return std::nullopt;
 

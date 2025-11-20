@@ -9,10 +9,6 @@ import std;
 
 namespace mo_yanxi{
 
-
-	using A = copy_const_t<std::remove_reference_t<const int&>, float>;
-
-
 	template <class It, class T>
 	concept Span_compatible_iterator =
 		std::contiguous_iterator<It> && std::is_convertible_v<std::remove_reference_t<std::iter_reference_t<It>> (*)[], T (*)[]>;

@@ -32,13 +32,16 @@ public:
 		return static_cast<bool>(segments.x) || static_cast<bool>(segments.y);
 	}
 
-	void move_progress(const math::vec2 movement_in_percent, snap_shot<math::vec2>::selection_ptr base_ptr = &snap_shot<math::vec2>::base) noexcept{
+	void move_progress(const math::vec2 movement_in_percent, vec2 base) noexcept{
 		if(is_segment_move_activated()){
-			bar_progress_.temp =
-				(bar_progress_.*base_ptr + movement_in_percent).round_to(get_segment_unit()).clamp_xy_normalized();
+			bar_progress_.temp = (base + movement_in_percent).round_to(get_segment_unit()).clamp_xy_normalized();
 		} else{
-			bar_progress_.temp = (bar_progress_.*base_ptr + movement_in_percent).clamp_xy({}, {1, 1});
+			bar_progress_.temp = (base + movement_in_percent).clamp_xy({}, {1, 1});
 		}
+	}
+
+	void move_progress(const math::vec2 movement_in_percent, snap_shot<math::vec2>::selection_ptr base_ptr = &snap_shot<math::vec2>::base) noexcept{
+		return move_progress(movement_in_percent, bar_progress_.*base_ptr);
 	}
 
 	void move_minimum_delta(const math::vec2 move, snap_shot<math::vec2>::selection_ptr base_ptr = &snap_shot<math::vec2>::base){
@@ -166,10 +169,11 @@ protected:
 	bool smooth_scroll_{};
 	bool smooth_drag_{};
 	bool smooth_jump_{};
-	bool is_dragging_{};
 
-	float f;
+	math::optional_vec2<float> drag_src_{math::nullopt_vec2<float>};
+
 public:
+	float approach_speed_scl = 0.05f;
 
 	slider2d_slot bar;
 
@@ -251,7 +255,7 @@ public:
 	}
 
 	events::op_afterwards on_drag(const events::drag event) override{
-		bar.move_progress(event.delta() * sensitivity / content_extent());
+		bar.move_progress(event.delta() * sensitivity / content_extent(), drag_src_);
 		return events::op_afterwards::intercepted;
 	}
 
@@ -261,20 +265,19 @@ public:
 
 		switch(action){
 		case input_handle::act::press :{
-			is_dragging_ = true;
+			drag_src_ = bar.get_temp_progress();
+
 			if(mode == input_handle::mode::ctrl){
 				const auto move = (event.pos - content_src_pos_abs() - get_progress() * content_extent()) /
 					content_extent();
 				bar.move_progress(move * sensitivity.sign_or_zero());
 				if(!smooth_jump_)check_apply();
-			}else{
-				if(smooth_drag_)bar.resume();
 			}
 			break;
 		}
 
 		case input_handle::act::release :{
-			is_dragging_ = false;
+			drag_src_.reset();
 			if(!smooth_drag_)check_apply();
 		}
 
@@ -333,9 +336,9 @@ public:
 
 	bool update(float delta_in_ticks) override{
 		if(elem::update(delta_in_ticks)){
-			if(!is_dragging_ && (smooth_scroll_ || smooth_jump_ || smooth_drag_)){
+			if(!drag_src_ && (smooth_scroll_ || smooth_jump_ || smooth_drag_)){
 				//TODO user provided speed scl?
-				if(bar.update(delta_in_ticks * 0.05f) && submit_node_){
+				if(bar.update(delta_in_ticks * approach_speed_scl) && submit_node_){
 					submit_node_->update_value(bar.get_progress());
 				}
 
