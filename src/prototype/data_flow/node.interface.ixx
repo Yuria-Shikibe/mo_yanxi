@@ -18,7 +18,6 @@ export module mo_yanxi.react_flow:node_interface;
 import std;
 
 import mo_yanxi.type_register;
-import mo_yanxi.referenced_ptr;
 import mo_yanxi.data_storage;
 
 namespace mo_yanxi::react_flow{
@@ -119,7 +118,7 @@ struct intermediate_cache;
 export struct node;
 
 export
-using node_ptr = referenced_ptr<node>;
+using node_ptr = node*;
 
 /**
  * @brief 判断在 n0 的 output 中加入 n1 后是否会形成环
@@ -131,7 +130,7 @@ using node_ptr = referenced_ptr<node>;
 export
 bool is_ring_bridge(const node* self, const node* successors);
 
-struct node : referenced_object{
+struct node{
 	friend successor_entry;
 
 	template <typename T>
@@ -385,7 +384,7 @@ struct successor_entry{
 
 bool try_insert(std::vector<successor_entry>& successors, std::size_t slot, node& next){
 	if(std::ranges::find_if(successors, [&](const successor_entry& e){
-		return e.index == slot && e.entity.get() == &next;
+		return e.index == slot && e.entity == &next;
 	}) != successors.end()){
 		return false;
 	}
@@ -396,7 +395,7 @@ bool try_insert(std::vector<successor_entry>& successors, std::size_t slot, node
 
 bool try_erase(std::vector<successor_entry>& successors, const std::size_t slot, const node& next) noexcept{
 	return std::erase_if(successors, [&](const successor_entry& e){
-		return e.index == slot && e.entity.get() == &next;
+		return e.index == slot && e.entity == &next;
 	});
 }
 
@@ -499,7 +498,7 @@ public:
 	void disconnect_self_from_context() noexcept final{
 		if(parent){
 			parent->erase_successors_impl(0, *this);
-			parent.reset();
+			parent = nullptr;
 		}
 	}
 
@@ -595,8 +594,8 @@ bool is_reachable(const node* start_node, const node* target_node, std::unordere
 	visited.insert(start_node);
 
 	for (auto& neighbor : start_node->get_inputs()) {
-		if (!visited.contains(neighbor.get())) {
-			if (is_reachable(neighbor.get(), target_node, visited)) {
+		if (!visited.contains(neighbor)) {
+			if (is_reachable(neighbor, target_node, visited)) {
 				return true;
 			}
 		}

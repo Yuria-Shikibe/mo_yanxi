@@ -7,6 +7,7 @@ export module mo_yanxi.react_flow:nodes;
 import :manager;
 import :node_interface;
 
+import mo_yanxi.meta_programming;
 import std;
 
 namespace mo_yanxi::react_flow{
@@ -112,8 +113,8 @@ struct modifier_base : type_aware_node<Ret>{
 
 	static constexpr std::size_t arg_count = sizeof...(Args);
 	static constexpr std::array<data_type_index, arg_count> in_type_indices{
-			unstable_type_identity_of<Args>()...
-		};
+		unstable_type_identity_of<Args>()...
+	};
 	using arg_type = std::tuple<std::remove_const_t<Args>...>;
 
 private:
@@ -173,9 +174,9 @@ public:
 
 	void disconnect_self_from_context() noexcept final{
 		for(std::size_t i = 0; i < parents.size(); ++i){
-			if(auto& ptr = parents[i]){
-				static_cast<node&>(*ptr).erase_successors_impl(i, *this);
-				ptr.reset();
+			if(node_ptr& ptr = parents[i]){
+				ptr->erase_successors_impl(i, *this);
+				ptr = nullptr;
 			}
 		}
 		for (const auto & successor : successors){
@@ -294,8 +295,7 @@ template <typename T, typename ...Args>
 struct modifier_async_task final : async_task_base{
 private:
 	using type = modifier_base<T, Args...>;
-	using ref_ptr_t = referenced_ptr<type>;
-	ref_ptr_t modifier_{};
+	type* modifier_{};
 	std::stop_token stop_token_{};
 
 	std::tuple<Args...> arguments_{};
@@ -303,7 +303,7 @@ private:
 
 public:
 	[[nodiscard]] explicit modifier_async_task(type& modifier, std::tuple<Args...>&& args) :
-	modifier_(ref_ptr_t{std::addressof(modifier)}),
+	modifier_(std::addressof(modifier)),
 	stop_token_(modifier.get_stop_token()), arguments_{std::move(args)}{
 	}
 
@@ -313,6 +313,10 @@ public:
 		if(rst_cache_){
 			modifier_->async_resume(manager, rst_cache_.value());
 		}
+	}
+
+	node* get_owner_if_node() noexcept override{
+		return modifier_;
 	}
 
 private:
@@ -522,8 +526,6 @@ private:
 	std::vector<successor_entry> successors{};
 
 public:
-	static constexpr data_type_index node_data_type_index = unstable_type_identity_of<T>();
-
 	request_pass_handle<T> request_raw(bool allow_expired) override{
 		if(is_expired_){
 			if(auto rst = node_type_cast<T>(*parent).request(allow_expired)){
@@ -564,7 +566,7 @@ protected:
 		}
 		successors.clear();
 		parent->erase_successors_impl(0, *this);
-		parent.reset();
+		parent = nullptr;
 	}
 
 
@@ -607,9 +609,91 @@ public:
 		return is_expired_ ? data_state::expired : data_state::fresh;
 	}
 
-	[[nodiscard]] std::span<const data_type_index> get_in_socket_type_index() const noexcept override{
-		return std::span{&node_data_type_index, 1};
+};
+
+template <typename T>
+struct optional_value_type : std::type_identity<T>{
+
+};
+
+template <typename T>
+struct optional_value_type<std::optional<T>> : std::type_identity<T>{
+
+};
+
+template <typename T>
+using optional_value_type_t = typename optional_value_type<T>::type;
+
+template <typename Fn, typename... Args>
+consteval auto test_invoke_result(){
+	if constexpr (std::invocable<Fn, const std::stop_token&, Args&&...>){
+		return std::type_identity<optional_value_type_t<std::invoke_result_t<Fn, const std::stop_token&, Args...>>>{};
+	}else{
+		return std::type_identity<optional_value_type_t<std::invoke_result_t<Fn, Args...>>>{};
+	}
+}
+
+//TODO allow optional<T&> one day...
+
+template <typename Fn, typename... Args>
+using transformer_base_t = modifier_transient<std::remove_cvref_t<typename decltype(test_invoke_result<Fn, Args&&...>())::type>, Args...>;
+
+template <typename Fn, typename ...Args>
+struct transformer : transformer_base_t<Fn, Args...>{
+private:
+	Fn fn;
+
+public:
+	[[nodiscard]] explicit transformer(async_type async_type, Fn&& fn)
+	: transformer_base_t<Fn, Args...>(async_type), fn(std::move(fn)){
+	}
+
+	[[nodiscard]] explicit transformer(async_type async_type, const Fn& fn)
+	: transformer_base_t<Fn, Args...>(async_type), fn(fn){
+	}
+
+protected:
+	std::optional<typename function_traits<Fn>::return_type> operator()(
+		const std::stop_token& stop_token,
+		const Args& ...args) override{
+		if constexpr (std::invocable<Fn, const std::stop_token&, Args&&...>){
+			return std::invoke(fn, stop_token, args...);
+		}else{
+			return std::invoke(fn, args...);
+		}
+	}
+
+	std::optional<typename function_traits<Fn>::return_type> operator()(
+		const std::stop_token& stop_token,
+		Args&& ...args) override{
+		if constexpr (std::invocable<Fn, const std::stop_token&, Args&&...>){
+			return std::invoke(fn, stop_token, std::move(args)...);
+		}else{
+			return std::invoke(fn, std::move(args)...);
+		}
 	}
 };
+
+
+template <typename RawFn, typename Tup>
+struct transformer_unambiguous_helper;
+
+template <typename RawFn, typename... Args>
+struct transformer_unambiguous_helper<RawFn, std::tuple<Args...>>{
+	using type = transformer<RawFn, Args...>;
+};
+
+export
+template <typename Fn>
+using transformer_unambiguous = typename transformer_unambiguous_helper<
+	std::remove_cvref_t<Fn>,
+	typename function_traits<std::remove_cvref_t<Fn>>::mem_func_args_type
+>::type;
+
+export
+template <typename Fn>
+transformer_unambiguous<Fn> make_transformer(async_type async_type, Fn&& fn){
+	return transformer_unambiguous<Fn>{async_type, std::forward<Fn>(fn)};
+}
 
 }

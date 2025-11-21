@@ -837,7 +837,10 @@ public:
 			}
 		}
 
-		assert(!submitted_current);
+		if(submitted_current){
+			submit_current(submitted_current, initial_idle_group_index);
+			submitted_total += submitted_current;
+		}
 
 		return submitted_total < count;
 	}

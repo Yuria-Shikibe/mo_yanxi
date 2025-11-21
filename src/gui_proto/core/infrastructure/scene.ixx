@@ -75,9 +75,9 @@ protected:
 	std::unique_ptr<react_flow::manager> react_flow_{std::make_unique<react_flow::manager>()};
 
 	std::unordered_multimap<
-		const elem*, referenced_ptr<react_flow::node>,
+		const elem*, react_flow::node*,
 		std::hash<const elem*>, std::equal_to<const elem*>,
-		mr::heap_allocator<std::pair<const elem* const, referenced_ptr<react_flow::node>>>>
+		mr::heap_allocator<std::pair<const elem* const, react_flow::node*>>>
 	elem_owned_nodes_{};
 
 
@@ -155,7 +155,7 @@ protected:
 	void drop_elem_nodes(const elem* elem) noexcept{
 		auto [begin, end] = elem_owned_nodes_.equal_range(elem);
 		for(auto cur = begin; cur != end; ++cur){
-			cur->second->disconnect_self_from_context();
+			react_flow_->erase_node(*cur->second);
 		}
 		elem_owned_nodes_.erase(begin, end);
 	}
@@ -210,15 +210,20 @@ public:
 		return react_flow_->add_node<T>( std::forward<Args>(args)...);
 	}
 
-	bool erase_independent_react_node(react_flow::node& node, bool disconnect_it) noexcept {
-		return react_flow_->erase_node(node, disconnect_it);
+	template <typename T>
+	[[nodiscard]] auto& request_independent_react_node(T&& args){
+		return react_flow_->add_node( std::forward<T>(args));
+	}
+
+	bool erase_independent_react_node(react_flow::node& node) noexcept {
+		return react_flow_->erase_node(node);
 	}
 
 	template <typename T, std::derived_from<elem> E, typename ...Args>
 	T& request_react_node(E& elem, Args&& ...args){
-		referenced_ptr<T> ptr = react_flow_->make_node<T>(elem, std::forward<Args>(args)...);
-		elem_owned_nodes_.insert({std::addressof(elem), react_flow::node_ptr{ptr}});
-		return *ptr;
+		T& ptr = react_flow_->add_node<T>(elem, std::forward<Args>(args)...);
+		elem_owned_nodes_.insert({std::addressof(elem), std::addressof(ptr)});
+		return ptr;
 	}
 
 

@@ -3,7 +3,6 @@ module;
 export module mo_yanxi.react_flow:manager;
 
 import :node_interface;
-import mo_yanxi.referenced_ptr;
 import mo_yanxi.utility;
 import mo_yanxi.mpsc_queue;
 
@@ -26,6 +25,10 @@ public:
 	virtual void on_finish(manager& manager){
 
 	}
+
+	virtual node* get_owner_if_node() noexcept{
+		return nullptr;
+	}
 };
 
 //TODO allocator?
@@ -35,9 +38,25 @@ export struct manager_no_async_t{
 
 export constexpr inline manager_no_async_t manager_no_async{};
 
+struct node_deleter{
+	static void operator()(node* pnode) noexcept{
+		pnode->disconnect_self_from_context();
+		delete pnode;
+	}
+};
+
+struct node_p : std::unique_ptr<node, node_deleter>{
+	template <std::derived_from<node> T, typename... Args>
+		requires (std::constructible_from<T, Args&&...>)
+	explicit(false) node_p(std::in_place_type_t<T>, Args&& ...args) : std::unique_ptr<node, node_deleter>(
+		new T(std::forward<Args>(args)...), node_deleter{}){
+	}
+};
+
 export struct manager{
 private:
-	std::vector<node_ptr> nodes_anonymous_{};
+	std::vector<node_p> nodes_anonymous_{};
+	std::unordered_set<node*> expired_nodes{};
 
 	using async_task_queue = mpsc_queue<std::move_only_function<void()>>;
 	async_task_queue pending_received_updates_{};
@@ -53,6 +72,11 @@ private:
 
 	std::jthread async_thread_{};
 
+	template <std::derived_from<node> T, typename ...Args>
+	[[nodiscard]] node_p make_node(Args&& ...args){
+		return mo_yanxi::back_redundant_construct<node_p, 1>(std::in_place_type<T>, *this, std::forward<Args>(args)...);
+	}
+
 
 public:
 	[[nodiscard]] manager() : async_thread_([](std::stop_token stop_token, manager& manager){
@@ -62,31 +86,41 @@ public:
 	[[nodiscard]] explicit manager(manager_no_async_t){}
 
 	template <std::derived_from<node> T, typename ...Args>
-	[[nodiscard]] referenced_ptr<T> make_node(Args&& ...args){
-		return mo_yanxi::back_redundant_construct<referenced_ptr<T>, 1>(std::in_place, *this, std::forward<Args>(args)...);
-	}
-
-	template <std::derived_from<node> T, typename ...Args>
 	T& add_node(Args&& ...args){
 		auto& ptr = nodes_anonymous_.emplace_back(this->make_node<T>(std::forward<Args>(args)...));
 		return static_cast<T&>(*ptr);
 	}
 
-	bool erase_node(node& n, bool disconnect_it) noexcept {
-		if(auto itr = std::ranges::find(nodes_anonymous_, &n, [](const node_ptr& nd){
-			return nd.get();
-		}); itr != nodes_anonymous_.end()){
-			if(disconnect_it){
-				(*itr)->disconnect_self_from_context();
-			}
-
-			*itr = std::move(nodes_anonymous_.back());
-			nodes_anonymous_.pop_back();
-
-			return true;
-		}
-		return false;
+	template <std::derived_from<node> T>
+	T& add_node(T&& node){
+		auto& ptr = nodes_anonymous_.emplace_back(this->make_node<T>(std::move(node)));
+		return static_cast<T&>(*ptr);
 	}
+
+	template <std::derived_from<node> T>
+	T& add_node(const T& node){
+		auto& ptr = nodes_anonymous_.emplace_back(this->make_node<T>(node));
+		return static_cast<T&>(*ptr);
+	}
+
+	bool erase_node(node& n) noexcept
+	try{
+		return expired_nodes.insert(std::addressof(n)).second;
+	} catch(const std::bad_alloc&){
+		pending_async_modifiers_.erase_if([&](const std::unique_ptr<async_task_base>& ptr){
+			return ptr->get_owner_if_node() == &n;
+		});
+		{
+			std::lock_guard lg{done_mutex_};
+			std::erase_if(done_[1], [&](const std::unique_ptr<async_task_base>& ptr){
+				return ptr->get_owner_if_node() == &n;
+			});
+		}
+		return std::erase_if(nodes_anonymous_, [&](const node_p& ptr){
+			return ptr.get() == &n;
+		});
+	}
+
 
 
 	/**
@@ -108,6 +142,22 @@ public:
 	}
 
 	void update(){
+		if(!expired_nodes.empty()){
+			pending_async_modifiers_.erase_if([&](const std::unique_ptr<async_task_base>& ptr){
+				return expired_nodes.contains(ptr->get_owner_if_node());
+			});
+			std::erase_if(nodes_anonymous_, [&](const node_p& ptr){
+				return expired_nodes.contains(ptr.get());
+			});
+			{
+				std::lock_guard lg{done_mutex_};
+				std::erase_if(done_[1], [&](const std::unique_ptr<async_task_base>& ptr){
+					return expired_nodes.contains(ptr->get_owner_if_node());
+				});
+			}
+			expired_nodes.clear();
+		}
+
 		if(pending_received_updates_.swap(recycled_queue_container_)){
 			for (auto&& move_only_function : recycled_queue_container_){
 				move_only_function();

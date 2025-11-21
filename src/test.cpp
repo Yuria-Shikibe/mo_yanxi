@@ -15,6 +15,7 @@ import mo_yanxi.gui.elem.grid;
 import mo_yanxi.gui.elem.menu;
 import mo_yanxi.gui.elem.label;
 import mo_yanxi.gui.elem.slider;
+import mo_yanxi.gui.elem.progress_bar;
 
 struct format_node : mo_yanxi::react_flow::modifier_transient<std::string, std::string, mo_yanxi::math::vec2>{
 	[[nodiscard]] format_node() = default;
@@ -35,20 +36,26 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root, mo_yanxi::re
 
 	auto& layoutnode = scene.request_independent_react_node<mo_yanxi::gui::label_layout_node>();
 	auto& formatnode = scene.request_independent_react_node<format_node>();
+	auto& proj_x = scene.request_independent_react_node(react_flow::make_transformer(react_flow::async_type::none, [](math::vec2 v){
+		return v.x;
+	}));
+
 	// mo_yanxi::react_flow::connect_chain({&console_input, &formatnode});
 	mo_yanxi::react_flow::connect_chain({&console_input, &formatnode, &layoutnode});
 
 	auto hdl = mroot.create_back([&](mo_yanxi::gui::scroll_pane& scroll_pane){
 		scroll_pane.create([&](mo_yanxi::gui::sequence& sequence){
 			sequence.template_cell.set_pad({4, 4});
-			sequence.create_back([&](mo_yanxi::gui::slider& slider){
-				slider.set_smooth_scroll(true);
-				slider.set_smooth_jump(true);
-				slider.set_smooth_drag(true);
-				auto& progNode = slider.request_react_node();
-				formatnode.connect_predecessor(progNode);
-				slider.set_hori_only();
-			}).cell().set_size(60);
+
+			auto slider = sequence.emplace_back<mo_yanxi::gui::slider>();
+			slider->set_smooth_scroll(true);
+			slider->set_smooth_jump(true);
+			slider->set_smooth_drag(true);
+			slider->set_hori_only();
+			slider.cell().set_size(60);
+
+			auto& progNode = slider->request_react_node();
+			formatnode.connect_predecessor(progNode);
 
 			sequence.create_back([&](mo_yanxi::gui::async_label& label){
 				label.set_as_config_prov();
@@ -58,9 +65,16 @@ void test::build_main_ui(gui::scene& scene, gui::loose_group& root, mo_yanxi::re
 			}).cell().set_pending();
 
 			sequence.create_back([&](mo_yanxi::gui::label& label){
-				auto& t = label.request_react_node();
+				auto& t = label.request_receiver();
 				t.connect_predecessor(formatnode);
 			}).cell().set_pending();
+
+			sequence.create_back([&](mo_yanxi::gui::progress_bar& prog){
+				prog.progress.set_state(gui::progress_state::approach_scaled);
+				prog.progress.set_speed(.0001f);
+				auto& t = prog.request_receiver();
+				react_flow::connect_chain({&progNode, &proj_x, &t});
+			}).cell().set_size(60);
 		});
 	});
 

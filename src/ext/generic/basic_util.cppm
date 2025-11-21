@@ -29,8 +29,8 @@ struct redundant_test_result{
 
 template <typename T, std::size_t skip_front, typename ...Args>
 consteval redundant_test_result test_constructible_drop_param_v(){
-	std::size_t rst = std::dynamic_extent;
-	std::size_t rst_back = 0;
+	std::size_t rst_skip = std::dynamic_extent;
+	std::size_t rst_drop = 0;
 
 	using Tup = std::tuple<Args...>;
 	static constexpr std::size_t argc = sizeof...(Args);
@@ -46,8 +46,8 @@ consteval redundant_test_result test_constructible_drop_param_v(){
 				return ([&]<std::size_t CurDrop>(){
 					using ConstructParams = tuple_cat_t<Front, tuple_drop_back_n_elem_t<CurDrop, BackCur>>;
 					if constexpr(mo_yanxi::is_constructible_from<T>(std::type_identity<ConstructParams>{})){
-						rst = CurSkip;
-						rst_back = CurDrop;
+						rst_skip = CurSkip;
+						rst_drop = CurDrop;
 						return true;
 					}
 					return false;
@@ -56,7 +56,7 @@ consteval redundant_test_result test_constructible_drop_param_v(){
 		}.template operator()<Skip>() || ...);
 	}(std::make_index_sequence<argc + 1 - skip_front>{});
 
-	return redundant_test_result{rst, rst_back};
+	return redundant_test_result{rst_skip, rst_drop};
 }
 
 template <typename T, std::size_t skip_front, typename ...Args>

@@ -130,7 +130,7 @@ public:
 	}
 
 
-	sync_label_terminal& request_react_node(){
+	sync_label_terminal& request_receiver(){
 		if(notifier_){
 			return *notifier_;
 		}
@@ -281,7 +281,7 @@ public:
 	}
 
 	~async_label() override{
-		if(terminal)get_scene().erase_independent_react_node(*terminal, true);
+		if(terminal)get_scene().erase_independent_react_node(*terminal);
 	}
 
 	void set_fit(bool is_scale_text_to_fit){

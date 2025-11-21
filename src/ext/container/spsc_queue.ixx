@@ -25,6 +25,12 @@ public:
 		: m_queue(alloc){
 	}
 
+	template <std::predicate<const value_type&> Pred>
+	void erase_if(Pred pred) noexcept {
+		std::lock_guard lock(m_mutex);
+		std::erase_if(m_queue, pred);
+	}
+
 	void push(T&& value) noexcept(std::is_nothrow_move_constructible_v<value_type>){
 		{
 			std::lock_guard lock(m_mutex);

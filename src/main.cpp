@@ -1046,10 +1046,11 @@ int main(){
 		bloom_merge_pass.pass.add_dep({bloom_pass.id(), 0, 2});
 		bloom_merge_pass.meta.meta().set_format_at_out(0, VK_FORMAT_R16G16B16A16_SFLOAT);
 
-		auto smaa_final_pass = game::fx::add_smaa(manager, bloom_merge_pass.id());
-		smaa_final_pass.meta.meta().set_format_at_out(0, VK_FORMAT_R16G16B16A16_SFLOAT);
+		// auto smaa_final_pass = game::fx::add_smaa(manager, bloom_merge_pass.id());
+		// smaa_final_pass.meta.meta().set_format_at_out(0, VK_FORMAT_R16G16B16A16_SFLOAT);
+		// hdr_to_sdr_pass.pass.add_dep({smaa_final_pass.id()});
 
-		hdr_to_sdr_pass.pass.add_dep({smaa_final_pass.id()});
+		hdr_to_sdr_pass.pass.add_dep({bloom_merge_pass.id()});
 
 		hdr_to_sdr_pass.pass.add_output({
 				{0, false},

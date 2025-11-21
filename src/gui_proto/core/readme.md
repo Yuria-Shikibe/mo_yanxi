@@ -16,13 +16,15 @@
 
 ### GUI基本组件
 
-* [x] List
+* [x] List(Sequence)
 * [x] Table
 * [x] Grid
 * [x] ScrollPane
-* [ ] ProgressBar
+* [x] ProgressBar(1D) 
+* [ ] ProgressBar(ND) 
 * [x] Label
 * [ ] ImageFrame
+* [ ] InputArea
 
 * [x] Slider
 * [ ] InputBox
@@ -32,6 +34,21 @@
 * [x] Menu
 * [x] Collapser
 
+## 光标样式
+* [ ] 自定义样式 
+* [ ] 根据元素和可交互状况切换样式 
+* [ ] 扩展样式 
+
+## Style
+* 一键Style切换？
+* [ ] Style管理
+* [ ] 调色盘
+* [ ] 默认提供的圆角Style
+
+## 默认渲染后端
+* [ ] SlideLine渲染
+* [ ] 带谓词的抗锯齿
+* 临近阴影？
 
 ## 待决
 * I18N

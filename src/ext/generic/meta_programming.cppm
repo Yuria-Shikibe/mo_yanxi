@@ -94,7 +94,7 @@ template <typename T>
 struct function_traits{
 };
 
-export
+
 template <typename Ret, typename... Args>
 struct function_traits<Ret(Args...)>{
 	using return_type = Ret;
@@ -118,7 +118,6 @@ struct function_traits<Ret(Args...)>{
 	}
 };
 
-export
 template <typename Ret, typename T, typename... Args>
 struct function_traits<Ret(T::*)(Args...)> : function_traits<Ret(T*, Args...)>{
 	using mem_func_args_type = std::tuple<Args...>;
@@ -136,7 +135,7 @@ struct function_traits<Ret(T::*)(Args...)> : function_traits<Ret(T*, Args...)>{
 // 	using type = std::remove_pointer_t<T>;
 // };
 
-#define VariantFunc(ext) export template<typename Ret, typename... Args> struct function_traits<Ret(Args...) ext> : function_traits<Ret(Args...)>{};
+#define VariantFunc(ext) template<typename Ret, typename... Args> struct function_traits<Ret(Args...) ext> : function_traits<Ret(Args...)>{};
 VariantFunc(&);
 VariantFunc(&&);
 VariantFunc(const);
@@ -147,7 +146,7 @@ VariantFunc(&& noexcept);
 VariantFunc(const noexcept);
 VariantFunc(const& noexcept);
 
-#define VariantMemberFunc(ext) export template<typename Ret, typename T, typename... Args> struct function_traits<Ret(T::*)(Args...) ext> : function_traits<Ret(T::*)(Args...)>{};
+#define VariantMemberFunc(ext) template<typename Ret, typename T, typename... Args> struct function_traits<Ret(T::*)(Args...) ext> : function_traits<Ret(T::*)(Args...)>{};
 VariantMemberFunc(&);
 VariantMemberFunc(&&);
 VariantMemberFunc(const);
@@ -158,11 +157,17 @@ VariantMemberFunc(&& noexcept);
 VariantMemberFunc(const noexcept);
 VariantMemberFunc(const& noexcept);
 
+template <typename Ret, typename T>
+struct function_traits<Ret T::*> : function_traits<Ret(T::*)()>{
+};
+
+
 export
 template <typename Ty>
 	requires (std::is_class_v<Ty> && std::is_void_v<std::void_t<decltype(&Ty::operator())>>)
 struct function_traits<Ty> : function_traits<std::remove_pointer_t<decltype(&Ty::operator())>>{
 };
+
 
 export
 template <typename T>
