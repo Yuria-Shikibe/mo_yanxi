@@ -253,7 +253,7 @@ void label::draw_content(const rect clipSpace) const{
 
 
 void async_label_terminal::on_update(const font::typesetting::glyph_layout* const& data){
-	if(data->extent().beyond(label->content_extent())){
+	if(data->extent().beyond(label->content_extent()) || !data->extent().equals(label->content_extent(), 1)){
 		label->notify_layout_changed(propagate_mask::local | propagate_mask::force_upper);
 	}
 
@@ -277,9 +277,19 @@ void async_label::draw_content(const rect clipSpace) const{
 	math::mat3 mat;
 	const auto reg_ext = align::embed_to(align::scale::fit, layout.extent(), content_extent());
 	mat.set_rect_transform({}, layout.extent(), content_src_pos_abs(), reg_ext);
-	gui::transform_guard _t{renderer, mat};
+	{
+		gui::transform_guard _t{renderer, mat};
 
-	renderer.push_same_instr(draw_instr_buffer_, get_instr_size<rectangle_ortho>());
+		renderer.push_same_instr(draw_instr_buffer_, get_instr_size<rectangle_ortho>());
+	}
+
+
+	renderer.push(rectangle_ortho_outline{
+			.v00 = content_src_pos_abs(),
+			.v11 = content_src_pos_abs() + reg_ext,
+			.stroke = {2},
+			.vert_color = {graphic::colors::aqua}
+		});
 }
 
 

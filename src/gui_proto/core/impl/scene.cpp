@@ -41,23 +41,23 @@ void scene::draw(rect clip){
 			if(elem.belowScene){
 				elem.element->try_draw(region_);
 				const auto bound = elem.element->bound_abs().round<int>().intersection_with(root_bound).as<unsigned>();
-				renderer().push(blit_config{
+				renderer().update_state(blit_config{
 					.blit_region = {bound.src, bound.extent()}
-				});
+				}, {0});
 			}
 		}
 
 		root_->draw(clip);
-		renderer().push(blit_config{
+		renderer().update_state(blit_config{
 			.blit_region = {root_bound.src.as<unsigned>(), root_bound.extent().as<unsigned>()}
-		});
+		}, {0});
 
 		for (const auto & draw_sequence : overlay_manager_.get_draw_sequence()){
 			draw_sequence->draw(clip);
 			const auto bound = draw_sequence->bound_abs().round<int>().intersection_with(root_bound).as<unsigned>();
-			renderer().push(blit_config{
+			renderer().update_state(blit_config{
 				.blit_region = {bound.src, bound.extent()}
-			});
+			}, {0});
 		}
 
 		/*if(dialog_manager.empty())*/{
@@ -78,9 +78,9 @@ void scene::draw(rect clip){
 			if(!elem.belowScene){
 				elem.element->try_draw(clip);
 				const auto bound = elem.element->bound_abs().round<int>().intersection_with(root_bound).as<unsigned>();
-				renderer().push(blit_config{
+				renderer().update_state(blit_config{
 					.blit_region = {bound.src, bound.extent()}
-				});
+				}, {0});
 
 			}
 		}

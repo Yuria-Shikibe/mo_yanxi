@@ -162,10 +162,7 @@ struct alignas(16) draw_mode_param{
 
 
 export
-using gui_reserved_user_data_tuple = std::tuple<ubo_screen_info, ubo_layer_info, blit_config, draw_mode_param>;
-
-export
-using gui_reserved_user_data_tuple_uniform_buffer_used = std::tuple<ubo_screen_info, ubo_layer_info>;
+using gui_reserved_user_data_tuple = std::tuple<ubo_screen_info, ubo_layer_info>;
 
 export
 template <typename T>
@@ -221,6 +218,14 @@ public:
 				instruction::place_ubo_update_at(next, instr, reserved_data_index_of<Instr>);
 			}
 		}
+	}
+	template <typename Instr>
+	void update_state(const Instr& instr, graphic::draw::instruction::state_change_config config) const {
+		using namespace graphic::draw;
+		static_assert(!instruction::known_instruction<Instr>);
+
+		auto* next = batch_backend_interface_.acquire(instruction::get_instr_size<Instr>());
+		instruction::place_state_update_at(next, instr, config);
 	}
 
 	[[nodiscard]] bool push(const std::byte* instr, const std::size_t instr_size) const {
@@ -421,13 +426,13 @@ private:
 	friend guard_base;
 
 	void pop() const{
-		renderer_->push(draw_mode_param{draw_mode::COUNT_or_fallback});
+		renderer_->update_state(draw_mode_param{draw_mode::COUNT_or_fallback}, {1});
 	}
 
 public:
 	[[nodiscard]] mode_guard(renderer_frontend& renderer, const draw_mode_param& param) :
 	guard_base(renderer){
-		renderer.push(param);
+		renderer.update_state(param, {1});
 	}
 
 };

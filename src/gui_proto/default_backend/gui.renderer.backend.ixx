@@ -26,6 +26,7 @@ import std;
 
 namespace mo_yanxi::gui{
 
+
 #pragma region BlitUtil
 
 struct indirect_dispatcher{
@@ -267,11 +268,106 @@ private:
 };
 #pragma endregion
 
+
+#pragma region PipelineCustomize
+
+using user_data_table = graphic::draw::instruction::user_data_index_table;
+
+export
+template <typename Cell>
+struct pipeline_create_handle{
+	struct promise_type;
+	using handle = std::coroutine_handle<promise_type>;
+
+	[[nodiscard]] pipeline_create_handle() = default;
+
+private:
+	[[nodiscard]] explicit pipeline_create_handle(handle&& hdl)
+	: hdl{std::move(hdl)}{
+	}
+
+public:
+
+	struct awaiter{
+		const user_data_table** returned_{};
+
+		[[nodiscard]] constexpr bool await_ready() const noexcept {
+			return false;
+		}
+
+		constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
+		constexpr const user_data_table& await_resume() const noexcept{
+			return **returned_;
+		}
+	};
+
+	struct promise_type{
+		[[nodiscard]] promise_type() = default;
+
+		pipeline_create_handle get_return_object(){
+			return pipeline_create_handle{handle::from_promise(*this)};
+		}
+
+		[[nodiscard]] static auto initial_suspend() noexcept{ return std::suspend_never{}; }
+
+		[[nodiscard]] static auto final_suspend() noexcept{ return std::suspend_always{}; }
+
+		static void return_void(){
+		}
+
+		awaiter await_transform(const user_data_table& val){
+			user_data_table = &val;
+			return awaiter{user_data_table};
+		}
+
+		[[noreturn]] static void unhandled_exception() noexcept{
+			std::terminate();
+		}
+
+		const user_data_table* user_data_table{};
+	};
+
+	const user_data_table* get() noexcept{
+		return hdl.handle.promise().user_data_table;
+	}
+
+	void set_and_resume(const user_data_table& updated) noexcept{
+		hdl.handle.promise().user_data_table = &updated;
+		hdl->resume();
+	}
+	
+	explicit operator bool() const noexcept{
+		return static_cast<bool>(hdl.handle);
+	}
+
+	[[nodiscard]] bool done() const noexcept{
+		return hdl->done();
+	}
+
+	~pipeline_create_handle(){
+		if(hdl){
+			hdl->destroy();
+		}
+	}
+
+	pipeline_create_handle(const pipeline_create_handle& other) = delete;
+	pipeline_create_handle(pipeline_create_handle&& other) noexcept = default;
+	pipeline_create_handle& operator=(const pipeline_create_handle& other) = delete;
+	pipeline_create_handle& operator=(pipeline_create_handle&& other) noexcept = default;
+
+protected:
+	exclusive_handle_member<handle> hdl{};
+};
+
 export
 struct draw_mode_pipeline_data{
 	vk::pipeline_layout pipeline_layout{};
 	vk::pipeline pipeline{};
+
+	vk::descriptor_buffer descriptor_buffer{};
 	graphic::draw::instruction::batch_command_slots command_slots{};
+
+	user_data_table ubo_data_index_table{};
 
 	[[nodiscard]] draw_mode_pipeline_data() = default;
 
@@ -283,24 +379,25 @@ struct draw_mode_pipeline_data{
 export
 struct pipeline_creator{
 	vk::shader_module* shader_module;
-	void(* creator)(vk::pipeline&, const vk::shader_module&, const vk::pipeline_layout&);
+	void(* creator)(draw_mode_pipeline_data&, const vk::shader_module&);
 
 	[[nodiscard]] pipeline_creator() = default;
 
 	[[nodiscard]] pipeline_creator(vk::shader_module& shader_module,
-		void(* creator)(vk::pipeline&, const vk::shader_module&, const vk::pipeline_layout&))
+		void(* creator)(draw_mode_pipeline_data&, const vk::shader_module&))
 	: shader_module(std::addressof(shader_module)),
 	creator(creator){
 	}
 };
 
+#pragma endregion
 //TODO adopt heap allocator from scene?
 
 export
 struct renderer{
 private:
-	graphic::draw::instruction::user_data_index_table ubo_table_{
-		graphic::draw::instruction::make_user_data_index_table<gui_reserved_user_data_tuple_uniform_buffer_used>()
+	user_data_table ubo_table_{
+		graphic::draw::instruction::make_user_data_index_table<gui_reserved_user_data_tuple>()
 	};
 
 public:
@@ -342,11 +439,7 @@ public:
 		const std::array<pipeline_creator, std::to_underlying(draw_mode::COUNT_or_fallback)>& pipe_creator,
 		const vk::shader_module& ui_main_blit_shader
 	)
-	: batch(ctx, spr,
-		graphic::draw::instruction::make_user_data_index_table<gui_reserved_user_data_tuple>({
-				{}, {}, graphic::draw::instruction::user_data_flag::fence_like,
-				graphic::draw::instruction::user_data_flag::fence_like
-			}))
+	: batch(ctx, spr, ubo_table_)
 	, general_descriptors_(ctx, [](vk::descriptor_layout_builder& b){
 		b.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
 		b.push_seq(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
@@ -356,7 +449,7 @@ public:
 
 	, blitter_{ctx, 1, ui_main_blit_shader.get_create_info(VK_SHADER_STAGE_COMPUTE_BIT)}{
 		general_descriptors_.bind([&](const std::uint32_t idx, const vk::descriptor_mapper& mapper){
-			using T = graphic::draw::instruction::user_data_index_table;
+			using T = user_data_table;
 
 			for(auto&& [binding, ientry] : ubo_table_.get_entries()
 			    | std::views::take_while([](const T::identity_entry& l){
@@ -375,43 +468,22 @@ public:
 		batch.set_submit_callback([this](const graphic::draw::instruction::batch::command_acquire_config& config){
 			VkSemaphoreSubmitInfo blit_semaphore_submit_info{};
 			using namespace graphic::draw::instruction;
-
 			if(config.data_entries){
 				vk::buffer_mapper mapper{uniform_buffer_};
-				for (const auto & entry : config.data_entries.entries){
+				for(const auto& entry : config.data_entries.entries){
 					const auto data_span = entry.to_range(config.data_entries.base_address);
 
-					switch(entry.global_offset){
-					case gui::data_offset_of<gui::blit_config> :{
-						process_blit_(config, blit_semaphore_submit_info,
-							data_span);
-						break;
-					}
-					case gui::data_offset_of<gui::draw_mode_param> :{
-						draw_mode_param param;
-						std::memcpy(&param, data_span.data(), data_span.size_bytes());
-						if(param.mode_ == draw_mode::COUNT_or_fallback){
-							draw_mode_history_.pop_back();
-							current_draw_mode_ = draw_mode_history_.back();
-						}else{
-							draw_mode_history_.push_back(current_draw_mode_);
-							current_draw_mode_ = param;
-						}
-						break;
-					}
-					default :{
-						for(const unsigned idx : config.group_indices){
-							(void)mapper.load_range(data_span,
-								entry.local_offset + idx * ubo_table_.required_capacity());
-						}
-					}
+					for(const unsigned idx : config.group_indices){
+						(void)mapper.load_range(data_span,
+							entry.local_offset + idx * ubo_table_.required_capacity());
 					}
 				}
 			}
-
 			// VkSemaphoreSubmitInfo blit_semaphore_submit_info_wait{blit_semaphore_submit_info};
 			// blit_semaphore_submit_info_wait.stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-			cache_command_buffer_submit_info_.reserve(config.group_indices.size());
+
+			const auto lastCap = cache_command_buffer_submit_info_.capacity();
+
 			for(const auto [i, group_idx] : config.group_indices | std::views::enumerate){
 				auto& cmd_ref = cache_command_buffer_submit_info_.emplace_back(VkCommandBufferSubmitInfo{
 					.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -430,11 +502,43 @@ public:
 				});
 			}
 
-			if(cache_submit_info_.empty())return;
-			vkQueueSubmit2(context().graphic_queue(), cache_submit_info_.size(), cache_submit_info_.data(), nullptr);
 
-			cache_command_buffer_submit_info_.clear();
-			cache_submit_info_.clear();
+			if(config.state_config){
+				switch(config.state_config.config.index){
+				case 0:{
+					process_blit_(config, blit_semaphore_submit_info, config.state_config.data);
+					break;
+				}
+				case 1:{
+					draw_mode_param param;
+						std::memcpy(&param, config.state_config.data.data(), config.state_config.data.size_bytes());
+						if(param.mode_ == draw_mode::COUNT_or_fallback){
+							draw_mode_history_.pop_back();
+							current_draw_mode_ = draw_mode_history_.back();
+						}else{
+							draw_mode_history_.push_back(current_draw_mode_);
+							current_draw_mode_ = param;
+						}
+						break;
+				}
+				default: break;
+				}
+			}
+
+			if(!cache_submit_info_.empty()){
+				if(lastCap != cache_command_buffer_submit_info_.capacity()){
+					//Check Reallocation
+					for(std::size_t i = 0; i < cache_submit_info_.size(); ++i){
+						cache_submit_info_[i].pCommandBufferInfos = cache_command_buffer_submit_info_.data() + i;
+					}
+				}
+
+				vkQueueSubmit2(context().graphic_queue(), cache_submit_info_.size(), cache_submit_info_.data(), nullptr);
+
+				cache_command_buffer_submit_info_.clear();
+				cache_submit_info_.clear();
+			}
+
 		});
 
 		for (auto && vkCommandBuffers : pipeline_slots){
@@ -544,7 +648,13 @@ private:
 				context().get_device(), 0,
 			{batch.get_batch_descriptor_layout(), general_descriptors_.descriptor_set_layout()});
 
-			creator.creator(pipe.pipeline, *creator.shader_module, pipe.pipeline_layout);
+			creator.creator(pipe, *creator.shader_module);
+
+			if(pipe.ubo_data_index_table.count()){
+				ubo_table_.append(pipe.ubo_data_index_table);
+				batch.append_ubo_table(pipe.ubo_data_index_table);
+			}
+
 		}
 	}
 
@@ -596,13 +706,13 @@ private:
 
 		auto& cmd_unit = blitter_.blit(rect);
 		blit_semaphore_submit_info = cmd_unit.get_next_semaphore_submit_info(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-		cache_command_buffer_submit_info_.reserve(1 + config.group_indices.size());
-		cache_command_buffer_submit_info_.push_back(cmd_unit.get_command_submit_info());
+		auto& pdata = cache_command_buffer_submit_info_.emplace_back(cmd_unit.get_command_submit_info());
+
 
 		cache_submit_info_.push_back(VkSubmitInfo2{
 			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
 			.commandBufferInfoCount = 1,
-			.pCommandBufferInfos = cache_command_buffer_submit_info_.data(),
+			.pCommandBufferInfos = &pdata,
 			.signalSemaphoreInfoCount = 1,
 			.pSignalSemaphoreInfos = &blit_semaphore_submit_info
 		});

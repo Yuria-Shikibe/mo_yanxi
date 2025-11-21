@@ -142,6 +142,12 @@ struct user_data_indices{
 	std::uint32_t group_index;
 };
 
+export
+struct state_change_config{
+	std::uint32_t index;
+	std::uint32_t _reserved;
+};
+
 static_assert(sizeof(user_data_indices) == 8);
 
 export
@@ -151,6 +157,7 @@ union dispatch_info_payload{
 	T draw;
 
 	user_data_indices ubo;
+	state_change_config state;
 };
 
 export
@@ -370,6 +377,7 @@ export struct alignas(instr_required_align) primitive_generic{
 export enum struct instr_type : std::uint32_t{
 	noop,
 	uniform_update,
+	state_update,
 
 	triangle,
 	quad,
@@ -417,11 +425,11 @@ concept valid_consequent_argument = (is_valid_consequent_argument_v<Instr, Args>
 
 export
 template <typename T>
-constexpr inline instr_type instruction_type_of = instr_type::uniform_update;
+constexpr inline instr_type instruction_type_of = instr_type::SIZE;
 
 export
 template <typename T>
-concept known_instruction = instruction_type_of<T> != instr_type::uniform_update;
+concept known_instruction = instruction_type_of<T> != instr_type::SIZE;
 
 export
 template <typename T, typename... Args>
@@ -539,7 +547,23 @@ FORCE_INLINE void place_ubo_update_at(
 }
 
 export
-[[nodiscard]] FORCE_INLINE inline std::span<const std::byte> get_ubo_data_span(const std::byte* ptr_to_instr) noexcept{
+template <typename T>
+	requires (std::is_trivially_copyable_v<T>)
+FORCE_INLINE void place_state_update_at(
+	std::byte* const where,
+	const T& payload,
+	const state_change_config info
+) noexcept{
+	instruction::place_instr_at_impl(
+		where, instruction_head{
+			.type = instr_type::state_update,
+			.size = get_instr_size<T>(),
+			.payload = {.state = info}
+		}, payload);
+}
+
+export
+[[nodiscard]] FORCE_INLINE inline std::span<const std::byte> get_payload_data_span(const std::byte* ptr_to_instr) noexcept{
 	const auto head = get_instr_head(ptr_to_instr);
 	const std::size_t ubo_size = head.get_payload_byte_size();
 	return std::span{ptr_to_instr + sizeof(instruction_head), ubo_size};

@@ -4,7 +4,6 @@ module;
 
 module mo_yanxi.gui.elem.scroll_pane;
 
-import prototype.renderer.ui;
 import mo_yanxi.graphic.draw.instruction;
 
 namespace mo_yanxi::gui{

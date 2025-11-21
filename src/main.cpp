@@ -952,9 +952,8 @@ int main(){
 #pragma endregion
 
 		static constexpr auto default_creator = +[](
-						vk::pipeline& pipeline,
-						const vk::shader_module& shader_module,
-						const vk::pipeline_layout& layout){
+						gui::draw_mode_pipeline_data& data,
+						const vk::shader_module& shader_module){
 			vk::graphic_pipeline_template gtp{};
 			gtp.set_shaders({
 					shader_module.get_create_info(VK_SHADER_STAGE_MESH_BIT_EXT, nullptr, "main_mesh"),
@@ -963,7 +962,7 @@ int main(){
 			gtp.push_color_attachment_format(VK_FORMAT_R16G16B16A16_SFLOAT, vk::blending::alpha_blend);
 			gtp.push_color_attachment_format(VK_FORMAT_R8G8B8A8_UNORM, vk::blending::alpha_blend);
 
-			pipeline = vk::pipeline{layout.get_device(), layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, gtp};
+			data.pipeline = vk::pipeline{data.pipeline_layout.get_device(), data.pipeline_layout, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT, gtp};
 		};
 
 		mo_yanxi::gui::renderer renderer{
@@ -1138,7 +1137,7 @@ int main(){
 		auto thd = std::jthread([&cnode = console_input_node](std::stop_token t){
 			while(!t.stop_requested()){
 				std::string str;
-				std::cin >> str;
+				std::getline(std::cin, str);
 
 				if(t.stop_requested()){
 					break;

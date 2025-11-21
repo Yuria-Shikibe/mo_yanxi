@@ -24,7 +24,7 @@ struct dispatch_result{
 	std::uint32_t count;
 	std::uint32_t next_primit_offset;
 	std::uint32_t next_vertex_offset;
-	bool ubo_requires_update;
+	instr_type next_type;
 	bool img_requires_update;
 
 	VkImageView current_img{};
@@ -33,12 +33,8 @@ struct dispatch_result{
 		return next_vertex_offset != 0;
 	}
 
-	bool host_process_required() const noexcept{
-		return next == nullptr || ubo_requires_update || img_requires_update;
-	}
-
 	[[nodiscard]] bool no_next(std::byte* original) const noexcept{
-		return next == original && count == 0 && !ubo_requires_update && !img_requires_update;
+		return next == original && count == 0 && next_type == instr_type::noop && !img_requires_update;
 	}
 };
 
@@ -108,16 +104,17 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 			if(ptr_to_head + head.get_instr_byte_size() > instr_sentinel){
 				save_chunk_head_and_incr();
 				return {
-						ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, false,
+						ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, head.type, false,
 						current_img
 					};
 			}
 
 			switch(head.type){
-			case instr_type::noop : save_chunk_head_and_incr();
-				return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, false};
-			case instr_type::uniform_update : save_chunk_head_and_incr();
-				return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, true, false};
+			case instr_type::noop :
+			case instr_type::uniform_update :
+			case instr_type::state_update :
+				save_chunk_head_and_incr();
+				return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, head.type, false};
 			default : break;
 			}
 
@@ -126,7 +123,7 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 				if(auto rst = set_image_index(ptr_to_head + sizeof(instruction_head), image_cache); !rst){
 					save_chunk_head_and_incr();
 					return {
-							ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, true,
+							ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, head.type, true,
 							rst.image
 						};
 				} else{
@@ -170,22 +167,13 @@ FORCE_INLINE inline dispatch_result get_dispatch_info(
 		save_chunk_head_and_incr();
 	}
 
-	return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, false, false, current_img};
+	return {ptr_to_head, currentMeshCount, nextPrimitiveOffset, verticesBreakpoint, instr_type::noop, false, current_img};
 }
 #pragma endregion
 
 constexpr inline std::size_t maximum_images = 4;
 constexpr inline std::size_t max_dispatch_per_workgroup = 32;
 constexpr inline std::size_t working_group_count = 4;
-
-
-export
-enum struct user_data_flag : std::uint32_t{
-	none,
-	fence_like = 1 << 0
-};
-
-BITMASK_OPS(export, user_data_flag);
 
 export
 struct user_data_index_table{
@@ -207,9 +195,6 @@ struct user_data_index_table{
 	struct identity_entry{
 		type_identity_index id;
 		entry entry;
-
-		//TODO make it more compact?
-		user_data_flag flag;
 	};
 
 private:
@@ -218,7 +203,7 @@ private:
 
 public:
 	template <typename ...Ts>
-	friend user_data_index_table make_user_data_index_table(std::initializer_list<user_data_flag> flags);
+	friend user_data_index_table make_user_data_index_table();
 
 	[[nodiscard]] user_data_index_table() = default;
 
@@ -238,11 +223,6 @@ public:
 		}
 
 		return required_capacity_ - base_offset;
-	}
-
-	[[nodiscard]] user_data_flag flag_at(const unsigned index) const noexcept{
-		assert(index < count());
-		return entries[index].flag;
 	}
 
 	[[nodiscard]] std::size_t count() const noexcept{
@@ -307,7 +287,7 @@ public:
 
 export
 template <typename ...Ts>
-[[nodiscard]] user_data_index_table make_user_data_index_table(std::initializer_list<user_data_flag> flags = {}){
+[[nodiscard]] user_data_index_table make_user_data_index_table(){
 	user_data_index_table table{};
 
 	auto push = [&]<typename T, std::size_t I>(std::size_t current_base_size){
@@ -333,11 +313,6 @@ template <typename ...Ts>
 			}(std::make_index_sequence<std::tuple_size_v<T>>{});
 		}.template operator()<Ts, Idx>(), ...);
 	}(std::index_sequence_for<Ts...>());
-
-	for (auto [idx, flag] : flags | std::views::enumerate){
-		if(idx >= table.count())break;
-		table.entries[idx].flag = flag;
-	}
 
 	return table;
 }
@@ -425,6 +400,11 @@ export
 struct batch;
 
 struct working_group{
+	constexpr static std::array semaphore_stages{
+		VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT,
+		VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+		// VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+	};
 	friend batch;
 private:
 	image_view_history image_view_history{};
@@ -432,9 +412,9 @@ private:
 	std::byte* span_end{};
 
 	std::uint64_t current_signal_index{};
-	vk::semaphore mesh_semaphore{};
-	vk::semaphore frag_semaphore{};
-	// vk::semaphore attc_semaphore{};
+
+
+	std::array<vk::semaphore, semaphore_stages.size()> semaphores{};
 
 	void set_sentinel(std::byte* instr_span_end) noexcept{
 		span_end = instr_span_end;
@@ -504,10 +484,20 @@ public:
 		}
 	};
 
+	struct state_config{
+		state_change_config config;
+		std::span<const std::byte> data;
+
+		explicit operator bool() const noexcept{
+			return !data.empty();
+		}
+	};
+
 	struct command_acquire_config{
 		user_data_entries data_entries;
 		std::span<const unsigned> group_indices;
 		std::span<const VkSemaphoreSubmitInfo> group_semaphores;
+		state_config state_config{};
 	};
 
 
@@ -574,9 +564,9 @@ public:
 		}
 
 		for(auto&& group : groups_){
-			group.mesh_semaphore = vk::semaphore{context_->get_device(), 0};
-			group.frag_semaphore = vk::semaphore{context_->get_device(), 0};
-			// group.attc_semaphore = vk::semaphore{context_->get_device(), 0};
+			for (auto & vkSemaphore : group.semaphores){
+				vkSemaphore = vk::semaphore{context_->get_device(), 0};
+			}
 		}
 	}
 
@@ -668,23 +658,24 @@ public:
 			auto& group = groups_[current_idle_group_index_];
 			const auto begin = instruction_pend_ptr_;
 
-			const auto sentinel = instruction_idle_ptr_ >= instruction_pend_ptr_
-				                      ? instruction_idle_ptr_
-				                      : instruction_buffer_.end();
 			const auto dspcinfo = get_dispatch_info(
-				instruction_pend_ptr_, sentinel,
+				instruction_pend_ptr_,
+				instruction_idle_ptr_ >= instruction_pend_ptr_
+					? instruction_idle_ptr_
+					: instruction_buffer_.end(),
+
 				temp_dispatch_info_.group_info,
 				group.image_view_history, last_primit_offset_,
 				last_vertex_offset_);
-
 			instruction_pend_ptr_ = dspcinfo.next;
+			last_primit_offset_ = dspcinfo.next_primit_offset;
+			last_vertex_offset_ = dspcinfo.next_vertex_offset;
 
-
+			const auto next_payload = get_payload_data_span(dspcinfo.next);
 			const auto& next_head = get_instr_head(dspcinfo.next);
 			const auto next_instr_type = next_head.type;
 
-			last_primit_offset_ = dspcinfo.next_primit_offset;
-			last_vertex_offset_ = dspcinfo.next_vertex_offset;
+
 			if(dspcinfo.img_requires_update){
 				//TODO better image update strategy ?
 				if(!dspcinfo.count){
@@ -693,25 +684,38 @@ public:
 				}
 			}
 
-			auto update_ubo = [&](std::span<const std::byte> data){
+			auto submit_cached = [&](const state_config& state_config){
 				if(submitted_current){
-					submit_current(submitted_current, initial_idle_group_index);
-					initial_idle_group_index = current_idle_group_index_;
-					initial_idle = groups_.size() - get_pushed_group_count();
+					submit_current(submitted_current, initial_idle_group_index, state_config);
 					submitted_total += submitted_current;
 					submitted_current = 0;
+					initial_idle_group_index = current_idle_group_index_;
+					initial_idle = groups_.size() - get_pushed_group_count();
+
+					return true;
 				}
+				return false;
+			};
+
+			auto update_state = [&](std::span<const std::byte> data){
+				state_config cfg{next_head.payload.state, data};
+				if(submit_cached(cfg))return;
+
+				submit_current(0, initial_idle_group_index, cfg, std::numeric_limits<unsigned>::max());
+			};
+
+			auto update_ubo = [&](std::span<const std::byte> data){
+				bool submitted = submit_cached({});
 
 				const auto idx = next_head.payload.ubo.local_index;
 
 				const auto& entry = ubo_table_[idx];
 				assert(entry.size == data.size_bytes());
 				std::memcpy(ubo_cache_.data() + entry.global_offset, data.data(), data.size_bytes());
-				// if(idx == 2)return;
 				++ubo_timeline_mark_[idx];
 
-				if(!submitted_current){
-					submit_current(0, initial_idle_group_index, idx);
+				if(!submitted){
+					submit_current(0, initial_idle_group_index, {}, idx);
 				}
 			};
 
@@ -778,54 +782,69 @@ public:
 				++group.current_signal_index;
 				push_current_group();
 
-				if(dspcinfo.ubo_requires_update){
-					const auto data = get_ubo_data_span(dspcinfo.next);
-					update_ubo(data);
-					instruction_pend_ptr_ += data.size_bytes() + sizeof(instruction_head);
+				switch(dspcinfo.next_type){
+				case instr_type::uniform_update :{
+					update_ubo(next_payload);
+					instruction_pend_ptr_ += next_head.get_instr_byte_size();
+					break;
 				}
+				case instr_type::state_update :{
+					update_state(next_payload);
+					instruction_pend_ptr_ += next_head.get_instr_byte_size();
+					break;
+				}
+				default : break;
+				}
+
 				group.set_sentinel(instruction_pend_ptr_);
-
-
 			}else{
-				if(dspcinfo.ubo_requires_update){
-					const auto data = get_ubo_data_span(dspcinfo.next);
-					update_ubo(data);
-					instruction_pend_ptr_ += data.size_bytes() + sizeof(instruction_head);
+				auto patch_dspt_ptr = [&]{
 					if(is_all_idle()){
 						instruction_dspt_ptr_ = instruction_pend_ptr_;
 					}else{
 						get_back_group()->span_end = instruction_pend_ptr_;
 					}
+				};
+
+				switch(dspcinfo.next_type){
+				case instr_type::uniform_update :{
+					update_ubo(next_payload);
+					instruction_pend_ptr_ += next_head.get_instr_byte_size();
+					patch_dspt_ptr();
+					break;
+				}
+				case instr_type::state_update :{
+					update_state(next_payload);
+					instruction_pend_ptr_ += next_head.get_instr_byte_size();
+					patch_dspt_ptr();
+					break;
+				}
+				default : break;
 				}
 			}
-
-			bool hasNext = !dspcinfo.no_next(begin);
 
 			if(next_instr_type == instr_type::noop && instruction_pend_ptr_ > instruction_idle_ptr_){
 				assert(last_shared_instr_size_ == 0);
 				instruction_pend_ptr_ = instruction_buffer_.begin();
-				hasNext = true;
+				continue;
 			}
 
-			if(!hasNext && (submitted_total >= count || !dspcinfo.count)){
+			bool hasNext = !dspcinfo.no_next(begin);
+
+
+			if(!hasNext || (submitted_total >= count)){
 				break;
 			}
 		}
 
-		if(submitted_current){
-			submit_current(submitted_current, initial_idle_group_index);
-		}
+		assert(!submitted_current);
 
 		return submitted_total < count;
 	}
 
 	void wait_one(bool wait_on_frag = true){
 		if(const auto group = get_front_group()){
-			if(wait_on_frag){
-				group->frag_semaphore.wait(group->current_signal_index);
-			} else{
-				group->mesh_semaphore.wait(group->current_signal_index);
-			}
+			group->semaphores[wait_on_frag].wait(group->current_signal_index);
 
 			instruction_dspt_ptr_ = group->span_end;
 			pop_front_group();
@@ -858,7 +877,7 @@ public:
 		std::uint32_t pushed{};
 		for_each_submit([&](unsigned, const working_group& group){
 			if(pushed >= count) return;
-			semaphores[pushed] = wait_on_frag ? group.frag_semaphore : group.mesh_semaphore;
+			semaphores[pushed] = group.semaphores[wait_on_frag];
 			values[pushed] = group.current_signal_index;
 			++pushed;
 			instruction_dspt_ptr_ = group.span_end;
@@ -929,7 +948,12 @@ public:
 	}
 
 private:
-	void submit_current(unsigned submit_count, unsigned initial_group, unsigned ubo_force_update = std::numeric_limits<unsigned>::max()){
+	void submit_current(
+		unsigned submit_count,
+		unsigned initial_group,
+		const state_config& state_config = {},
+		unsigned ubo_force_update = std::numeric_limits<unsigned>::max()
+		){
 		std::array<unsigned, working_group_count> group_indices;
 		for(unsigned i = 0; i < submit_count; i++){
 			group_indices[i] = (initial_group + i) % groups_.size();
@@ -947,67 +971,39 @@ private:
 			//TODO switch layout policy to make cache friendly?
 			for(unsigned i = 0; i < ubo_total_count; ++i){
 				if(ubo_timeline_mark_[i + (latest_group + 1) * ubo_total_count] < ubo_timeline_mark_[i]){
-					if((ubo_table_.flag_at(i) & user_data_flag::fence_like) != user_data_flag{}){
-						for(unsigned idx = 0; idx < groups_.size(); ++idx){
-							ubo_timeline_mark_[i + (idx + 1) * ubo_total_count] = ubo_timeline_mark_[i];
-						}
-					}else{
-						for(const auto idx : indices_span){
-							ubo_timeline_mark_[i + (idx + 1) * ubo_total_count] = ubo_timeline_mark_[i];
-						}
+					for(const auto idx : indices_span){
+						ubo_timeline_mark_[i + (idx + 1) * ubo_total_count] = ubo_timeline_mark_[i];
 					}
-
-
 					ubo_update_data_cache_.push_back(ubo_table_[i]);
 				}
 			}
-		}else{
-			assert(ubo_force_update != std::numeric_limits<unsigned>::max());
-
+		}else if(ubo_force_update != std::numeric_limits<unsigned>::max()){
 			ubo_update_data_cache_.push_back(ubo_table_[ubo_force_update]);
-			if((ubo_table_.flag_at(ubo_force_update) & user_data_flag::fence_like) != user_data_flag{}){
-				for(unsigned i = 0; i < groups_.size(); ++i){
-					ubo_timeline_mark_[ubo_force_update + (i + 1) * ubo_total_count] = ubo_timeline_mark_[ubo_force_update];
-				}
-			}else{
-				for(const auto i : indices_span){
-					ubo_timeline_mark_[ubo_force_update + (i + 1) * ubo_total_count] = ubo_timeline_mark_[ubo_force_update];
-				}
+			for(const auto i : indices_span){
+				ubo_timeline_mark_[ubo_force_update + (i + 1) * ubo_total_count] = ubo_timeline_mark_[ubo_force_update];
 			}
-
 		}
 		//usr update
-		assert(on_submit);
-		std::array<VkSemaphoreSubmitInfo, working_group_count * 3> semaphores{};
+		std::array<VkSemaphoreSubmitInfo, working_group_count * work_group::semaphore_stages.size()> semaphores{};
 		for(unsigned i = 0; i < submit_count; ++i){
 			const auto& group = groups_[group_indices[i]];
 
-			semaphores[i * 2] = VkSemaphoreSubmitInfo{
-				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-				.semaphore = group.mesh_semaphore,
-				.value = group.current_signal_index,
-				.stageMask = VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT,
-			};
-
-			semaphores[i * 2 + 1] = VkSemaphoreSubmitInfo{
-				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-				.semaphore = group.frag_semaphore,
-				.value = group.current_signal_index,
-				.stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-			};
-
-			// semaphores[i * 3 + 2] = VkSemaphoreSubmitInfo{
-			// 	.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-			// 	.semaphore = group.attc_semaphore,
-			// 	.value = group.current_signal_index,
-			// 	.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			// };
+			for(std::size_t j = 0; j < work_group::semaphore_stages.size(); ++j){
+				semaphores[i * work_group::semaphore_stages.size() + j] = VkSemaphoreSubmitInfo{
+					.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+					.semaphore = group.semaphores[j],
+					.value = group.current_signal_index,
+					.stageMask = work_group::semaphore_stages[j],
+				};
+			}
 		}
 
+		assert(on_submit);
 		on_submit({
 			.data_entries = user_data_entries{ubo_cache_.data(), std::span{ubo_update_data_cache_.data(), ubo_update_data_cache_.size()}},
 			.group_indices = indices_span,
-			.group_semaphores = std::span{semaphores.data(), submit_count * 2}
+			.group_semaphores = std::span{semaphores.data(), submit_count * 2},
+			.state_config = state_config
 		});
 	}
 
